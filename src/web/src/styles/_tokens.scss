@@ -1,0 +1,10 @@
+$ink: #1d2926;
+$paper: #f6f5f0;
+$petrol: #2c746b;
+
+:root {
+  --color-ink: #{$ink};
+  --color-paper: #{$paper};
+  --color-petrol: #{$petrol};
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

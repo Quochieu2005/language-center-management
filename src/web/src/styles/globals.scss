@@ -1,0 +1,61 @@
+@use "tokens" as tokens;
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: tokens.$paper;
+  color: tokens.$ink;
+  font-family: var(--font-sans);
+  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: tokens.$paper;
+  color: tokens.$ink;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(tokens.$petrol, 0.55);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: rgba(tokens.$petrol, 0.2);
+  color: tokens.$ink;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
