@@ -209,38 +209,39 @@ executeApprovedTransfer(requestId, source, destination):
 ## 5. Cấu trúc source gợi ý
 
 ```text
-frontend/                         Next.js
-  app/                             Màn hình/routes frontend
-  components/                      Thành phần giao diện
-  lib/api/                         Client gọi Django API; không có credential SQL Server
+src/
+├── web/                           Next.js project root
+│   └── src/
+│       ├── app/                   Màn hình/routes frontend
+│       ├── components/            Thành phần giao diện
+│       └── lib/api/               Client gọi Django API; không có credential SQL Server
+└── api/                           Django API và Coordinator
+    ├── config/                    Cấu hình Django và biến môi trường
+    ├── api/                       Endpoint, xác thực request và định dạng response
+    ├── core/
+    │   ├── permissions/           Vai trò, phạm vi cơ sở/lớp
+    │   ├── sites/                 Site Router và cấu hình kết nối SQL Server
+    │   ├── global_queries/        Đọc từng site và gộp kết quả
+    │   ├── replication/           Điểm vào ghi dữ liệu dùng chung
+    │   ├── distributed_tx/        Chuyển cơ sở, trạng thái và phục hồi
+    │   └── audit/                 Nhật ký và đối soát
+    └── modules/
+        ├── accounts/              Tài khoản
+        ├── catalogs/              Cơ sở, môn học, khóa học
+        ├── students/              Học viên
+        ├── classes/               Lớp, phòng, buổi học
+        ├── enrollments/           Đăng ký, đổi lớp
+        ├── tuition/                Học phí, phiếu thu
+        ├── grades/                 Điểm
+        ├── attendance/            Điểm danh
+        └── reports/               Thống kê
 
-backend/                          Django API và Coordinator
-  config/                          Cấu hình Django và biến môi trường
-  api/                             Endpoint, xác thực request và định dạng response
-  core/
-    permissions/                   Vai trò, phạm vi cơ sở/lớp
-    sites/                          Site Router và cấu hình kết nối SQL Server
-    global_queries/                 Đọc từng site và gộp kết quả
-    replication/                    Điểm vào ghi dữ liệu dùng chung
-    distributed_tx/                 Chuyển cơ sở, trạng thái và phục hồi
-    audit/                           Nhật ký và đối soát
-  modules/
-    accounts/                       Tài khoản
-    catalogs/                       Cơ sở, môn học, khóa học
-    students/                       Học viên
-    classes/                        Lớp, phòng, buổi học
-    enrollments/                    Đăng ký, đổi lớp
-    tuition/                        Học phí, phiếu thu
-    grades/                         Điểm
-    attendance/                     Điểm danh
-    reports/                        Thống kê
-
-database/
+db/
   sqlserver/                        Script tạo cùng schema trên từng CSDL site
   seed/                             Bộ dữ liệu demo theo site
 ```
 
-Đây là cấu trúc gợi ý để tránh trộn trách nhiệm, chưa khẳng định các thư mục này đã có trong repo. Next.js chỉ gọi Django API; Django là nơi duy nhất đọc biến kết nối và truy cập SQL Server. Không tạo module chưa cần, nhưng Site Router, Global Query, replicated write và transfer transaction phải có người sở hữu rõ.
+Đây là cấu trúc định hướng để tránh trộn trách nhiệm. Trong repo hiện đã có dự án Next.js tại `src/web` và thư mục giữ chỗ `src/api`; các module Django trong sơ đồ chưa được khởi tạo. Next.js chỉ gọi Django API; Django là nơi duy nhất đọc biến kết nối và truy cập SQL Server. Không tạo module chưa cần, nhưng Site Router, Global Query, replicated write và transfer transaction phải có người sở hữu rõ.
 
 ## 6. Lỗi và kết quả trả về
 

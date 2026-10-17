@@ -291,7 +291,7 @@ Mỗi bước dưới đây cần ghi: ngày thực hiện, người làm, máy/
 
 ### 3.1. Cài VPN hoặc Remote Desktop
 
-- Chọn một phương án nhóm thực sự sử dụng: VPN (ví dụ Radmin VPN nếu được giảng viên chấp thuận) hoặc Remote Desktop.
+- Chọn một phương án nhóm thực sự sử dụng: VPN ZeroTier hoặc Remote Desktop; ghi rõ công cụ nhóm đã cài và kiểm thử.
 - Ghi tên máy, người dùng, IP ảo/địa chỉ kết nối, nhóm mạng, kiểm tra ping/port thành công.
 - Không chụp/lưu mật khẩu, private key, token hoặc thông tin đăng nhập trong báo cáo/repo.
 - Ảnh cần có: mỗi máy đã vào cùng mạng; trạng thái kết nối; kết quả kiểm tra máy A tới máy B.
