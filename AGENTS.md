@@ -99,6 +99,14 @@ Mỗi cơ sở giữ **một CSDL SQL Server riêng**, cùng cấu trúc logic n
 
 `specs/README.md` là mục lục và quy tắc đồng bộ đặc tả. Trước khi sửa API, đọc `specs/api.md`; trước khi sửa giao diện, đọc `specs/ui-ux.md`. Nếu thay đổi ảnh hưởng cả thao tác người dùng lẫn API, phải đối chiếu và cập nhật **cả hai**. Các file trong `specs/` là tài liệu thiết kế; endpoint hoặc màn hình được ghi là đề xuất/chưa bật không được mô tả như đã triển khai hay tự ý coi là hợp đồng đã chốt.
 
+### Quy tắc dùng Functional Specification
+
+- Trước khi triển khai hoặc sửa một chức năng nghiệp vụ, đọc `fs/README.md` và yêu cầu tương ứng trong `fs/Functional-Specification.md`, đồng thời đối chiếu `README.md`, `docs/DATABASE_SCHEMA.md` và `specs/api.md`/`specs/ui-ux.md` theo phần bị ảnh hưởng.
+- `fs/Functional-Specification.md` là nguồn mô tả mục tiêu chức năng, vai trò, điều kiện, luồng chính, trường hợp lỗi và tiêu chí nghiệm thu. Tài liệu này không thay thế schema hay hợp đồng API, và không chứng minh chức năng đã được code hoặc kiểm thử.
+- Khi thêm, đổi hoặc bỏ hành vi nghiệp vụ, cập nhật yêu cầu/tiêu chí nghiệm thu trong `fs/Functional-Specification.md` cùng PR. Nếu thay đổi ảnh hưởng API hoặc giao diện, cập nhật tương ứng `specs/api.md` và/hoặc `specs/ui-ux.md`; nếu ảnh hưởng bảng, cột, khóa, phân mảnh hoặc định vị, cập nhật `docs/DATABASE_SCHEMA.md` và script/migration liên quan. Cập nhật `README.md` khi kiến trúc hoặc luồng hướng dẫn thành viên thay đổi.
+- Nếu FS, README, schema, API spec, UI spec hoặc source không khớp nhau, không tự đoán rồi triển khai. Nêu rõ chỗ mâu thuẫn, xác định tài liệu nào cần thống nhất với nhóm, rồi cập nhật các tài liệu liên quan trong cùng thay đổi.
+- Không triển khai một mục được ghi là ngoài phạm vi, chưa chốt hoặc chưa bật như thể đã được duyệt. Đặc biệt, portal/tài khoản học viên và thanh toán trực tuyến chỉ được đưa vào phạm vi sau khi nhóm chốt và cập nhật đồng bộ FS, schema, API và UI.
+
 ### Quy tắc API tổng hợp từ `specs/api.md`
 
 - **Tình trạng đặc tả:** `specs/api.md` là thiết kế; đường dẫn/method/status được ghi là đề xuất chưa phải hợp đồng đã triển khai. Trước khi thêm endpoint, đối chiếu `specs/README.md`, README dự án, schema và API hiện có. Không tự tuyên bố một chức năng hoặc tích hợp đã chạy chỉ vì nó có trong tài liệu.
@@ -145,6 +153,7 @@ Khi đổi yêu cầu giao diện/API, cập nhật `specs/ui-ux.md` và/hoặc 
 
 ## Đọc tiếp
 
+- `fs/README.md` và `fs/Functional-Specification.md`: phạm vi chức năng, vai trò, luồng nghiệp vụ, quy tắc lỗi và tiêu chí nghiệm thu
 - `specs/README.md`: mục lục và cách giữ đặc tả API/UI đồng bộ
 - `specs/api.md`: bảo mật, validation, phân quyền, các endpoint và nghiệp vụ thanh toán
 - `specs/ui-ux.md`: vai trò, sơ đồ trang, cấu trúc component, thiết kế và kiểm tra responsive
@@ -152,3 +161,4 @@ Khi đổi yêu cầu giao diện/API, cập nhật `specs/ui-ux.md` và/hoặc 
 - `README.md`: kiến trúc, phân quyền, 14 luồng nghiệp vụ kèm ví dụ (có thêm / đóng cơ sở)
 - `docs/QLTTNN-Lam-Viec-Nhom.md`: phân công, quy trình task, nhánh cá nhân và PR
 - Đổi bảng hoặc luồng → cập nhật `README.md`, `docs/DATABASE_SCHEMA.md` và tài liệu con liên quan trong cùng PR; nhờ Quốc Hiếu review và merge theo quy trình Git ở trên
+- Đổi yêu cầu hoặc hành vi chức năng → cập nhật `fs/Functional-Specification.md`; nếu thay đổi liên quan tới bảng hoặc luồng thì vẫn cập nhật đồng thời các tài liệu theo quy tắc phía trên.
