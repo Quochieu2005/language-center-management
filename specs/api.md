@@ -84,6 +84,21 @@ Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một l
 
 Ảnh được tải lên Cloudinary; API không ghi file vào source, ổ đĩa dự án hay thư mục media local. Django giữ `api_secret` ở secret store/environment server; frontend không bao giờ nhận secret.
 
+Thư mục gốc mặc định là `language-center-management/`. Mỗi ảnh có thư mục riêng dựa trên loại tài nguyên, site (nếu dữ liệu bị phân mảnh theo cơ sở), mã hồ sơ và UUID ảnh do API sinh:
+
+```text
+language-center-management/
+├── hoc-vien/<ma_site>/<ma_hoc_vien>/anh/<uuid-anh>/
+├── giao-vien/<ma_site>/<ma_giao_vien>/anh/<uuid-anh>/
+├── khoa-hoc/dung-chung/<ma_khoa_hoc>/anh/<uuid-anh>/
+├── co-so/dung-chung/<ma_co_so>/anh/<uuid-anh>/
+└── thuong-hieu/dung-chung/<loai-tai-nguyen>/anh/<uuid-anh>/
+```
+
+Tên người, email, số điện thoại và nội dung nhạy cảm không được dùng làm tên folder hoặc `public_id`; mã site/mã hồ sơ phải lấy từ bản ghi và quyền đã xác thực ở server. Mã ảnh là UUID ngẫu nhiên riêng cho từng asset. API dự kiến dùng `asset_folder` với Cloudinary Dynamic folders để phân loại trong Media Library mà không bắt buộc đưa đường dẫn folder vào `public_id`; không dùng thư mục để thay thế kiểm soát quyền truy cập. Ảnh cá nhân cần chính sách delivery hạn chế phù hợp. Xem [Cloudinary Folder Modes](https://cloudinary.com/documentation/folder_modes) và [Upload API Reference](https://cloudinary.com/documentation/image_upload_api_reference).
+
+Khai báo `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` và `CLOUDINARY_ROOT_FOLDER` trong `src/api/.env`, không commit các giá trị này. Nếu API secret từng bị chia sẻ, phải rotate trước khi cấu hình giá trị mới. `.env.example` chỉ chứa placeholders. Cấu hình hiện tại mới chuẩn bị biến môi trường và hàm dựng folder path; chưa có endpoint upload hay upload nào được xác nhận hoạt động. Trước khi bật upload phải bổ sung metadata ảnh tại CSDL site phù hợp trong `docs/DATABASE_SCHEMA.md` và triển khai/kiểm thử xác thực, quyền, ký upload và xác minh asset.
+
 Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có thời hạn → frontend gửi bytes ảnh trực tiếp tới Cloudinary → frontend gửi `public_id` về API → API xác minh lại asset rồi gắn metadata vào bản ghi tại site đúng. Nếu upload Cloudinary thành công nhưng ghi metadata thất bại, không báo hoàn tất; ghi nhận asset mồ côi để dọn an toàn.
 
 | Method và path đề xuất | Người gọi | Hành vi |

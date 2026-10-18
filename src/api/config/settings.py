@@ -158,6 +158,16 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env_csv("CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS")
 
+# Cloudinary credentials are optional until a signed upload endpoint is
+# implemented. Never expose CLOUDINARY_API_SECRET to the web frontend or logs.
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "").strip()
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+CLOUDINARY_ROOT_FOLDER = (
+    os.getenv("CLOUDINARY_ROOT_FOLDER", "language-center-management").strip("/ ")
+    or "language-center-management"
+)
+
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG

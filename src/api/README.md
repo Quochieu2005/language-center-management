@@ -46,6 +46,12 @@ Không commit `.env`, mật khẩu SQL, hoặc địa chỉ kết nối riêng c
 
 Global Query về sau phải truy vấn từng CSDL site riêng trong phạm vi quyền, tổng hợp tại tầng API và báo site lỗi; không thực hiện `JOIN`/khóa ngoại xuyên site, không sao chép dữ liệu nghiệp vụ vào một DB chung. Các nghiệp vụ `LOCAL`, `GLOBAL`, `REPLICATED-WRITE` và `DISTRIBUTED-TX` phải theo `../../README.md`, `../../docs/DATABASE_SCHEMA.md` và `../../specs/api.md`.
 
+## Cloudinary và cách xếp thư mục ảnh
+
+`src/api/.env.example` khai báo placeholders cho Cloud Name, API Key, API Secret và `CLOUDINARY_ROOT_FOLDER=language-center-management`. Sau khi tạo API secret mới trong Cloudinary, đặt credentials thật vào `src/api/.env` (đã bị Git bỏ qua); không đưa secret vào frontend, source, log hoặc PR.
+
+Folder path được dựng từ loại tài nguyên và dữ liệu đã được API xác thực, ví dụ `language-center-management/hoc-vien/Q1/Q1-HV-000001/anh/<uuid>/`. Mỗi ảnh có UUID riêng; ảnh học viên/giáo viên có phân đoạn site, còn ảnh khóa học/cơ sở dùng nhánh `dung-chung`. Hàm `core.media.folders.build_asset_folder` chỉ tạo đường dẫn an toàn, chưa upload file. API upload chưa được triển khai vì schema metadata ảnh và các luồng xác thực/quyền chưa hoàn tất. Cloudinary Dynamic folders dùng `asset_folder`; cần kiểm tra chế độ folder của Product Environment trước khi bật luồng upload.
+
 ## Phạm vi đã khởi tạo
 
 Hiện có scaffold Django REST Framework, OpenAPI/Swagger UI sinh tự động, cấu hình an toàn mặc định cho quyền endpoint, bcrypt password hasher, giờ Việt Nam, CORS theo cấu hình và tiện ích định tuyến tới kết nối site. Endpoint duy nhất hiện hoạt động là liveness check. Endpoint này chỉ xác nhận tiến trình API còn chạy, **không** kiểm tra kết nối SQL Server.
