@@ -21,6 +21,7 @@ File này mô tả giao diện gọi API thế nào và API phải xử lý quy�
 12. Ảnh nhị phân phải lưu ở Cloudinary, không trong source, thư mục upload của API hoặc Git. SQL Server chỉ lưu metadata/đường dẫn cần thiết tại site đúng phân mảnh.
 13. Luồng đăng nhập, đăng ký (nếu được bật) và quên mật khẩu phải có rate limit, chống dò tài khoản, audit an toàn và response không tiết lộ tài khoản tồn tại.
 14. Khi viết endpoint phải chạy kiểm tra thật với API và SQL Server test: quyền, dữ liệu sau CRUD, rollback, phân tán, lỗi bảo mật và độ trễ; không đánh dấu hoàn tất chỉ vì code biên dịch.
+15. Đăng nhập Google/Facebook chỉ xác thực tài khoản nội bộ đã được liên kết trước. Không tự tạo tài khoản, không tự ghép theo email và không lưu access/refresh token của nhà cung cấp.
 
 ## Múi giờ và định dạng giờ
 
@@ -72,6 +73,7 @@ Các ngưỡng dưới đây là **giá trị khởi đầu đề xuất**, ph�
 | Form/endpoint | Giới hạn ban đầu đề xuất | Hành vi khi vượt ngưỡng |
 |---|---|---|
 | Đăng nhập | Tối đa 10 request/IP/phút và 5 lần sai cho cặp tài khoản+IP trong 15 phút | Tăng thời gian chờ; yêu cầu CAPTCHA sau ngưỡng; trả `429` với `Retry-After`; không tiết lộ tên tài khoản hợp lệ |
+| Bắt đầu/callback OAuth | Giới hạn riêng theo IP, provider và state; callback chỉ dùng một lần | Từ chối state/code lặp hoặc hết hạn; không cho client điều chỉnh callback URI; không log query có authorization code |
 | Đăng ký, chỉ khi được nhóm bật | Tối đa 5 request/IP/giờ và 3 lần cho cùng email/giờ | Xác minh email/CAPTCHA sau ngưỡng; response trùng email không tiết lộ tài khoản đã có |
 | Quên mật khẩu | Tối đa 10 request/IP/giờ và 3 lần cho cùng email/giờ | Trả cùng response `202` dù email có tồn tại hay không; không gửi nhiều email reset |
 | Xác nhận reset mật khẩu | Giới hạn theo IP và token; token một lần, có hạn | Token sai/hết hạn/đã dùng không đổi dữ liệu; trả lỗi chung và ghi audit không chứa token |
@@ -79,6 +81,16 @@ Các ngưỡng dưới đây là **giá trị khởi đầu đề xuất**, ph�
 IP chỉ được lấy từ proxy đã tin cậy; không tin header IP tùy ý từ client. Rate limit phải phối hợp IP, tài khoản/email đã chuẩn hóa và thời gian; CAPTCHA không thay thế rate limit. Public registration hiện vẫn **tắt** vì học viên chưa có tài khoản trong schema. Nếu sau này bật, phải áp dụng các giới hạn này trước khi mở endpoint.
 
 Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một lần và lưu dạng hash; token gửi qua email không ghi log. Khác với mật khẩu người dùng, token ngẫu nhiên có thể lưu bằng SHA-256/HMAC hash phục vụ tra cứu an toàn; mật khẩu vẫn phải dùng bcrypt.
+
+### Email kích hoạt tài khoản và khôi phục mật khẩu
+
+Django gửi thư từ backend qua SMTP; thông tin kết nối chỉ nằm trong biến môi trường/secret store (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` hoặc `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`). Với Gmail, cấu hình mặc định là `smtp.gmail.com:587` + STARTTLS, dùng địa chỉ Gmail và Google App Password. App Password chỉ dành cho SMTP, không phải OAuth Client Secret. Không ghi thông tin này vào source, Git, log, Swagger response hoặc frontend. Chỉ báo gửi thành công sau khi SMTP chấp nhận thư; lỗi gửi thư phải có trạng thái retry an toàn và không log nội dung bí mật.
+
+Khi Admin Big tạo Admin Small hoặc giáo viên, không gửi mật khẩu tạm qua email. Sau khi tài khoản và hồ sơ site được tạo an toàn, gửi email mời người nhận tự đặt mật khẩu bằng token kích hoạt ngẫu nhiên, một lần, có hạn; tài khoản chưa được đăng nhập cho tới khi kích hoạt. Schema hiện tại chưa có bảng token kích hoạt riêng/trạng thái `cho_kich_hoat`, nên phải cập nhật schema và luồng `REPLICATED-WRITE`/phục hồi trước khi bật tính năng mời. Không tái sử dụng token reset cho mục đích kích hoạt.
+
+Quên mật khẩu gửi liên kết đặt lại chứa token có entropy cao; người dùng mở liên kết và tự nhập mật khẩu mới. Token hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 900 giây), chỉ dùng một lần, chỉ lưu hash tại site tiếp nhận và không xuất hiện trong nhật ký. Nếu site lưu tài khoản không sẵn sàng, không báo reset thành công và không cập nhật một phần các bản sao. Endpoint yêu cầu reset vẫn trả cùng thông báo chung `202` dù tài khoản/email tồn tại hay không; rate limit theo IP và email đã chuẩn hóa. Chọn liên kết ngẫu nhiên thay cho mã số ngắn trong phiên bản đầu để giảm khả năng dò mã; nếu sau này dùng OTP số, phải thêm bộ đếm thử/khóa ngắn hạn và lưu hash mã vào schema trước khi triển khai.
+
+Các timeout URL cấu hình ở backend gồm `PASSWORD_RESET_TIMEOUT` (900 giây) và `ACCOUNT_ACTIVATION_TIMEOUT` (86400 giây). `WEB_APP_BASE_URL` chỉ nhận origin đã được cấu hình; không lấy URL redirect tùy ý từ request. Cấu hình SMTP hiện mới là nền tảng, không có endpoint gửi thư cho tới khi các luồng tài khoản được triển khai và kiểm thử.
 
 ## Ảnh và Cloudinary
 
@@ -137,14 +149,44 @@ Tất cả method/path dưới đây là **đề xuất cho đặc tả**, chưa
 | `GET /api/v1/public/courses/{ma_khoa_hoc}` | Khách chưa đăng nhập | Đọc bản sao dùng chung | Chi tiết khóa học; mã không tồn tại trả `404` |
 | `GET /api/v1/public/classes?ma_co_so=...&ma_khoa_hoc=...` | Khách chưa đăng nhập | `LOCAL` nếu lọc một site; `GLOBAL` nếu xem nhiều site | Đọc `LopHoc`, lịch cần công khai; Global Query phải trả `meta.complete` và `missing_sites` |
 | `POST /api/v1/auth/login` | Vai trò nội bộ hiện có | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Nhận tên đăng nhập/mật khẩu; trả phiên và ngữ cảnh quyền, không trả hash mật khẩu hoặc chuỗi kết nối |
+| `GET /api/v1/auth/oauth/{provider}/start?intent=login` | Người chưa đăng nhập; `provider` chỉ `google` hoặc `facebook` | Khởi tạo OAuth; chưa truy cập CSDL nghiệp vụ | Tạo state một lần rồi chuyển hướng tới provider; redirect URI lấy từ cấu hình server |
+| `GET /api/v1/auth/oauth/{provider}/callback` | Callback Google/Facebook | `GLOBAL` xác minh liên kết nhân bản và đọc `TaiKhoan` | Đổi authorization code ở server; xác minh provider subject; chỉ tài khoản nội bộ hoạt động mới được cấp phiên |
+| `GET /api/v1/auth/oauth/{provider}/link/start` | Người đã đăng nhập và xác thực lại gần đây | Khởi tạo liên kết; callback ghi bằng `REPLICATED-WRITE` | Bắt đầu ghép danh tính provider với `ma_tai_khoan` lấy từ phiên; không tìm tài khoản theo email |
+| `GET /api/v1/auth/oauth/{provider}/link/callback` | Callback Google/Facebook trong luồng link | `REPLICATED-WRITE` | Ghi liên kết giống nhau tới mọi site hoạt động; nếu thiếu site hoặc xung đột thì không báo thành công toàn phần |
+| `DELETE /api/v1/auth/oauth/{provider}/link` | Người đã đăng nhập, xác thực lại gần đây | `REPLICATED-WRITE` | Thu hồi liên kết ở mọi site; giữ lịch sử và bảo đảm còn phương thức đăng nhập hợp lệ |
 | `POST /api/v1/auth/register` | Không có trong phạm vi hiện tại | Tắt/chưa triển khai | Chưa cấp tài khoản công khai; chỉ mở sau khi nhóm duyệt đối tượng đăng ký, schema, xác minh email và rate limit |
 | `GET /api/v1/auth/me` | Người đã đăng nhập | Đọc ngữ cảnh phiên và hồ sơ an toàn đúng site | Trả vai trò/chức vụ, site, phạm vi lớp, quyền được phép, trang mặc định và thông tin hồ sơ được phép hiển thị trên trang cá nhân; không trả bí mật xác thực |
 | `POST /api/v1/auth/logout` | Người đã đăng nhập | Hủy phiên | Thu hồi phiên phía server và xóa cookie nếu dùng cookie |
 | `POST /api/v1/auth/password-change` | Người đã đăng nhập | `LOCAL` kiểm tra tài khoản; `REPLICATED-WRITE` cập nhật bản sao mật khẩu theo chính sách | Nhận mật khẩu hiện tại và mật khẩu mới; xác minh bằng bcrypt, thu hồi phiên khác và ghi audit an toàn |
 | `POST /api/v1/auth/password-reset-requests` | Người chưa đăng nhập | Tra cứu nhiều bản tài khoản; tạo token cục bộ | Luôn trả thông báo chung để không tiết lộ email/tên đăng nhập có tồn tại hay không |
 | `POST /api/v1/auth/password-resets` | Người có liên kết đặt lại | `LOCAL` kiểm token; `REPLICATED-WRITE` cập nhật tài khoản | Token dùng một lần, có hạn; cập nhật bản băm mật khẩu tại mọi site bắt buộc theo chính sách |
+| `POST /api/v1/auth/account-activations` | Người có liên kết mời hợp lệ | `LOCAL` kiểm token; `REPLICATED-WRITE` kích hoạt và đặt mật khẩu mới | Chỉ bật sau khi schema có trạng thái tài khoản chờ kích hoạt và token kích hoạt riêng; không dùng chung token reset |
 
 `POST /api/v1/auth/register` hiện là route tắt: nếu `RegisterPage` còn hiển thị, trang chỉ giải thích điều kiện/liên hệ, không gửi tạo tài khoản. Admin Big tạo tài khoản nội bộ. Nếu nhóm duyệt portal học viên, đăng ký/kích hoạt phải được đặc tả và cập nhật schema trước khi bật endpoint; tuyệt đối không tự mở public signup.
+
+### Đăng nhập và liên kết tài khoản Google/Facebook — đặc tả, chưa triển khai
+
+Hai nút Google và Facebook dùng chung màn hình đăng nhập. Đây là phương thức bổ sung cho tài khoản nội bộ có `vai_tro` `admin`, `nhan_vien` hoặc `giao_vien`; học viên vẫn chưa có tài khoản trong phạm vi hiện tại. API chưa có endpoint đăng nhập nào được triển khai. Các route trong bảng là thiết kế, không được frontend gọi cho tới khi code, CSDL và OAuth applications đã được cấu hình, kiểm thử.
+
+**Luồng đăng nhập:**
+
+1. Người dùng bấm nhà cung cấp tương ứng; trình duyệt mở `GET /api/v1/auth/oauth/google/start?intent=login` hoặc `.../facebook/start?intent=login`. Backend chỉ nhận provider từ allowlist, tạo state ngẫu nhiên dùng một lần (và nonce cho Google), gắn với trình duyệt bằng cookie bảo mật tạm thời rồi chuyển hướng sang provider. `redirect_uri` được cấu hình cố định ở API, không lấy từ query/body.
+2. Google/Facebook trả authorization code về callback đã đăng ký của API. Backend đối chiếu state/cookie, đổi code trực tiếp với provider qua HTTPS rồi xác minh; không chuyển provider token sang frontend và không ghi code/token vào log.
+3. Google ID token phải được xác minh chữ ký bằng JWKS chính thức và kiểm tra `iss`, `aud`, `exp`, `iat`, `nonce`; định danh bền vững là `sub`, không phải email. Facebook access token phải được introspect server-to-server (app ID đúng, token hợp lệ, đúng subject và chưa hết hạn); sau đó lấy Facebook app-scoped user ID. Chỉ yêu cầu quyền dữ liệu tối thiểu.
+4. API dùng cặp `(nha_cung_cap, provider_subject)` tra `TaiKhoanLienKetOAuth`, sau đó xác nhận liên kết và `TaiKhoan` nhất quán, tài khoản đang `hoat_dong`, vai trò/phạm vi còn hợp lệ trên các site hoạt động. Đây là `GLOBAL`; nếu site cần thiết mất kết nối hoặc các bản sao mâu thuẫn, từ chối cấp phiên và trả lỗi tạm thời, không âm thầm chọn một bản.
+5. Sau khi xác minh, API tạo phiên ứng dụng riêng bằng cơ chế phiên có thể thu hồi đã chốt, đặt cookie `HttpOnly`, `Secure`, `SameSite` phù hợp và redirect về URL callback web trong allowlist. Không trả Google/Facebook token hoặc quyền do provider cung cấp về trình duyệt. Frontend gọi `GET /auth/me` để nhận vai trò, site và phạm vi từ API.
+
+Facebook có thể không trả email hoặc người dùng có thể từ chối quyền email; điều đó không ảnh hưởng xác thực vì API dùng Facebook user ID. Không yêu cầu quyền `email` chỉ để ghép tài khoản. Google email đã xác minh cũng không dùng làm khóa: chỉ subject đã liên kết mới đăng nhập được.
+
+**Luồng liên kết:** người dùng đăng nhập bằng tài khoản nội bộ hiện hữu, xác thực lại bằng mật khẩu gần thời điểm liên kết, rồi bắt đầu OAuth trong chế độ `link`. Callback chỉ gắn provider subject vào `ma_tai_khoan` lấy từ phiên đã xác thực. Nếu subject đã thuộc tài khoản khác, API từ chối; không tự chuyển liên kết. Thu hồi liên kết phải được nhân bản đủ site. Không có chức năng tự đăng ký qua Google/Facebook hoặc Admin Big gắn danh tính cho người khác.
+
+**Redirect và lỗi:** callback URL/`return_to` chỉ lấy từ allowlist cấu hình; từ chối URL tùy ý để chống open redirect. Sai state, code hết hạn, provider lỗi, identity chưa liên kết, tài khoản bị khóa hoặc dữ liệu site không đủ đều không tạo phiên. Người dùng nhận thông báo chung; nhật ký chỉ ghi provider, mã lỗi nội bộ, kết quả và mã tài khoản nếu xác định an toàn. Không ghi authorization code, ID/access/refresh token, client secret, email hoặc provider subject.
+
+**Phân tán:** `TaiKhoanLienKetOAuth` là bảng dùng chung nhân bản ở từng site, không phải CSDL identity trung tâm. Thêm/thu hồi liên kết là `REPLICATED-WRITE` qua một service duy nhất; dùng cùng UUID, thời điểm và phiên bản tại mọi site. Nếu một site bắt buộc lỗi, không báo thành công; lưu kết quả để retry/đối soát. Đăng nhập là `GLOBAL`, đọc từng site riêng rồi đối chiếu ở API. Không có FK/JOIN xuyên site. Vai trò và site luôn lấy từ `TaiKhoan`, không lấy từ provider profile.
+
+**Cấu hình:** tạo OAuth application riêng cho môi trường phát triển và cấu hình được duyệt cho môi trường triển khai; khai báo callback chính xác trong Google Cloud và Meta Developers. API cần `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `FACEBOOK_OAUTH_APP_ID`, `FACEBOOK_OAUTH_APP_SECRET`, `FACEBOOK_OAUTH_REDIRECT_URI` và `OAUTH_WEB_RETURN_URL`. Client secret chỉ ở Django/environment, không ở Next.js, Git, Swagger example hay log. Trước khi bật phải hoàn tất TLS, state/nonce dùng một lần, cookie/CSRF, rate limit riêng từng provider và cơ chế phiên có thể thu hồi.
+
+Start/callback là redirect của trình duyệt, không nhận provider token từ frontend. Khi liên kết, API lấy tài khoản hiện tại từ cookie phiên, không nhận `ma_tai_khoan` từ request. Callback thành công đặt cookie phiên của ứng dụng và redirect tới trang đã cấu hình; các endpoint chỉ xuất hiện trong Swagger khi có code đã triển khai và test tích hợp.
 
 ## Endpoint quản trị theo Admin Big và Admin Small
 
@@ -349,6 +391,8 @@ Các thao tác này do Admin Big thực hiện. Ví dụ request tạo Admin Sma
 ```
 
 API tự đặt `vai_tro = nhan_vien`, `chuc_vu = quan_ly_co_so`, gắn site và tạo `TaiKhoan` theo chính sách nhân bản cùng hồ sơ `NhanVien` tại Q7. Không cho client gửi `vai_tro` hoặc `chuc_vu` tùy ý. Với giáo viên, API tự đặt `vai_tro = giao_vien`, tạo `TaiKhoan` dùng chung và hồ sơ `GiaoVien` tại site được chọn.
+
+Sau khi schema có trạng thái kích hoạt và token riêng, quy trình phải gửi liên kết đặt mật khẩu ban đầu cho email của người được tạo; Admin Big không biết hoặc gửi mật khẩu người dùng. Hiện endpoint tạo tài khoản và gửi email đều chưa được triển khai.
 
 Đây là nhiều bước ghi (`REPLICATED-WRITE` cho `TaiKhoan`, `LOCAL` cho hồ sơ). Response cần có trạng thái xử lý theo từng chặng; chỉ trả thành công hoàn toàn khi tài khoản có hồ sơ/phạm vi dùng được. Nếu đồng bộ tài khoản thành công nhưng tạo hồ sơ site thất bại, vô hiệu hóa hoặc đưa tài khoản về trạng thái chờ xử lý có thể phục hồi; không để tài khoản hoạt động không có site/phạm vi. Kiểm tra trùng `ten_dang_nhap`/`email` trên các bản sao trước khi ghi.
 
@@ -609,3 +653,4 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 4. Chốt cách lưu phiên/CSRF, quy tắc pagination, danh sách lỗi nghiệp vụ và cơ chế lưu tiến trình tạo tài khoản nhiều site. Khi chốt phải sửa mục này và ví dụ response trước khi viết client/server.
 5. Schema chưa có metadata Cloudinary. Bổ sung bảng/quan hệ metadata và quy tắc phân mảnh/nhân bản trước khi gắn ảnh vào giao diện; binary chỉ ở Cloudinary.
 6. Chốt storage bền vững cho giới hạn/rate limit khi có nhiều worker và đặt ngưỡng bcrypt theo benchmark; không lưu bộ đếm chỉ trong memory nếu chạy nhiều instance.
+7. OAuth Google/Facebook đã có thiết kế bảng nhân bản và migration `db/06_add_oauth_identity_table.sql`; trước khi bật route phải chốt cách lưu/thu hồi phiên, callback HTTPS, tạo OAuth apps và triển khai/test flow liên kết trong `src/api`. OAuth credentials chỉ điền ở `src/api/.env`, không commit.

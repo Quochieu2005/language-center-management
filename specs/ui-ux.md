@@ -117,7 +117,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 
 | Page | Sections chính | Mục tiêu |
 |---|---|---|
-| Đăng nhập | Nhận diện thương hiệu, form tài khoản/mật khẩu, hiện/ẩn mật khẩu, quên mật khẩu, lỗi và trạng thái đang gửi | Một trang đăng nhập cho mọi chức vụ; không có lựa chọn “đăng nhập Admin Big/Admin Small/giáo viên” để tự quyết định quyền |
+| Đăng nhập | Nhận diện thương hiệu, form tài khoản/mật khẩu, nút tiếp tục với Google/Facebook, hiện/ẩn mật khẩu, quên mật khẩu, lỗi và trạng thái đang gửi | Một trang cho mọi chức vụ; API xác định quyền. OAuth chỉ dùng cho tài khoản nội bộ đã liên kết; không có chọn role hoặc tự đăng ký |
 | Quên mật khẩu | Form email/tên đăng nhập, xác nhận đã nhận yêu cầu, giới hạn gửi lại và thông báo chung | Không tiết lộ tài khoản có tồn tại hay không; trạng thái gửi do API trả về |
 | Đặt lại mật khẩu | Form mật khẩu mới/xác nhận, tiêu chí hợp lệ, trạng thái token hết hạn/đã dùng/thành công | Token dùng một lần; không lưu/ghi token vào log hoặc analytics |
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
@@ -284,11 +284,15 @@ flowchart TD
 
 ### 3.4. Luồng đăng nhập, đăng ký và phân quyền giao diện
 
-1. Mọi chức vụ mở cùng route đăng nhập và gửi thông tin tới API; frontend không hỏi người dùng muốn vào vai trò nào.
-2. API xác thực tài khoản, trạng thái hoạt động và quyền; mật khẩu không được lưu ở trình duyệt hoặc ghi ra log. API là nơi quyết định vai trò, chức vụ, site và phạm vi lớp.
-3. Sau đăng nhập thành công, frontend đọc ngữ cảnh phiên do API cung cấp và mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; lễ tân, kế toán và giáo viên thấy menu theo nhiệm vụ.
-4. Các API nghiệp vụ vẫn phải kiểm tra quyền và site ở phía máy chủ. Frontend không được dùng giá trị site từ URL/local storage để cấp quyền hoặc truy vấn thẳng cơ sở dữ liệu.
-5. Đăng xuất xóa phiên phía client theo cơ chế API quy định. Lỗi đăng nhập dùng thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt cho tới khi nhóm thống nhất đối tượng được đăng ký và cập nhật README/API/schema cho khớp.
+1. Mọi chức vụ mở cùng route đăng nhập; trang có thể dùng tên đăng nhập/mật khẩu hoặc nút Google/Facebook khi API đã triển khai và cấu hình OAuth. Frontend không hỏi người dùng muốn vào vai trò nào.
+2. Với OAuth, frontend điều hướng trình duyệt tới API start endpoint; backend quản lý state/nonce, callback, kiểm tra provider subject và liên kết tài khoản. Frontend không nhận hay lưu provider access token. API chỉ chấp nhận tài khoản nội bộ đã được Admin Big tạo và người dùng đã tự liên kết khi đăng nhập vào tài khoản đó; không tự tạo tài khoản, không tự liên kết qua email.
+3. API xác thực trạng thái hoạt động và quyền; mật khẩu không được lưu ở trình duyệt hoặc ghi ra log. API là nơi quyết định vai trò, chức vụ, site và phạm vi lớp.
+4. Sau đăng nhập thành công, frontend gọi `GET /auth/me`, đọc ngữ cảnh phiên do API trả về rồi mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; lễ tân, kế toán và giáo viên thấy menu theo nhiệm vụ.
+5. Các API nghiệp vụ vẫn phải kiểm tra quyền và site ở phía máy chủ. Frontend không được dùng giá trị site từ URL/local storage để cấp quyền hoặc truy vấn thẳng cơ sở dữ liệu.
+6. Đăng xuất kết thúc phiên phía server rồi xóa cookie. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
+7. Admin Big tạo Admin Small/giáo viên bằng email công việc và cơ sở được giao; không nhập hoặc gửi mật khẩu thay người nhận. Khi API kích hoạt tài khoản sẵn sàng, người nhận mở liên kết một lần trong `/auth/activate` để tự đặt mật khẩu. Người quên mật khẩu yêu cầu email liên kết tại `/auth/forgot-password`, rồi tự nhập mật khẩu mới ở `/auth/reset-password`; giao diện không hiển thị việc email có tồn tại hay không. Liên kết reset mặc định hết hạn sau 15 phút.
+
+Khi API chưa bật OAuth, không hiển thị nút giả hoặc làm nút chỉ chuyển trang. Nếu thiết kế cần thể hiện trước, đặt trạng thái chưa khả dụng kèm ghi chú nội bộ trong prototype; chỉ bật control khi endpoint, OAuth app, callback URL, cấu hình cookie và test API đều sẵn sàng. Các nút dùng logo provider chính thức: kiểm tra `assets/icons` và thư viện hiện có trước; nếu thiếu mới thêm SVG logo theo quy định thương hiệu, không tự vẽ lại logo.
 
 ### 3.5. Section dự kiến bên trong từng page
 
@@ -343,10 +347,12 @@ Danh mục dưới đây làm rõ page nào cần thiết kế để không gộ
 | `/courses` | Danh sách khóa học | Tìm kiếm, lọc, sắp xếp allowlist, phân trang, loading/empty/error | Cần API danh mục công khai |
 | `/courses/[courseId]` | Chi tiết khóa học | Mô tả, trình độ, học phí chuẩn, lớp và lịch khả dụng | Cần API danh mục công khai |
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
-| `/auth/login` | Đăng nhập dùng chung | Form, lỗi chung, giới hạn gửi, loading, quên mật khẩu | Dùng chung mọi chức vụ |
+| `/auth/login` | Đăng nhập dùng chung | Form mật khẩu, nút Google/Facebook khi API bật, lỗi chung, giới hạn gửi, loading, quên mật khẩu | Dùng chung mọi chức vụ; OAuth không tự đăng ký hoặc tự chọn role |
+| `/auth/activate` | Kích hoạt tài khoản nội bộ | Kiểm tra liên kết mời, nhập mật khẩu mới/xác nhận, trạng thái hết hạn/đã dùng/thành công | Chỉ mở từ liên kết mời dùng một lần; chưa triển khai cho tới khi API và schema có token kích hoạt |
 | `/auth/forgot-password` | Quên mật khẩu | Nhập email/tài khoản, trạng thái gửi; không tiết lộ tài khoản tồn tại | Cần API reset mật khẩu |
-| `/auth/reset-password` | Đặt lại mật khẩu | Mật khẩu mới, xác nhận, token hợp lệ/hết hạn/đã dùng | Cần API reset mật khẩu |
+| `/auth/reset-password` | Đặt lại mật khẩu | Mật khẩu mới, xác nhận, token hợp lệ/hết hạn/đã dùng | Mở từ liên kết một lần gửi qua email; token mặc định hết hạn sau 15 phút; cần API reset mật khẩu |
 | `/auth/register` | Đăng ký | Không hiển thị hoặc giữ trang thông báo chưa mở | Tắt cho tới khi nhóm duyệt đăng ký công khai và schema/API phù hợp |
+| `/portal/account/security` | Phương thức đăng nhập | Trạng thái liên kết Google/Facebook, bắt xác thực lại trước khi thêm/gỡ, trạng thái đồng bộ | Chỉ mở khi API triển khai endpoint link/unlink; dữ liệu liên kết được nhân bản ở các CSDL site |
 
 #### Admin Big — các trang toàn hệ thống
 

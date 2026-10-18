@@ -17,6 +17,11 @@ BEGIN
     ;THROW 51021, N'Thiếu bảng cốt lõi hoặc bảng giao dịch chuyển cơ sở. Hãy kiểm tra lại 01_create_schema.sql.', 1;
 END;
 
+IF OBJECT_ID(N'dbo.TaiKhoanLienKetOAuth', N'U') IS NULL
+BEGIN
+    ;THROW 51026, N'Thiếu bảng TaiKhoanLienKetOAuth. Với database đã tạo trước đó, chạy 06_add_oauth_identity_table.sql trên site này.', 1;
+END;
+
 IF (SELECT COUNT(*) FROM sys.triggers
     WHERE parent_id = OBJECT_ID(N'dbo.LichSuChuyenCoSo')
       AND name = N'TR_LichSuChuyenCoSo_AppendOnly') <> 1
@@ -55,7 +60,7 @@ FROM sys.tables AS t
 JOIN sys.partitions AS p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
 WHERE t.schema_id = SCHEMA_ID(N'dbo')
   AND t.name IN (N'HocVien', N'LopHoc', N'GiaoVien', N'MonHoc', N'DangKy', N'HocPhi', N'Diem',
-                 N'GiaoDichChuyenCoSo', N'LichSuChuyenCoSo')
+                 N'GiaoDichChuyenCoSo', N'LichSuChuyenCoSo', N'TaiKhoanLienKetOAuth')
 GROUP BY t.name
 ORDER BY t.name;
 

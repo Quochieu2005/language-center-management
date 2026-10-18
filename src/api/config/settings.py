@@ -158,6 +158,30 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env_csv("CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS")
 
+# Email delivery for account activation and password recovery. Keep credentials
+# in src/api/.env or a deployment secret store; never expose them to the web app.
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+).strip()
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com").strip()
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER).strip()
+WEB_APP_BASE_URL = os.getenv("WEB_APP_BASE_URL", "http://localhost:3000").rstrip("/")
+PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "900"))
+ACCOUNT_ACTIVATION_TIMEOUT = int(os.getenv("ACCOUNT_ACTIVATION_TIMEOUT", "86400"))
+
+if not 1 <= EMAIL_PORT <= 65535:
+    raise ImproperlyConfigured("EMAIL_PORT phải nằm trong khoảng 1–65535.")
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured("Chỉ bật một trong EMAIL_USE_TLS hoặc EMAIL_USE_SSL.")
+if EMAIL_TIMEOUT <= 0 or PASSWORD_RESET_TIMEOUT <= 0 or ACCOUNT_ACTIVATION_TIMEOUT <= 0:
+    raise ImproperlyConfigured("Các timeout email và đặt lại mật khẩu phải lớn hơn 0.")
+
 # Cloudinary credentials are optional until a signed upload endpoint is
 # implemented. Never expose CLOUDINARY_API_SECRET to the web frontend or logs.
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
@@ -167,6 +191,17 @@ CLOUDINARY_ROOT_FOLDER = (
     os.getenv("CLOUDINARY_ROOT_FOLDER", "language-center-management").strip("/ ")
     or "language-center-management"
 )
+
+# OAuth settings are placeholders for the future authorization-code callbacks.
+# No OAuth route is enabled until provider verification, distributed account
+# resolution, revocable app sessions, and the schema migration are implemented.
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
+FACEBOOK_OAUTH_APP_ID = os.getenv("FACEBOOK_OAUTH_APP_ID", "").strip()
+FACEBOOK_OAUTH_APP_SECRET = os.getenv("FACEBOOK_OAUTH_APP_SECRET", "").strip()
+FACEBOOK_OAUTH_REDIRECT_URI = os.getenv("FACEBOOK_OAUTH_REDIRECT_URI", "").strip()
+OAUTH_WEB_RETURN_URL = os.getenv("OAUTH_WEB_RETURN_URL", "").strip()
 
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
 SESSION_COOKIE_HTTPONLY = True

@@ -66,7 +66,7 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 
 | Chức năng/truy vấn | Kiểu | Vị trí gọi | Site được truy cập | Tần suất dự kiến | Bảng đọc/ghi chính |
 |---|---|---|---|---|---|
-| Đăng nhập | `LOCAL` đọc tài khoản nhân bản | Máy trạm mọi cơ sở | Site đăng nhập; tài khoản có bản sao ở các site | Cao (đăng nhập mỗi phiên) | Đọc `TaiKhoan`; ghi `NhatKyHeThong` |
+| Đăng nhập bằng mật khẩu/Google/Facebook | `GLOBAL` đối chiếu tài khoản và liên kết nhân bản | Máy trạm mọi cơ sở | Các site đang hoạt động; API đối chiếu rồi dựng phiên | Cao (đăng nhập mỗi phiên) | Đọc `TaiKhoan`, `TaiKhoanLienKetOAuth`; ghi nhật ký đăng nhập an toàn |
 | Xem khóa học/lớp còn chỗ | `LOCAL` | Lễ tân/quản lý tại cơ sở | Site đang làm việc | Cao | Đọc `KhoaHoc`, `LopHoc`, `HocVien`, `DangKy` |
 | Đăng ký khóa học | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Cao theo mùa tuyển sinh | Ghi `DangKy`, `HocPhi`, `LopHoc`, `NhatKyHeThong` |
 | Đổi lớp | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Trung bình | Ghi `DangKy`, sĩ số `LopHoc`; đọc lịch và học phí |
@@ -77,7 +77,7 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 | Xem thống kê cơ sở | `LOCAL` | Quản lý/admin | Một site | Trung bình | Đọc `HocVien`, `DangKy`, `HocPhi`, `PhieuThu`, `Diem` |
 | Thống kê/tra cứu toàn cục | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp–trung bình | Đọc bảng nghiệp vụ tại từng site; Coordinator gộp |
 | Xem nhật ký toàn hệ thống | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp, chủ yếu kiểm tra/audit | Đọc `NhatKyHeThong`, `NhatKyDongBo` |
-| Sửa danh mục/tài khoản | `REPLICATED-WRITE` | Admin | Mọi site `hoat_dong` | Thấp hơn đọc, nhưng cần nhất quán | Ghi `MonHoc`, `KhoaHoc`, `TaiKhoan`, `CoSo` |
+| Sửa danh mục/tài khoản/liên kết OAuth | `REPLICATED-WRITE` | Admin hoặc chủ tài khoản đã xác thực theo thao tác | Mọi site `hoat_dong` | Thấp hơn đọc, nhưng cần nhất quán | Ghi `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth`, `CoSo` |
 | Đề nghị chuyển | `LOCAL` | Admin Small tại nguồn | CSDL nguồn | Theo nhu cầu | Ghi `GiaoDichChuyenCoSo` trạng thái `cho_duyet`, sự kiện `de_nghi` |
 | Hộp thư/duyệt đề nghị | `GLOBAL` đọc; quyết định ghi cục bộ tại nguồn | Admin Big | Đọc các site; ghi CSDL nguồn của đề nghị | Thấp, cần độ đúng cao | Đọc `GiaoDichChuyenCoSo`; ghi quyết định và `LichSuChuyenCoSo` tại nguồn |
 | Thực hiện chuyển sau duyệt | `DISTRIBUTED-TX` | Coordinator sau khi Admin Big duyệt | Site nguồn và site đích | Thấp, cần độ đúng cao | Đọc/ghi `HocVien`, đăng ký/lớp liên quan và lịch sử chuyển |
@@ -174,7 +174,7 @@ Thiết kế gồm các bảng sau (bộ cột chi tiết xem trực tiếp sche
 
 | Nhóm | Bảng |
 |---|---|
-| Danh mục/tài khoản nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` |
+| Danh mục/tài khoản nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` |
 | Hồ sơ phân mảnh nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` |
 | Bảng dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` |
 | Trạng thái giao dịch và nhật ký cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` |
@@ -218,7 +218,7 @@ Ràng buộc bổ sung: học viên đăng ký lớp cùng cơ sở. Mỗi bản
 
 | Loại | Quan hệ vị trí | Cơ chế theo thiết kế |
 |---|---|---|
-| Nhân bản | Với `R ∈ {CoSo, MonHoc, KhoaHoc, TaiKhoan}`, mỗi site hoạt động giữ một bản giống nhau của `R` | Chỉ ghi qua module Đồng bộ dữ liệu dùng chung; thiếu một site hoạt động thì từ chối; đối soát qua phiên bản |
+| Nhân bản | Với `R ∈ {CoSo, MonHoc, KhoaHoc, TaiKhoan, TaiKhoanLienKetOAuth}`, mỗi site hoạt động giữ một bản giống nhau của `R` | Chỉ ghi qua module Đồng bộ dữ liệu dùng chung; thiếu một site hoạt động thì từ chối; đối soát qua phiên bản |
 | Cục bộ | `GiaoDichChuyenCoSo` lưu đề nghị/quyết định/trạng thái chỉ tại nguồn; `LichSuChuyenCoSo` ghi sự kiện tại site phát sinh | Không nhân bản đại trà; Admin Small tạo đề nghị tại nguồn, Admin Big quyết định qua Coordinator; bảng sự kiện chỉ thêm |
 
 `TaiKhoan.ten_dang_nhap` và `email` cần kiểm tra duy nhất trên toàn hệ thống trước khi ghi. Mật khẩu/token chỉ lưu dạng băm; không xuất hiện trong nhật ký.
@@ -327,7 +327,7 @@ Nhóm đã chọn Microsoft SQL Server. Ghi edition/version, instance, authentic
 ### 3.6. Tạo Publication/Replication
 
 - Chốt loại replication, publisher/distributor/subscriber, publication/article và bảng được phép nhân bản.
-- Phân biệt nhóm bảng nhân bản (`CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`) với bảng phân mảnh site và bảng dẫn xuất. Không publish toàn bộ bảng một cách mặc định.
+- Phân biệt nhóm bảng nhân bản (`CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth`) với bảng phân mảnh site và bảng dẫn xuất. Không publish toàn bộ bảng một cách mặc định.
 - Ghi hướng dữ liệu, tần suất, latency quan sát, cách xử lý lỗi và cách kiểm tra bản sao.
 - Chụp publication, subscription, trạng thái Agent/job nếu có, và kết quả đối chiếu dữ liệu sau đồng bộ.
 - So kết quả thực tế với quy tắc “mọi site hoạt động cùng có bản mới; thiếu site thì thao tác bị từ chối”. Nếu công cụ cấu hình không bảo đảm quy tắc này, ghi rõ khác biệt và thiết kế bù ở Coordinator sau khi nhóm thống nhất.

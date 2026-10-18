@@ -5,14 +5,14 @@
 Áp dụng cho mọi thành viên và mọi tác nhân AI làm việc trong repository này. Không tự ý bỏ qua các bước sau.
 
 - **Không đẩy code lên `main`**: không commit trực tiếp, push, mở Pull Request (PR) nhắm vào `main`, hoặc dùng `main` làm nhánh làm việc.
-- **Không ghi trực tiếp lên `dev`**: không commit hoặc push lên `dev`; không tự merge nhánh cá nhân vào `dev` bằng Git, GitHub hay công cụ khác.
-- Mỗi người làm trên **nhánh cá nhân** tạo từ bản mới nhất của `dev`, theo tên `feature/<ten-thanh-vien>/<mo-ta-ngan>` (ví dụ: `feature/quoc-hieu/site-router`). Chỉ push nhánh cá nhân của task đó.
-- Khi hoàn tất, push nhánh cá nhân và mở **PR từ nhánh cá nhân vào `dev`**. PR phải nêu mục đích, thay đổi chính, bảng/site bị ảnh hưởng, loại nghiệp vụ phân tán, kiểm tra đã chạy và tài liệu đã cập nhật. Yêu cầu **Quốc Hiếu, trưởng nhóm**, review PR.
-- Tác giả không tự duyệt hoặc merge PR của mình. Các thành viên khác có thể review bổ sung, nhưng không thay thế bước Quốc Hiếu review; chỉ Quốc Hiếu mới merge PR đã kiểm tra vào `dev`. Nếu cần sửa sau review, tác giả cập nhật nhánh cá nhân và đẩy commit mới lên chính nhánh đó; không tự merge để xử lý nhanh.
+- **Không ghi trực tiếp lên `Dev`**: không commit hoặc push thẳng lên `Dev`; thay đổi phải đi từ nhánh cá nhân qua PR.
+- Mỗi người làm trên **nhánh cá nhân mang tên thành viên**, tạo từ bản mới nhất của `Dev` (ví dụ: `qhiu`, `nguyen-van-a`). Không thêm tiền tố `feature/` hay tên task vào tên nhánh. Mỗi thành viên push công việc của mình lên đúng nhánh cá nhân đó.
+- Khi hoàn tất, push nhánh cá nhân và mở **PR từ nhánh cá nhân vào `Dev`**. PR phải nêu mục đích, thay đổi chính, bảng/site bị ảnh hưởng, loại nghiệp vụ phân tán, kiểm tra đã chạy và tài liệu đã cập nhật. Yêu cầu **Quốc Hiếu, trưởng nhóm**, review PR.
+- Tác giả không tự duyệt hoặc merge PR của mình. Các thành viên khác có thể review bổ sung, nhưng không thay thế bước Quốc Hiếu review; chỉ Quốc Hiếu mới merge PR đã kiểm tra vào `Dev`. Nếu cần sửa sau review, tác giả cập nhật nhánh cá nhân và đẩy commit mới lên chính nhánh đó; không tự merge để xử lý nhanh.
 - Không đoán tài khoản GitHub của Quốc Hiếu. Nếu không xác định được tài khoản để gán reviewer, để PR ở trạng thái chờ và báo Quốc Hiếu; không tự thay bước review bắt buộc của trưởng nhóm hoặc tự merge.
-- Nếu chưa có `dev`, không xác định được remote/nhánh cá nhân, hoặc repository không cho tạo PR, dừng trước thao tác ghi lên nhánh dùng chung và báo rõ trở ngại. **Không lấy `main` làm phương án thay thế.**
+- Nếu chưa có `Dev`, không xác định được remote/nhánh cá nhân, hoặc repository không cho tạo PR, dừng trước thao tác ghi lên nhánh dùng chung và báo rõ trở ngại. **Không lấy `main` làm phương án thay thế.**
 
-Quy trình chuẩn: cập nhật `dev` → tạo nhánh cá nhân → sửa và kiểm tra → push nhánh cá nhân → mở PR vào `dev` và yêu cầu Quốc Hiếu review → chờ Quốc Hiếu merge. Các quy tắc này cũng áp dụng khi một tác nhân AI được yêu cầu hoàn thành thay đổi code.
+Quy trình chuẩn: cập nhật `Dev` → tạo/chuyển sang nhánh mang tên thành viên → sửa và kiểm tra → push nhánh cá nhân → mở PR vào `Dev` và yêu cầu Quốc Hiếu review → chờ Quốc Hiếu merge. Các quy tắc này cũng áp dụng khi một tác nhân AI được yêu cầu hoàn thành thay đổi code.
 
 ### Nội dung bắt buộc trong `Add a title` và `Add a description`
 

@@ -66,12 +66,12 @@ README và schema là nguồn chuẩn. Tài liệu con không được âm thầ
 
 1. **Chọn task:** lấy một luồng từ README mục 10; nêu loại thao tác, site, bảng và quyền.
 2. **Chốt hợp đồng:** thống nhất chữ ký service/repository và cấu trúc kết quả/lỗi trước khi hai domain tích hợp.
-3. **Cập nhật nhánh gốc:** lấy thay đổi mới nhất từ `dev`; tạo nhánh riêng theo mẫu `feature/<ten-thanh-vien>/<mo-ta-ngan>`. Không dùng `main` làm nhánh làm việc.
-4. **Làm trên nhánh cá nhân:** commit thay đổi vào nhánh của mình. Không commit hoặc push trực tiếp lên `dev` hay `main`; không merge nhánh cá nhân vào `dev`.
+3. **Cập nhật nhánh gốc:** lấy thay đổi mới nhất từ `Dev`; mỗi thành viên dùng một nhánh cá nhân mang tên mình, ví dụ `qhiu` hoặc `nguyen-van-a`. Không thêm tiền tố `feature/`; không dùng `main` làm nhánh làm việc.
+4. **Làm trên nhánh cá nhân:** commit thay đổi vào nhánh mang tên mình. Không commit hoặc push trực tiếp lên `Dev` hay `main`; không merge nhánh cá nhân trực tiếp vào `Dev`.
 5. **Kiểm tra trước PR:** chạy các kiểm tra phù hợp, thử luồng trên các CSDL riêng khi cần, kiểm tra log và cập nhật README/schema/tài liệu con liên quan.
-6. **Mở Pull Request:** tạo PR từ nhánh cá nhân vào `dev`, không nhắm vào `main`. Điền đầy đủ `Add a title` và `Add a description` theo mẫu ở mục 5.1. Yêu cầu trưởng nhóm **Quốc Hiếu** review.
-7. **Sửa theo review:** tác giả cập nhật nhánh cá nhân và push commit bổ sung lên đúng nhánh đó. Mỗi lần có code mới, cập nhật description của PR để mô tả toàn bộ diff hiện tại, gồm cả thay đổi cũ lẫn mới. Không tự approve hoặc merge PR của mình; không tự merge vào `dev`.
-8. **Merge và đóng task:** chỉ Quốc Hiếu, sau khi kiểm tra PR, mới merge vào `dev`. Nếu chưa xác định được tài khoản reviewer hoặc không mở được PR, giữ thay đổi trên nhánh cá nhân và báo Quốc Hiếu; không thay `main` cho `dev`.
+6. **Mở Pull Request:** tạo PR từ nhánh cá nhân vào `Dev`, không nhắm vào `main`. Điền đầy đủ `Add a title` và `Add a description` theo mẫu ở mục 5.1. Yêu cầu trưởng nhóm **Quốc Hiếu** review.
+7. **Sửa theo review:** tác giả cập nhật nhánh cá nhân và push commit bổ sung lên đúng nhánh đó. Mỗi lần có code mới, cập nhật description của PR để mô tả toàn bộ diff hiện tại, gồm cả thay đổi cũ lẫn mới. Không tự approve hoặc merge PR của mình; không tự merge vào `Dev`.
+8. **Merge và đóng task:** chỉ Quốc Hiếu, sau khi kiểm tra PR, mới merge vào `Dev`. Nếu chưa xác định được tài khoản reviewer hoặc không mở được PR, giữ thay đổi trên nhánh cá nhân và báo Quốc Hiếu; không thay `main` cho `Dev`.
 9. **Demo định kỳ:** dùng kịch bản ở README mục 6; ghi lại lỗi và người theo dõi thay vì để tới cuối kỳ.
 
 ### 5.1. Tiêu chuẩn title và description của Pull Request
@@ -125,8 +125,8 @@ Ví dụ: nếu PR #1 đã được mở/push và sau đó tác giả push thêm
 
 ## 7. Checklist trước khi merge
 
-- [ ] Thay đổi nằm trên nhánh cá nhân tạo từ `dev`; không có commit/push trực tiếp lên `dev` hoặc `main`.
-- [ ] PR nhắm vào `dev`, có mô tả và bằng chứng kiểm tra; đã yêu cầu Quốc Hiếu review.
+- [ ] Thay đổi nằm trên nhánh cá nhân mang tên thành viên, tạo từ `Dev`; không có commit/push trực tiếp lên `Dev` hoặc `main`.
+- [ ] PR nhắm vào `Dev`, có mô tả và bằng chứng kiểm tra; đã yêu cầu Quốc Hiếu review.
 - [ ] `Add a title` nêu rõ loại, phạm vi và kết quả; `Add a description` bao quát toàn bộ diff hiện tại.
 - [ ] Mỗi lần push thêm code vào PR, description đã được cập nhật; PR mới có description riêng.
 - [ ] Tác giả không tự approve hoặc merge; Quốc Hiếu đã review và là người merge. Review bổ sung không thay bước này.
