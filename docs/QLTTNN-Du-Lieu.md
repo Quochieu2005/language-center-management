@@ -10,7 +10,7 @@ Q1, Q7 và TD có cùng cấu trúc bảng, nhưng không gộp thành một CSD
 
 | Nhóm | Bảng | Quy tắc định vị |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` | Bản sao thống nhất ở mọi site đang `hoat_dong` |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` | Bản sao thống nhất ở mọi site đang `hoat_dong` |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Dựa theo `ma_co_so` của bản ghi |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Theo site của bảng cha, không tự định tuyến độc lập |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái chuyển chỉ tại CSDL nguồn; sự kiện chuyển append-only tại site phát sinh; các bảng khác tại site xử lý |
