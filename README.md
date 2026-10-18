@@ -89,7 +89,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 | Nhiều CSDL độc lập | SQL Server có một CSDL riêng cho mỗi cơ sở; mỗi site có kết nối riêng |
 | Phân mảnh ngang | Hồ sơ nghiệp vụ của học viên, nhân viên, giáo viên, phòng và lớp nằm ở site quản lý hồ sơ đó |
 | Phân mảnh dẫn xuất | Đăng ký, học phí, điểm, buổi học và điểm danh nằm cùng site với bảng cha |
-| Nhân bản dữ liệu dùng chung | Cơ sở, môn học, khóa học và tài khoản được giữ đồng nhất ở các site đang hoạt động |
+| Nhân bản dữ liệu dùng chung | Cơ sở, môn học, khóa học, tài khoản và liên kết đăng nhập OAuth được giữ đồng nhất ở các site đang hoạt động |
 | Truy vấn toàn cục | Django hỏi các site cần thiết rồi gộp kết quả ở tầng ứng dụng |
 | Giao dịch phân tán | Chuyển cơ sở phối hợp site nguồn và site đích, có trạng thái phục hồi |
 
@@ -228,7 +228,7 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện lịch sử chỉ ghi thêm tại site phát sinh; không nhân bản |
@@ -247,7 +247,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 |---|---|---|---|
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản và liên kết OAuth | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
 | `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
@@ -262,7 +262,7 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc` hoặc `TaiKhoan` đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
+Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` hoặc `TaiKhoanLienKetOAuth` đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -438,13 +438,15 @@ flowchart LR
     NguoiDung["Người dùng"] -->|gửi thao tác| GiaoDienWeb["GiaoDienWeb"]
     GiaoDienWeb["GiaoDienWeb"] -->|gửi yêu cầu| API["API"]
     API["API"] -->|điều phối nghiệp vụ| DangNhap["Đăng nhập"]
-    DangNhap["Đăng nhập"] -->|chọn cơ sở để đăng nhập| SiteRouter["Bộ định tuyến cơ sở"]
+    GiaoDienWeb -->|chuyển hướng OAuth khi người dùng chọn| GoogleFacebook["Google / Facebook"]
+    GoogleFacebook -->|authorization code về callback| API
+    DangNhap -->|đối chiếu subject đã liên kết| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|đọc tài khoản| SQLServer_CSDL_Site["SQL Server của cơ sở"]
     DangNhap["Đăng nhập"] -->|nạp phạm vi quyền| PhanQuyen["Phân quyền"]
     DangNhap["Đăng nhập"] -->|ghi nhận đăng nhập| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Django tìm tài khoản theo thông tin đăng nhập ở các bản nhân bản, xác minh mật khẩu bằng bản băm và trạng thái tài khoản. Sau đó tạo ngữ cảnh người dùng gồm vai trò, site được giao và phạm vi lớp. Không trả mật khẩu băm hoặc thông tin kết nối CSDL về Next.js. Ghi nhật ký thành công/thất bại nhưng không ghi mật khẩu.
+Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider, tra subject trong `TaiKhoanLienKetOAuth` ở các CSDL site riêng rồi đọc `TaiKhoan` để lấy trạng thái, vai trò và phạm vi. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi danh tính là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao của bảng dùng chung; không có CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
 
 ### 5.8. Quên và đặt lại mật khẩu
 
@@ -459,7 +461,7 @@ flowchart LR
     API["API"] -->|điều phối nghiệp vụ| DatLaiMatKhau["Đặt lại mật khẩu"]
     DatLaiMatKhau["Đặt lại mật khẩu"] -->|tìm tài khoản tại cơ sở| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|đọc tài khoản| SQLServer_CSDL_Site["SQL Server của cơ sở"]
-    DatLaiMatKhau["Đặt lại mật khẩu"] -->|tạo mã một lần| KiemTraLienKet["Kiểm tra liên kết"]
+    DatLaiMatKhau["Đặt lại mật khẩu"] -->|tạo token liên kết ngẫu nhiên, dùng một lần| KiemTraLienKet["Kiểm tra liên kết"]
     DatLaiMatKhau["Đặt lại mật khẩu"] -->|gửi liên kết| DichVuEmail["Dịch vụ email"]
 ```
 
@@ -479,6 +481,8 @@ flowchart LR
 
 Phản hồi yêu cầu quên mật khẩu không tiết lộ email có tồn tại hay không. Token có hạn dùng và chỉ dùng một lần; CSDL lưu `token_bam`, email chỉ nhận liên kết cần thiết. Khi đổi mật khẩu, cập nhật `TaiKhoan` tới mọi site đang hoạt động bằng cùng bộ đồng bộ dữ liệu dùng chung, vô hiệu hóa token và đăng xuất phiên cũ. Không ghi token thô vào log.
 
+API đã có cấu hình nền Gmail SMTP trong `src/api/.env` (máy cá nhân); dùng địa chỉ Gmail gửi thư và App Password riêng, không phải OAuth Client Secret. Nếu App Password cũ đã bị lộ, hãy thu hồi trước khi điền mật khẩu mới. Các luồng gửi thư/đặt lại mật khẩu trong README là thiết kế nghiệp vụ, chưa chạy được vì API hiện chưa có endpoint xác thực; trang phục hồi cũng chưa thể gửi email thật.
+
 ### 5.9. Tạo tài khoản nhân viên/giáo viên và phân công Admin Small
 
 **Loại:** tạo tài khoản `REPLICATED-WRITE`; tạo hồ sơ làm việc `LOCAL` tại site được giao · **Ai làm:** Admin Big.
@@ -494,7 +498,7 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big tạo thông tin đăng nhập dùng chung rồi tạo hồ sơ nhân viên/giáo viên tại đúng cơ sở làm việc. Với Admin Small, tài khoản có `vai_tro = nhan_vien`, gắn `ma_co_so` của cơ sở được phân công và hồ sơ có `chuc_vu = quan_ly_co_so`. Kiểm tra email/tên đăng nhập toàn hệ thống trước khi ghi. Nếu tạo hồ sơ site thất bại sau khi tài khoản đã được nhân bản, phải vô hiệu hóa/khôi phục theo trạng thái lưu; không để tài khoản hoạt động mà thiếu phạm vi cơ sở.
+Admin Big tạo tài khoản dùng chung và hồ sơ nhân viên/giáo viên tại đúng cơ sở làm việc. Với Admin Small, tài khoản có `vai_tro = nhan_vien`, gắn `ma_co_so` của cơ sở được phân công và hồ sơ có `chuc_vu = quan_ly_co_so`. Không để Admin Big đặt hoặc gửi mật khẩu thay người nhận: sau khi hồ sơ và dữ liệu phân tán sẵn sàng, API sẽ gửi liên kết kích hoạt dùng một lần để người nhận tự đặt mật khẩu. Kiểm tra email/tên đăng nhập toàn hệ thống trước khi ghi. Nếu tạo hồ sơ site thất bại sau khi tài khoản đã được nhân bản, phải vô hiệu hóa/khôi phục theo trạng thái lưu; không để tài khoản hoạt động mà thiếu phạm vi cơ sở. Hiện schema chưa có trạng thái/token kích hoạt và API chưa có endpoint tạo tài khoản hay gửi email, nên luồng này chưa được bật.
 
 ### 5.10. Mở lớp và sinh lịch học
 

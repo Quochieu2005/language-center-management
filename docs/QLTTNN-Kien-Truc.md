@@ -52,7 +52,7 @@ Luồng thêm site theo README 5.14:
 
 1. Tạo CSDL mới với cùng bộ schema; khai báo cấu hình kết nối ở Coordinator.
 2. Thêm site ở trạng thái `chuan_bi` vào bảng `CoSo` nhân bản để các site đang chạy biết site mới.
-3. Chép `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` sang site mới; đối soát phiên bản cho khớp.
+3. Chép `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` sang site mới; đối soát phiên bản cho khớp.
 4. Chỉ khi đồng nhất mới kích hoạt `hoat_dong` qua ghi nhân bản tới mọi site, bao gồm site mới.
 5. Tạo tài khoản quản lý/nhân viên/giáo viên tại cơ sở mới; sau đó site mới nhận dữ liệu nghiệp vụ.
 
@@ -66,7 +66,7 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 |---|---|---|---|
 | `LOCAL` | Một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm, mở lớp, điểm danh | Không ghi sang site khác; giao dịch tại site được rollback nếu bước cục bộ thất bại |
 | `GLOBAL` | Đọc các site cần thiết; ứng dụng gộp | Thống kê, tra cứu học viên, nhật ký toàn hệ thống | README 5.6 cho phép hiện phần có được kèm cảnh báo site thiếu; không trình bày số đó như tổng đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung ở mọi site `hoat_dong` | Tài khoản, môn học, khóa học, trạng thái cơ sở | Thiếu site sẵn sàng thì từ chối; không báo thành công nếu chỉ ghi một phần |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung ở mọi site `hoat_dong` | Tài khoản, liên kết OAuth, môn học, khóa học, trạng thái cơ sở | Thiếu site sẵn sàng thì từ chối; không báo thành công nếu chỉ ghi một phần |
 | Đề nghị chuyển | CSDL nguồn | Admin Small tạo đề nghị `cho_duyet` | Học viên chưa chuyển và vẫn ở nguồn |
 | Hộp thư/duyệt đề nghị | Đọc các site; ghi quyết định tại nguồn | Admin Big đọc hộp thư, duyệt hoặc từ chối (`GLOBAL` + ghi cục bộ) | Kết quả thiếu site phải được đánh dấu; không có DB trung tâm |
 | `DISTRIBUTED-TX` | Hai site nguồn/đích của học viên | Chuyển hồ sơ sau khi được duyệt | Chỉ bắt đầu khi đề nghị `cho_duyet` đã chuyển sang `dang_xu_ly`; phục hồi theo trạng thái đã lưu, xem [giao dịch phân tán](QLTTNN-Giao-Dich-Phan-Tan.md) |

@@ -92,6 +92,31 @@ BEGIN TRY
         CONSTRAINT CK_TaiKhoan_phien_ban CHECK (phien_ban > 0)
     );
 
+    /* Liên kết OAuth là dữ liệu dùng chung, phải được ghi giống nhau tại mọi site hoạt động. */
+    CREATE TABLE dbo.TaiKhoanLienKetOAuth
+    (
+        ma_lien_ket       UNIQUEIDENTIFIER NOT NULL,
+        ma_tai_khoan      VARCHAR(24)      NOT NULL,
+        nha_cung_cap      VARCHAR(16)      NOT NULL,
+        provider_subject  NVARCHAR(255)    NOT NULL,
+        trang_thai        VARCHAR(20)      NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_trang_thai DEFAULT ('hoat_dong'),
+        ngay_lien_ket      DATETIME2(0)     NOT NULL,
+        ngay_thu_hoi       DATETIME2(0)     NULL,
+        phien_ban          BIGINT           NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_phien_ban DEFAULT (1),
+        cap_nhat_luc       DATETIME2(0)     NOT NULL,
+        CONSTRAINT PK_TaiKhoanLienKetOAuth PRIMARY KEY (ma_lien_ket),
+        CONSTRAINT UQ_TaiKhoanLienKetOAuth_provider_subject UNIQUE (nha_cung_cap, provider_subject),
+        CONSTRAINT UQ_TaiKhoanLienKetOAuth_tai_khoan_provider UNIQUE (ma_tai_khoan, nha_cung_cap),
+        CONSTRAINT FK_TaiKhoanLienKetOAuth_TaiKhoan FOREIGN KEY (ma_tai_khoan)
+            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT CK_TaiKhoanLienKetOAuth_nha_cung_cap CHECK (nha_cung_cap IN ('google', 'facebook')),
+        CONSTRAINT CK_TaiKhoanLienKetOAuth_trang_thai CHECK (trang_thai IN ('hoat_dong', 'da_thu_hoi')),
+        CONSTRAINT CK_TaiKhoanLienKetOAuth_thu_hoi CHECK
+            ((trang_thai = 'hoat_dong' AND ngay_thu_hoi IS NULL) OR
+             (trang_thai = 'da_thu_hoi' AND ngay_thu_hoi IS NOT NULL)),
+        CONSTRAINT CK_TaiKhoanLienKetOAuth_phien_ban CHECK (phien_ban > 0)
+    );
+
     /* Hồ sơ riêng theo site. ma_co_so trên bảng con là khóa phân mảnh. */
     CREATE TABLE dbo.HocVien
     (
