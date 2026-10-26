@@ -17,6 +17,16 @@ Copy-Item .env.example .env
 
 Nếu môi trường đã có Python khác tương thích, thay `py -3.13` bằng launcher/version tương ứng. Không cài package vào Python toàn máy; dependency được cài trong `.venv` của API. Cần cài driver SQL Server tương thích nếu máy API kết nối SQL Server qua ODBC.
 
+Khi mở repository ở thư mục gốc bằng VS Code, terminal tích hợp CMD mặc định bắt đầu tại thư mục gốc. Sau khi đã tạo `src/api/.venv`, có thể vào API theo từng bước rồi chạy lệnh như bình thường:
+
+```cmd
+cd src
+cd api
+python manage.py runserver 127.0.0.1:8000
+```
+
+Profile trong `.vscode/settings.json` tự kích hoạt `.venv` khi `cd` vào thư mục có `Scripts/activate.bat`. Cấu hình này chỉ áp dụng cho terminal tích hợp của VS Code khi mở repository; cửa sổ CMD mở bên ngoài VS Code không đọc cấu hình workspace. Nếu profile chưa đổi sau khi cập nhật, chạy **Developer: Reload Window**, đóng terminal cũ và mở terminal mới.
+
 ## Swagger / OpenAPI
 
 Giao diện tài liệu được **sinh từ API bằng `drf-spectacular`**; source không tự dựng một trang Swagger riêng. Gói `drf-spectacular[sidecar]` phục vụ asset Swagger UI từ dependency đã cài, không cần tải giao diện từ CDN.
