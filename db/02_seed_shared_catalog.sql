@@ -20,27 +20,32 @@ BEGIN TRY
     BEGIN TRANSACTION;
 
     IF NOT EXISTS (SELECT 1 FROM dbo.CoSo WHERE ma_co_so = 'Q1')
-        INSERT dbo.CoSo (ma_co_so, ten_co_so, trang_thai) VALUES ('Q1', N'Cơ sở Quận 1', 'hoat_dong');
+        INSERT dbo.CoSo (ma_co_so, slug, ten_co_so, trang_thai)
+        VALUES ('Q1', 'co-so-quan-1', N'Cơ sở Quận 1', 'hoat_dong');
 
     IF NOT EXISTS (SELECT 1 FROM dbo.CoSo WHERE ma_co_so = 'Q7')
-        INSERT dbo.CoSo (ma_co_so, ten_co_so, trang_thai) VALUES ('Q7', N'Cơ sở Quận 7', 'hoat_dong');
+        INSERT dbo.CoSo (ma_co_so, slug, ten_co_so, trang_thai)
+        VALUES ('Q7', 'co-so-quan-7', N'Cơ sở Quận 7', 'hoat_dong');
 
     IF NOT EXISTS (SELECT 1 FROM dbo.CoSo WHERE ma_co_so = 'TD')
-        INSERT dbo.CoSo (ma_co_so, ten_co_so, trang_thai) VALUES ('TD', N'Cơ sở Thủ Đức', 'hoat_dong');
+        INSERT dbo.CoSo (ma_co_so, slug, ten_co_so, trang_thai)
+        VALUES ('TD', 'co-so-thu-duc', N'Cơ sở Thủ Đức', 'hoat_dong');
 
     IF NOT EXISTS (SELECT 1 FROM dbo.MonHoc WHERE ma_mon = 'MH-ENG')
-        INSERT dbo.MonHoc (ma_mon, ten_mon, mo_ta) VALUES ('MH-ENG', N'Tiếng Anh', N'Danh mục môn học dùng chung');
+        INSERT dbo.MonHoc (ma_mon, slug, ten_mon, mo_ta)
+        VALUES ('MH-ENG', 'tieng-anh', N'Tiếng Anh', N'Danh mục môn học dùng chung');
 
     IF NOT EXISTS (SELECT 1 FROM dbo.MonHoc WHERE ma_mon = 'MH-JPN')
-        INSERT dbo.MonHoc (ma_mon, ten_mon, mo_ta) VALUES ('MH-JPN', N'Tiếng Nhật', N'Danh mục môn học dùng chung');
+        INSERT dbo.MonHoc (ma_mon, slug, ten_mon, mo_ta)
+        VALUES ('MH-JPN', 'tieng-nhat', N'Tiếng Nhật', N'Danh mục môn học dùng chung');
 
     IF NOT EXISTS (SELECT 1 FROM dbo.KhoaHoc WHERE ma_khoa_hoc = 'KH-IELTS-65')
-        INSERT dbo.KhoaHoc (ma_khoa_hoc, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
-        VALUES ('KH-IELTS-65', 'MH-ENG', N'IELTS 6.5', N'IELTS 6.5', 24, 12000000);
+        INSERT dbo.KhoaHoc (ma_khoa_hoc, slug, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
+        VALUES ('KH-IELTS-65', 'ielts-6-5', 'MH-ENG', N'IELTS 6.5', N'IELTS 6.5', 24, 12000000);
 
     IF NOT EXISTS (SELECT 1 FROM dbo.KhoaHoc WHERE ma_khoa_hoc = 'KH-JP-N5')
-        INSERT dbo.KhoaHoc (ma_khoa_hoc, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
-        VALUES ('KH-JP-N5', 'MH-JPN', N'Tiếng Nhật N5', N'N5', 30, 6000000);
+        INSERT dbo.KhoaHoc (ma_khoa_hoc, slug, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
+        VALUES ('KH-JP-N5', 'tieng-nhat-n5', 'MH-JPN', N'Tiếng Nhật N5', N'N5', 30, 6000000);
 
     IF (SELECT COUNT(*) FROM dbo.CoSo WHERE ma_co_so IN ('Q1', 'Q7', 'TD')) <> 3
        OR EXISTS
