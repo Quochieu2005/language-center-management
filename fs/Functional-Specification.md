@@ -56,6 +56,12 @@ Danh sách site không được đóng cứng trong code. Khi có thêm cơ sở
 
 ## 3. Thuật ngữ và quy tắc phân tán
 
+### Yêu cầu chung phải nghiệm thu cùng chức năng
+
+Theo yêu cầu môn học, mỗi đề tài có **2–4 site** và phải triển khai **phân mảnh, replication, transaction, đồng bộ dữ liệu**. Ba site Q1/Q7/TD thuộc phạm vi này; kịch bản BT là site thứ tư. Mỗi nhóm được chọn kiểu phân mảnh phù hợp, nhưng phải chứng minh **ít nhất 1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
+
+[YC-01–YC-07 và kịch bản kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) là tiêu chí nghiệm thu bắt buộc. Các mục cơ chế còn mở không miễn yêu cầu. Điều phối chuyển hiện được thiết kế theo phục hồi tiến về phía trước; cần chốt mức bảo đảm phù hợp tiêu chí giảng viên, không tự khẳng định đã có ACID nguyên tử xuyên site.
+
 | Thuật ngữ | Ý nghĩa trong dự án |
 |---|---|
 | Site/cơ sở | Một cơ sở nghiệp vụ và CSDL SQL Server độc lập tương ứng. |
@@ -264,6 +270,8 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 **Nghiệm thu:** không thể đăng ký lớp ở site khác; mọi bản ghi con ở đúng site lớp; kiểm tra đồng thời hai lượt cuối không vượt sức chứa.
 
+**TC-CON-01 / YC-05:** hai học viên khác nhau, hai phiên độc lập, cùng lớp còn đúng một chỗ; hai yêu cầu phải chạy chồng lấp tại vùng tranh chấp. Chỉ một yêu cầu tạo `DangKy`/`HocPhi` và tăng sĩ số; yêu cầu còn lại nhận lỗi lớp đầy/xung đột theo hợp đồng, không ghi nghiệp vụ dở dang. Ghi cơ chế bảo vệ sức chứa phía API/DB và bằng chứng cạnh tranh; khóa nút giao diện không đủ chứng minh concurrency.
+
 ### FS-CLASS-01 — Mở lớp và tạo lịch học
 
 **Người dùng:** Admin Small/lễ tân theo quyền. **Kiểu:** LOCAL. **Bảng:** KhoaHoc, GiaoVien, PhongHoc, LopHoc, BuoiHoc, NhatKyHeThong.
@@ -467,6 +475,22 @@ Response thành công/lỗi cuối cùng được chốt trong specs/api.md. Res
 
 ## 10. Tiêu chí nghiệm thu tổng thể
 
+### Đối chiếu yêu cầu chung ngoài sáu nghiệp vụ
+
+| Yêu cầu chung | Phần chức năng/thiết kế liên quan | Bằng chứng bắt buộc |
+|---|---|---|
+| YC-01: 2–4 site | FS-SITE-01, định tuyến và schema; mặc định 3 site | TC-SITE-01: DB/alias và topology thực tế |
+| YC-02: phương pháp phân mảnh | FS-CLASS-01, FS-ENR-01; ngang `LopHoc`, dẫn xuất `DangKy` | TC-FRAG-01: đầy đủ, không giao nhau, tái thiết |
+| YC-03: phương pháp replication | FS-SITE-01, FS-ACC-01; bảng dùng chung theo schema | TC-REP-01: một thay đổi thực tế truyền đến các bản sao |
+| YC-04: distributed transaction | FS-TRF-01/02/03 | TC-DTX-01: thay đổi hai site, lỗi trước/sau commit đích và recovery |
+| YC-05: concurrency | FS-ENR-01; kiểm soát cập nhật sức chứa trong site | TC-CON-01: hai phiên tranh chỗ cuối, chỉ một yêu cầu thành công |
+| YC-06: distributed query | FS-REPORT-01; hộp thư FS-TRF-02 | TC-DQ-01: truy vấn từng site, gộp và thông báo site thiếu |
+| YC-07: đồng bộ | FS-SITE-01, FS-AUD-01 | TC-SYNC-01: site lỗi, retry/đối soát, không ghi trùng |
+
+Ma trận này bổ sung ma trận sáu nghiệp vụ ở mục 9; không thay thế yêu cầu chức năng nào. Các bước chi tiết nằm trong [tài liệu kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md).
+
+### Điều kiện hoàn tất
+
 Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất cả mục áp dụng:
 
 1. Đúng vai trò, bản ghi và phạm vi site; thử sửa role/site trong request không vượt quyền.
@@ -479,6 +503,7 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 8. Chạy kiểm tra cần thiết cho phần thay đổi: test, lint/typecheck/build theo repo; kiểm tra API và truy vấn SQL tại từng site bị ảnh hưởng.
 9. Ghi rõ môi trường, kịch bản, kết quả và phần chưa thử. Không tuyên bố hiệu năng ms hoặc không còn bug khi chưa đo/chạy.
 10. Cập nhật README, API/UI spec, schema/script/migration và tài liệu liên quan nếu thay đổi làm chúng lệch nhau.
+11. Với phần liên quan, có mã YC/TC và kết quả thật; nghiệm thu toàn đồ án phải đủ YC-01–YC-07. Phải chứng minh concurrency bằng hai phiên thực sự cạnh tranh và replication bằng truyền thay đổi, không chỉ seed hay thao tác tuần tự.
 
 ## 11. Các quyết định và khoảng trống còn phải chốt
 
@@ -494,6 +519,10 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 | OPEN-08 | Metadata Cloudinary, quyền upload/xóa và ràng buộc site sở hữu ảnh | DATABASE_SCHEMA.md, API upload |
 | OPEN-09 | Có đưa tài khoản/portal học viên vào phạm vi không; nếu có phải thiết kế vai trò và liên kết HocVien | README, schema, API, UI, FS |
 | OPEN-10 | Ngưỡng thời gian truy vấn p50/p95 và thiết bị/mạng đo cho mục tiêu hiệu năng | specs/api.md, specs/ui-ux.md |
+| OPEN-11 | Phương pháp replication, nơi được phép ghi, tiến trình/ACK từng site, phiên bản và phục hồi; tránh API/Publication ghi trùng | README mục 9, schema, tài liệu đồng bộ, YC-03/YC-07 |
+| OPEN-12 | Giao thức distributed transaction và mức bảo đảm đáp ứng tiêu chí giảng viên; nếu cần DBMS quản lý phải triển khai/kiểm thử bổ sung | README mục 9, tài liệu giao dịch, YC-04 |
+| OPEN-13 | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện để bảo vệ chỗ cuối, bộ kiểm thử hai phiên | FS-ENR-01, specs/api.md, source, YC-05 |
+| OPEN-14 | Cách lưu bền vững một thao tác replication cùng trạng thái/phiên bản xác nhận ở từng site để có thể phân biệt chưa gửi, đã nhận, timeout chưa rõ và cần retry. `NhatKyDongBo` hiện chỉ là log append-only; xác định log đủ dùng hay cần outbox/bảng tiến trình và migration trước khi code | `NhatKyDongBo`, schema/migration, README mục 9, specs/api.md, TC-REP-01/TC-SYNC-01 |
 
 Không tự coi các mục OPEN là đã chốt. Khi nhóm thống nhất, cập nhật các tài liệu liên quan trong cùng thay đổi và bổ sung tiêu chí nghiệm thu cụ thể.
 
