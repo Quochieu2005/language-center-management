@@ -10,10 +10,11 @@
 
 **Cách đọc sơ đồ:** đây là **sơ đồ kiến trúc luồng**, không phải ERD bảng. Mỗi nút là vai trò người dùng, `GiaoDienWeb`, `API`, dịch vụ điều phối hoặc CSDL tại cơ sở. Mũi tên cho biết chiều gửi yêu cầu, điều phối hoặc đọc/ghi dữ liệu; chúng không biểu diễn khóa ngoại giữa các CSDL. ERD bảng và quan hệ dữ liệu nằm trong `docs/DATABASE_SCHEMA.md`.
 
-**Mục lục:** [Mô hình hoạt động tổng quát](#mô-hình-hoạt-động-tổng-quát) · [1. Bài toán](#1-bài-toán-trong-1-phút) · [2. Sơ đồ kiến trúc](#2-sơ-đồ-kiến-trúc-hệ-thống) · [3. Vai trò](#3-ai-được-làm-gì) · [4. Quy tắc phân tán](#4-dữ-liệu-và-quy-tắc-phân-tán) · [5. Luồng nghiệp vụ](#5-các-luồng-nghiệp-vụ) · [6. Demo](#6-kịch-bản-demo) · [7. Ngoài phạm vi](#7-ngoài-phạm-vi) · [8. Chức năng](#8-danh-sách-chức-năng) · [9. Stack và quyết định còn mở](#9-stack-và-quyết-định-còn-mở) · [10. Tiến độ](#10-tiến-độ) · [11. Hướng dẫn cho người triển khai](#11-hướng-dẫn-cho-người-triển-khai)
+**Mục lục:** [Mô hình hoạt động tổng quát](#mô-hình-hoạt-động-tổng-quát) · [1. Bài toán](#1-bài-toán-trong-1-phút) · [2. Sơ đồ kiến trúc](#2-sơ-đồ-kiến-trúc-hệ-thống) · [3. Vai trò](#3-ai-được-làm-gì) · [4. Quy tắc phân tán](#4-dữ-liệu-và-quy-tắc-phân-tán) · [5. Luồng nghiệp vụ](#5-các-luồng-nghiệp-vụ) · [6. Demo](#6-kịch-bản-demo) · [7. Ngoài phạm vi](#7-ngoài-phạm-vi) · [8. Chức năng](#8-danh-sách-chức-năng) · [9. Stack và quyết định còn mở](#9-stack-và-quyết-định-còn-mở) · [10. Tiến độ](#10-tiến-độ) · [11. Hướng dẫn cho người triển khai](#11-hướng-dẫn-cho-người-triển-khai) · [12. Tốc độ tải trang và dữ liệu](#12-tốc-độ-tải-trang-và-dữ-liệu)
 
 **Tài liệu theo chủ đề:**
 
+- [Đặc tả chức năng và tiêu chí nghiệm thu](fs/README.md)
 - [Đặc tả yêu cầu giao diện và API](specs/README.md)
 - [Cấu trúc bảng và phân mảnh](docs/DATABASE_SCHEMA.md)
 - [Script khởi tạo ba CSDL SQL Server](db/README.md)
@@ -92,6 +93,14 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 | Nhân bản dữ liệu dùng chung | Cơ sở, môn học, khóa học, tài khoản và liên kết đăng nhập OAuth được giữ đồng nhất ở các site đang hoạt động |
 | Truy vấn toàn cục | Django hỏi các site cần thiết rồi gộp kết quả ở tầng ứng dụng |
 | Giao dịch phân tán | Chuyển cơ sở phối hợp site nguồn và site đích, có trạng thái phục hồi |
+| Truy cập đồng thời | Hai phiên đăng ký tranh chỗ cuối; chỉ một yêu cầu thành công, không vượt sĩ số |
+| Đồng bộ khi có lỗi | Site phục hồi nhận đúng thay đổi còn thiếu; retry không ghi trùng, không báo hoàn tất khi còn thiếu bản sao |
+
+### Yêu cầu chung áp dụng cho mọi đề tài
+
+Giảng viên yêu cầu **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Đồ án chọn **3 site Q1, Q7, TD**; BT trong kịch bản mở rộng là site thứ tư. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh, nhưng phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
+
+Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Lựa chọn cơ chế còn mở ở mục 9 không làm các yêu cầu này trở thành tùy chọn.
 
 ### Sáu nghiệp vụ bắt buộc theo đề tài
 
@@ -616,6 +625,12 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 | 15 | Đặt lại mật khẩu và dùng lại cùng liên kết | Token chỉ dùng một lần; mật khẩu mới đồng bộ ở mọi site hoạt động |
 | 16 | Đăng nhập sai và kiểm tra nhật ký | Có sự kiện từ chối, không có mật khẩu/token trong log |
 | 17 | Thêm cơ sở BT, nạp dữ liệu dùng chung rồi kích hoạt | BT được đưa vào truy vấn/ghi sau khi hoạt động mà không sửa code nghiệp vụ |
+| 18 | Hai phiên đăng ký hai học viên khác nhau vào lớp còn một chỗ | Chạy thực sự đồng thời; đúng một yêu cầu thành công; sĩ số tăng một, yêu cầu còn lại không để `DangKy`/`HocPhi` dở dang (TC-CON-01) |
+| 19 | Gây lỗi giữa lúc ghi bản sao, khôi phục site và retry/đối soát | Không báo hoàn tất sớm; bản sao nhận đúng phiên bản, không ghi lặp thay đổi đã nhận (TC-SYNC-01) |
+| 20 | Kiểm tra các mảnh lớp và đăng ký, hợp kết quả đọc tại ứng dụng | Chứng minh đầy đủ, không giao nhau và tái thiết được tập lớp logic; bản ghi con ở đúng site (TC-FRAG-01) |
+| 21 | Ngắt một site khi thống kê toàn hệ thống rồi khôi phục | `complete=false` và `missing_sites` đúng khi lỗi; sau phục hồi đối chiếu lại đủ số liệu (TC-DQ-01) |
+
+Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP-01, TC-DTX-01, TC-CON-01, TC-DQ-01 và TC-SYNC-01. Một bộ bằng chứng có thể phục vụ nhiều kịch bản nếu ghi rõ tiêu chí tương ứng; không đánh dấu đạt khi mới mô tả kế hoạch.
 
 ---
 
@@ -664,11 +679,15 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Worker phục hồi chuyển cơ sở | Nhịp quét, timeout/backoff, cảnh báo giao dịch `dang_xu_ly` quá lâu và cách vận hành worker được cấu hình thế nào? |
-| Yêu cầu công cụ của giảng viên | Có bắt buộc VPN/Remote Desktop, SQL Server Agent, Linked Server hoặc Publication/Replication không? Dùng cho mục đích nào và tránh ghi trùng ra sao? |
+| Phương pháp replication bắt buộc | Cơ chế nào truyền thay đổi bảng dùng chung? Nơi được phép ghi, các bản sao, phiên bản, ACK, xung đột và retry được xử lý thế nào? Nếu dùng Publication, chốt publisher/distributor/subscriber và tránh hai cơ chế ghi cùng bảng |
+| Trạng thái bền vững của đồng bộ | `NhatKyDongBo` hiện là nhật ký chỉ thêm theo site đích. Cần chốt cách lưu mã thao tác/phiên bản/trạng thái mỗi site và khôi phục sau timeout; xác định có cần bảng tiến trình/outbox và cập nhật schema/script không |
+| Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
+| Kiểm soát concurrency | Cách bảo vệ kiểm tra/cập nhật chỗ cuối trong một transaction và cách tạo cạnh tranh giữa hai phiên ở TC-CON-01 là gì? |
+| Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |
 | Giao diện API và bảo mật | Hợp đồng endpoint, xác thực phiên/token, CORS và thời hạn đăng nhập được thống nhất thế nào? |
 | Cấu hình môi trường | Tên biến môi trường và nơi lưu chuỗi kết nối/bí mật; tuyệt đối không commit bí mật vào Git |
 
-Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay đồng bộ vật lý đã hoàn tất. Thiết kế nghiệp vụ hiện yêu cầu Django hỏi từng CSDL rồi gộp ở ứng dụng. Nếu môn học bắt buộc minh họa Linked Server hoặc Publication/Replication, nhóm cần xác định phạm vi riêng, kiểm tra với yêu cầu giảng viên và ghi lại kết quả thật; không tự chuyển các luồng nghiệp vụ sang JOIN xuyên site hoặc ghi nhân bản hai lần.
+Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay đồng bộ vật lý đã hoàn tất. Replication, distributed transaction, concurrency, distributed query và phân mảnh phải có minh chứng; đồng bộ phải thử cả lỗi/phục hồi. Công cụ cụ thể phải bám yêu cầu cài đặt của giảng viên. Django vẫn hỏi từng CSDL rồi gộp ở ứng dụng; không tự đổi nghiệp vụ sang JOIN xuyên site hoặc để API và Publication ghi trùng cùng bảng. Kết quả kiểm chứng và quyết định cơ chế phải được ghi riêng với mô tả thiết kế.
 
 ---
 
@@ -681,6 +700,7 @@ Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay
 | Frontend Next.js / Django API | Stack đã chọn; tình trạng source cần cập nhật theo repo | Source, lệnh chạy và kiểm thử API/UI |
 | Ba CSDL SQL Server | Thiết kế yêu cầu ba DB độc lập; tình trạng cài đặt cần cập nhật | Ảnh SSMS, truy vấn xác nhận từng site |
 | VPN/Linked Server/Agent/Publication | Chỉ ghi nhận nếu thực tế được yêu cầu và cài | Ảnh cấu hình, script và kết quả thử |
+| YC-01–YC-07 của môn học | Đã bổ sung tiêu chí; chưa kiểm chứng trong đợt cập nhật tài liệu này | Kết quả bảy kịch bản TC, dữ liệu từng site, lỗi/phục hồi và concurrency thực tế |
 | Phục hồi giao dịch chuyển cơ sở | Schema và quy tắc phục hồi đã thiết kế; code worker và bằng chứng fault-injection còn cần thực hiện | Kịch bản lỗi trước/sau từng bước, trạng thái từng site, thống kê và kết quả phục hồi |
 
 Khi cập nhật bảng này, chỉ đánh dấu hoàn thành khi có source hoặc bằng chứng chạy được. Không ghi kế hoạch thành kết quả đã triển khai.
@@ -710,3 +730,57 @@ Quy tắc khi viết source:
 - Không ghi mật khẩu/token thô vào CSDL hoặc log; chỉ lưu bản băm.
 - Mọi thay đổi schema cập nhật `docs/DATABASE_SCHEMA.md`; mọi thay đổi nghiệp vụ/kiến trúc cập nhật README và tài liệu con liên quan.
 - Kiểm thử từng DB site riêng, kiểm tra quyền Admin Big/Admin Small và thử ít nhất một tình huống mất kết nối cho luồng phân tán.
+
+---
+
+## 12. Tốc độ tải trang và dữ liệu
+
+Các quy tắc dưới đây áp dụng khi thành viên hoặc AI thêm/sửa trang có dữ liệu. Mục tiêu là người dùng thấy cấu trúc trang và trạng thái chờ ngay, không phải đợi toàn bộ API hoặc CSDL phản hồi mới nhìn thấy nội dung. Đây là yêu cầu triển khai, **không phải xác nhận source hiện tại đã có đủ trang nghiệp vụ hoặc đã đạt một mức tốc độ cụ thể**.
+
+### 12.1. Xác định đúng nơi gây chậm
+
+Đo từng đoạn bằng millisecond; không mặc định quy mọi độ trễ cho SQL Server.
+
+| Dấu hiệu | Kiểm tra trước |
+|---|---|
+| Mở route đầu tiên sau `npm run dev` chậm, lần sau nhanh hơn | Next.js có thể đang biên dịch route khi truy cập trong chế độ phát triển. So sánh log terminal và lần mở lại; không dùng riêng số đo `dev` để kết luận tốc độ production. |
+| Khung trang hiện ngay nhưng bảng/số liệu tới muộn | DevTools → Network để tìm API chậm; sau đó đo thời gian xử lý Django và truy vấn SQL/site tương ứng. |
+| Cả trang trắng hoặc bị khóa tới khi dữ liệu xong | Kiểm tra page/Server Component có đang chờ toàn bộ request trước khi render hay chưa có loading boundary. |
+| Trang toàn hệ thống chậm hơn trang tại một cơ sở | Đo riêng từng site; kiểm tra số site được hỏi, lời gọi tuần tự, timeout và site không phản hồi. |
+
+Phân biệt thời gian nhận HTML/route, tải JavaScript, từng request API, xử lý Django và truy vấn SQL Server. Có thể ghi `request_id` cùng thời lượng từng bước; không ghi mật khẩu, token, chuỗi kết nối hoặc dữ liệu nhạy cảm vào log.
+
+### 12.2. Hiển thị trang trong lúc tải
+
+- Render layout, tiêu đề, điều hướng và phần nội dung ổn định trước; không đợi dữ liệu của mọi section rồi mới hiển thị toàn trang.
+- Với route cần chờ dữ liệu, dùng `loading.tsx`; với từng section độc lập, đặt Suspense boundary và skeleton cho riêng section. Kích thước skeleton gần với nội dung thật để hạn chế layout nhảy.
+- Hiện loading ngay khi thao tác bắt đầu. Không chờ response mới bật spinner; không thay toàn trang bằng spinner nếu chỉ một bảng đang tải.
+- Phân biệt rõ `loading`, `empty`, `error` và `partial`. Khi lỗi, giữ dữ liệu người dùng đã nhập. Chỉ đưa ra nút thử lại khi thao tác có thể retry an toàn.
+- Animation không được trì hoãn nội dung và phải tôn trọng `prefers-reduced-motion`.
+
+### 12.3. Gọi API và truy vấn dữ liệu
+
+- Không `await` nối tiếp các request độc lập. Khởi chạy song song khi dữ liệu không phụ thuộc nhau; chỉ chờ tuần tự khi có phụ thuộc nghiệp vụ. Tránh để page và component con tải trùng cùng một dữ liệu.
+- Không lấy toàn bộ học viên/lớp/phiếu thu về trình duyệt để lọc. Tìm kiếm, lọc và phân trang danh sách lớn phải được giới hạn tại API/Django và SQL Server.
+- Tránh truy vấn N+1. Dùng `select_related`/`prefetch_related` khi phù hợp; chỉ đọc trường cần hiển thị. Chỉ thêm index sau khi xem truy vấn và query plan thực tế.
+- Không thêm cache để che truy vấn chậm khi chưa xác định thời hạn và cách vô hiệu hóa. Không phục vụ trạng thái cũ cho quyền tài khoản, hồ sơ học viên, học phí, điểm, giao dịch hoặc chuyển cơ sở. Dữ liệu dùng chung chỉ cache theo chính sách đồng bộ đã thống nhất.
+- Không tự retry thao tác ghi, thu/hoàn học phí hoặc chuyển cơ sở khi timeout; trước tiên phải đọc trạng thái/idempotency theo hợp đồng API.
+
+### 12.4. Giữ nguyên kiến trúc CSDL phân tán
+
+- `LOCAL`: chỉ truy vấn CSDL của site hợp lệ thông qua Site Router. Trình duyệt không kết nối SQL Server.
+- `GLOBAL`: Django hỏi các site cần thiết qua kết nối riêng rồi tổng hợp tại tầng API. Không tạo DB trung tâm, không JOIN hoặc đặt khóa ngoại xuyên site.
+- Khi các truy vấn site độc lập, tránh chờ tuần tự từng site. Chỉ dùng fan-out song song có giới hạn và timeout sau khi xác nhận driver/kết nối an toàn.
+- Site không phản hồi phải được thể hiện trong kết quả `GLOBAL` bằng trạng thái chưa đầy đủ và `missing_sites`; không biến lỗi site thành danh sách rỗng hoặc báo cáo thành công toàn phần.
+- Không gọi truy vấn toàn cục nếu người dùng chỉ cần dữ liệu của site mình; không tải thêm dữ liệu nhạy cảm chỉ để giảm số request.
+
+### 12.5. Cách kiểm tra trước khi hoàn tất
+
+1. Ghi route, vai trò/site, lệnh chạy, môi trường và trạng thái cold start/cache khi đo.
+2. Đo lần vào route đầu và lần vào lại; khi đánh giá production, so sánh với bản chạy bằng `npm run build` rồi `npm run start`, không kết luận từ `npm run dev` một mình.
+3. Trong DevTools Network, ghi thời gian document, JavaScript và từng API. Với API có truy vấn DB, tách thời gian xử lý Django và từng site/query nếu có thể. Khi đo endpoint bằng nhiều request cùng điều kiện, ghi số lượt đo và p50/p95; một request đơn lẻ chỉ dùng để lần dấu nguyên nhân.
+4. Với `GLOBAL`, kiểm tra cả lúc đủ site và lúc một site chậm/mất kết nối; xác nhận UI hiển thị dữ liệu một phần đúng quy ước.
+5. Đo Core Web Vitals theo `specs/ui-ux.md` trên mobile và desktop. Ghi số đo, đơn vị `ms`, công cụ, viewport và môi trường; mục tiêu đặc tả không thay thế kết quả đo.
+6. Ghi kiểm tra đã chạy và điểm còn mở trong mô tả PR. Không ghi “đã tối ưu”, “không còn chậm” hoặc cam kết thời gian tải nếu chưa có số đo có thể lặp lại.
+
+**Điều kiện hoàn tất trang có dữ liệu:** phần giao diện ổn định hiện ra trước khi request kết thúc; loading/empty/error/partial khớp trạng thái API; không có request trùng hoặc truy vấn N+1 chưa giải thích; API kiểm tra đúng quyền/site; số đo route và API được ghi để nhóm so sánh về sau.
