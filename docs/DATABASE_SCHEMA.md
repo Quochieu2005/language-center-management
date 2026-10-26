@@ -239,6 +239,8 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 
 Ràng buộc duy nhất trong mỗi CSDL: `(nha_cung_cap, provider_subject)` và `(ma_tai_khoan, nha_cung_cap)`. Coordinator phải kiểm tra cùng các ràng buộc này trên toàn bộ site hoạt động trước khi nhân bản thay đổi; một provider identity không được gắn vào hai tài khoản. Không lưu access token, refresh token, client secret, email provider hoặc ảnh đại diện trong bảng này. Không tự tạo tài khoản và không tự liên kết theo email trùng nhau.
 
+**Phiên đăng nhập và idle timeout:** mỗi phiên phải hết hạn sau 3600 giây không có hoạt động người dùng và có thể bị thu hồi phía server. Schema hiện chưa có bảng phiên và API chưa có session backend. Trước khi triển khai đăng nhập, nhóm phải chốt nơi lưu trạng thái phiên (gồm mã phiên dạng băm, tài khoản, thời điểm hoạt động gần nhất, thời điểm hết hạn, trạng thái thu hồi); nếu chọn SQL Server thì phải định nghĩa vị trí sở hữu phiên, cập nhật lược đồ/script và triển khai riêng theo kiến trúc site. Không suy ra site từ tiền tố ID, không đặt mặc định trạng thái vào `default` dummy và không tạo CSDL nghiệp vụ trung tâm.
+
 ### 6.3. Con người (phân mảnh)
 
 **`HocVien`**

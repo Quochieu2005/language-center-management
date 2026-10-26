@@ -214,6 +214,22 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 **Điều kiện mở chức năng:** SMTP settings hiện có nhưng API gửi thư và endpoint reset chưa triển khai. Kiểm thử gửi thật cần tài khoản SMTP cục bộ, không ghi secret vào repo.
 
+### FS-AUTH-04 — Tự đăng xuất sau 1 giờ không hoạt động
+
+**Người dùng:** mọi tài khoản nội bộ đã đăng nhập: Admin Big, Admin Small, nhân viên, giáo viên; áp dụng cho tài khoản học viên nếu phạm vi tài khoản học viên được duyệt sau này. **Phân tán:** phiên xác thực là trạng thái kỹ thuật có thể thu hồi; việc đặt nơi lưu phải tuân theo kiến trúc CSDL riêng từng site, không tạo CSDL nghiệp vụ trung tâm.
+
+**Quy tắc:**
+
+1. Mỗi phiên đăng nhập có hạn idle **60 phút (3600 giây)** từ hoạt động người dùng thật gần nhất. Mỗi thiết bị/trình duyệt là một phiên riêng.
+2. Hoạt động thật gồm thao tác bàn phím, nhấn/chạm, cuộn trang có chủ ý và thao tác nghiệp vụ do người dùng khởi tạo. Request nền, polling, health check, tự refresh, timer, tab chỉ mở và thao tác reload không làm mới hạn.
+3. API lưu/kiểm tra thời điểm hoạt động và thời điểm hết hạn theo đồng hồ server. Sau hạn, mọi API cần xác thực trả `401 SESSION_IDLE_TIMEOUT`, thu hồi phiên và xóa cookie. Frontend đưa người dùng về trang đăng nhập.
+4. Frontend đồng bộ hoạt động giữa các tab cùng phiên. Có thể cảnh báo ở phút 55; nút “Tiếp tục phiên” phải được API xác nhận và không được dùng để hồi sinh phiên đã hết hạn.
+5. Logout thủ công, khóa/vô hiệu tài khoản hoặc reset mật khẩu phải thu hồi phiên theo chính sách bảo mật; không ghi cookie/token vào log.
+
+**Nghiệm thu:** phiên còn hiệu lực tại 59:59 nếu có hoạt động; sau 60:00 không hoạt động thì không truy cập được API và giao diện trở về đăng nhập; hoạt động thật đặt lại hạn; polling nền không đặt lại; reload/tab ngủ không vượt hạn; test riêng Admin Big, Admin Small và giáo viên cho cùng kết quả. Nơi lưu trạng thái phiên phải được chốt và cập nhật schema/migration trước khi triển khai.
+
+**Trạng thái hiện tại:** chưa triển khai vì API chưa có đăng nhập, logout hoặc session backend. Yêu cầu này là tiêu chí bắt buộc cho FS-AUTH-01/02 khi xây dựng xác thực, không phải xác nhận tính năng đang chạy.
+
 ### FS-ACC-01 — Tạo và phân công tài khoản nội bộ
 
 **Người dùng:** Admin Big. **Phân tán:** TaiKhoan Replicated-Write; hồ sơ NhanVien/GiaoVien Local tại site được giao.
