@@ -6,6 +6,8 @@ Tài liệu này giải thích README chính thành bản đồ kiến trúc d�
 
 Đồ án phải thể hiện nhiều CSDL độc lập, dữ liệu được chia theo cơ sở, dữ liệu dùng chung được nhân bản, truy vấn toàn cục được gộp, và ít nhất một giao dịch ảnh hưởng nhiều site. Đây không phải ứng dụng một CSDL có cột `chi_nhanh`.
 
+Yêu cầu chung của môn học là **2–4 site**; tối thiểu có phân mảnh, replication, transaction và đồng bộ. Phải chứng minh **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**. Nhóm được chọn kiểu phân mảnh; đồ án này chọn ngang và dẫn xuất. Ba site ban đầu và site BT mở rộng nằm trong giới hạn bài học. Các tiêu chí/bằng chứng ở [YC-01–YC-07](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md).
+
 Hiện có ba cơ sở: Quận 1 (`Q1`), Quận 7 (`Q7`) và Thủ Đức (`TD`). Mỗi site có một CSDL riêng, cùng cấu trúc bảng nhưng lưu các mảnh dữ liệu khác nhau. Có thể bổ sung site mới như Bình Thạnh (`BT`) mà không phải sửa code nghiệp vụ.
 
 ## 2. Sơ đồ thành phần
@@ -96,5 +98,15 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 - Ghi danh mục/tài khoản đi qua một module đồng bộ duy nhất.
 
 ## 7. Các điểm phải thống nhất trước khi code phân tán
+
+### Trách nhiệm bảo đảm các yêu cầu chung
+
+- Site Router và repository chịu trách nhiệm YC-01/YC-02: kết nối riêng, truy cập đúng mảnh và cha/con cùng site.
+- Module dữ liệu dùng chung chịu trách nhiệm YC-03/YC-07: phương pháp replication cụ thể, ACK/phiên bản, lỗi giữa chừng và đối soát; một điểm vào ghi không đồng nghĩa dùng DB nghiệp vụ trung tâm. Không vừa fan-out ghi từ API vừa để Publication ghi lại cùng bảng.
+- Coordinator chuyển cơ sở chịu trách nhiệm YC-04: hai site, trạng thái bền vững, lỗi trước/sau commit và phục hồi. Mức bảo đảm hiện tại là phục hồi tiến về phía trước; nếu tiêu chí giảng viên yêu cầu DBMS quản lý giao dịch, phải chốt cơ chế bổ sung, không gọi thiết kế hiện tại là ACID xuyên site.
+- Service đăng ký cùng transaction SQL Server chịu trách nhiệm YC-05: kiểm tra/cập nhật chỗ cuối an toàn trước hai phiên cạnh tranh. Frontend chỉ phản hồi trạng thái xung đột.
+- Global Query chịu trách nhiệm YC-06: tổng hợp kết quả đọc tại API, chọn học viên hiện hành và thông báo site thiếu; không giả định snapshot chung giữa các site.
+
+Replication, distributed transaction và concurrency đều phải có cơ chế và bằng chứng thực tế; các quyết định còn mở dưới đây không làm chúng trở thành tùy chọn.
 
 README đã chốt SQL Server, Next.js và Django. Nhóm vẫn phải quyết định giao thức xử lý giao dịch nhiều CSDL, retry sau timeout, mã yêu cầu chống xử lý trùng, trạng thái giao dịch bền vững và đối soát sau sự cố. Ghi quyết định ở README mục 9 và cập nhật tài liệu giao dịch. Xem [QLTTNN-Lam-Viec-Nhom.md](QLTTNN-Lam-Viec-Nhom.md) để thống nhất người chịu trách nhiệm quyết định và tích hợp.

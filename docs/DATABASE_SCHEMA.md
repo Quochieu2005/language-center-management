@@ -7,6 +7,8 @@
 > DBMS đã chọn: **SQL Server**. Mỗi site là một CSDL SQL Server độc lập; file này mô tả schema logic và phân mảnh, không khẳng định các CSDL đã được cài vật lý.
 > **Đổi schema → cập nhật file này trong cùng commit.**
 
+Yêu cầu chung là **2–4 site**, có phân mảnh, replication, transaction và đồng bộ; phải chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency và một distributed query. Đồ án dùng 3 site Q1/Q7/TD. [Ma trận YC-01–YC-07](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) quy định minh chứng; schema là thiết kế, không tự chứng minh đã chạy các cơ chế này.
+
 **Mục lục:** [1. Quy ước mã](#1-quy-ước-mã) · [2. Bốn kiểu bảng](#2-bốn-kiểu-bảng) · [3. Dữ liệu nằm ở đâu](#3-dữ-liệu-nằm-ở-đâu) · [4. Ràng buộc phân tán](#4-ràng-buộc-phân-tán-bắt-buộc) · [5. Quan hệ giữa các bảng](#5-các-bảng-liên-quan-với-nhau-thế-nào) · [6. Chi tiết từng bảng](#6-chi-tiết-từng-bảng) · [7. Dữ liệu mẫu](#7-dữ-liệu-mẫu-cho-các-ví-dụ)
 
 ---
@@ -52,6 +54,13 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 | **Cục bộ** | ④ Trạng thái điều phối, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `TokenDatLaiMatKhau` `NhatKyHeThong` `NhatKyDongBo` |
 
 Bảng nhân bản có thêm 2 cột để **đối soát** khi 3 site bị lệch: `phien_ban` (số nguyên, tăng 1 mỗi lần sửa) và `cap_nhat_luc` (thời điểm sửa gần nhất).
+
+### Kiểm chứng phương pháp phân mảnh và nhân bản
+
+- **YC-02 / TC-FRAG-01:** dùng `LopHoc` làm ví dụ mảnh ngang: mảnh tại site S gồm các dòng `ma_co_so = S`; `DangKy` dẫn xuất theo site của lớp cha. Đọc riêng từng DB để kiểm tra không có dòng sai site/thiếu cha; hợp kết quả tại công cụ kiểm thử hoặc API phải đúng tập lớp dự kiến, không thiếu/thừa và không trùng khóa giữa các mảnh. Không tạo JOIN/FK xuyên DB hoặc lưu hợp các mảnh vào DB trung tâm.
+- Các bảng phân mảnh được định vị theo site, nhưng `HocVien` có bản lịch sử sau chuyển và có thể tạm có hai dòng vật lý `dang_hoc`. Chứng minh không giao nhau bằng mảnh lớp; thống kê học viên phải chọn bản hiện hành theo trạng thái giao dịch, không đòi xóa bản lịch sử để đạt tiêu chí.
+- **YC-03 / TC-REP-01:** bản sao bảng dùng chung phải nhận được một thay đổi thực tế theo phương pháp replication đã chốt. Đối chiếu cùng khóa, nội dung, `phien_ban` và dấu vết đồng bộ; nạp cùng seed ở ba DB không phải bằng chứng replication.
+- **YC-07 / TC-SYNC-01:** kiểm tra bản sao sau lỗi và retry. Hai cột đối soát không tự tạo cơ chế truyền dữ liệu hay lưu toàn bộ tiến trình; nếu cơ chế cần thêm bảng/cột, cập nhật schema/script trước khi triển khai. Không đánh dấu đã đồng bộ khi một site bắt buộc chưa nhận thay đổi.
 
 ---
 
@@ -112,6 +121,10 @@ flowchart LR
 | R7 | Đề nghị/trạng thái chuyển (`GiaoDichChuyenCoSo`) chỉ lưu tại CSDL nguồn; nhật ký (`NhatKyHeThong`, `NhatKyDongBo`, `LichSuChuyenCoSo`) chỉ **thêm**, không sửa, không xóa | Admin Small tạo đề nghị ở nguồn; Admin Big quyết định qua Coordinator; chỉ giao dịch đã duyệt mới chạy giữa nguồn và đích |
 | R8 | Mật khẩu và token chỉ lưu **bản băm** | Không bao giờ ghi vào nhật ký, không trả ra API |
 | R9 | `HocVien` là bảng **duy nhất** được di chuyển giữa các site | Chỉ di chuyển qua nghiệp vụ Chuyển cơ sở |
+
+**YC-05 / TC-CON-01 — ràng buộc sức chứa dưới cạnh tranh:** kiểm tra lớp còn chỗ, tăng `si_so_hien_tai`, tạo `DangKy`, `HocPhi` và nhật ký phải cùng transaction tại site, có cơ chế bảo vệ cập nhật cạnh tranh. Unique đăng ký theo học viên/lớp không ngăn hai học viên khác nhau lấy chỗ cuối. Đọc lại dữ liệu sau hai phiên cạnh tranh: đúng một đăng ký/học phí mới, sĩ số tăng một và không vượt `si_so_toi_da`; giao dịch thất bại không để nghiệp vụ dở dang. Cơ chế khóa/mức cô lập/cập nhật có điều kiện phải được ghi và kiểm thử; đây không phải thay đổi cột trong đợt cập nhật tài liệu này.
+
+**YC-04 / TC-DTX-01:** `GiaoDichChuyenCoSo` và `LichSuChuyenCoSo` hỗ trợ điều phối/phục hồi, không tự tạo transaction ACID xuyên site. Phải kiểm chứng cả nguồn và đích theo [tài liệu giao dịch](QLTTNN-Giao-Dich-Phan-Tan.md). **YC-06 / TC-DQ-01:** đọc các mảnh riêng để thống kê tại API, xử lý bản học viên hiện hành và báo site thiếu.
 
 ---
 
@@ -464,6 +477,8 @@ Sự kiện được thêm tại site nơi hành động xảy ra. `de_nghi`, `d
 | `site_dich` | | `Q1` · `Q7` · `TD` |
 | `trang_thai` | | `thanh_cong` · `that_bai` |
 | `thong_bao_loi` | | |
+
+`NhatKyDongBo` ghi sự kiện/kết quả ở một site đích và là nhật ký append-only; không mặc định rằng bảng này là outbox hay state machine đủ thông tin để retry một lần ghi nhiều site sau khi Coordinator mất phản hồi. Trước khi code YC-03/YC-07, nhóm phải đối chiếu trường dữ liệu với phương pháp replication đã chọn và quyết định có cần bảng/lược đồ tiến trình bền vững (mã thao tác, version, trạng thái/ACK theo từng site, retry) hay không. Nếu cần, thêm thiết kế vào schema và script cho tất cả site trước khi triển khai; không tự sửa riêng một CSDL.
 
 ---
 

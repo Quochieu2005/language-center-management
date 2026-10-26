@@ -13,7 +13,7 @@ File này mô tả giao diện gọi API thế nào và API phải xử lý quy�
 4. API tự xác định site từ danh tính đã xác thực, bản ghi hiện hành hoặc danh sách site đang `hoat_dong`. Không tin `ma_co_so_nguon` do trình duyệt gửi lên nếu nguồn phải lấy từ tài khoản.
 5. `GLOBAL` truy vấn riêng các CSDL site trong phạm vi quyền và tổng hợp ở tầng API. Response phải chỉ rõ dữ liệu có đầy đủ không; site lỗi không được âm thầm bỏ qua.
 6. `REPLICATED-WRITE` ghi theo một chính sách thống nhất tới mọi site hoạt động cần tham gia. Không trả thành công toàn phần nếu có site bắt buộc chưa được cập nhật.
-7. Hai CSDL riêng không tạo thành một transaction ACID nguyên tử xuyên site. Với `DISTRIBUTED-TX`, API lưu tiến trình, có thể retry/phục hồi và trả trạng thái giao dịch rõ ràng.
+7. Có hai CSDL riêng không tự bảo đảm transaction ACID nguyên tử xuyên site. Thiết kế `DISTRIBUTED-TX` hiện tại lưu tiến trình, retry/phục hồi và trả trạng thái rõ ràng; không tuyên bố bảo đảm ACID xuyên site khi chưa triển khai và kiểm thử cơ chế đó.
 8. Mọi ghi cần bảo vệ khỏi dữ liệu sai, quyền không hợp lệ, gửi trùng và cập nhật đồng thời. Không ghi mật khẩu, token hoặc thông tin kết nối vào log hay response.
 9. Mọi dữ liệu từ form phải được kiểm tra lại ở API. Validation frontend chỉ phục vụ trải nghiệm, không phải lớp bảo vệ.
 10. Truy vấn dùng Django ORM hoặc câu SQL parameterized. Không nối chuỗi dữ liệu người dùng vào SQL, tên bảng, tên cột, `ORDER BY` hay biểu thức lọc.
@@ -22,6 +22,21 @@ File này mô tả giao diện gọi API thế nào và API phải xử lý quy�
 13. Luồng đăng nhập, đăng ký (nếu được bật) và quên mật khẩu phải có rate limit, chống dò tài khoản, audit an toàn và response không tiết lộ tài khoản tồn tại.
 14. Khi viết endpoint phải chạy kiểm tra thật với API và SQL Server test: quyền, dữ liệu sau CRUD, rollback, phân tán, lỗi bảo mật và độ trễ; không đánh dấu hoàn tất chỉ vì code biên dịch.
 15. Đăng nhập Google/Facebook chỉ xác thực tài khoản nội bộ đã được liên kết trước. Không tự tạo tài khoản, không tự ghép theo email và không lưu access/refresh token của nhà cung cấp.
+
+## Yêu cầu chung và hợp đồng kiểm chứng phân tán
+
+Môn học yêu cầu **2–4 site**, có phân mảnh, replication, transaction và đồng bộ; chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**. Nhóm chọn 3 site Q1/Q7/TD; danh sách site vẫn lấy từ dữ liệu/cấu hình. Không bắt buộc mọi nhóm dùng cùng kiểu phân mảnh.
+
+| Mã yêu cầu | Trách nhiệm API và cách kiểm tra |
+|---|---|
+| YC-01 / YC-02 | Định tuyến đến DB riêng; đăng ký ở đúng site lớp/học viên; đọc lại `LopHoc`/`DangKy` từng site để kiểm chứng phân mảnh (TC-SITE-01, TC-FRAG-01) |
+| YC-03 | Một điểm vào ghi bảng dùng chung; chứng minh cơ chế truyền một thay đổi `MonHoc` tới các bản sao, không chạy UPDATE thủ công từng DB (TC-REP-01) |
+| YC-04 | Admin Small đề nghị, Admin Big duyệt rồi Coordinator mới chuyển; trạng thái/sự kiện nguồn và đích cho phép kiểm tra lỗi trước/sau commit đích (TC-DTX-01) |
+| YC-05 | Bảo vệ sức chứa và tạo đăng ký/học phí trong cùng transaction site; hai phiên tranh chỗ cuối chỉ một yêu cầu thắng (TC-CON-01) |
+| YC-06 | Đọc từng site và tổng hợp tại API; khi thiếu site trả `complete=false`, `missing_sites`, không thay dữ liệu thiếu bằng 0 (TC-DQ-01) |
+| YC-07 | Trạng thái đồng bộ bền vững, đối soát/retry sau lỗi; chỉ xác nhận hoàn tất khi đủ site bắt buộc, không áp dụng lại thay đổi đã nhận (TC-SYNC-01) |
+
+[Hướng dẫn kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) quy định điều kiện đầu vào và bằng chứng. Phương pháp replication và mức bảo đảm distributed transaction phải chốt theo README/FS; chưa chốt công cụ không có nghĩa được bỏ các yêu cầu này. Swagger chỉ mô tả endpoint, không chứng minh chúng đã chạy đúng trên SQL Server.
 
 ## Múi giờ và định dạng giờ
 
@@ -432,6 +447,8 @@ Các route `GET /api/v1/student/me/...` không nhận `ma_hoc_vien` từ client.
 
 API phải xác nhận học viên và lớp thuộc cùng site, lớp đang nhận đăng ký và còn chỗ, học viên chưa có đăng ký trùng còn hiệu lực. Tạo `DangKy`, `HocPhi`, cập nhật sĩ số và ghi nhật ký trong một transaction cục bộ; lỗi ở một bước thì rollback cả transaction.
 
+Kiểm tra chỗ trống và cập nhật sĩ số phải được bảo vệ khỏi cạnh tranh trong chính transaction đó. Người triển khai phải ghi cơ chế SQL Server thực tế đã chọn (khóa/mức cô lập hoặc cập nhật có điều kiện), không chỉ đọc sĩ số rồi ghi lại ngoài vùng bảo vệ. Unique `(ma_hoc_vien, ma_lop)` không ngăn hai học viên khác nhau lấy chỗ cuối. Theo hợp đồng đề xuất, yêu cầu thua cạnh tranh trả `409` với mã lỗi nghiệp vụ đã chốt; frontend đọc lại lớp, không tự gửi lại đăng ký. Không để lại `DangKy`/`HocPhi` hoặc tăng sĩ số của yêu cầu thất bại.
+
 ### Xếp hoặc đổi lớp
 
 Request tối thiểu gồm `ma_lop_moi`. API lấy site từ đăng ký hiện tại; không nhận site để chuyển đăng ký sang cơ sở khác. Kiểm tra lớp đích cùng site, còn chỗ và phù hợp lịch; cập nhật đăng ký/sĩ số lớp cũ và mới trong một transaction cục bộ.
@@ -560,10 +577,15 @@ Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm
 - `GLOBAL` không trả thành công toàn phần khi site bị lỗi: giữ kết quả từng site, đặt `complete: false`, liệt kê `missing_sites`; các thao tác yêu cầu đủ site như `REPLICATED-WRITE` phải báo thất bại/chờ đối soát theo chính sách, không giả thành công.
 - Ghi `NhatKyHeThong` cùng giao dịch cục bộ với thao tác quan trọng. Log chỉ chứa định danh và dữ liệu nghiệp vụ tối thiểu; không ghi mật khẩu, hash mật khẩu, token, cookie, header xác thực hay thông tin kết nối.
 
+`NhatKyDongBo` trong schema hiện là log append-only theo site đích, với trạng thái thành công/thất bại; chỉ riêng log này chưa chứng minh API lưu được toàn bộ tiến trình replication để retry an toàn sau timeout chưa rõ. Trước khi bật `REPLICATED-WRITE`, chốt nơi lưu mã thao tác, phiên bản/thay đổi cần áp dụng và trạng thái bền vững của từng site; dùng log hiện có nếu đủ bảo đảm hoặc cập nhật schema/script với outbox/bảng tiến trình theo quyết định nhóm. Không suy diễn “retry an toàn” chỉ từ việc có bảng log.
+
 ## Kiểm thử hợp đồng API cần có
 
 | Nhóm | Kịch bản phải kiểm tra |
 |---|---|
+| Concurrency bắt buộc YC-05 | TC-CON-01: hai phiên độc lập, hai học viên khác nhau cùng đăng ký lớp còn một chỗ; ghi cách tạo cạnh tranh và dữ liệu cuối, đúng một yêu cầu thành công. Không thay bằng test thanh toán online còn ngoài phạm vi |
+| Replication YC-03 và đồng bộ YC-07 | TC-REP-01 truyền thay đổi danh mục; TC-SYNC-01 gây lỗi trước ghi và giữa ghi, kết nối lại rồi đối soát/retry không trùng; đọc từng bản sao |
+| Distributed transaction YC-04 | TC-DTX-01 phải có thay đổi thật ở DB nguồn/đích sau duyệt, trạng thái trước–sau và phục hồi; transaction cục bộ đăng ký không thay thế |
 | Phân quyền | Admin Small gọi site khác bị `403`; giáo viên gọi lớp không được phân công bị từ chối; Admin Big mới được duyệt chuyển |
 | Phân tán | Không có JOIN xuyên site; Global Query tổng hợp ở API; một site lỗi được thể hiện là kết quả một phần |
 | Đồng bộ chung | Ghi môn/khóa/tài khoản không trả success nếu site bắt buộc chưa được cập nhật; đối soát có thể tiếp tục |
@@ -632,6 +654,7 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 - Người gọi và vai trò:
 - Quyền/phạm vi site:
 - Kiểu phân tán:
+- Mã yêu cầu YC / kịch bản TC liên quan (hoặc Không áp dụng, nêu lý do):
 - Site Router chọn site theo:
 - Bảng đọc:
 - Bảng ghi:
@@ -654,3 +677,4 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 5. Schema chưa có metadata Cloudinary. Bổ sung bảng/quan hệ metadata và quy tắc phân mảnh/nhân bản trước khi gắn ảnh vào giao diện; binary chỉ ở Cloudinary.
 6. Chốt storage bền vững cho giới hạn/rate limit khi có nhiều worker và đặt ngưỡng bcrypt theo benchmark; không lưu bộ đếm chỉ trong memory nếu chạy nhiều instance.
 7. OAuth Google/Facebook đã có thiết kế bảng nhân bản và migration `db/06_add_oauth_identity_table.sql`; trước khi bật route phải chốt cách lưu/thu hồi phiên, callback HTTPS, tạo OAuth apps và triển khai/test flow liên kết trong `src/api`. OAuth credentials chỉ điền ở `src/api/.env`, không commit.
+8. YC-03/YC-07 cần phương pháp replication và tiến trình/ACK/phiên bản cho phục hồi bản sao; YC-04 cần chốt cơ chế đáp ứng tiêu chí distributed transaction; YC-05 cần cơ chế bảo vệ chỗ cuối và kiểm thử hai phiên. Nếu cần thêm trạng thái/bảng, phải cập nhật schema/migration trước; không tự dùng DB trung tâm hoặc coi các mục bắt buộc là tùy chọn.

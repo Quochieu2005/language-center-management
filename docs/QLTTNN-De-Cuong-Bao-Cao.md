@@ -6,6 +6,14 @@ Tài liệu này biến yêu cầu báo cáo của giảng viên thành dàn ý 
 
 ## Cấu trúc báo cáo theo yêu cầu giảng viên
 
+### Yêu cầu chung bắt buộc trước khi nghiệm thu
+
+Mỗi đề tài có **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh. Báo cáo phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**. Đề tài này dùng 3 site Q1/Q7/TD; site BT trong demo mở rộng là site thứ tư.
+
+Dùng [ma trận YC-01–YC-07 và bài kiểm chứng TC](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) để nối thiết kế ở mục 2.2 với kết quả thực tế ở mục 3. Ghi rõ cơ chế, site/bảng, script hoặc phiên chạy, kết quả trước–sau, lỗi/phục hồi và bằng chứng. Không đưa ảnh seed/VPN/Swagger thay cho minh chứng replication/giao dịch phân tán; không bỏ concurrency chỉ vì các nghiệp vụ chạy tuần tự đã đúng.
+
+### Các phần của báo cáo
+
 1. **Đề tài được giao**: tên đề tài và danh sách 5 thành viên theo danh sách giảng viên.
 2. **Viết tài liệu**
    - 2.1 Đặt vấn đề
@@ -18,7 +26,7 @@ Tài liệu này biến yêu cầu báo cáo của giảng viên thành dàn ý 
    - 3.3 Cài hệ quản trị CSDL
    - 3.4 Kiểm tra Agent nếu DBMS có dịch vụ này
    - 3.5 Tạo và kiểm tra liên kết server nếu dùng
-   - 3.6 Tạo Publication/Replication nếu dùng
+   - 3.6 Triển khai và kiểm chứng replication; cấu hình Publication theo phương án/hướng dẫn giảng viên
    - 3.7 Thử quyền, dữ liệu, giao tác và truy vấn
 
 ## 2.1. Đặt vấn đề
@@ -267,7 +275,7 @@ Sơ đồ logic là client/server: người dùng ở máy trạm gọi ứng d�
 
 Luồng này dùng các transaction cục bộ tại từng CSDL với Coordinator phục hồi tiến về phía trước. Không mô tả là ACID nguyên tử giữa hai CSDL; báo cáo kết quả kiểm thử theo trạng thái từng site, sự kiện đã ghi, cách retry và quy tắc thống kê khi giao dịch còn `dang_xu_ly`.
 
-SQL Server đã được chọn, nhưng nhóm chưa chốt có dùng SQL Server Replication hay cơ chế điều phối/commit nào cho các giao dịch nhiều CSDL. Cơ chế thực tế phải thống nhất với quy tắc ghi đủ site và yêu cầu giảng viên; ghi lựa chọn vào README mục 9 rồi cập nhật mục này.
+SQL Server đã được chọn; **replication và distributed transaction là bắt buộc**. Phương pháp truyền thay đổi và mức bảo đảm giao dịch phải được chốt theo tiêu chí giảng viên, thống nhất với quy tắc ghi đủ site; ghi lựa chọn vào README mục 9 và FS mục 11 rồi cập nhật phần triển khai. Thiết kế Coordinator phục hồi hiện tại không chứng minh ACID nguyên tử xuyên site; nếu cần cơ chế DBMS quản lý thì phải bổ sung và kiểm thử, không tự ghi đã đạt.
 
 ### QTLPT và lựa chọn kiến trúc
 
@@ -281,7 +289,7 @@ Theo README, đây là kiến trúc **Client/Server có Coordinator**: máy tr�
 
 #### Publication/Replication và tránh hai cơ chế ghi
 
-Nếu yêu cầu môn học bắt buộc SQL Server Publication/Replication, trước khi tạo nhóm phải chốt publisher, subscriber, article/table, hướng đồng bộ, lịch/độ trễ và xử lý xung đột. Không vừa để Django tự ghi các site vừa để publication ghi trùng cùng bảng nếu chưa có thiết kế rõ; nếu không, phiên bản và nhật ký có thể lệch.
+Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. Khi dùng SQL Server Publication theo phương án/hướng dẫn giảng viên, trước khi tạo phải chốt publisher, distributor, subscriber, article/table, hướng đồng bộ, lịch/độ trễ và xử lý xung đột. Nếu chọn cơ chế khác, ghi cụ thể phương pháp và bằng chứng tương đương theo yêu cầu môn học; không ghi replication là “không áp dụng”. Không vừa để Django tự ghi các site vừa để Publication ghi trùng cùng bảng nếu chưa có thiết kế rõ; nếu không, phiên bản và nhật ký có thể lệch.
 
 README hiện yêu cầu ghi đồng bộ vào mọi site hoạt động và từ chối nếu thiếu site. Cơ chế Publication mặc định của môi trường cần được kiểm tra có đạt được hợp đồng này không; báo cáo phải mô tả cấu hình và kết quả thực đo, không chỉ chụp wizard đã tạo.
 
@@ -326,6 +334,8 @@ Nhóm đã chọn Microsoft SQL Server. Ghi edition/version, instance, authentic
 
 ### 3.6. Tạo Publication/Replication
 
+Phần này phải có bằng chứng **YC-03 / TC-REP-01** và **YC-07 / TC-SYNC-01**. Nếu phương án đã chốt dùng cơ chế khác Publication, ghi cơ chế đó và minh chứng truyền thay đổi/lỗi/phục hồi; không bỏ phần replication/đồng bộ. Việc thay công cụ được yêu cầu trong hướng dẫn giảng viên cần được thống nhất, không tự coi là miễn bước cài đặt.
+
 - Chốt loại replication, publisher/distributor/subscriber, publication/article và bảng được phép nhân bản.
 - Phân biệt nhóm bảng nhân bản (`CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth`) với bảng phân mảnh site và bảng dẫn xuất. Không publish toàn bộ bảng một cách mặc định.
 - Ghi hướng dữ liệu, tần suất, latency quan sát, cách xử lý lỗi và cách kiểm tra bản sao.
@@ -347,6 +357,9 @@ Chạy từng kịch bản trên các CSDL độc lập. Mỗi lần ghi lại t
 | Đề nghị/duyệt chuyển cơ sở | Admin Small gửi; Admin Big duyệt hoặc từ chối; kiểm tra quyền và dữ liệu từng site | Đề nghị chờ duyệt vẫn ở nguồn; từ chối không đổi hồ sơ; duyệt mới kích hoạt chuyển |
 | Chuyển sau khi duyệt | Q1→Q7, kiểm tra trạng thái, lớp, lịch sử, học phí/điểm | Bản nguồn `da_chuyen_di`, đích `dang_hoc`, history được giữ, thống kê không đếm trùng |
 | Retry/recovery | Từ chối khi đích đóng; mất kết nối trước khi đích commit; dừng app sau khi đích commit; gửi trùng request | Nguồn giữ nguyên trước khi đích commit; sau commit đích thì recovery hoàn tất nguồn; idempotency không tạo hồ sơ/giao dịch trùng |
+| Concurrency — TC-CON-01 | Hai phiên độc lập đăng ký hai học viên vào một lớp còn đúng một chỗ, chạy chồng lấp tại vùng kiểm tra/cập nhật | Cách tạo cạnh tranh, cơ chế khóa/cô lập/cập nhật có điều kiện, response hai phiên; một đăng ký/học phí mới, không vượt sĩ số hoặc ghi dở dang |
+| Đồng bộ sau lỗi — TC-SYNC-01 | Thử lỗi trước ghi và lỗi giữa các bước ghi bản sao; khôi phục site và retry/đối soát | Kết quả từng site, phiên bản, trạng thái chưa hoàn tất khi thiếu site; sau phục hồi bản sao khớp, không áp dụng trùng |
+| Tái thiết mảnh — TC-FRAG-01 | Đọc riêng lớp/đăng ký ở từng site, hợp kết quả tại ứng dụng/công cụ kiểm thử | Mảnh đúng site, cha/con đúng vị trí, đầy đủ, không giao nhau và tái thiết đúng tập lớp logic |
 | Nhật ký | Sửa điểm/thu tiền, tìm người thực hiện | Log có cũ/mới và kết quả; không có password/token |
 
 Trigger bảo vệ tính toàn vẹn dữ liệu trong phạm vi một CSDL. Phân quyền chức năng theo vai trò/cơ sở vẫn phải được kiểm tra ở backend; nếu giảng viên yêu cầu trigger phân quyền, báo cáo cần ghi rõ giới hạn, bảng/điều kiện trigger bảo vệ và kết quả thử trực tiếp. Không để trigger tạo ảo giác rằng nó kiểm soát được quyền giữa nhiều CSDL độc lập.
@@ -358,8 +371,14 @@ Trigger bảo vệ tính toàn vẹn dữ liệu trong phạm vi một CSDL. Ph�
 | E-3.1-01 | VPN | Điền máy nguồn/đích | Hai máy cùng mạng | Chưa thực hiện | `docs/evidence/...` |
 | E-3.3-01 | DBMS | Điền instance | Phiên bản và dịch vụ hoạt động | Chưa thực hiện | `docs/evidence/...` |
 | E-3.5-01 | Linked Server | Điền server nguồn/đích | Kết nối thử thành công | Chưa thực hiện/không áp dụng | `docs/evidence/...` |
-| E-3.6-01 | Publication | Điền publisher/subscriber | Đồng bộ article đã chọn | Chưa thực hiện/không áp dụng | `docs/evidence/...` |
+| E-3.6-01 | Replication — TC-REP-01 | Điền nơi ghi/các bản sao; publisher/subscriber nếu dùng | Truyền thay đổi thật theo phương pháp đã chốt | Chưa kiểm chứng | `docs/evidence/TC-REP-01/...` |
+| E-3.6-02 | Đồng bộ — TC-SYNC-01 | Điền site lỗi/phục hồi | Đối soát/retry không trùng, đủ bản sao mới hoàn tất | Chưa kiểm chứng | `docs/evidence/TC-SYNC-01/...` |
 | E-3.7-01 | Giao tác | Điền kịch bản/site | Trước-sau, trạng thái nguồn/đích, sự kiện và recovery | Chưa thực hiện | `docs/evidence/...` |
+| E-3.7-02 | Concurrency — TC-CON-01 | Điền site và hai phiên | Tranh chỗ cuối, đúng một yêu cầu thành công | Chưa kiểm chứng | `docs/evidence/TC-CON-01/...` |
+| E-3.7-03 | Phân mảnh — TC-FRAG-01 | Các site chứa lớp/đăng ký | Đầy đủ, không giao nhau và tái thiết | Chưa kiểm chứng | `docs/evidence/TC-FRAG-01/...` |
+| E-3.7-04 | Distributed query — TC-DQ-01 | API và các site đọc | Kết quả từng site, gộp tại API và thiếu site | Chưa kiểm chứng | `docs/evidence/TC-DQ-01/...` |
+
+Đây là mẫu, không khẳng định đã có ảnh/file. Kết quả của YC-01–YC-07 phải có mã TC và người chạy/review; các bài chưa chạy vẫn ghi “Chưa kiểm chứng”. Chỉ ghi “Không áp dụng” cho công cụ cụ thể có lý do được thống nhất, không dùng cho một trong các yêu cầu chung bắt buộc.
 
 ## Những thông tin cần điền sau buổi triển khai
 
@@ -367,6 +386,7 @@ Trigger bảo vệ tính toàn vẹn dữ liệu trong phạm vi một CSDL. Ph�
 - SQL Server version/edition, phiên bản Next.js/Django, vị trí máy/VM, IP/port, site nào chạy ở máy nào.
 - Tài liệu SQL/lệnh của giảng viên và cách nhóm áp dụng.
 - Định lượng tần suất nếu giảng viên yêu cầu con số; hiện bảng truy cập là ước lượng định tính.
-- Cấu hình SQL Server; có dùng Agent, Linked Server, Publication/Replication hay công cụ khác theo yêu cầu giảng viên.
+- Cấu hình SQL Server và công cụ triển khai theo hướng dẫn giảng viên; phương pháp replication bắt buộc, nơi được phép ghi, hướng truyền và các bản sao.
 - Cơ chế durable transaction, retry, đồng bộ và recovery đã chạy thật.
+- Cơ chế concurrency và kết quả hai phiên; ma trận đủ năm nội dung chứng minh tối thiểu, topology 2–4 site và đồng bộ dữ liệu.
 - Tất cả ảnh, script, output truy vấn và kết quả test giao tác.

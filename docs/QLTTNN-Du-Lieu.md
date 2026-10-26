@@ -4,6 +4,8 @@
 
 ## 1. Ba CSDL, một cấu trúc
 
+Đồ án chọn 3 site trong giới hạn **2–4 site**. Yêu cầu môn học gồm ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Không bắt buộc mọi nhóm dùng cùng kiểu phân mảnh; nhóm này dùng ngang theo cơ sở và dẫn xuất theo bảng cha. [Bộ YC/TC](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) là điều kiện kiểm chứng bắt buộc.
+
 Q1, Q7 và TD có cùng cấu trúc bảng, nhưng không gộp thành một CSDL. Mỗi site giữ phần dữ liệu nghiệp vụ của mình. Một số bảng được nhân bản để site nào cũng dùng được danh mục và tài khoản. Không thêm cột `chi_nhanh` vào một CSDL chung để giả lập phân tán.
 
 ## 2. Bản đồ phân mảnh và nhân bản
@@ -65,3 +67,15 @@ Mã chính dùng dạng `<SITE>-<LOẠI>-<SỐ THỨ TỰ 6 CHỮ SỐ>`, ví d�
 ## 8. Quy tắc thay đổi schema
 
 Khi thêm/sửa bảng, cập nhật DATABASE_SCHEMA trước, rồi so lại các luồng README sử dụng bảng đó. Nếu thay đổi tác động nghiệp vụ hoặc phân mảnh, cập nhật README trong cùng thay đổi. Mỗi site phải nhận cùng phiên bản schema. Không sửa trực tiếp riêng một site rồi để cấu trúc lệch.
+
+## 9. Đọc dữ liệu để kiểm chứng yêu cầu chung
+
+| Kịch bản | Dữ liệu cần đối chiếu |
+|---|---|
+| TC-SITE-01 / TC-FRAG-01 | DB riêng, `LopHoc.ma_co_so`, cha của `DangKy`; hợp danh sách lớp ở ứng dụng phải đầy đủ và không trùng giữa các mảnh |
+| TC-REP-01 / TC-SYNC-01 | `MonHoc` và phiên bản tại từng site, trạng thái/sự kiện đồng bộ; phải có thay đổi truyền thật và phục hồi sau lỗi, không chỉ cùng seed |
+| TC-DTX-01 | Hồ sơ nguồn/đích, `GiaoDichChuyenCoSo`, sự kiện tại từng site và lịch sử nguồn còn nguyên |
+| TC-CON-01 | Hai phiên tranh một chỗ: chỉ một `DangKy`/`HocPhi` mới và sĩ số tăng một; phiên thua không để dữ liệu dở dang |
+| TC-DQ-01 | Học viên hiện hành theo trạng thái/bước chuyển, kết quả từng site và tổng tại API; site thiếu phải được báo rõ |
+
+Schema, bản sao và nhật ký chỉ hỗ trợ triển khai. Người chạy phải lưu kết quả theo từng TC; không tự suy ra các yêu cầu đã đạt từ cấu trúc bảng.

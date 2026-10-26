@@ -10,6 +10,10 @@ Luồng có ba kiểu thao tác theo thứ tự:
 
 Việc có bước duyệt làm rõ trách nhiệm quản trị, còn tính phân tán được thể hiện bằng dữ liệu nằm ở các CSDL site riêng, hộp thư Global Query và giao dịch Coordinator phối hợp hai CSDL sau khi duyệt.
 
+Đồ án chọn 3 site trong yêu cầu **2–4 site**. [Yêu cầu chung YC-01–YC-07](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) bắt buộc có ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Tài liệu này phụ trách YC-04 và phần phục hồi YC-03/YC-07; không thay thế kiểm chứng các nội dung còn lại.
+
+**Giới hạn phải ghi khi nghiệm thu:** thiết kế hiện tại phối hợp các transaction cục bộ và phục hồi tiến về phía trước, chưa chứng minh ACID nguyên tử xuyên site. Phải ghi giao thức thực tế và chốt mức bảo đảm đáp ứng tiêu chí distributed transaction của giảng viên. Nếu cần cơ chế DBMS quản lý, triển khai/kiểm thử bổ sung; không bỏ YC-04 hoặc tự ghi đã có MSDTC/2PC.
+
 ## 1. Phân biệt các thao tác ghi nhiều site
 
 | Thao tác | Kiểu | Nơi đọc/ghi | Kết quả |
@@ -29,6 +33,8 @@ Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 4. Ghi cùng thay đổi vào các site tham gia.
 5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
 6. Ghi `NhatKyDongBo` cho từng site đích và đối soát các bản sao.
+
+Các bước trên là hợp đồng bắt buộc cho replication/đồng bộ, không phải mô tả cơ chế đã triển khai. Nhóm phải chốt phương pháp truyền thay đổi, nơi được phép ghi, phiên bản, tiến trình và ACK từng site (README mục 9). Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
 
 ## 3. Vai trò và dữ liệu đề nghị
 
@@ -159,5 +165,7 @@ Nếu không đọc được CSDL nguồn để biết trạng thái giao dịch
 9. Ứng dụng dừng sau khi đích commit: worker đối chiếu sự kiện rồi hoàn tất nguồn, không tạo đích lần hai.
 
 ## 9. Trách nhiệm phối hợp nhóm
+
+Các trường hợp 4, 8, 9 ở mục 8 cung cấp bằng chứng cho **TC-DTX-01 / YC-04**; phải lưu trạng thái và sự kiện thật tại cả hai CSDL. Trường hợp 6 là concurrency bổ sung; bài concurrency tối thiểu thống nhất của nhóm là **TC-CON-01 / YC-05** (hai phiên tranh chỗ cuối). Thử riêng replication và đồng bộ theo TC-REP-01/TC-SYNC-01; thành công chuyển cơ sở không chứng minh các bản sao danh mục được đồng bộ.
 
 Đây là tính năng liên nhóm: người phụ trách quyền/API triển khai luồng đề nghị và duyệt; người phụ trách database giữ đúng các trạng thái, index và sự kiện append-only; người phụ trách học viên/đăng ký xử lý dữ liệu tại nguồn/đích; người phụ trách báo cáo kiểm thử Global Query và trạng thái chờ duyệt; người phụ trách kiểm thử thử quyền sai, timeout và retry. Phân công cụ thể ở [QLTTNN-Lam-Viec-Nhom.md](QLTTNN-Lam-Viec-Nhom.md).

@@ -55,6 +55,32 @@ Vấn đề cần giải quyết và kết quả mong muốn.
 
 **Đây KHÔNG phải ứng dụng CRUD thông thường với 1 database.** Mục tiêu của đồ án là thể hiện các kỹ thuật phân tán: phân mảnh dữ liệu, nhân bản, truy vấn toàn cục, giao dịch phân tán.
 
+## Yêu cầu chung của môn học (áp dụng cho tất cả đề tài)
+
+Mỗi đề tài có **2–4 site**. Nhóm phải triển khai tối thiểu **phân mảnh, replication (nhân bản), transaction (giao dịch) và đồng bộ dữ liệu**. Đồ án này chọn **3 site Q1, Q7, TD**, mỗi site có CSDL SQL Server riêng; số site này nằm trong phạm vi yêu cầu của môn học.
+
+Không bắt buộc mọi nhóm dùng cùng một kiểu phân mảnh. Tuy nhiên, mỗi nhóm phải chứng minh được ít nhất: **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction (giao dịch phân tán) + 1 tình huống concurrency (truy cập đồng thời) + 1 distributed query (truy vấn phân tán)**. Có mô tả hoặc sơ đồ thiết kế chưa đủ để kết luận đã đáp ứng; phải có kịch bản chạy thực tế và kết quả kiểm chứng.
+
+Mã yêu cầu **YC-01–YC-07**, cách chạy các kịch bản **TC-SITE-01, TC-FRAG-01, TC-REP-01, TC-DTX-01, TC-CON-01, TC-DQ-01, TC-SYNC-01**, phân công và mẫu bằng chứng nằm tại [docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md](docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Khi sửa phần liên quan, đối chiếu cùng README, FS, API/UI specs và tài liệu triển khai; không chỉ cập nhật yêu cầu trong riêng `AGENTS.md`.
+
+### Áp dụng và kiểm chứng trong đồ án này
+
+| Nội dung bắt buộc | Kịch bản cần triển khai và chứng minh |
+|---|---|
+| **Phân mảnh — ít nhất 1 phương pháp** | Dùng phân mảnh ngang theo cơ sở cho dữ liệu nghiệp vụ, ví dụ `LopHoc`; các bảng con phân mảnh dẫn xuất theo bảng cha như `DangKy` theo lớp. Ghi rõ điều kiện phân mảnh, vị trí từng mảnh và truy vấn đối chiếu để chứng minh tính đầy đủ, khả năng tái thiết và tính không giao nhau của các mảnh ngang đã chọn. |
+| **Replication — ít nhất 1 phương pháp** | Chọn và ghi rõ phương pháp nhân bản cho bảng dùng chung theo schema, ví dụ `MonHoc`: nơi được phép ghi, các site nhận bản sao, hướng truyền và cơ chế xử lý lỗi/xung đột. Thay đổi dữ liệu ở nơi được phép ghi rồi đọc từng bản sao để chứng minh cơ chế thực sự truyền thay đổi; nạp cùng dữ liệu mẫu thủ công vào ba DB không đủ chứng minh replication. |
+| **Distributed transaction — ít nhất 1 giao dịch** | Dùng nghiệp vụ chuyển cơ sở đã được Admin Big duyệt, tác động tới CSDL nguồn và đích. Ghi cơ chế điều phối/commit, trạng thái trước–sau tại hai site, thử lỗi trước và sau khi đích commit, rồi kiểm tra retry/phục hồi không tạo hồ sơ trùng hoặc làm mất lịch sử. Transaction chỉ chạy trong một CSDL không thay thế bằng chứng giao dịch phân tán. |
+| **Concurrency — ít nhất 1 tình huống** | Cho hai phiên/yêu cầu chạy đồng thời để đăng ký hai học viên vào cùng lớp chỉ còn một chỗ. Chứng minh đúng một yêu cầu thành công, yêu cầu còn lại được xử lý rõ ràng, sĩ số không vượt sức chứa và yêu cầu thất bại không để lại `DangKy`/`HocPhi` dở dang. Ghi cơ chế khóa, mức cô lập hoặc kiểm soát phiên bản thực tế; chạy tuần tự hai yêu cầu không được tính là kiểm thử đồng thời. |
+| **Distributed query — ít nhất 1 truy vấn** | Thống kê học viên theo cơ sở qua Global Query: Site Router đọc từng CSDL site, API tổng hợp kết quả. Đối chiếu số liệu với truy vấn cục bộ tại từng site, áp dụng quy tắc trạng thái học viên/chuyển cơ sở để tránh đếm trùng; thử ngắt một site và xác nhận kết quả báo thiếu site. Không gom dữ liệu vào DB trung tâm hoặc dùng JOIN xuyên site. |
+| **Đồng bộ dữ liệu — bắt buộc** | Sau thay đổi bảng nhân bản, kiểm tra dữ liệu và trạng thái đồng bộ ở các site. Thử một site mất kết nối, khôi phục rồi retry/đối soát theo chính sách đã chốt; chứng minh bản sao được cập nhật đúng, không ghi trùng và không báo hoàn tất khi còn thiếu site bắt buộc. Có thể dùng cùng cơ chế replication để chứng minh nội dung này, nhưng phải kiểm tra cả trường hợp lỗi và phục hồi. |
+
+### Bằng chứng và giới hạn khi kết luận hoàn thành
+
+- Mỗi kịch bản ghi rõ mã/tên, người thực hiện, điều kiện ban đầu, site và bảng tham gia, script/lệnh/API hoặc các phiên đồng thời, kết quả mong đợi, kết quả thực tế, dữ liệu trước–sau và ảnh/log kiểm chứng. Bằng chứng không chứa mật khẩu, token hay thông tin kết nối bí mật.
+- **Replication và distributed transaction là yêu cầu bắt buộc**, kể cả khi tài liệu hiện còn để mở lựa chọn công cụ triển khai. Phải chốt cơ chế cụ thể và cập nhật FS, README, schema, đặc tả và tài liệu triển khai có liên quan trước khi code phụ thuộc vào lựa chọn đó; không diễn giải việc chưa chọn công cụ thành được phép bỏ yêu cầu.
+- Thiết kế chuyển cơ sở hiện dùng Coordinator với transaction cục bộ và phục hồi tiến về phía trước sau khi đích commit. Phải mô tả đúng bảo đảm của cơ chế này; không ghi là ACID nguyên tử xuyên CSDL hoặc đã dùng MSDTC/2PC khi chưa cấu hình và kiểm thử. Nếu tiêu chí giảng viên yêu cầu cơ chế giao dịch phân tán do DBMS quản lý, phải thống nhất và triển khai bổ sung cơ chế đó, không tự coi bằng chứng phục hồi hiện tại là đủ thay thế.
+- Chỉ đánh dấu đáp ứng khi có kết quả kiểm chứng cho đủ năm nội dung tối thiểu và đồng bộ dữ liệu. Mục chưa chạy hoặc chưa có bằng chứng phải ghi rõ **chưa kiểm chứng**; không suy ra đã đạt từ việc có ba DB, có màn hình ứng dụng hay có tài liệu thiết kế.
+
 ## Phạm vi bắt buộc theo đề tài được giao
 
 Đề tài là **Đề tài 10: Quản lý trung tâm đào tạo ngoại ngữ**. Ba cơ sở ban đầu là **Quận 1 (`Q1`)**, **Quận 7 (`Q7`)** và **Thủ Đức (`TD`)**. Đây là ba site của hệ thống CSDL phân tán, không phải ba giá trị giả lập trong một CSDL duy nhất.
@@ -138,6 +164,7 @@ Mỗi cơ sở giữ **một CSDL SQL Server riêng**, cùng cấu trúc logic n
 - **Form, ngày giờ và thanh toán:** frontend giúp nhập đúng nhưng API vẫn là nơi xác thực cuối cùng. Khi chọn ngày kết thúc, vô hiệu hóa ngày trước ngày bắt đầu và hiển thị giờ Việt Nam 24 tiếng. Màn hình đóng học phí phải cho thấy khoản nợ, số tiền, site, phương thức và trạng thái rõ ràng; khóa nút trong lúc gửi; giữ trạng thái sau reload; không xem redirect là bằng chứng thanh toán. Trạng thái chưa rõ cần hướng dẫn chờ/đối soát, không khuyến khích bấm thu lại. Không hiển thị trang học viên tự thanh toán cho tới khi tài khoản/portal và cổng thanh toán được duyệt.
 - **Trợ năng:** dùng semantic HTML, label gắn với input, điều khiển được bằng bàn phím, focus nhìn thấy, thứ tự focus hợp lý, thông báo lỗi/loading cho screen reader, văn bản thay thế cho ảnh có ý nghĩa và tương phản đủ đọc. Không chỉ dùng màu để biểu thị trạng thái. Dialog/drawer phải quản lý focus và cho đóng bằng bàn phím theo hành vi phù hợp.
 - **Tốc độ:** đo thay vì phỏng đoán. Mục tiêu Core Web Vitals trong specs là LCP không quá 2500 ms, INP không quá 200 ms, CLS không quá 0.1 ở p75; ghi thiết bị, viewport, mạng/môi trường và công cụ đo. Tối ưu kích thước ảnh theo viewport, lazy-load ảnh dưới màn hình đầu, không lazy-load nội dung hero nếu nó là LCP, tránh video/asset nặng không cần thiết và tách phần tải theo route khi phù hợp. Không ghi “tải dưới X ms” nếu chưa đo.
+- **Chẩn đoán tải trang và dữ liệu:** trước khi sửa, phân biệt route Next.js biên dịch lần đầu trong `npm run dev`, thời gian render HTML/JavaScript, API/Django, truy vấn SQL từng site và truy vấn `GLOBAL`; không quy kết cho SQL Server nếu chưa đo. So sánh lần mở route đầu với lần mở lại và chỉ dùng `npm run build` + `npm run start` khi đánh giá bản production. Trang phải render layout và trạng thái loading/skeleton ngay, không chờ mọi request; request độc lập chạy song song, tránh gọi lặp và N+1; danh sách lớn phải lọc/phân trang tại API/SQL. Truy vấn `GLOBAL` chỉ hỏi site cần thiết qua Site Router; fan-out chỉ chạy song song có giới hạn/timeout khi driver và kết nối an toàn, đồng thời phải báo `complete`/`missing_sites` chính xác. Ghi thời gian bằng ms theo request và site, p50/p95 khi có nhiều lượt đo; không log bí mật hoặc dữ liệu nhạy cảm. Làm theo [README.md mục 12](README.md#12-tốc-độ-tải-trang-và-dữ-liệu).
 - **Kiểm tra mỗi trang trước khi hoàn tất:** chạy lint, typecheck và build theo scripts hiện có; mở route trực tiếp và đi qua điều hướng; kiểm tra API/network, console, ảnh/icon/font/404; thử các viewport đã nêu, chuột, bàn phím, touch, reduced motion, trạng thái loading/empty/error/disabled và dữ liệu một phần; xác nhận role không thấy route/thao tác trái quyền. Đo hiệu năng và lưu bằng chứng/kết quả. Không kết luận responsive hoặc không có bug nếu chưa kiểm tra trên giao diện chạy thật.
 
 ### Đồng bộ tài liệu
@@ -153,10 +180,12 @@ Khi đổi yêu cầu giao diện/API, cập nhật `specs/ui-ux.md` và/hoặc 
 
 ## Đọc tiếp
 
+- `docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md`: yêu cầu 2–4 site, năm nội dung chứng minh tối thiểu, đồng bộ dữ liệu, mã YC/TC và bằng chứng nghiệm thu
 - `fs/README.md` và `fs/Functional-Specification.md`: phạm vi chức năng, vai trò, luồng nghiệp vụ, quy tắc lỗi và tiêu chí nghiệm thu
 - `specs/README.md`: mục lục và cách giữ đặc tả API/UI đồng bộ
 - `specs/api.md`: bảo mật, validation, phân quyền, các endpoint và nghiệp vụ thanh toán
 - `specs/ui-ux.md`: vai trò, sơ đồ trang, cấu trúc component, thiết kế và kiểm tra responsive
+- `README.md` mục 12: phân biệt độ trễ Next.js/API/SQL/site, hiện loading ngay, giữ nguyên ranh giới CSDL phân tán và quy trình đo hiệu năng
 - `docs/DATABASE_SCHEMA.md`: các bảng, kiểu phân mảnh, ràng buộc phân tán (mục 4), dữ liệu mẫu
 - `README.md`: kiến trúc, phân quyền, 14 luồng nghiệp vụ kèm ví dụ (có thêm / đóng cơ sở)
 - `docs/QLTTNN-Lam-Viec-Nhom.md`: phân công, quy trình task, nhánh cá nhân và PR
