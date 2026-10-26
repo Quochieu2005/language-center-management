@@ -32,6 +32,10 @@ Khi `API_DOCS_ENABLED=true` (mặc định theo `DJANGO_DEBUG`):
 
 ## CSDL phân tán và kết nối site
 
+**Yêu cầu chung:** đồ án dùng 3 site trong giới hạn 2–4; phải chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Đọc [yêu cầu chung và kịch bản demo trong README chính](../../README.md#yêu-cầu-chung-áp-dụng-cho-mọi-đề-tài) cùng [API spec](../../specs/api.md) trước khi triển khai module nghiệp vụ.
+
+API/Coordinator phải cung cấp định tuyến mảnh, một điểm vào replication, trạng thái/phục hồi chuyển cơ sở, bảo vệ chỗ cuối của lớp và Global Query có thông tin site thiếu. Kết nối alias, liveness hoặc Swagger hoạt động chưa chứng minh các yêu cầu này; chạy TC-REP-01/TC-SYNC-01, TC-DTX-01, TC-CON-01 và TC-DQ-01 trên SQL Server test trước khi ghi đạt. Các cơ chế còn mở phải được chốt theo README/FS; đây là yêu cầu phải làm, không phải xác nhận đã triển khai.
+
 Mỗi cơ sở có CSDL SQL Server riêng. Cấu hình chỉ tạo một alias/kết nối riêng cho từng entry trong `SITE_DATABASES_JSON`; không tạo CSDL nghiệp vụ trung tâm và không có alias mặc định dùng để lưu dữ liệu (`default` dùng dummy backend). Ví dụ máy demo hiện tại có thể khai báo ba DB riêng cùng SQL Server host; khi demo trên nhiều máy, `host` của mỗi entry là địa chỉ VPN/LAN của máy chứa CSDL đó.
 
 Sửa `.env` (file này đã bị Git bỏ qua) và thay thông tin mẫu bằng giá trị môi trường thật:
@@ -41,6 +45,12 @@ SITE_DATABASES_JSON={"Q1":{"name":"QLTTNN_Q1","host":"127.0.0.1","port":1433,"us
 ```
 
 Không commit `.env`, mật khẩu SQL, hoặc địa chỉ kết nối riêng của nhóm. `SQL_SERVER_TRUST_SERVER_CERTIFICATE=yes` chỉ phù hợp khi phát triển với chứng chỉ tự ký; triển khai thật cần chứng chỉ được tin cậy và đặt `SQL_SERVER_TRUST_SERVER_CERTIFICATE=no`. Mã cơ sở được đọc từ cấu hình, không có vòng lặp cố định ba site.
+
+## Hiệu năng API và truy vấn site
+
+Khi endpoint chậm, đo tách thời gian xử lý Django và từng truy vấn SQL/site bằng millisecond. Dùng `request_id` để nối log giữa các tầng; nếu chưa có, bổ sung correlation ID an toàn. Đây là hướng dẫn triển khai, không xác nhận middleware đo thời gian đã có. Không ghi bí mật hoặc dữ liệu nhạy cảm. Tránh truy vấn N+1, chỉ lấy trường cần thiết, lọc và phân trang tại SQL Server. Chỉ thêm index sau khi xem query plan và thời gian truy vấn thực tế. Xem [README chính mục 12](../../README.md#12-tốc-độ-tải-trang-và-dữ-liệu) trước khi tối ưu page/API.
+
+Với `GLOBAL`, chỉ hỏi các site cần thiết qua kết nối riêng. Nếu truy vấn độc lập và driver/kết nối cho phép, dùng fan-out có giới hạn đồng thời và timeout; không chờ tuần tự từng site nếu không có lý do nghiệp vụ. Trả trạng thái đầy đủ và `missing_sites` chính xác khi thiếu site. Không chuyển dữ liệu vào DB trung tâm, không JOIN xuyên site, không âm thầm bỏ site lỗi và không tự retry thao tác ghi khi chưa đối soát trạng thái.
 
 ## Email kích hoạt tài khoản và khôi phục mật khẩu
 
