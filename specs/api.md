@@ -81,6 +81,18 @@ Lỗi validation trả `400` hoặc `422` cùng mã trường, ví dụ `{"error
 - Cookie phiên nếu dùng phải có `HttpOnly`, `Secure`, `SameSite` phù hợp; request thay đổi dữ liệu phải được bảo vệ CSRF. Không lưu mật khẩu/token lâu hạn trong `localStorage`.
 - So sánh hash bằng thư viện chuẩn; xác thực sai, tài khoản không tồn tại, bị khóa hoặc vô hiệu hóa trả cùng thông báo chung. Giới hạn kích thước mật khẩu đầu vào để chống request quá lớn, không cắt mật khẩu.
 
+### Tự hết hạn phiên sau 1 giờ không hoạt động
+
+- Áp dụng cho mọi phiên đã xác thực của Admin Big, Admin Small, lễ tân, kế toán, nhân viên và giáo viên; nếu sau này bật tài khoản học viên thì áp dụng cùng chính sách. Mỗi phiên/trình duyệt/thiết bị được theo dõi riêng; đăng xuất do idle ở một thiết bị không tự đăng xuất thiết bị khác.
+- Thời hạn idle là **3600 giây (60 phút)** kể từ hoạt động người dùng gần nhất. Thời gian được tính bằng đồng hồ phía server, lưu timestamp UTC có timezone; không dựa vào giờ hệ điều hành của trình duyệt.
+- Hoạt động được tính gồm thao tác bàn phím, nhấn/chạm, cuộn trang có chủ ý và thao tác nghiệp vụ do người dùng khởi tạo. Không tính polling, refresh tự động, health check, analytics, request nền, tab còn mở hoặc timer. Reload trang không đặt lại thời hạn.
+- API phải kiểm tra hết hạn ở **mọi request cần xác thực**, không chỉ dựa vào timer giao diện. Phiên cần trạng thái có thể thu hồi và `last_user_activity_at`/`idle_expires_at` do server quản lý. Chữ ký token hoặc cookie hết hạn tuyệt đối không tự chứng minh idle timeout nếu server không thể xác minh hoạt động gần nhất.
+- Khi người dùng hoạt động nhưng không phát sinh request nghiệp vụ, frontend có thể gửi `POST /auth/activity` có CSRF để cập nhật phiên; chỉ gửi khi có sự kiện người dùng thật và giới hạn cập nhật tối đa một lần mỗi 60 giây. Tự động gọi endpoint này theo chu kỳ không có hoạt động người dùng sẽ làm sai chính sách và bị cấm. Request nghiệp vụ do người dùng khởi tạo có thể cập nhật hoạt động trong cùng lần xác thực.
+- Khi hết 3600 giây, API từ chối phiên bằng `401` với mã ổn định `SESSION_IDLE_TIMEOUT`, thu hồi trạng thái phiên, hết hạn cookie `HttpOnly` và không xử lý nghiệp vụ. `POST /auth/logout` dùng cùng cơ chế kết thúc phiên khi logout thủ công. Nếu không thể truy cập nơi lưu trạng thái phiên, API không được coi phiên là hợp lệ; trả lỗi dịch vụ phù hợp và không cho qua kiểm tra quyền.
+- Frontend đồng bộ hoạt động giữa các tab cùng phiên, hiển thị cảnh báo trước hạn (mặc định 5 phút) và nút “Tiếp tục phiên” chỉ khi API xác nhận phiên còn hạn. Đến hạn hoặc nhận `SESSION_IDLE_TIMEOUT`, frontend xóa trạng thái người dùng trong bộ nhớ, điều hướng về trang đăng nhập với thông báo phiên hết hạn và không giữ token trong storage.
+- Chính sách cần kiểm thử: chưa hết hạn tại 59:59; hết hạn tại 60:00; tương tác thật đặt lại hạn; polling/refresh nền không đặt lại; reload/tab ngủ không kéo dài phiên; hoạt động ở tab khác được đồng bộ; logout thủ công thu hồi ngay; các role có cùng chính sách.
+- **Phụ thuộc triển khai hiện tại:** chưa có endpoint đăng nhập/logout, model xác thực hay nơi lưu phiên trong API; `DATABASES['default']` cố ý là dummy. Trước khi bật auth, phải chốt nơi lưu trạng thái phiên có thể thu hồi phù hợp mô hình CSDL riêng từng site và cập nhật schema/migration nếu cần. Không tự tạo CSDL nghiệp vụ trung tâm hoặc lưu trạng thái phiên vào một site tùy ý.
+
 ### Rate limit và chống dò tài khoản
 
 Các ngưỡng dưới đây là **giá trị khởi đầu đề xuất**, phải cấu hình được, ghi nhận trong môi trường test và điều chỉnh theo lưu lượng thực tế. Không dùng khóa tài khoản vĩnh viễn chỉ vì client gửi sai nhiều lần.

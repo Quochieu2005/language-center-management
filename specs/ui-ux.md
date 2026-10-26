@@ -294,6 +294,14 @@ flowchart TD
 6. Đăng xuất kết thúc phiên phía server rồi xóa cookie. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
 7. Admin Big tạo Admin Small/giáo viên bằng email công việc và cơ sở được giao; không nhập hoặc gửi mật khẩu thay người nhận. Khi API kích hoạt tài khoản sẵn sàng, người nhận mở liên kết một lần trong `/auth/activate` để tự đặt mật khẩu. Người quên mật khẩu yêu cầu email liên kết tại `/auth/forgot-password`, rồi tự nhập mật khẩu mới ở `/auth/reset-password`; giao diện không hiển thị việc email có tồn tại hay không. Liên kết reset mặc định hết hạn sau 15 phút.
 
+#### Tự đăng xuất khi không hoạt động
+
+- Sau đăng nhập, mọi vai trò dùng chung hạn idle **60 phút**. Tính hoạt động từ thao tác thực của người dùng; polling API, refresh tự động, tab để mở và reload không kéo dài phiên.
+- Đồng bộ bộ đếm giữa các tab cùng phiên. Có thể hiện cảnh báo ở phút 55 kèm nút “Tiếp tục phiên”; chỉ tiếp tục khi API xác nhận phiên chưa hết hạn.
+- Khi hết hạn hoặc API trả `401 SESSION_IDLE_TIMEOUT`, xóa ngữ cảnh người dùng trong bộ nhớ, đóng khu vực yêu cầu đăng nhập, hiển thị “Phiên đã hết hạn do không hoạt động. Vui lòng đăng nhập lại.” và chuyển đến trang đăng nhập.
+- Giao diện không tự quyết định phiên còn hợp lệ bằng đồng hồ máy khách; API là nguồn quyết định cuối cùng. Không lưu token để cố khôi phục phiên sau reload.
+- Yêu cầu này chưa hoạt động trong frontend hiện tại vì luồng đăng nhập/API phiên chưa được triển khai.
+
 Khi API chưa bật OAuth, không hiển thị nút giả hoặc làm nút chỉ chuyển trang. Nếu thiết kế cần thể hiện trước, đặt trạng thái chưa khả dụng kèm ghi chú nội bộ trong prototype; chỉ bật control khi endpoint, OAuth app, callback URL, cấu hình cookie và test API đều sẵn sàng. Các nút dùng logo provider chính thức: kiểm tra `assets/icons` và thư viện hiện có trước; nếu thiếu mới thêm SVG logo theo quy định thương hiệu, không tự vẽ lại logo.
 
 ### 3.5. Section dự kiến bên trong từng page
