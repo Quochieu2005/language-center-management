@@ -4,6 +4,8 @@ Tài liệu này chuyển [README chính](../README.md), mục 2–5 và 11, th�
 
 ## 1. Luồng một yêu cầu
 
+Trước khi triển khai, đọc [yêu cầu chung và bộ kịch bản YC/TC](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md): **2–4 site** (đồ án dùng 3), tối thiểu một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Mỗi nhóm được chọn kiểu phân mảnh phù hợp. Các mã giả dưới đây mô tả ý định, không phải bằng chứng các cơ chế đã chạy.
+
 ```mermaid
 flowchart LR
     NguoiDung["Người dùng"] -->|gửi yêu cầu| GiaoDienWeb["GiaoDienWeb"]
@@ -93,6 +95,8 @@ registerStudent(actor, siteCode, studentId, classId):
 
 Các điều kiện và thay đổi lấy từ README mục 5.1. Cách khóa bản ghi và transaction cụ thể phải phù hợp với SQL Server và cách Django kết nối từng site. Nếu bước tạo học phí hoặc nhật ký lỗi, không để lại đăng ký hay tăng sĩ số một mình. README yêu cầu lớp cùng cơ sở và còn chỗ; nhóm cần thống nhất trước khi code có cho đăng ký muộn vào lớp `dang_hoc` hay không.
 
+`findForUpdate` trong mã giả là yêu cầu bảo vệ vùng kiểm tra/cập nhật, không khẳng định ORM/backend đang có một API khóa cụ thể. Với YC-05, phải chọn và ghi rõ cách khóa/mức cô lập hoặc cập nhật có điều kiện thực tế trên SQL Server. Chạy TC-CON-01 bằng hai phiên độc lập, hai học viên khác nhau tranh một chỗ; chỉ một yêu cầu thành công, yêu cầu thua không có `DangKy`/`HocPhi` dở dang. Unique đăng ký và nút disabled không thay thế cơ chế này.
+
 Các luồng `LOCAL` khác cũng phải giữ toàn bộ thay đổi cùng site trong một giao dịch:
 
 | Chức năng | Kiểm tra trước ghi | Thay đổi cùng giao dịch |
@@ -124,6 +128,8 @@ countActiveStudents(actor):
 
 Không cộng trạng thái `da_chuyen_di`. Nếu có site lỗi, vẫn có thể trả phần nhận được theo README 5.6, nhưng `complete` phải là `false` và giao diện phải nêu rõ site thiếu. Không thay kết quả thiếu bằng 0.
 
+Phép cộng COUNT trong mã giả chỉ mô tả trường hợp dữ liệu ổn định, không có giao dịch chuyển đang chạy. Khi có chuyển đang mở, phải đọc trạng thái/bước từ nguồn và áp dụng quy tắc bản hiện hành ở mục 7 của [tài liệu giao dịch](QLTTNN-Giao-Dich-Phan-Tan.md) trước khi đếm; thiếu dữ liệu xác định trạng thái thì báo chưa đầy đủ. TC-DQ-01 kiểm tra cả kết quả từng site và dấu vết gộp ở API; TC-DTX-01 kiểm tra tránh đếm trùng trong thời gian phục hồi.
+
 ### `REPLICATED-WRITE`: thêm khóa học
 
 ```text
@@ -140,6 +146,8 @@ addCourse(actor, course):
 ```
 
 `sharedDataWriter` là một điểm vào duy nhất, không nằm lặp lại trong `catalogs`, `accounts`, `sites`. Cơ chế commit khi có lỗi giữa chừng chưa chốt; người làm module không được tự thay hợp đồng thành ghi một nơi rồi để nền đồng bộ sau.
+
+YC-03/YC-07 bắt buộc chốt phương pháp truyền thay đổi, lưu tiến trình/ACK, phiên bản và cách retry/đối soát trước khi triển khai. Tiền kiểm mọi site sẵn sàng không loại trừ site lỗi ngay sau đó. Nếu đã có bản sao commit, giữ kết quả từng site và báo chưa hoàn tất đến khi phục hồi; không tự giả định toàn bộ đã rollback. TC-REP-01 chứng minh truyền thay đổi thật; TC-SYNC-01 chứng minh lỗi/phục hồi. Seed ba DB và cấu hình kết nối không thay thế hai bài này.
 
 Khi ghi `TaiKhoan`, trước khi tạo mới kiểm tra `ten_dang_nhap` và `email` chưa tồn tại ở bất cứ site liên quan nào. Khi đổi mật khẩu, bản mới phải có ở mọi site hoạt động để người dùng đăng nhập từ cơ sở nào cũng được. Quyền reset/khóa tài khoản và các bước xác minh theo README mục 5.8–5.9.
 
@@ -204,7 +212,7 @@ executeApprovedTransfer(requestId, source, destination):
     verifyBothSitesAndCompleteAtSource(tx)
 ```
 
-`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Worker bỏ qua `cho_duyet` và `tu_choi`, chỉ xử lý `dang_xu_ly`. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Nếu đích đã commit rồi ứng dụng dừng, recovery tìm trạng thái mở ở nguồn, đối chiếu sự kiện có cùng `ma_chuyen` tại đích và làm nốt nguồn. Không tạo hồ sơ đích lần hai, không xóa đích. Dùng `khoa_chong_lap`, unique index trên học viên đang mở và `rowversion` để chặn gửi trùng/cạnh tranh. Đây là điều phối phục hồi tiến về phía trước bằng các transaction cục bộ, không khẳng định ACID nguyên tử xuyên CSDL; Global Query xử lý bản hiện hành theo mục 6 của tài liệu giao dịch phân tán.
+`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Worker bỏ qua `cho_duyet` và `tu_choi`, chỉ xử lý `dang_xu_ly`. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Nếu đích đã commit rồi ứng dụng dừng, recovery tìm trạng thái mở ở nguồn, đối chiếu sự kiện có cùng `ma_chuyen` tại đích và làm nốt nguồn. Không tạo hồ sơ đích lần hai, không xóa đích. Dùng `khoa_chong_lap`, unique index trên học viên đang mở và `rowversion` để chặn gửi trùng/cạnh tranh. Đây là điều phối phục hồi tiến về phía trước bằng các transaction cục bộ, không khẳng định ACID nguyên tử xuyên CSDL; Global Query xử lý bản hiện hành theo mục 7 của tài liệu giao dịch phân tán.
 
 ## 5. Cấu trúc source gợi ý
 
@@ -252,3 +260,5 @@ Không log mật khẩu/token, kể cả trong exception. Mọi thao tác cần 
 ## 7. Quy tắc cho từng PR
 
 Mỗi thay đổi phải nêu: loại nghiệp vụ; site đọc/ghi; bảng ảnh hưởng; quyền cần kiểm tra; ranh giới transaction; nhật ký; hành vi khi site lỗi; và docs/schema có thay đổi không. Checklist hoàn tất và cách chia người làm ở [QLTTNN-Lam-Viec-Nhom.md](QLTTNN-Lam-Viec-Nhom.md).
+
+Nếu thay đổi phục vụ YC-01–YC-07, ghi mã YC/TC, bằng chứng thực tế và phần chưa kiểm chứng. Rà đồng thời FS, API và UI để lỗi cạnh tranh/thiếu site/đang phục hồi có cùng ý nghĩa. Transaction cục bộ của đăng ký không thay cho distributed transaction giữa nguồn và đích.

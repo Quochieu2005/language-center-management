@@ -6,6 +6,8 @@ Tài liệu quy định cách chia component, page, section, SCSS, SVG, nội du
 
 ## 1. Sản phẩm và nội dung
 
+Đây là giao diện cho đồ án **2–4 site**, hiện chọn 3 site Q1/Q7/TD. Yêu cầu chung bắt buộc gồm ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Mỗi nhóm được chọn kiểu phân mảnh phù hợp. [YC-01–YC-07 và các bài kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) áp dụng cùng các trang bên dưới; giao diện hiển thị kết quả do API xác nhận, không tự mô phỏng kết quả phân tán.
+
 | Hạng mục | Quy ước cho dự án |
 |---|---|
 | Sản phẩm | Trung tâm đào tạo ngoại ngữ, có các khóa học và lớp tại từng cơ sở |
@@ -550,6 +552,18 @@ Mỗi nút, liên kết, item điều hướng, bộ lọc và thành phần có
 
 Animation chỉ dùng để giải thích kết quả thao tác: mở/đóng menu, accordion, drawer, xác nhận lưu hoặc trạng thái đang xử lý. Thời lượng chuyển trạng thái thường `120–180 ms`; tránh animation lặp tự động, parallax nặng và chuyển động làm người dùng chờ. Tôn trọng `prefers-reduced-motion`; trạng thái vẫn phải hiểu được khi tắt animation.
 
+### 8.1. Trạng thái giao diện phục vụ kiểm chứng môn học
+
+| Trang/luồng đã có trong phạm vi | Trạng thái phải thể hiện từ API | Liên kết kiểm chứng |
+|---|---|---|
+| Danh sách lớp, học viên và đăng ký | Hiện tên cơ sở/phạm vi đang xem; Admin Small chỉ thao tác tại cơ sở được giao; không lấy site từ tiền tố mã học viên | YC-01/YC-02, TC-SITE-01 và TC-FRAG-01 |
+| Danh mục môn/khóa học của Admin Big | Đang lưu, hoàn tất hoặc chưa đồng bộ đủ; khi API chưa xác nhận đủ bản sao, thông báo “Thay đổi chưa hoàn tất đồng bộ” và cho xem/kiểm tra lại trạng thái theo quyền | YC-03/YC-07, TC-REP-01 và TC-SYNC-01 |
+| Tạo đề nghị và chi tiết chuyển cơ sở | Phân biệt chờ duyệt, bị từ chối, đang chuyển/phục hồi và hoàn tất; reload đọc lại tiến trình; không hiển thị “Chuyển thành công” chỉ vì đã duyệt | YC-04, TC-DTX-01 |
+| Form đăng ký lớp của Admin Small/lễ tân | Khi người khác lấy chỗ cuối, hiển thị “Lớp đã hết chỗ. Hãy chọn lớp khác.” theo lỗi API; giữ học viên đang chọn, tải lại sĩ số và cho chọn lớp khác. Không tự retry thao tác đăng ký | YC-05, TC-CON-01 |
+| Báo cáo học viên của Admin Big | Tổng đầy đủ khác với kết quả một phần; nêu cơ sở chưa phản hồi, cho đọc lại; không trình bày dữ liệu thiếu thành 0 | YC-06, TC-DQ-01 |
+
+Copy lỗi phải khớp trạng thái API đã chốt. Dùng màn hình/section nghiệp vụ hiện có; không cần tạo trang kỹ thuật riêng để giả lập các tiêu chí này. Việc khóa nút chỉ chống gửi lặp trong một giao diện, không thay thế kiểm soát concurrency tại API/DB. Replication và đồng bộ có thể cùng cơ chế; UI chỉ hiển thị hoàn tất theo xác nhận của server.
+
 ## 9. Tốc độ và ngân sách hiệu năng
 
 Đo bằng millisecond khi phù hợp; đây là mục tiêu nghiệm thu, không phải cam kết trước khi có build và phép đo. Theo ngưỡng Core Web Vitals hiện được web.dev công bố, mục tiêu tại percentile 75, đo riêng mobile và desktop: **LCP ≤ 2500 ms**, **INP ≤ 200 ms**, **CLS ≤ 0.1** ([web.dev — Web Vitals](https://web.dev/articles/vitals)).
@@ -572,6 +586,7 @@ Kiểm tra ngay khi làm từng page/section, không đợi hoàn tất toàn b�
 5. Kiểm tra form sai/hợp lệ, gửi lặp, API lỗi và đổi kích thước trong khi drawer/modal đang mở.
 6. Kiểm tra `prefers-reduced-motion`, độ tương phản, nhãn form, alt text và tên truy cập của icon/nút.
 7. Đo hiệu năng theo mục 9 và ghi kết quả. Chỉ đánh dấu page hoàn tất khi có kết quả kiểm tra và ảnh chụp các viewport chính.
+8. Với trang liên quan YC-01–YC-07, chạy trạng thái ở mục 8.1 cùng API/DB kiểm thử. Dùng hai phiên độc lập cho tranh chỗ cuối, thử reload lúc chuyển đang xử lý và đọc báo cáo khi một site lỗi; đối chiếu dữ liệu sau thao tác. Chỉ hai tab mở mà không có yêu cầu cạnh tranh thực sự chưa chứng minh concurrency.
 
 Không thay API bằng dữ liệu giả viết cứng trong giao diện hoàn thiện. Dữ liệu fixture chỉ dùng trong bài test cô lập, phải được phân biệt với dữ liệu ứng dụng thật.
 
@@ -584,3 +599,4 @@ Không thay API bằng dữ liệu giả viết cứng trong giao diện hoàn t
 - Page hoạt động ở mobile `375px` và desktop `1440px`, có kiểm tra tablet và kích thước trung gian.
 - Tương tác có hover/active/focus/loading/empty/error khi phù hợp; animation ngắn và tôn trọng reduced-motion.
 - Lint/typecheck/build và kiểm tra giao diện/performance có kết quả được ghi lại; không còn lỗi console, overflow hoặc lỗi hiển thị đã biết.
+- Các luồng phân tán liên quan có bằng chứng API/DB và UI khớp trạng thái thật; không đánh dấu đạt yêu cầu chung chỉ bằng ảnh giao diện, dữ liệu fixture hoặc kết quả mock.

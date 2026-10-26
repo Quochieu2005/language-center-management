@@ -10,6 +10,8 @@ ZeroTier tạo một mạng riêng ảo để các máy được nhóm cho phép
 
 Ba site ban đầu của đồ án là Quận 1 (Q1), Quận 7 (Q7) và Thủ Đức (TD). Mỗi site giữ một CSDL SQL Server riêng. API/Coordinator kết nối riêng tới từng site; không tạo CSDL nghiệp vụ trung tâm để gộp dữ liệu.
 
+Yêu cầu chung cho phép **2–4 site**, nên 3 site của nhóm phù hợp; máy thành viên, trình duyệt hoặc máy chỉ chạy API không tự tính thêm một site dữ liệu. Sau bước mạng, phải tiếp tục [bộ kiểm chứng YC-01–YC-07](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md): ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Nhóm được chọn kiểu phân mảnh phù hợp. TC-SITE-01 xác nhận DB/kết nối riêng; các TC còn lại cần API/SQL và dữ liệu thật, không thể đánh dấu đạt chỉ bằng ping hoặc TCP thành công.
+
 ```mermaid
 flowchart LR
     API[Máy chạy API / Coordinator]

@@ -5,6 +5,7 @@ Tài liệu này giúp năm thành viên phối hợp làm một hệ thống c�
 ## 1. Nguyên tắc cả nhóm cùng nắm
 
 - Đọc README mục 1–4 và schema mục 1–4 trước khi nhận task.
+- Đọc [yêu cầu chung và kiểm chứng](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md): 2–4 site (nhóm dùng 3), tối thiểu một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ. Các nhóm có thể chọn kiểu phân mảnh khác nhau; các nội dung chứng minh đều bắt buộc.
 - Mỗi task phải ghi rõ loại `LOCAL`, `GLOBAL`, `REPLICATED-WRITE` hay `DISTRIBUTED-TX`.
 - Mỗi người sở hữu module của mình, nhưng các interface dùng chung được thống nhất trước khi code song song.
 - Dùng stack đã chốt trong README mục 9: Next.js frontend, Django API và SQL Server; không tự đổi công nghệ nếu chưa thống nhất cả nhóm.
@@ -26,6 +27,18 @@ Nhóm gán tên thật vào các vai trò dưới đây. Đây là đề xuất 
 Chuyển cơ sở là công việc liên chức năng: B làm điều phối; A xác định lưu trạng thái và ràng buộc DB; D bảo đảm trạng thái học viên/lớp; C kiểm tra Admin Small chỉ tạo đề nghị còn Admin Big mới duyệt/từ chối; E kiểm tra hộp thư Global Query, nhật ký, lịch sử và thống kê sau chuyển. Cả nhóm có thể review kịch bản lỗi; Pull Request vẫn phải được trưởng nhóm Quốc Hiếu kiểm tra và merge theo quy trình ở mục 5.
 
 Mỗi vai trò chịu trách nhiệm phần giao diện của domain mình nếu có giao diện. Không dồn toàn bộ frontend vào một người ở cuối dự án.
+
+### Phân công minh chứng yêu cầu chung
+
+| Yêu cầu/kịch bản | Đầu mối | Phối hợp và đầu ra |
+|---|---|---|
+| YC-01/YC-02 — TC-SITE-01, TC-FRAG-01 | A | B/D xác nhận kết nối, mảnh ngang/dẫn xuất, đối chiếu tập dữ liệu và tái thiết |
+| YC-03/YC-07 — TC-REP-01, TC-SYNC-01 | C | A/B triển khai phương pháp replication và phục hồi; lưu dữ liệu/phiên bản từng site |
+| YC-04 — TC-DTX-01 | B | A/D xác nhận trạng thái nguồn/đích và recovery; C kiểm tra quyền; E lưu kịch bản lỗi |
+| YC-05 — TC-CON-01 | D | A/B chốt cơ chế cạnh tranh; E chạy hai phiên tranh chỗ cuối và đối chiếu dữ liệu |
+| YC-06 — TC-DQ-01 | E | B/A đối chiếu kết quả cục bộ, tổng API và trường hợp site lỗi |
+
+Nhóm điền người thực hiện và người review vào task, kèm mã YC/TC và nơi lưu kết quả. Quốc Hiếu kiểm tra trước khi ghi đạt; chưa có bằng chứng thì ghi “Chưa kiểm chứng”. Phân công này không thay đổi quyền review/merge Git ở mục 5.
 
 ## 3. Hợp đồng trước khi chia task song song
 
@@ -58,6 +71,7 @@ Nếu chưa trả lời được ranh giới commit/rollback hoặc site tham gi
 | `docs/QLTTNN-Huong-Dan-Source.md` | B | Khi module/interface hoặc quy tắc truy cập thay đổi |
 | `docs/QLTTNN-Giao-Dich-Phan-Tan.md` | B + A | Khi chốt giao thức commit, trạng thái hoặc recovery |
 | `docs/QLTTNN-Ke-Hoach-Trien-Khai.md` | Người tích hợp | Khi thứ tự/gate hoặc demo thay đổi |
+| `docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md` | B + A/E và người làm kịch bản | Khi tiêu chí, phương pháp kiểm chứng hoặc bằng chứng thay đổi |
 | `docs/QLTTNN-Lam-Viec-Nhom.md` | Cả nhóm thống nhất | Khi thay đổi người sở hữu hoặc quy tắc phối hợp |
 
 README và schema là nguồn chuẩn. Tài liệu con không được âm thầm đưa ra chính sách khác. Trong PR đổi schema/nghiệp vụ, sửa file chuẩn và tài liệu con liên quan trong cùng PR.
@@ -122,6 +136,7 @@ Ví dụ: nếu PR #1 đã được mở/push và sau đó tác giả push thêm
 - [ ] Đã phân loại `LOCAL/GLOBAL/REPLICATED-WRITE/DISTRIBUTED-TX`.
 - [ ] Đã ghi rõ thành công, rollback, timeout và retry.
 - [ ] Đã thống nhất ai sửa file nào để tránh đụng nhau.
+- [ ] Đã gắn YC/TC liên quan và xác định dữ liệu ban đầu, cách chạy, điều kiện đạt; không ghi “không áp dụng” cho yêu cầu chung bắt buộc của toàn đồ án.
 
 ## 7. Checklist trước khi merge
 
@@ -136,3 +151,4 @@ Ví dụ: nếu PR #1 đã được mở/push và sau đó tác giả push thêm
 - [ ] Với GLOBAL, kết quả thiếu site được đánh dấu chưa đầy đủ.
 - [ ] Với dữ liệu dùng chung/chuyển cơ sở, đã thử lỗi giữa chừng và đường phục hồi.
 - [ ] README/schema/docs khớp với source đã merge.
+- [ ] Với phần phân tán liên quan, FS/API/UI và mã YC/TC khớp nhau; bằng chứng thể hiện thao tác thật trên các site hoặc hai phiên cạnh tranh, không chỉ mock/seed.

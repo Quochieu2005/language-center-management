@@ -2,6 +2,16 @@
 
 Thư mục này chứa script SQL Server để dựng **ba CSDL riêng**, cùng schema nhưng lưu dữ liệu theo từng cơ sở. Cần SQL Server 2012 trở lên và SSMS có SQLCMD Mode. Đây là phần cài đặt vật lý ban đầu của Đề tài 10; nó không tạo một CSDL trung tâm có cột phân loại chi nhánh.
 
+## Yêu cầu chung và giới hạn của bộ script
+
+Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phân mảnh, replication, transaction và đồng bộ; chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency và một distributed query. Các nhóm được chọn kiểu phân mảnh phù hợp. Xem [yêu cầu chung](../README.md#yêu-cầu-chung-áp-dụng-cho-mọi-đề-tài) và [kịch bản demo](../README.md#6-kịch-bản-demo) trong README chính.
+
+- Schema/seed/verify hỗ trợ TC-SITE-01 và TC-FRAG-01; đọc riêng từng DB để đối chiếu mảnh và dữ liệu cha/con.
+- `02_seed_shared_catalog.sql` là nạp ban đầu; không tự triển khai phương pháp replication runtime. YC-03/YC-07 phải có TC-REP-01/TC-SYNC-01: một thay đổi truyền đến bản sao và lỗi/phục hồi.
+- Bảng trạng thái/sự kiện hỗ trợ Coordinator, không tự chạy distributed transaction hoặc bảo đảm ACID xuyên site. TC-DTX-01 cần nghiệp vụ nguồn/đích và cơ chế đã chốt chạy thật.
+- TC-CON-01 cần hai phiên cạnh tranh chỗ cuối, cơ chế bảo vệ sức chứa và đọc lại `LopHoc`/`DangKy`/`HocPhi`; các ràng buộc/verify cục bộ không đủ thay bài thử này.
+- TC-DQ-01 cần đọc các DB rồi tổng hợp tại API; không thay bằng JOIN xuyên DB. Chạy xong script khởi tạo chưa có nghĩa đã đạt toàn bộ yêu cầu môn học.
+
 ## Các file
 
 | File | Mục đích |
