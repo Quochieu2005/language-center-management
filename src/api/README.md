@@ -33,12 +33,11 @@ Giao diện tài liệu được **sinh từ API bằng `drf-spectacular`**; sou
 
 Khi `API_DOCS_ENABLED=true` (mặc định theo `DJANGO_DEBUG`):
 
-- Swagger UI: <http://127.0.0.1:8000/api/docs/swagger/>
-- ReDoc: <http://127.0.0.1:8000/api/docs/redoc/>
+- Swagger UI: <http://127.0.0.1:8000/api/docs>
 - OpenAPI JSON/YAML: <http://127.0.0.1:8000/api/schema/> (thêm `?format=json` để yêu cầu JSON)
 - Liveness API: <http://127.0.0.1:8000/api/v1/health/>
 
-Đặt `API_DOCS_ENABLED=false` để gỡ Swagger, ReDoc và schema endpoint khỏi URL khi triển khai. Không bật debug trên môi trường công khai.
+Đặt `API_DOCS_ENABLED=false` để gỡ Swagger và schema endpoint khỏi URL khi triển khai. Không bật debug trên môi trường công khai.
 
 ## CSDL phân tán và kết nối site
 
