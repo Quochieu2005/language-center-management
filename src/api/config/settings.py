@@ -158,7 +158,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "120/min", "user": "600/min"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "120/min",
+        "user": "600/min",
+        "admin_account_create": "10/hour",
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -195,6 +199,7 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER).strip()
+ADMIN_SMALL_TEMP_PASSWORD = os.getenv("ADMIN_SMALL_TEMP_PASSWORD", "").strip()
 WEB_APP_BASE_URL = os.getenv("WEB_APP_BASE_URL", "http://localhost:3000").rstrip("/")
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "120"))
 ACCOUNT_ACTIVATION_TIMEOUT = int(os.getenv("ACCOUNT_ACTIVATION_TIMEOUT", "86400"))

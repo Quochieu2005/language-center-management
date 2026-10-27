@@ -7,13 +7,18 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication, AuthenticationUnavailable
 from core.auth.serializers import (
     AdminForgotPasswordSerializer,
+    AdminSmallCreateResponseSerializer,
+    AdminSmallCreateSerializer,
+    AuthChangePasswordSerializer,
+    AuthPasswordChangeResponseSerializer,
     AdminResetPasswordSerializer,
     AuthLoginResponseSerializer,
     AuthLoginSerializer,
@@ -25,8 +30,12 @@ from core.auth.serializers import (
 )
 from core.auth.services import (
     AuthInfrastructureUnavailable,
+    AdminSmallAccountConflict,
+    AdminSmallSiteUnavailable,
     LoginRateLimitExceeded,
     PasswordResetRateLimitExceeded,
+    change_authenticated_password,
+    create_admin_small,
     extend_user_session,
     login_user,
     request_admin_password_reset,
@@ -45,6 +54,7 @@ def _serialized_user(user):
         "role": user.role,
         "site_code": user.site_code,
         "profile_id": user.profile_id,
+        "must_change_password": user.must_change_password,
     }
 
 
@@ -143,6 +153,132 @@ class AuthLoginView(APIView):
         )
         _set_auth_cookie(response, token)
         return response
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AuthChangePasswordView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="auth_password_change",
+        tags=["Xác thực"],
+        summary="Đổi mật khẩu hiện tại hoặc mật khẩu tạm được cấp",
+        description=(
+            "Yêu cầu mật khẩu hiện tại và mật khẩu mới tối thiểu 12 ký tự. "
+            "Mật khẩu mới được băm BCrypt và đồng bộ tới mọi site đang hoạt động; "
+            "các phiên cũ bị thu hồi. Tài khoản có cờ bắt buộc đổi mật khẩu chỉ được "
+            "xem /auth/me/, đổi mật khẩu hoặc đăng xuất."
+        ),
+        request=AuthChangePasswordSerializer,
+        responses={
+            200: AuthPasswordChangeResponseSerializer,
+            400: OpenApiResponse(description="Mật khẩu hiện tại sai hoặc mật khẩu mới không hợp lệ."),
+            401: OpenApiResponse(description="Phiên không hợp lệ hoặc đã hết hạn."),
+            503: OpenApiResponse(description="Không thể cập nhật mật khẩu đầy đủ trên các site."),
+        },
+    )
+    def post(self, request):
+        serializer = AuthChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        try:
+            changed = change_authenticated_password(
+                request.user,
+                serializer.validated_data["current_password"],
+                serializer.validated_data["new_password"],
+            )
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+
+        if not changed:
+            return Response(
+                {"detail": "Mật khẩu hiện tại không đúng hoặc tài khoản đã thay đổi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        response = Response(
+            {"detail": "Đã đổi mật khẩu. Vui lòng đăng nhập lại bằng mật khẩu mới."},
+            status=status.HTTP_200_OK,
+        )
+        response.delete_cookie(
+            settings.AUTH_COOKIE_NAME,
+            path="/",
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+        return response
+
+
+class AdminSmallCreateView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_account_create"
+
+    @extend_schema(
+        operation_id="admin_small_create",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big tạo Admin Small cho một cơ sở",
+        description=(
+            "Chỉ Admin Big được gọi. API tạo tài khoản nhan_vien với hồ sơ NhanVien có "
+            "chuc_vu=quan_ly_co_so tại cơ sở được chọn; vai trò hiệu lực là admin_small. "
+            "TaiKhoan được nhân bản tới mọi site đang hoạt động; hồ sơ nhân viên chỉ nằm "
+            "ở site được giao. API gửi mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD qua SMTP, "
+            "bắt buộc đổi mật khẩu sau đăng nhập đầu tiên và không trả mật khẩu trong response. "
+            "Giới hạn 10 yêu cầu mỗi giờ cho một tài khoản Admin Big."
+        ),
+        request=AdminSmallCreateSerializer,
+        responses={
+            201: AdminSmallCreateResponseSerializer,
+            400: OpenApiResponse(description="Dữ liệu không hợp lệ hoặc site không hoạt động."),
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Big được tạo Admin Small."),
+            409: OpenApiResponse(description="Email hoặc tên đăng nhập đã được sử dụng."),
+            429: OpenApiResponse(description="Đã vượt giới hạn tạo tài khoản."),
+            503: OpenApiResponse(description="Site, SQL Server hoặc SMTP chưa sẵn sàng."),
+        },
+    )
+    def post(self, request):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được tạo Admin Small."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = AdminSmallCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result, email_sent = create_admin_small(
+                email=serializer.validated_data["email"],
+                full_name=serializer.validated_data["full_name"],
+                site_code=serializer.validated_data["site_code"],
+                username=serializer.validated_data.get("username"),
+                admin_big_id=request.user.account_id,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallAccountConflict:
+            return Response(
+                {"detail": "Email hoặc tên đăng nhập đã được sử dụng."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except AdminSmallSiteUnavailable:
+            return Response(
+                {"detail": "Cơ sở không tồn tại hoặc đang không hoạt động."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+
+        return Response(
+            {
+                "account_id": result.account_id,
+                "employee_id": result.employee_id,
+                "username": result.username,
+                "email": result.email,
+                "site_code": result.site_code,
+                "role": "admin_small",
+                "must_change_password": result.must_change_password,
+                "email_sent": email_sent,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 @method_decorator(csrf_protect, name="dispatch")
