@@ -457,6 +457,8 @@ flowchart LR
 
 Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider, tra subject trong `TaiKhoanLienKetOAuth` ở các CSDL site riêng rồi đọc `TaiKhoan` để lấy trạng thái, vai trò và phạm vi. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi danh tính là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao của bảng dùng chung; không có CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
 
+Mỗi phiên sau khi xác thực phải tự hết hạn sau **60 phút không có hoạt động người dùng thật**, áp dụng như nhau cho Admin Big, Admin Small, nhân viên và giáo viên. Request nền như polling, health check và tự refresh không được tính hoạt động. API phải xác minh idle expiry và thu hồi phiên; giao diện đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và đưa người dùng về đăng nhập khi hết hạn. Mỗi thiết bị là phiên riêng. Cơ chế lưu trạng thái phiên có thể thu hồi còn phải được chốt theo mô hình CSDL riêng từng site; không dùng CSDL nghiệp vụ trung tâm. Do xác thực hiện chưa được triển khai, chính sách này hiện là yêu cầu thiết kế chứ chưa phải hành vi đang chạy.
+
 ### 5.8. Quên và đặt lại mật khẩu
 
 **Loại:** yêu cầu tra cứu nhiều site; cập nhật tài khoản dùng chung bằng `REPLICATED-WRITE`.
@@ -684,7 +686,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Cách bảo vệ kiểm tra/cập nhật chỗ cuối trong một transaction và cách tạo cạnh tranh giữa hai phiên ở TC-CON-01 là gì? |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |
-| Giao diện API và bảo mật | Hợp đồng endpoint, xác thực phiên/token, CORS và thời hạn đăng nhập được thống nhất thế nào? |
+| Giao diện API và bảo mật | Hợp đồng endpoint, cơ chế lưu/thu hồi phiên phù hợp CSDL riêng từng site, CORS, cookie/CSRF và cách thực thi idle timeout 60 phút được thống nhất thế nào? |
 | Cấu hình môi trường | Tên biến môi trường và nơi lưu chuỗi kết nối/bí mật; tuyệt đối không commit bí mật vào Git |
 
 Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay đồng bộ vật lý đã hoàn tất. Replication, distributed transaction, concurrency, distributed query và phân mảnh phải có minh chứng; đồng bộ phải thử cả lỗi/phục hồi. Công cụ cụ thể phải bám yêu cầu cài đặt của giảng viên. Django vẫn hỏi từng CSDL rồi gộp ở ứng dụng; không tự đổi nghiệp vụ sang JOIN xuyên site hoặc để API và Publication ghi trùng cùng bảng. Kết quả kiểm chứng và quyết định cơ chế phải được ghi riêng với mô tả thiết kế.

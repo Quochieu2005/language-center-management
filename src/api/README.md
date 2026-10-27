@@ -17,18 +17,27 @@ Copy-Item .env.example .env
 
 Nếu môi trường đã có Python khác tương thích, thay `py -3.13` bằng launcher/version tương ứng. Không cài package vào Python toàn máy; dependency được cài trong `.venv` của API. Cần cài driver SQL Server tương thích nếu máy API kết nối SQL Server qua ODBC.
 
+Khi mở repository ở thư mục gốc bằng VS Code, terminal tích hợp CMD mặc định bắt đầu tại thư mục gốc. Sau khi đã tạo `src/api/.venv`, có thể vào API theo từng bước rồi chạy lệnh như bình thường:
+
+```cmd
+cd src
+cd api
+python manage.py runserver 127.0.0.1:8000
+```
+
+Profile trong `.vscode/settings.json` tự kích hoạt `.venv` khi `cd` vào thư mục có `Scripts/activate.bat`. Cấu hình này chỉ áp dụng cho terminal tích hợp của VS Code khi mở repository; cửa sổ CMD mở bên ngoài VS Code không đọc cấu hình workspace. Nếu profile chưa đổi sau khi cập nhật, chạy **Developer: Reload Window**, đóng terminal cũ và mở terminal mới.
+
 ## Swagger / OpenAPI
 
 Giao diện tài liệu được **sinh từ API bằng `drf-spectacular`**; source không tự dựng một trang Swagger riêng. Gói `drf-spectacular[sidecar]` phục vụ asset Swagger UI từ dependency đã cài, không cần tải giao diện từ CDN.
 
 Khi `API_DOCS_ENABLED=true` (mặc định theo `DJANGO_DEBUG`):
 
-- Swagger UI: <http://127.0.0.1:8000/api/docs/swagger/>
-- ReDoc: <http://127.0.0.1:8000/api/docs/redoc/>
+- Swagger UI: <http://127.0.0.1:8000/api/docs>
 - OpenAPI JSON/YAML: <http://127.0.0.1:8000/api/schema/> (thêm `?format=json` để yêu cầu JSON)
 - Liveness API: <http://127.0.0.1:8000/api/v1/health/>
 
-Đặt `API_DOCS_ENABLED=false` để gỡ Swagger, ReDoc và schema endpoint khỏi URL khi triển khai. Không bật debug trên môi trường công khai.
+Đặt `API_DOCS_ENABLED=false` để gỡ Swagger và schema endpoint khỏi URL khi triển khai. Không bật debug trên môi trường công khai.
 
 ## CSDL phân tán và kết nối site
 
@@ -78,4 +87,4 @@ Hiện có scaffold Django REST Framework, OpenAPI/Swagger UI sinh tự động,
 
 Chưa triển khai đăng nhập, tài khoản Admin Big/Admin Small, giáo viên/học viên, đăng ký khóa học, xếp lớp, thu học phí, quản lý điểm, đề nghị/duyệt/chuyển cơ sở, Global Query hoặc đồng bộ bảng dùng chung. Chưa có migration Django hay CSDL trung tâm. Các luồng đó phải được triển khai theo schema SQL Server hiện có và kiểm thử với từng site trước khi được xem là hoàn tất. Chỉ endpoint đã triển khai và kiểm thử mới xuất hiện như API hoạt động trong Swagger.
 
-Đăng nhập Google/Facebook hiện mới có đặc tả và biến cấu hình mẫu trong `.env.example`; các endpoint chưa hoạt động và không được coi là đã tích hợp. Trước khi bật cần chạy `db/06_add_oauth_identity_table.sql` trên các CSDL cũ (hoặc tạo schema mới), triển khai callback/kiểm tra danh tính, liên kết tài khoản đã xác thực, cơ chế phiên có thể thu hồi, rate limit và test với OAuth apps thật. Không điền client secret vào `.env.example`, Git hoặc gửi trong chat; chỉ đặt secret mới trong `.env` cục bộ/secret store.
+Đăng nhập thường và Google/Facebook hiện mới có đặc tả; các endpoint chưa hoạt động và không được coi là đã tích hợp. Trước khi bật cần triển khai xác thực, callback/kiểm tra danh tính, liên kết tài khoản đã xác thực, cơ chế phiên có thể thu hồi, rate limit và test với OAuth apps thật. Mỗi phiên phải hết hạn sau 3600 giây không có hoạt động thật; API phải từ chối phiên quá hạn, frontend tự đưa người dùng về đăng nhập, còn polling nền không được kéo dài phiên. Chưa có session backend hoặc nơi lưu trạng thái phiên trong schema; phải chốt cách lưu tương thích mô hình CSDL riêng từng site trước khi bật auth. Với OAuth, cần chạy `db/06_add_oauth_identity_table.sql` trên các CSDL cũ (hoặc tạo schema mới). Không điền client secret vào `.env.example`, Git hoặc gửi trong chat; chỉ đặt secret mới trong `.env` cục bộ/secret store.
