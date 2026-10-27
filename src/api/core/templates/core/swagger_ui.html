@@ -2,6 +2,16 @@
 
 {% block head %}
   {{ block.super }}
+  <script>
+    (() => {
+      try {
+        const savedTheme = window.localStorage.getItem("qlttnn-swagger-theme");
+        document.documentElement.classList.toggle("dark-mode", savedTheme !== "light");
+      } catch {
+        document.documentElement.classList.add("dark-mode");
+      }
+    })();
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -12,6 +22,42 @@
       --docs-text: #edf1f1;
       --docs-muted: #c2cbcd;
       --docs-accent: #12c98b;
+      --docs-topbar: #252a2c;
+      --docs-url-background: #19201e;
+      --docs-link: #77baff;
+      --docs-version-background: #586267;
+      --docs-scheme-background: #202526;
+      --docs-authorize-background: #1e2b27;
+      --docs-get-background: rgb(69 141 196 / 10%);
+      --docs-get-border: #458dc4;
+      --docs-post-background: rgb(8 122 85 / 11%);
+      --docs-post-border: #087a55;
+      --docs-control-background: #1b2021;
+      --docs-control-border: #4b5659;
+      --docs-hover: rgb(255 255 255 / 3%);
+    }
+
+    :root:not(.dark-mode) {
+      color-scheme: light;
+      --docs-background: #f4f6f5;
+      --docs-panel: #fff;
+      --docs-panel-raised: #edf1ef;
+      --docs-border: #d4dcd8;
+      --docs-text: #26332d;
+      --docs-muted: #52635b;
+      --docs-accent: #087a55;
+      --docs-url-background: #fff;
+      --docs-link: #126bb1;
+      --docs-version-background: #66736d;
+      --docs-scheme-background: #fff;
+      --docs-authorize-background: #e6f4ec;
+      --docs-get-background: rgb(69 141 196 / 10%);
+      --docs-get-border: #75add8;
+      --docs-post-background: rgb(8 122 85 / 8%);
+      --docs-post-border: #3a9b75;
+      --docs-control-background: #fff;
+      --docs-control-border: #b9c5bf;
+      --docs-hover: rgb(0 0 0 / 3%);
     }
 
     html,
@@ -31,13 +77,13 @@
     }
 
     .swagger-ui .topbar {
-      background: #252a2c;
+      background: var(--docs-topbar);
       border-bottom: 1px solid var(--docs-border);
     }
 
     .swagger-ui .topbar .download-url-wrapper input[type="text"] {
-      border: 1px solid #087a55;
-      background: #19201e;
+      border: 1px solid var(--docs-accent);
+      background: var(--docs-url-background);
       color: var(--docs-text);
     }
 
@@ -58,17 +104,17 @@
 
     .swagger-ui .info .base-url,
     .swagger-ui .info a {
-      color: #77baff;
+      color: var(--docs-link);
     }
 
     .swagger-ui .info .title small.version-stamp {
-      background: #586267;
+      background: var(--docs-version-background);
       color: #fff;
       box-shadow: none;
     }
 
     .swagger-ui .scheme-container {
-      background: #202526;
+      background: var(--docs-scheme-background);
       border-top: 1px solid var(--docs-border);
       border-bottom: 1px solid var(--docs-border);
       box-shadow: none;
@@ -77,7 +123,7 @@
     .swagger-ui .auth-wrapper .authorize,
     .swagger-ui .btn.authorize {
       border-color: var(--docs-accent);
-      background: #1e2b27;
+      background: var(--docs-authorize-background);
       color: var(--docs-accent);
     }
 
@@ -91,7 +137,7 @@
     }
 
     .swagger-ui .opblock-tag:hover {
-      background: rgb(255 255 255 / 3%);
+      background: var(--docs-hover);
     }
 
     .swagger-ui .opblock {
@@ -106,19 +152,19 @@
     }
 
     .swagger-ui .opblock.opblock-get {
-      border-color: #458dc4;
-      background: rgb(69 141 196 / 10%);
+      border-color: var(--docs-get-border);
+      background: var(--docs-get-background);
     }
 
     .swagger-ui .opblock.opblock-post {
-      border-color: #087a55;
-      background: rgb(8 122 85 / 11%);
+      border-color: var(--docs-post-border);
+      background: var(--docs-post-background);
     }
 
     .swagger-ui .opblock.opblock-put,
     .swagger-ui .opblock.opblock-patch,
     .swagger-ui .opblock.opblock-delete {
-      background: #242a2c;
+      background: var(--docs-panel);
     }
 
     .swagger-ui .opblock-body,
@@ -159,18 +205,18 @@
     .swagger-ui input[type="email"],
     .swagger-ui textarea,
     .swagger-ui select {
-      border-color: #4b5659;
-      background: #1b2021;
+      border-color: var(--docs-control-border);
+      background: var(--docs-control-background);
       color: var(--docs-text);
     }
 
     .swagger-ui select option {
-      background: #1b2021;
+      background: var(--docs-control-background);
       color: var(--docs-text);
     }
 
     .swagger-ui .btn {
-      border-color: #4b5659;
+      border-color: var(--docs-control-border);
       background: var(--docs-panel-raised);
       color: var(--docs-text);
     }

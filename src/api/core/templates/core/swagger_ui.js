@@ -124,3 +124,56 @@ const ui = SwaggerUIBundle({
 });
 
 {% if oauth2_config %}ui.initOAuth({{ oauth2_config|safe }});{% endif %}
+
+const swaggerThemeStorageKey = "qlttnn-swagger-theme";
+let preferredDarkTheme = true;
+try {
+  preferredDarkTheme = window.localStorage.getItem(swaggerThemeStorageKey) !== "light";
+} catch {
+  // Keep the default dark theme if browser storage is unavailable.
+}
+
+document.documentElement.classList.toggle("dark-mode", preferredDarkTheme);
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  const toggle = target instanceof Element
+    ? target.closest(".dark-mode-toggle button")
+    : null;
+  if (!toggle) {
+    return;
+  }
+
+  const nextTheme = toggle.getAttribute("aria-pressed") === "true" ? "light" : "dark";
+  try {
+    window.localStorage.setItem(swaggerThemeStorageKey, nextTheme);
+  } catch {
+    // Theme still changes for this page even if persistence is unavailable.
+  }
+}, true);
+
+const syncSwaggerThemeToggle = () => {
+  const toggle = document.querySelector(".dark-mode-toggle button");
+  if (!toggle) {
+    return false;
+  }
+
+  const toggleIsDark = toggle.getAttribute("aria-pressed") === "true";
+  if (toggleIsDark !== preferredDarkTheme) {
+    toggle.click();
+    document.documentElement.classList.toggle("dark-mode", preferredDarkTheme);
+  }
+  return true;
+};
+
+if (!syncSwaggerThemeToggle()) {
+  const swaggerRoot = document.querySelector("#swagger-ui");
+  if (swaggerRoot) {
+    const themeObserver = new MutationObserver(() => {
+      if (syncSwaggerThemeToggle()) {
+        themeObserver.disconnect();
+      }
+    });
+    themeObserver.observe(swaggerRoot, { childList: true, subtree: true });
+  }
+}
