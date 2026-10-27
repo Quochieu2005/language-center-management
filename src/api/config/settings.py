@@ -163,6 +163,7 @@ REST_FRAMEWORK = {
         "user": "600/min",
         "admin_account_create": "10/hour",
         "admin_small_self_profile": "30/hour",
+        "admin_big_self_profile": "20/hour",
         "admin_small_delete": "10/hour",
     },
 }

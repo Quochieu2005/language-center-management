@@ -13,8 +13,17 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication, AuthenticationUnavailable
+from core.auth.admin_big_profile import (
+    AdminBigProfileConflict,
+    AdminBigProfileNotFound,
+    AdminBigProfilePasswordInvalid,
+    get_admin_big_self_profile,
+    update_admin_big_self_profile,
+)
 from core.auth.serializers import (
     AdminForgotPasswordSerializer,
+    AdminBigSelfProfileResponseSerializer,
+    AdminBigSelfProfileUpdateSerializer,
     AdminSmallCreateResponseSerializer,
     AdminSmallCreateSerializer,
     AdminSmallDeleteResponseSerializer,
@@ -358,6 +367,94 @@ class AdminSmallSelfProfileView(APIView):
             )
         except AdminSmallProfileNotFound:
             return Response({"detail": "Không tìm thấy hồ sơ Admin Small đang hoạt động."}, status=404)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(profile, status=status.HTTP_200_OK)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AdminBigSelfProfileView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_big_self_profile"
+
+    @extend_schema(
+        operation_id="admin_big_self_profile_read",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big xem thông tin tài khoản của chính mình",
+        responses={
+            200: AdminBigSelfProfileResponseSerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Big được xem thông tin này."),
+            503: OpenApiResponse(description="Một hoặc nhiều cơ sở chưa sẵn sàng."),
+        },
+    )
+    def get(self, request):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được xem tài khoản cá nhân này."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            profile = get_admin_big_self_profile(request.user)
+        except AdminBigProfileNotFound:
+            return Response({"detail": "Không tìm thấy tài khoản Admin Big đang hoạt động."}, status=404)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(profile, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        operation_id="admin_big_self_profile_update",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big cập nhật tài khoản của chính mình",
+        description=(
+            "Chỉ cho phép cập nhật username, email và slug của tài khoản gắn với phiên hiện tại; "
+            "bắt buộc xác nhận mật khẩu hiện tại. Không nhận account_id, role hoặc site từ client, "
+            "nên không thể dùng API này để sửa Admin Small. Các trường TaiKhoan được đồng bộ tới "
+            "mọi site đang hoạt động; nếu một site lỗi, tiến trình được lưu để lần gọi sau tiếp tục."
+        ),
+        request=AdminBigSelfProfileUpdateSerializer,
+        responses={
+            200: AdminBigSelfProfileResponseSerializer,
+            400: OpenApiResponse(description="Dữ liệu cập nhật không hợp lệ hoặc mật khẩu hiện tại sai."),
+            401: OpenApiResponse(description="Phiên đăng nhập không hợp lệ hoặc đã hết hạn."),
+            403: OpenApiResponse(description="Chỉ Admin Big được cập nhật tài khoản này."),
+            404: OpenApiResponse(description="Không tìm thấy tài khoản Admin Big."),
+            409: OpenApiResponse(description="Username, email hoặc slug đã được sử dụng; hoặc có xung đột cần đối soát."),
+            429: OpenApiResponse(description="Vượt giới hạn yêu cầu cập nhật."),
+            503: OpenApiResponse(description="Đồng bộ một hoặc nhiều CSDL site chưa hoàn tất; có thể gọi lại để tiếp tục."),
+        },
+    )
+    def patch(self, request):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được cập nhật tài khoản cá nhân này."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = AdminBigSelfProfileUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = dict(serializer.validated_data)
+        current_password = payload.pop("current_password")
+        try:
+            profile = update_admin_big_self_profile(
+                request.user,
+                payload,
+                current_password,
+                request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminBigProfilePasswordInvalid:
+            return Response(
+                {"detail": "Mật khẩu hiện tại không đúng."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except AdminBigProfileConflict:
+            return Response(
+                {"detail": "Username, email hoặc slug đã được sử dụng hoặc đang có thay đổi cần đối soát."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except AdminBigProfileNotFound:
+            return Response({"detail": "Không tìm thấy tài khoản Admin Big đang hoạt động."}, status=404)
         except AuthInfrastructureUnavailable as exc:
             raise AuthenticationUnavailable from exc
         return Response(profile, status=status.HTTP_200_OK)

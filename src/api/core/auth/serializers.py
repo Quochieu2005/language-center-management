@@ -144,6 +144,60 @@ class AdminSmallSelfProfileResponseSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+class AdminBigSelfProfileUpdateSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=128, trim_whitespace=False, write_only=True)
+    username = serializers.RegexField(
+        regex=r"^[A-Za-z0-9._-]{3,100}$", max_length=100, required=False
+    )
+    email = serializers.EmailField(max_length=254, required=False)
+    slug = serializers.RegexField(
+        regex=r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$", max_length=120, required=False
+    )
+
+    def to_internal_value(self, data):
+        allowed = {"current_password", "username", "email", "slug"}
+        if hasattr(data, "keys") and set(data.keys()) - allowed:
+            raise serializers.ValidationError(
+                {"detail": "Chỉ được cập nhật username, email và slug của tài khoản Admin Big hiện tại."}
+            )
+        return super().to_internal_value(data)
+
+    def validate_username(self, value):
+        value = value.strip().lower()
+        if (
+            not value
+            or not any(character.isalnum() for character in value)
+            or any(ord(character) < 32 for character in value)
+        ):
+            raise serializers.ValidationError("Tên đăng nhập không hợp lệ.")
+        return value
+
+    def validate_email(self, value):
+        return value.strip().casefold()
+
+    def validate_slug(self, value):
+        value = value.strip().lower()
+        if not value:
+            raise serializers.ValidationError("Slug không được để trống.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs.get("current_password"):
+            raise serializers.ValidationError({"current_password": "Cần xác nhận mật khẩu hiện tại."})
+        if not (set(attrs) - {"current_password"}):
+            raise serializers.ValidationError("Cần cung cấp ít nhất một trường để cập nhật.")
+        return attrs
+
+
+class AdminBigSelfProfileResponseSerializer(serializers.Serializer):
+    account_id = serializers.CharField()
+    slug = serializers.CharField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    role = serializers.ChoiceField(choices=["admin_big"])
+    site_code = serializers.CharField(allow_null=True)
+
+
 class AdminSmallDeleteResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
     site_code = serializers.CharField()
