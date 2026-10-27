@@ -9,6 +9,8 @@ from core.auth.views import (
     AdminForgotPasswordView,
     AdminResetPasswordView,
     AdminSmallCreateView,
+    AdminSmallDeleteView,
+    AdminSmallSelfProfileView,
     CsrfTokenView,
 )
 from core.views import health_check
@@ -27,4 +29,6 @@ urlpatterns = [
     path("auth/activity/", AuthActivityView.as_view(), name="auth-activity"),
     path("auth/logout/", AuthLogoutView.as_view(), name="auth-logout"),
     path("admin/admin-smalls/", AdminSmallCreateView.as_view(), name="admin-small-create"),
+    path("admin/admin-smalls/me/", AdminSmallSelfProfileView.as_view(), name="admin-small-self-profile"),
+    path("admin/admin-smalls/<str:account_id>/", AdminSmallDeleteView.as_view(), name="admin-small-delete"),
 ]

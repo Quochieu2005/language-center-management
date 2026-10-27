@@ -12,6 +12,7 @@ from core.sites.connections import UnknownSiteError, get_site_database_alias
 from core.media.folders import build_asset_folder
 from core.auth.authentication import AuthCookieAuthentication
 from core.auth.services import (
+    AdminSmallDeactivationResult,
     AdminSmallProvisioningResult,
     AuthenticatedSession,
     AuthenticatedUser,
@@ -43,6 +44,10 @@ class HealthCheckTests(SimpleTestCase):
         self.assertIn("/api/v1/health/", schema["paths"])
         self.assertIn("get", schema["paths"]["/api/v1/health/"])
         self.assertIn("/api/v1/admin/admin-smalls/", schema["paths"])
+        self.assertIn("/api/v1/admin/admin-smalls/me/", schema["paths"])
+        self.assertIn("patch", schema["paths"]["/api/v1/admin/admin-smalls/me/"])
+        self.assertIn("/api/v1/admin/admin-smalls/{account_id}/", schema["paths"])
+        self.assertIn("delete", schema["paths"]["/api/v1/admin/admin-smalls/{account_id}/"])
 
     def test_site_database_resolves_only_a_configured_site_code(self):
         with override_settings(SITE_DATABASE_ALIASES={"Q7": "site_q7"}):
@@ -156,6 +161,100 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
         self.assertNotIn("password", response.json())
         self.assertNotIn("1234567890", response.content.decode())
         create_account.assert_called_once()
+
+
+class AdminSmallManagementApiTests(SimpleTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.small = AuthenticatedUser(
+            account_id="Q7-TK-000123",
+            email="manager.q7@example.com",
+            username="manager.q7",
+            slug="manager-q7",
+            role="admin_small",
+            site_code="Q7",
+            profile_id="Q7-NV-000045",
+        )
+        self.big = SimpleNamespace(
+            is_authenticated=True,
+            role="admin_big",
+            account_id="Q1-TK-000001",
+            pk="Q1-TK-000001",
+        )
+
+    def test_only_admin_big_can_deactivate_admin_small(self):
+        self.client.force_authenticate(user=self.small)
+
+        with patch("core.auth.views.delete_admin_small") as delete_account:
+            response = self.client.delete("/api/v1/admin/admin-smalls/Q7-TK-000124/")
+            self_response = self.client.delete("/api/v1/admin/admin-smalls/Q7-TK-000123/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self_response.status_code, 403)
+        delete_account.assert_not_called()
+
+    def test_admin_big_deactivates_without_hard_deleting(self):
+        self.client.force_authenticate(user=self.big)
+        result = AdminSmallDeactivationResult(account_id="Q7-TK-000124", site_code="Q7")
+
+        with patch("core.auth.views.delete_admin_small", return_value=result) as delete_account:
+            response = self.client.delete("/api/v1/admin/admin-smalls/Q7-TK-000124/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "vo_hieu")
+        self.assertEqual(response.json()["role"], "admin_small")
+        self.assertNotIn("deleted", response.json())
+        delete_account.assert_called_once_with("Q7-TK-000124", "Q1-TK-000001", "127.0.0.1")
+
+    def test_admin_big_cannot_read_or_edit_admin_small_self_profile_endpoint(self):
+        self.client.force_authenticate(user=self.big)
+
+        with patch("core.auth.views.update_admin_small_self_profile") as update_profile:
+            get_response = self.client.get("/api/v1/admin/admin-smalls/me/")
+            response = self.client.patch(
+                "/api/v1/admin/admin-smalls/me/", {"full_name": "Tên mới"}, format="json"
+            )
+
+        self.assertEqual(get_response.status_code, 403)
+        self.assertEqual(response.status_code, 403)
+        update_profile.assert_not_called()
+
+    def test_admin_small_can_edit_only_own_profile_fields(self):
+        self.client.force_authenticate(user=self.small)
+        profile = {
+            "account_id": "Q7-TK-000123",
+            "profile_id": "Q7-NV-000045",
+            "site_code": "Q7",
+            "role": "admin_small",
+            "full_name": "Tên mới",
+            "phone": "0900000000",
+            "username": "manager.q7",
+            "email": "manager.q7@example.com",
+        }
+
+        with patch("core.auth.views.update_admin_small_self_profile", return_value=profile) as update_profile:
+            response = self.client.patch(
+                "/api/v1/admin/admin-smalls/me/",
+                {"full_name": "Tên mới", "phone": "0900000000"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), profile)
+        update_profile.assert_called_once_with(self.small, {"full_name": "Tên mới", "phone": "0900000000"}, "127.0.0.1")
+
+    def test_admin_small_cannot_submit_identity_or_permission_fields(self):
+        self.client.force_authenticate(user=self.small)
+
+        with patch("core.auth.views.update_admin_small_self_profile") as update_profile:
+            response = self.client.patch(
+                "/api/v1/admin/admin-smalls/me/",
+                {"full_name": "Tên mới", "site_code": "Q1", "role": "admin_big"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 400)
+        update_profile.assert_not_called()
 
 
 class TemporaryPasswordAccessTests(SimpleTestCase):

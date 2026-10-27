@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
+import re
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -47,6 +49,18 @@ class AdminSmallSiteUnavailable(Exception):
     """The requested branch is not an active site."""
 
 
+class AdminSmallProfileNotFound(Exception):
+    """The authenticated user has no active Admin Small profile at their site."""
+
+
+class AdminSmallTargetNotFound(Exception):
+    """The requested active Admin Small account does not exist."""
+
+
+class AdminSmallDeleteConflict(Exception):
+    """The requested account is not in the expected replicated state."""
+
+
 @dataclass(frozen=True)
 class AuthenticatedUser:
     account_id: str
@@ -82,6 +96,13 @@ class AdminSmallProvisioningResult:
     email: str
     site_code: str
     must_change_password: bool = True
+
+
+@dataclass(frozen=True)
+class AdminSmallDeactivationResult:
+    account_id: str
+    site_code: str
+    status: str = "vo_hieu"
 
 
 def auth_session_alias() -> str:
@@ -140,6 +161,32 @@ def _replicated_account(identifier: str, site_codes: tuple[str, ...]):
                 WHERE LOWER(email) = %s OR LOWER(ten_dang_nhap) = %s
                 """,
                 [identifier, identifier],
+            )
+            rows = cursor.fetchall()
+        if len(rows) > 1:
+            raise AuthInfrastructureUnavailable
+        replicas.append(tuple(rows[0]) if rows else None)
+
+    if not replicas or all(row is None for row in replicas):
+        return None
+    if any(row is None for row in replicas) or any(row != replicas[0] for row in replicas[1:]):
+        raise AuthInfrastructureUnavailable
+    return replicas[0]
+
+
+def _replicated_account_by_id(account_id: str, site_codes: tuple[str, ...]):
+    replicas = []
+    for code in site_codes:
+        with get_site_connection(code).cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
+                               vai_tro, ma_co_so, trang_thai, phien_ban,
+                               bat_buoc_doi_mat_khau
+                FROM dbo.TaiKhoan
+                WHERE ma_tai_khoan = %s
+                """,
+                [account_id],
             )
             rows = cursor.fetchall()
         if len(rows) > 1:
@@ -734,6 +781,438 @@ def _next_admin_small_employee_id(target_site: str) -> str:
         except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
             raise AuthInfrastructureUnavailable from exc
     raise AuthInfrastructureUnavailable
+
+
+def _admin_small_profile_cursor(site_code: str, account_id: str, profile_id: str | None = None):
+    cursor = connections[get_site_database_alias(site_code)].cursor()
+    query = """
+        SELECT TOP (2) n.ma_nhan_vien, n.ma_co_so, n.ho_ten, n.sdt,
+                       t.ten_dang_nhap, t.email
+        FROM dbo.NhanVien AS n
+        INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
+        WHERE n.ma_tai_khoan = %s AND n.ma_co_so = %s
+          AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
+          AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+    """
+    params: list[Any] = [account_id, site_code, site_code]
+    if profile_id is not None:
+        query += " AND n.ma_nhan_vien = %s"
+        params.append(profile_id)
+    cursor.execute(query, params)
+    return cursor
+
+
+def get_admin_small_self_profile(user: AuthenticatedUser) -> dict[str, Any]:
+    if user.role != "admin_small" or not user.site_code or not user.profile_id:
+        raise AdminSmallProfileNotFound
+    try:
+        with _admin_small_profile_cursor(user.site_code, user.account_id, user.profile_id) as cursor:
+            rows = cursor.fetchall()
+        if len(rows) != 1:
+            raise AdminSmallProfileNotFound
+        row = rows[0]
+        return {
+            "account_id": user.account_id,
+            "profile_id": str(row[0]),
+            "site_code": str(row[1]).upper(),
+            "role": "admin_small",
+            "full_name": str(row[2]),
+            "phone": str(row[3]) if row[3] is not None else None,
+            "username": str(row[4]),
+            "email": str(row[5]),
+        }
+    except AdminSmallProfileNotFound:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
+def update_admin_small_self_profile(
+    user: AuthenticatedUser, updates: dict[str, Any], remote_ip: str
+) -> dict[str, Any]:
+    if user.role != "admin_small" or not user.site_code or not user.profile_id:
+        raise AdminSmallProfileNotFound
+    if not updates or not set(updates).issubset({"full_name", "phone"}):
+        raise ValueError("Chỉ được cập nhật họ tên hoặc số điện thoại hồ sơ của chính mình.")
+
+    try:
+        alias = get_site_database_alias(user.site_code)
+        with transaction.atomic(using=alias):
+            with connections[alias].cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT n.ho_ten, n.sdt
+                    FROM dbo.NhanVien AS n WITH (UPDLOCK, ROWLOCK)
+                    INNER JOIN dbo.TaiKhoan AS t WITH (UPDLOCK, ROWLOCK)
+                        ON t.ma_tai_khoan = n.ma_tai_khoan
+                    WHERE n.ma_tai_khoan = %s AND n.ma_nhan_vien = %s AND n.ma_co_so = %s
+                      AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
+                      AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+                    """,
+                    [user.account_id, user.profile_id, user.site_code, user.site_code],
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise AdminSmallProfileNotFound
+                full_name = updates.get("full_name", str(row[0]))
+                phone = updates.get("phone", str(row[1]) if row[1] is not None else None)
+                cursor.execute(
+                    """
+                    UPDATE dbo.NhanVien
+                    SET ho_ten = %s, sdt = %s
+                    OUTPUT INSERTED.ma_nhan_vien
+                    WHERE ma_tai_khoan = %s AND ma_nhan_vien = %s AND ma_co_so = %s
+                      AND chuc_vu = 'quan_ly_co_so' AND trang_thai = 'dang_lam'
+                    """,
+                    [full_name, phone, user.account_id, user.profile_id, user.site_code],
+                )
+                if cursor.fetchone() is None:
+                    raise AdminSmallProfileNotFound
+                audit_id = f"{user.site_code}-NK-{_next_sequence_number(user.site_code, 'Seq_NK'):06d}"
+                cursor.execute(
+                    """
+                    INSERT INTO dbo.NhatKyHeThong
+                        (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong,
+                         bang_tac_dong, ma_ban_ghi, ip, ket_qua, ghi_chu)
+                    VALUES (%s, %s, %s, 'sua_ho_so_ca_nhan', 'NhanVien', %s, %s,
+                            'thanh_cong', N'Admin Small tự cập nhật hồ sơ của chính mình.')
+                    """,
+                    [audit_id, user.site_code, user.account_id, user.profile_id, remote_ip[:45]],
+                )
+        return get_admin_small_self_profile(user)
+    except AdminSmallProfileNotFound:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
+def _load_admin_small_deactivation(account_id: str):
+    alias = auth_session_alias()
+    try:
+        with connections[alias].cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ma_tai_khoan, ma_co_so, ma_admin_big, phien_ban_ban_dau,
+                       site_codes_json, trang_thai, ma_giao_dich
+                FROM dbo.GiaoDichVoHieuHoaAdminSmall
+                WHERE ma_tai_khoan = %s
+                """,
+                [account_id],
+            )
+            rows = cursor.fetchall()
+        if len(rows) > 1:
+            raise AuthInfrastructureUnavailable
+        return tuple(rows[0]) if rows else None
+    except AuthInfrastructureUnavailable:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
+def _insert_admin_small_deactivation_sync_event(
+    cursor, site_code: str, account_id: str, job_id: str
+) -> None:
+    event_id = f"{site_code}-DB-{uuid.uuid5(uuid.NAMESPACE_URL, f'{job_id}:{site_code}').hex[:10]}"
+    cursor.execute(
+        """
+        SELECT bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai
+        FROM dbo.NhatKyDongBo
+        WHERE ma_dong_bo = %s
+        """,
+        [event_id],
+    )
+    existing = cursor.fetchone()
+    expected = ("TaiKhoan", account_id, "sua", site_code, "thanh_cong")
+    if existing is not None:
+        if tuple(str(value) for value in existing) != expected:
+            raise AuthInfrastructureUnavailable
+        return
+    cursor.execute(
+        """
+        INSERT INTO dbo.NhatKyDongBo
+            (ma_dong_bo, bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai)
+        VALUES (%s, 'TaiKhoan', %s, 'sua', %s, 'thanh_cong')
+        """,
+        [event_id, account_id, site_code],
+    )
+
+
+def _deactivate_admin_small_replica(
+    site_code: str,
+    account_id: str,
+    target_site: str,
+    expected_version: int,
+    admin_big_id: str,
+    remote_ip: str,
+    job_id: str,
+) -> None:
+    alias = get_site_database_alias(site_code)
+    try:
+        with transaction.atomic(using=alias):
+            with connections[alias].cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT vai_tro, ma_co_so, trang_thai, phien_ban
+                    FROM dbo.TaiKhoan WITH (UPDLOCK, ROWLOCK)
+                    WHERE ma_tai_khoan = %s
+                    """,
+                    [account_id],
+                )
+                account = cursor.fetchone()
+                if account is None:
+                    raise AuthInfrastructureUnavailable
+                role, account_site, account_status, version = (
+                    str(account[0]).lower(),
+                    str(account[1]).upper() if account[1] else None,
+                    str(account[2]).lower(),
+                    int(account[3]),
+                )
+                if role != "nhan_vien" or account_site != target_site:
+                    raise AdminSmallDeleteConflict
+
+                if account_status == "hoat_dong" and version == expected_version:
+                    cursor.execute(
+                        """
+                        UPDATE dbo.TaiKhoan
+                        SET trang_thai = 'vo_hieu', phien_ban = phien_ban + 1,
+                            cap_nhat_luc = SYSUTCDATETIME()
+                        OUTPUT INSERTED.phien_ban
+                        WHERE ma_tai_khoan = %s AND vai_tro = 'nhan_vien'
+                          AND ma_co_so = %s AND trang_thai = 'hoat_dong' AND phien_ban = %s
+                        """,
+                        [account_id, target_site, expected_version],
+                    )
+                    updated_version = cursor.fetchone()
+                    if updated_version is None or int(updated_version[0]) != expected_version + 1:
+                        raise AdminSmallDeleteConflict
+                elif account_status == "vo_hieu" and version == expected_version + 1:
+                    pass  # Retry after a prior site commit is safe and idempotent.
+                else:
+                    raise AdminSmallDeleteConflict
+
+                if site_code == target_site:
+                    cursor.execute(
+                        """
+                        SELECT TOP (2) ma_nhan_vien, trang_thai
+                        FROM dbo.NhanVien WITH (UPDLOCK, ROWLOCK)
+                        WHERE ma_tai_khoan = %s AND ma_co_so = %s
+                          AND chuc_vu = 'quan_ly_co_so'
+                        """,
+                        [account_id, target_site],
+                    )
+                    profiles = cursor.fetchall()
+                    if len(profiles) != 1:
+                        raise AdminSmallDeleteConflict
+                    employee_id, employee_status = str(profiles[0][0]), str(profiles[0][1]).lower()
+                    if employee_status == "dang_lam":
+                        cursor.execute(
+                            """
+                            UPDATE dbo.NhanVien
+                            SET trang_thai = 'nghi_viec'
+                            OUTPUT INSERTED.ma_nhan_vien
+                            WHERE ma_tai_khoan = %s AND ma_nhan_vien = %s AND ma_co_so = %s
+                              AND chuc_vu = 'quan_ly_co_so' AND trang_thai = 'dang_lam'
+                            """,
+                            [account_id, employee_id, target_site],
+                        )
+                        if cursor.fetchone() is None:
+                            raise AdminSmallDeleteConflict
+                    elif employee_status != "nghi_viec":
+                        raise AdminSmallDeleteConflict
+
+                    cursor.execute(
+                        """
+                        SELECT COUNT_BIG(*)
+                        FROM dbo.NhatKyHeThong
+                        WHERE ma_co_so = %s AND ma_tai_khoan = %s
+                          AND hanh_dong = 'vo_hieu_hoa_admin_small'
+                          AND ma_ban_ghi = %s AND ket_qua = 'thanh_cong'
+                        """,
+                        [target_site, admin_big_id, account_id],
+                    )
+                    if int(cursor.fetchone()[0]) == 0:
+                        audit_id = f"{site_code}-NK-{_next_sequence_number(site_code, 'Seq_NK'):06d}"
+                        cursor.execute(
+                            """
+                            INSERT INTO dbo.NhatKyHeThong
+                                (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong,
+                                 bang_tac_dong, ma_ban_ghi, ip, ket_qua, ghi_chu)
+                            VALUES (%s, %s, %s, 'vo_hieu_hoa_admin_small', 'TaiKhoan', %s,
+                                    %s, 'thanh_cong', N'Admin Big vo hieu hoa tai khoan Admin Small.')
+                            """,
+                            [audit_id, target_site, admin_big_id, account_id, remote_ip[:45]],
+                        )
+                else:
+                    cursor.execute(
+                        "SELECT COUNT_BIG(*) FROM dbo.NhanVien WHERE ma_tai_khoan = %s",
+                        [account_id],
+                    )
+                    if int(cursor.fetchone()[0]) > 0:
+                        raise AdminSmallDeleteConflict
+
+                if site_code == auth_session_site_code():
+                    cursor.execute(
+                        """
+                        UPDATE dbo.PhienDangNhap
+                        SET thu_hoi_luc_utc = COALESCE(thu_hoi_luc_utc, SYSUTCDATETIME())
+                        WHERE ma_tai_khoan = %s AND thu_hoi_luc_utc IS NULL
+                        """,
+                        [account_id],
+                    )
+
+                _insert_admin_small_deactivation_sync_event(cursor, site_code, account_id, job_id)
+    except (AdminSmallDeleteConflict, AuthInfrastructureUnavailable):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
+def _complete_admin_small_deactivation(account_id: str) -> None:
+    alias = auth_session_alias()
+    try:
+        with transaction.atomic(using=alias):
+            with connections[alias].cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT trang_thai
+                    FROM dbo.GiaoDichVoHieuHoaAdminSmall WITH (UPDLOCK, ROWLOCK)
+                    WHERE ma_tai_khoan = %s
+                    """,
+                    [account_id],
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise AuthInfrastructureUnavailable
+                if str(row[0]).lower() == "hoan_tat":
+                    return
+                if str(row[0]).lower() != "dang_xu_ly":
+                    raise AdminSmallDeleteConflict
+
+                cursor.execute(
+                    """
+                    UPDATE dbo.PhienDangNhap
+                    SET thu_hoi_luc_utc = COALESCE(thu_hoi_luc_utc, SYSUTCDATETIME())
+                    WHERE ma_tai_khoan = %s AND thu_hoi_luc_utc IS NULL
+                    """,
+                    [account_id],
+                )
+                cursor.execute(
+                    """
+                    UPDATE dbo.GiaoDichVoHieuHoaAdminSmall
+                    SET trang_thai = 'hoan_tat', cap_nhat_luc_utc = SYSUTCDATETIME(),
+                        hoan_tat_luc_utc = SYSUTCDATETIME()
+                    WHERE ma_tai_khoan = %s AND trang_thai = 'dang_xu_ly'
+                    """,
+                    [account_id],
+                )
+    except AuthInfrastructureUnavailable:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
+def delete_admin_small(account_id: str, admin_big_id: str, remote_ip: str) -> AdminSmallDeactivationResult:
+    """Soft-deactivate one Admin Small across its account replicas with retryable forward recovery."""
+    normalized_id = str(account_id).strip().upper()
+    if not re.fullmatch(r"[A-Z0-9_-]{3,24}", normalized_id) or not remote_ip:
+        raise AdminSmallTargetNotFound
+
+    job = _load_admin_small_deactivation(normalized_id)
+    if job is None:
+        sites = active_site_codes()
+        coordinator_alias = auth_session_alias()
+        try:
+            with transaction.atomic(using=coordinator_alias):
+                with connections[coordinator_alias].cursor() as cursor:
+                    _acquire_named_lock(cursor, f"qlttnn-admin-small-deactivate:{normalized_id}")
+                    cursor.execute(
+                        """
+                        SELECT ma_tai_khoan, ma_co_so, ma_admin_big, phien_ban_ban_dau,
+                               site_codes_json, trang_thai, ma_giao_dich
+                        FROM dbo.GiaoDichVoHieuHoaAdminSmall
+                        WHERE ma_tai_khoan = %s
+                        """,
+                        [normalized_id],
+                    )
+                    job_row = cursor.fetchone()
+                    if job_row is None:
+                        account = _replicated_account_by_id(normalized_id, sites)
+                        if account is None or str(account[5]).lower() != "nhan_vien":
+                            raise AdminSmallTargetNotFound
+                        target_site = str(account[6]).upper() if account[6] else None
+                        if not target_site or target_site not in sites:
+                            raise AdminSmallTargetNotFound
+                        principal = _resolve_principal(account, sites)
+                        if principal is None or principal.role != "admin_small":
+                            # A previously disabled account is distinguishable from a non-manager below.
+                            with get_site_connection(target_site).cursor() as profile_cursor:
+                                profile_cursor.execute(
+                                    """
+                                    SELECT TOP (2) ma_nhan_vien
+                                    FROM dbo.NhanVien
+                                    WHERE ma_tai_khoan = %s AND ma_co_so = %s
+                                      AND chuc_vu = 'quan_ly_co_so'
+                                    """,
+                                    [normalized_id, target_site],
+                                )
+                                existing_profiles = profile_cursor.fetchall()
+                            if len(existing_profiles) == 1 and str(account[7]).lower() == "vo_hieu":
+                                raise AdminSmallDeleteConflict
+                            raise AdminSmallTargetNotFound
+
+                        job_id = str(uuid.uuid4())
+                        cursor.execute(
+                            """
+                            INSERT INTO dbo.GiaoDichVoHieuHoaAdminSmall
+                                (ma_giao_dich, ma_tai_khoan, ma_co_so, ma_admin_big,
+                                 phien_ban_ban_dau, site_codes_json, trang_thai)
+                            VALUES (CONVERT(uniqueidentifier, %s), %s, %s, %s, %s, %s, 'dang_xu_ly')
+                            """,
+                            [job_id, normalized_id, target_site, admin_big_id,
+                             int(account[8]), json.dumps(sites)],
+                        )
+                        job = (
+                            normalized_id, target_site, admin_big_id, int(account[8]),
+                            json.dumps(sites), "dang_xu_ly", job_id,
+                        )
+                    else:
+                        job = tuple(job_row)
+        except (AdminSmallTargetNotFound, AdminSmallDeleteConflict, AuthInfrastructureUnavailable):
+            raise
+        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+            raise AuthInfrastructureUnavailable from exc
+
+    target_site = str(job[1]).upper()
+    try:
+        original_sites = tuple(str(code).upper() for code in json.loads(str(job[4])))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+    if not original_sites or len(set(original_sites)) != len(original_sites):
+        raise AuthInfrastructureUnavailable
+    for site_code in original_sites:
+        try:
+            get_site_database_alias(site_code)
+        except UnknownSiteError as exc:
+            raise AuthInfrastructureUnavailable from exc
+
+    if str(job[5]).lower() != "hoan_tat":
+        coordinator_site = auth_session_site_code()
+        ordered_sites = tuple(
+            [coordinator_site] + [site for site in original_sites if site != coordinator_site]
+        )
+        for site_code in ordered_sites:
+            _deactivate_admin_small_replica(
+                site_code,
+                normalized_id,
+                target_site,
+                int(job[3]),
+                str(job[2]),
+                remote_ip,
+                str(job[6]),
+            )
+        _complete_admin_small_deactivation(normalized_id)
+
+    return AdminSmallDeactivationResult(account_id=normalized_id, site_code=target_site)
 
 
 def _account_sync_log_if_missing(cursor, site_code: str, account_id: str) -> None:

@@ -17,6 +17,9 @@ from core.auth.serializers import (
     AdminForgotPasswordSerializer,
     AdminSmallCreateResponseSerializer,
     AdminSmallCreateSerializer,
+    AdminSmallDeleteResponseSerializer,
+    AdminSmallSelfProfileResponseSerializer,
+    AdminSmallSelfProfileUpdateSerializer,
     AuthChangePasswordSerializer,
     AuthPasswordChangeResponseSerializer,
     AdminResetPasswordSerializer,
@@ -31,17 +34,23 @@ from core.auth.serializers import (
 from core.auth.services import (
     AuthInfrastructureUnavailable,
     AdminSmallAccountConflict,
+    AdminSmallDeleteConflict,
+    AdminSmallProfileNotFound,
     AdminSmallSiteUnavailable,
+    AdminSmallTargetNotFound,
     LoginRateLimitExceeded,
     PasswordResetRateLimitExceeded,
     change_authenticated_password,
     create_admin_small,
+    delete_admin_small,
     extend_user_session,
     login_user,
     request_admin_password_reset,
     reset_admin_password,
     revoke_user_session,
     session_token_digest,
+    get_admin_small_self_profile,
+    update_admin_small_self_profile,
 )
 
 
@@ -278,6 +287,139 @@ class AdminSmallCreateView(APIView):
                 "email_sent": email_sent,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AdminSmallSelfProfileView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_small_self_profile"
+
+    @extend_schema(
+        operation_id="admin_small_self_profile_read",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Small xem hồ sơ của chính mình",
+        responses={
+            200: AdminSmallSelfProfileResponseSerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Small được truy cập hồ sơ này."),
+            503: OpenApiResponse(description="Cơ sở chưa sẵn sàng."),
+        },
+    )
+    def get(self, request):
+        if request.user.role != "admin_small":
+            return Response(
+                {"detail": "Chỉ Admin Small được truy cập hồ sơ cá nhân này."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            profile = get_admin_small_self_profile(request.user)
+        except AdminSmallProfileNotFound:
+            return Response({"detail": "Không tìm thấy hồ sơ Admin Small đang hoạt động."}, status=404)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(profile, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        operation_id="admin_small_self_profile_update",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Small chỉnh sửa hồ sơ của chính mình",
+        description=(
+            "Chỉ cho phép sửa họ tên và số điện thoại của hồ sơ NhanVien gắn với phiên đăng nhập. "
+            "Không nhận mã tài khoản/hồ sơ, vai trò, cơ sở, email hoặc tên đăng nhập từ client. "
+            "Admin Big và các vai trò khác không được dùng endpoint này để sửa Admin Small."
+        ),
+        request=AdminSmallSelfProfileUpdateSerializer,
+        responses={
+            200: AdminSmallSelfProfileResponseSerializer,
+            400: OpenApiResponse(description="Dữ liệu hồ sơ không hợp lệ."),
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Small được tự sửa hồ sơ."),
+            404: OpenApiResponse(description="Không tìm thấy hồ sơ Admin Small."),
+            429: OpenApiResponse(description="Vượt giới hạn yêu cầu."),
+            503: OpenApiResponse(description="Cơ sở chưa sẵn sàng."),
+        },
+    )
+    def patch(self, request):
+        if request.user.role != "admin_small":
+            return Response(
+                {"detail": "Chỉ Admin Small được tự sửa hồ sơ."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = AdminSmallSelfProfileUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            profile = update_admin_small_self_profile(
+                request.user,
+                serializer.validated_data,
+                request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallProfileNotFound:
+            return Response({"detail": "Không tìm thấy hồ sơ Admin Small đang hoạt động."}, status=404)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(profile, status=status.HTTP_200_OK)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AdminSmallDeleteView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_small_delete"
+
+    @extend_schema(
+        operation_id="admin_small_deactivate",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big vô hiệu hóa Admin Small",
+        description=(
+            "Chỉ Admin Big được gọi. Đây là xóa mềm: TaiKhoan được chuyển sang vo_hieu và tăng phien_ban "
+            "trên các site đã ghi nhận; hồ sơ NhanVien ở site của tài khoản chuyển sang nghi_viec. Phiên cũ bị thu hồi, "
+            "nhật ký và dữ liệu lịch sử được giữ. Coordinator lưu tiến trình và retry tiến về phía trước nếu site lỗi; "
+            "không tuyên bố giao dịch ACID nguyên tử xuyên CSDL. Admin Small không thể xóa ai, kể cả chính mình."
+        ),
+        responses={
+            200: AdminSmallDeleteResponseSerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Big được vô hiệu hóa Admin Small."),
+            404: OpenApiResponse(description="Không tìm thấy tài khoản Admin Small."),
+            409: OpenApiResponse(description="Tài khoản có trạng thái không thể vô hiệu hóa."),
+            429: OpenApiResponse(description="Vượt giới hạn yêu cầu."),
+            503: OpenApiResponse(description="Site/Coordinator chưa sẵn sàng; lần gọi sau sẽ tiếp tục phục hồi."),
+        },
+    )
+    def delete(self, request, account_id: str):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được vô hiệu hóa Admin Small."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            result = delete_admin_small(
+                account_id,
+                request.user.account_id,
+                request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallTargetNotFound:
+            return Response({"detail": "Không tìm thấy tài khoản Admin Small."}, status=404)
+        except AdminSmallDeleteConflict:
+            return Response(
+                {"detail": "Tài khoản Admin Small đang ở trạng thái xung đột; cần kiểm tra hoặc tiếp tục phục hồi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(
+            {
+                "account_id": result.account_id,
+                "site_code": result.site_code,
+                "role": "admin_small",
+                "status": result.status,
+                "detail": "Tài khoản đã được vô hiệu hóa; hồ sơ và lịch sử vẫn được lưu giữ.",
+            },
+            status=status.HTTP_200_OK,
         )
 
 

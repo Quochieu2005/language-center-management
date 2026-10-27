@@ -99,6 +99,59 @@ class AdminSmallCreateSerializer(serializers.Serializer):
         return value
 
 
+class AdminSmallSelfProfileUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=150, required=False, trim_whitespace=True)
+    phone = serializers.CharField(
+        max_length=20, required=False, allow_blank=True, allow_null=True, trim_whitespace=True
+    )
+
+    def to_internal_value(self, data):
+        allowed = {"full_name", "phone"}
+        if hasattr(data, "keys") and set(data.keys()) - allowed:
+            raise serializers.ValidationError(
+                {"detail": "Chỉ được cập nhật họ tên và số điện thoại của chính mình."}
+            )
+        return super().to_internal_value(data)
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value or any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Họ tên không hợp lệ.")
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+        if not value:
+            return None
+        if len(value) < 6 or any(character not in "+0123456789(). -" for character in value):
+            raise serializers.ValidationError("Số điện thoại không hợp lệ.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Cần cung cấp ít nhất một trường để cập nhật.")
+        return attrs
+
+
+class AdminSmallSelfProfileResponseSerializer(serializers.Serializer):
+    account_id = serializers.CharField()
+    profile_id = serializers.CharField()
+    site_code = serializers.CharField()
+    role = serializers.ChoiceField(choices=["admin_small"])
+    full_name = serializers.CharField()
+    phone = serializers.CharField(allow_null=True)
+    username = serializers.CharField()
+    email = serializers.EmailField()
+
+
+class AdminSmallDeleteResponseSerializer(serializers.Serializer):
+    account_id = serializers.CharField()
+    site_code = serializers.CharField()
+    role = serializers.ChoiceField(choices=["admin_small"])
+    status = serializers.ChoiceField(choices=["vo_hieu"])
+    detail = serializers.CharField()
+
+
 class AuthPasswordChangeResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
