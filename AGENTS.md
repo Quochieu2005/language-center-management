@@ -121,13 +121,13 @@ Mỗi cơ sở giữ **một CSDL SQL Server riêng**, cùng cấu trúc logic n
 | Rải logic "ghi đủ các cơ sở hoạt động" ra nhiều luồng | Mọi logic ghi dữ liệu dùng chung chỉ nằm ở **một chỗ** (Đồng bộ dữ liệu dùng chung), để sau này đổi chế độ khi có nhiều cơ sở không phải sửa nhiều nơi (xem `README.md` mục 5.14) |
 | Tự ý đổi framework / DBMS | Stack đã chốt: **Next.js frontend, Django API, SQL Server**; dùng **SSMS** để quản trị. Không tự thay stack nếu chưa được nhóm thống nhất. Các quyết định triển khai còn mở ở `README.md` mục 9 |
 
-## Giới hạn độ dài file mã nguồn
+## Giới hạn độ dài file code API và web
 
-- Mỗi file mã nguồn được tạo hoặc sửa (Python, TypeScript/JavaScript, SQL, SCSS và mã thực thi tương tự) tối đa **1.000 dòng vật lý**, tính cả dòng trống và chú thích. Markdown, dữ liệu cấu hình thuần, file sinh tự động và file khóa phụ thuộc không thuộc giới hạn này.
-- Trước khi thêm logic, kiểm tra số dòng của file. Nếu file đã có 1.000 dòng hoặc thay đổi sẽ làm vượt giới hạn, tách phần trách nhiệm liên quan thành file/module riêng rồi import hoặc re-export tại điểm tích hợp phù hợp; không tiếp tục dồn logic vào file quá dài.
+- Mỗi file code trong backend API (`src/api`) và web/frontend (`src/web`) tối đa **1.000 dòng vật lý**, tính cả dòng trống và chú thích. Áp dụng cho Python, TypeScript/JavaScript, TSX/JSX, SQL, SCSS và mã thực thi tương tự. Markdown, dữ liệu cấu hình thuần, file sinh tự động và file khóa phụ thuộc không thuộc giới hạn này.
+- Trước khi sửa file, kiểm tra số dòng. Nếu file đã có 1.000 dòng hoặc thay đổi sẽ làm vượt giới hạn, tạo module/file mới theo đúng trách nhiệm, chuyển phần code liên quan sang đó rồi import hoặc re-export tại điểm tích hợp phù hợp. Không tiếp tục thêm logic vào file quá dài.
 - Với file cũ đã vượt giới hạn, không thêm logic mới vào đó; khi cần sửa, tách phần liên quan trước. Không refactor file cũ ngoài phạm vi chỉ để làm đẹp.
+- Với API, có thể tách view, serializer, service và URL theo trách nhiệm; với web, tách page, component, hook và style theo chức năng. Giữ nguyên hợp đồng và hành vi, tránh import vòng, cập nhật nơi gọi và kiểm tra liên quan.
 - Với SQL migration/script, nếu vượt giới hạn thì tách thành các file migration đánh số theo thứ tự chạy; không giả định SQL hỗ trợ import như Python.
-- Khi tách file, giữ nguyên hợp đồng API và hành vi hiện có, tránh import vòng, cập nhật nơi gọi và chạy các kiểm tra liên quan.
 
 ## Đặc tả API và giao diện phải đọc trước khi làm
 
