@@ -13,7 +13,11 @@ if settings.API_DOCS_ENABLED:
         path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
         path(
             "api/docs",
-            SpectacularSwaggerView.as_view(url_name="schema"),
+            SpectacularSwaggerView.as_view(
+                url_name="schema",
+                template_name="core/swagger_ui.html",
+                template_name_js="core/swagger_ui.js",
+            ),
             name="swagger-ui",
         ),
     ]
