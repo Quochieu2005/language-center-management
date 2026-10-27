@@ -36,9 +36,18 @@ class AuthCookieAuthentication(BaseAuthentication):
         if loaded is None:
             raise AuthenticationFailed("Phiên đăng nhập không hợp lệ hoặc đã hết hạn.")
 
+        user, session = loaded
+        if user.must_change_password:
+            allowed_url_names = {"auth-me", "auth-password-change", "auth-logout"}
+            match = getattr(request, "resolver_match", None)
+            if match is None or match.url_name not in allowed_url_names:
+                raise AuthenticationFailed(
+                    "Bạn phải đổi mật khẩu trước khi sử dụng chức năng khác.",
+                    code="password_change_required",
+                )
+
         if request.method not in ("GET", "HEAD", "OPTIONS", "TRACE"):
             SessionAuthentication().enforce_csrf(request)
-        user, session = loaded
         return user, session
 
     def authenticate_header(self, _request):
