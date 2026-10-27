@@ -6,6 +6,7 @@ from core.auth.views import (
     AuthLoginView,
     AuthLogoutView,
     AuthMeView,
+    AdminBigSelfProfileView,
     AdminForgotPasswordView,
     AdminResetPasswordView,
     AdminSmallCreateView,
@@ -31,4 +32,5 @@ urlpatterns = [
     path("admin/admin-smalls/", AdminSmallCreateView.as_view(), name="admin-small-create"),
     path("admin/admin-smalls/me/", AdminSmallSelfProfileView.as_view(), name="admin-small-self-profile"),
     path("admin/admin-smalls/<str:account_id>/", AdminSmallDeleteView.as_view(), name="admin-small-delete"),
+    path("admin/admin-bigs/me/", AdminBigSelfProfileView.as_view(), name="admin-big-self-profile"),
 ]

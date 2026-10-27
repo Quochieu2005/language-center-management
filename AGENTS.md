@@ -121,6 +121,14 @@ Mỗi cơ sở giữ **một CSDL SQL Server riêng**, cùng cấu trúc logic n
 | Rải logic "ghi đủ các cơ sở hoạt động" ra nhiều luồng | Mọi logic ghi dữ liệu dùng chung chỉ nằm ở **một chỗ** (Đồng bộ dữ liệu dùng chung), để sau này đổi chế độ khi có nhiều cơ sở không phải sửa nhiều nơi (xem `README.md` mục 5.14) |
 | Tự ý đổi framework / DBMS | Stack đã chốt: **Next.js frontend, Django API, SQL Server**; dùng **SSMS** để quản trị. Không tự thay stack nếu chưa được nhóm thống nhất. Các quyết định triển khai còn mở ở `README.md` mục 9 |
 
+## Giới hạn độ dài file code API và web
+
+- Mỗi file code trong backend API (`src/api`) và web/frontend (`src/web`) tối đa **1.000 dòng vật lý**, tính cả dòng trống và chú thích. Áp dụng cho Python, TypeScript/JavaScript, TSX/JSX, SQL, SCSS và mã thực thi tương tự; file Markdown không thuộc giới hạn này.
+- Trước khi sửa file, kiểm tra số dòng. Nếu file đã có 1.000 dòng hoặc thay đổi sẽ làm vượt giới hạn, tạo module/file mới theo đúng trách nhiệm, chuyển phần code liên quan sang đó rồi import hoặc re-export tại điểm tích hợp phù hợp. Không tiếp tục thêm logic vào file quá dài.
+- Với API, có thể tách view, serializer, service và URL theo trách nhiệm; với web, tách page, component, hook và style theo chức năng. Giữ nguyên hợp đồng và hành vi, tránh import vòng, cập nhật nơi gọi và kiểm tra liên quan.
+- File cũ đã vượt giới hạn phải được tách phần liên quan trước khi bổ sung logic mới; không yêu cầu refactor ngoài phạm vi khi không cần sửa file đó.
+- Nếu SQL migration/script vượt giới hạn, tách thành các file migration đánh số theo thứ tự chạy; không giả định SQL hỗ trợ import như Python.
+
 ## Đặc tả API và giao diện phải đọc trước khi làm
 
 `specs/README.md` là mục lục và quy tắc đồng bộ đặc tả. Trước khi sửa API, đọc `specs/api.md`; trước khi sửa giao diện, đọc `specs/ui-ux.md`. Nếu thay đổi ảnh hưởng cả thao tác người dùng lẫn API, phải đối chiếu và cập nhật **cả hai**. Các file trong `specs/` là tài liệu thiết kế; endpoint hoặc màn hình được ghi là đề xuất/chưa bật không được mô tả như đã triển khai hay tự ý coi là hợp đồng đã chốt.
