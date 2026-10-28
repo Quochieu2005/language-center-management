@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 from core.sites.connections import UnknownSiteError, get_site_database_alias
 from core.media.folders import build_asset_folder
 from core.auth.authentication import AuthCookieAuthentication
+from core.auth.account_status import AccountStatusResult
 from core.auth.services import (
     AdminSmallDeactivationResult,
     AdminSmallProvisioningResult,
@@ -43,9 +45,15 @@ class HealthCheckTests(SimpleTestCase):
         schema = json.loads(response.content)
         self.assertIn("/api/v1/health/", schema["paths"])
         self.assertIn("get", schema["paths"]["/api/v1/health/"])
+        self.assertIn("/api/v1/auth/profile/{slug}/", schema["paths"])
+        self.assertNotIn("/api/v1/auth/me/", schema["paths"])
         self.assertIn("/api/v1/admin/admin-smalls/", schema["paths"])
-        self.assertIn("/api/v1/admin/admin-smalls/me/", schema["paths"])
-        self.assertIn("patch", schema["paths"]["/api/v1/admin/admin-smalls/me/"])
+        self.assertIn("get", schema["paths"]["/api/v1/admin/admin-smalls/"])
+        self.assertIn("patch", schema["paths"]["/api/v1/admin/admin-smalls/{slug}/status/"])
+        self.assertIn("/api/v1/admin/admin-smalls/profile/{slug}/", schema["paths"])
+        self.assertIn("get", schema["paths"]["/api/v1/admin/admin-smalls/profile/{slug}/"])
+        self.assertIn("patch", schema["paths"]["/api/v1/admin/admin-smalls/profile/{slug}/"])
+        self.assertIn("/api/v1/admin/admin-bigs/profile/{slug}/", schema["paths"])
         self.assertIn("/api/v1/admin/admin-smalls/{account_id}/", schema["paths"])
         self.assertIn("delete", schema["paths"]["/api/v1/admin/admin-smalls/{account_id}/"])
 
@@ -149,6 +157,7 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
             username="manager.q7",
             email="manager.q7@example.com",
             site_code="Q7",
+            slug="admin-small-q7-manager-q7",
         )
 
         with patch("core.auth.views.create_admin_small", return_value=(result, True)) as create_account:
@@ -158,6 +167,8 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
         self.assertEqual(response.json()["role"], "admin_small")
         self.assertTrue(response.json()["must_change_password"])
         self.assertTrue(response.json()["email_sent"])
+        self.assertEqual(response.json()["slug"], result.slug)
+        self.assertEqual(response.json()["account_status"], "active")
         self.assertNotIn("password", response.json())
         self.assertNotIn("1234567890", response.content.decode())
         create_account.assert_called_once()
@@ -179,6 +190,7 @@ class AdminSmallManagementApiTests(SimpleTestCase):
             is_authenticated=True,
             role="admin_big",
             account_id="Q1-TK-000001",
+            slug="admin-big",
             pk="Q1-TK-000001",
         )
 
@@ -206,13 +218,69 @@ class AdminSmallManagementApiTests(SimpleTestCase):
         self.assertNotIn("deleted", response.json())
         delete_account.assert_called_once_with("Q7-TK-000124", "Q1-TK-000001", "127.0.0.1")
 
+    def test_only_admin_big_can_list_admin_smalls_and_get_slug_for_status_action(self):
+        result = {
+            "complete": True,
+            "missing_sites": [],
+            "site_codes": ["Q1", "Q7", "TD"],
+            "count": 1,
+            "limit": 25,
+            "offset": 0,
+            "results": [{
+                "employee_id": "Q7-NV-000045", "site_code": "Q7", "full_name": "Quản lý",
+                "phone": None, "account_id": "Q7-TK-000123", "slug": "manager-q7",
+                "username": "manager.q7", "email": "manager.q7@example.com",
+                "account_status": "active", "profile_status": "dang_lam",
+            }],
+        }
+        self.client.force_authenticate(user=self.big)
+        with patch("core.auth.views.list_admin_small_accounts", return_value=result) as list_accounts:
+            response = self.client.get("/api/v1/admin/admin-smalls/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"][0]["slug"], "manager-q7")
+        list_accounts.assert_called_once_with(limit=25, offset=0)
+
+        self.client.force_authenticate(user=self.small)
+        with patch("core.auth.views.list_admin_small_accounts") as list_accounts:
+            forbidden = self.client.get("/api/v1/admin/admin-smalls/")
+        self.assertEqual(forbidden.status_code, 403)
+        list_accounts.assert_not_called()
+
+    def test_only_admin_big_can_toggle_admin_small_status(self):
+        result = AccountStatusResult(
+            account_id="Q7-TK-000124", slug="manager-q7-2", role="admin_small",
+            site_code="Q7", status="inactive",
+        )
+        self.client.force_authenticate(user=self.big)
+        with patch("core.auth.views.change_account_status", return_value=result) as change:
+            response = self.client.patch(
+                "/api/v1/admin/admin-smalls/manager-q7-2/status/",
+                {"status": "inactive"}, format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        change.assert_called_once_with(
+            slug="manager-q7-2", expected_role="admin_small", desired_status="inactive",
+            actor_id="Q1-TK-000001", remote_ip="127.0.0.1",
+        )
+
+        self.client.force_authenticate(user=self.small)
+        with patch("core.auth.views.change_account_status") as change:
+            forbidden = self.client.patch(
+                "/api/v1/admin/admin-smalls/manager-q7-2/status/",
+                {"status": "active"}, format="json",
+            )
+        self.assertEqual(forbidden.status_code, 403)
+        change.assert_not_called()
+
     def test_admin_big_cannot_read_or_edit_admin_small_self_profile_endpoint(self):
         self.client.force_authenticate(user=self.big)
 
         with patch("core.auth.views.update_admin_small_self_profile") as update_profile:
-            get_response = self.client.get("/api/v1/admin/admin-smalls/me/")
+            get_response = self.client.get("/api/v1/admin/admin-smalls/profile/manager-q7/")
             response = self.client.patch(
-                "/api/v1/admin/admin-smalls/me/", {"full_name": "Tên mới"}, format="json"
+                "/api/v1/admin/admin-smalls/profile/manager-q7/",
+                {"full_name": "Tên mới"},
+                format="json",
             )
 
         self.assertEqual(get_response.status_code, 403)
@@ -226,6 +294,7 @@ class AdminSmallManagementApiTests(SimpleTestCase):
             "profile_id": "Q7-NV-000045",
             "site_code": "Q7",
             "role": "admin_small",
+            "slug": "manager-q7",
             "full_name": "Tên mới",
             "phone": "0900000000",
             "username": "manager.q7",
@@ -234,27 +303,112 @@ class AdminSmallManagementApiTests(SimpleTestCase):
 
         with patch("core.auth.views.update_admin_small_self_profile", return_value=profile) as update_profile:
             response = self.client.patch(
-                "/api/v1/admin/admin-smalls/me/",
+                "/api/v1/admin/admin-smalls/profile/manager-q7/",
                 {"full_name": "Tên mới", "phone": "0900000000"},
                 format="json",
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), profile)
-        update_profile.assert_called_once_with(self.small, {"full_name": "Tên mới", "phone": "0900000000"}, "127.0.0.1")
+        update_profile.assert_called_once_with(
+            self.small,
+            "manager-q7",
+            {"full_name": "Tên mới", "phone": "0900000000"},
+            "127.0.0.1",
+        )
 
     def test_admin_small_cannot_submit_identity_or_permission_fields(self):
         self.client.force_authenticate(user=self.small)
 
         with patch("core.auth.views.update_admin_small_self_profile") as update_profile:
             response = self.client.patch(
-                "/api/v1/admin/admin-smalls/me/",
+                "/api/v1/admin/admin-smalls/profile/manager-q7/",
                 {"full_name": "Tên mới", "site_code": "Q1", "role": "admin_big"},
                 format="json",
             )
 
         self.assertEqual(response.status_code, 400)
         update_profile.assert_not_called()
+
+    def test_admin_small_cannot_read_or_edit_another_profile_by_slug(self):
+        self.client.force_authenticate(user=self.small)
+
+        with (
+            patch("core.auth.views.get_admin_small_self_profile") as get_profile,
+            patch("core.auth.views.update_admin_small_self_profile") as update_profile,
+        ):
+            get_response = self.client.get("/api/v1/admin/admin-smalls/profile/another-manager/")
+            patch_response = self.client.patch(
+                "/api/v1/admin/admin-smalls/profile/another-manager/",
+                {"full_name": "Tên mới"},
+                format="json",
+            )
+
+        self.assertEqual((get_response.status_code, patch_response.status_code), (404, 404))
+        get_profile.assert_not_called()
+        update_profile.assert_not_called()
+
+
+class AdminBigProfileSlugApiTests(SimpleTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin_big = SimpleNamespace(
+            is_authenticated=True,
+            role="admin_big",
+            account_id="Q1-TK-000001",
+            slug="admin-big",
+            pk="Q1-TK-000001",
+        )
+        self.profile = {
+            "account_id": "Q1-TK-000001",
+            "slug": "admin-big",
+            "username": "quochieu",
+            "email": "admin@example.com",
+            "role": "admin_big",
+            "site_code": None,
+        }
+
+    def test_admin_big_profile_uses_its_slug_for_read_and_update(self):
+        self.client.force_authenticate(user=self.admin_big)
+        path = "/api/v1/admin/admin-bigs/profile/admin-big/"
+
+        with patch("core.auth.views.get_admin_big_self_profile", return_value=self.profile) as get_profile:
+            response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        get_profile.assert_called_once_with(self.admin_big, "admin-big")
+
+        with patch("core.auth.views.update_admin_big_self_profile", return_value=self.profile) as update:
+            response = self.client.patch(
+                path,
+                {"current_password": "current-password", "username": "quochieu"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        update.assert_called_once_with(
+            self.admin_big,
+            "admin-big",
+            {"username": "quochieu"},
+            "current-password",
+            "127.0.0.1",
+        )
+
+    def test_admin_big_cannot_read_or_update_profile_using_another_slug(self):
+        self.client.force_authenticate(user=self.admin_big)
+
+        with (
+            patch("core.auth.views.get_admin_big_self_profile") as get_profile,
+            patch("core.auth.views.update_admin_big_self_profile") as update,
+        ):
+            get_response = self.client.get("/api/v1/admin/admin-bigs/profile/other-admin/")
+            patch_response = self.client.patch(
+                "/api/v1/admin/admin-bigs/profile/other-admin/",
+                {"current_password": "current-password", "username": "quochieu"},
+                format="json",
+            )
+
+        self.assertEqual((get_response.status_code, patch_response.status_code), (404, 404))
+        get_profile.assert_not_called()
+        update.assert_not_called()
 
 
 class TemporaryPasswordAccessTests(SimpleTestCase):
@@ -285,9 +439,9 @@ class TemporaryPasswordAccessTests(SimpleTestCase):
         self.assertEqual(caught.exception.get_codes(), "password_change_required")
 
     def test_temporary_password_allows_account_profile_check(self):
-        request = APIRequestFactory().get("/api/v1/auth/me/")
+        request = APIRequestFactory().get("/api/v1/auth/profile/admin-small-q7-manager-q7/")
         request.COOKIES[settings.AUTH_COOKIE_NAME] = "a" * 64
-        request.resolver_match = resolve("/api/v1/auth/me/")
+        request.resolver_match = resolve("/api/v1/auth/profile/admin-small-q7-manager-q7/")
 
         with patch(
             "core.auth.authentication.load_user_session", return_value=(self.user, self.session)
@@ -295,3 +449,35 @@ class TemporaryPasswordAccessTests(SimpleTestCase):
             authenticated = AuthCookieAuthentication().authenticate(request)
 
         self.assertEqual(authenticated[0], self.user)
+
+
+class AuthProfileSlugApiTests(SimpleTestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = SimpleNamespace(
+            is_authenticated=True,
+            account_id="Q7-TK-000123",
+            email="manager.q7@example.com",
+            username="manager.q7",
+            slug="admin-small-q7-manager-q7",
+            role="admin_small",
+            site_code="Q7",
+            profile_id="Q7-NV-000045",
+            must_change_password=False,
+            pk="Q7-TK-000123",
+        )
+        self.session = SimpleNamespace(expires_at=datetime.now(timezone.utc))
+        self.client.force_authenticate(user=self.user, token=self.session)
+
+    def test_auth_profile_reads_only_the_authenticated_user_slug(self):
+        path = "/api/v1/auth/profile/admin-small-q7-manager-q7/"
+        response = self.client.get(path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["slug"], self.user.slug)
+
+    def test_auth_profile_rejects_another_slug(self):
+        response = self.client.get("/api/v1/auth/profile/another-account/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"detail": "Không tìm thấy hồ sơ tài khoản."})

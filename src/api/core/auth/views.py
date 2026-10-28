@@ -5,7 +5,7 @@ from django.conf import settings
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +13,12 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication, AuthenticationUnavailable
+from core.auth.admin_small_accounts import list_admin_small_accounts
+from core.auth.account_status import (
+    AccountStatusConflict,
+    AccountStatusTargetNotFound,
+    change_account_status,
+)
 from core.auth.admin_big_profile import (
     AdminBigProfileConflict,
     AdminBigProfileNotFound,
@@ -24,6 +30,10 @@ from core.auth.serializers import (
     AdminForgotPasswordSerializer,
     AdminBigSelfProfileResponseSerializer,
     AdminBigSelfProfileUpdateSerializer,
+    AccountStatusResponseSerializer,
+    AccountStatusUpdateSerializer,
+    AdminSmallListQuerySerializer,
+    AdminSmallListResponseSerializer,
     AdminSmallCreateResponseSerializer,
     AdminSmallCreateSerializer,
     AdminSmallDeleteResponseSerializer,
@@ -34,7 +44,7 @@ from core.auth.serializers import (
     AdminResetPasswordSerializer,
     AuthLoginResponseSerializer,
     AuthLoginSerializer,
-    AuthMeResponseSerializer,
+    AuthProfileResponseSerializer,
     CsrfTokenResponseSerializer,
     EmptyRequestSerializer,
     GenericPasswordResetResponseSerializer,
@@ -186,7 +196,7 @@ class AuthChangePasswordView(APIView):
             "Yêu cầu mật khẩu hiện tại và mật khẩu mới tối thiểu 12 ký tự. "
             "Mật khẩu mới được băm BCrypt và đồng bộ tới mọi site đang hoạt động; "
             "các phiên cũ bị thu hồi. Tài khoản có cờ bắt buộc đổi mật khẩu chỉ được "
-            "xem /auth/me/, đổi mật khẩu hoặc đăng xuất."
+            "xem hồ sơ qua /auth/profile/{slug}/, đổi mật khẩu hoặc đăng xuất."
         ),
         request=AuthChangePasswordSerializer,
         responses={
@@ -230,6 +240,49 @@ class AdminSmallCreateView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "admin_account_create"
+
+    def get_throttles(self):
+        self.throttle_scope = "admin_account_read" if self.request.method == "GET" else "admin_account_create"
+        return super().get_throttles()
+
+    @extend_schema(
+        operation_id="admin_small_list",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big xem Admin Small theo cơ sở",
+        description=(
+            "Chỉ Admin Big. Mặc định truy vấn Global Query trên tất cả site đang hoạt động; dữ liệu "
+            "NhanVien được đọc tại từng CSDL site rồi gộp ở API, không JOIN xuyên site. Nếu site bắt "
+            "buộc lỗi thì API trả 503, không trả danh sách thiếu như thể đầy đủ. Danh sách gồm slug và "
+            "trạng thái để Admin Big có thể bật/tắt đúng tài khoản."
+        ),
+        parameters=[
+            OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
+            OpenApiParameter("limit", int, OpenApiParameter.QUERY),
+            OpenApiParameter("offset", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: AdminSmallListResponseSerializer,
+            400: OpenApiResponse(description="Tham số phân trang hoặc site không hợp lệ."),
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Big được xem danh sách Admin Small."),
+            503: OpenApiResponse(description="Site/CSDL chưa sẵn sàng; danh sách chưa đầy đủ."),
+        },
+    )
+    def get(self, request):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được xem danh sách Admin Small."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        query = AdminSmallListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        try:
+            result = list_admin_small_accounts(**query.validated_data)
+        except ValueError:
+            return Response({"detail": "Cơ sở được chọn không hoạt động."}, status=status.HTTP_400_BAD_REQUEST)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(result, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="admin_small_create",
@@ -291,7 +344,9 @@ class AdminSmallCreateView(APIView):
                 "username": result.username,
                 "email": result.email,
                 "site_code": result.site_code,
+                "slug": result.slug,
                 "role": "admin_small",
+                "account_status": "active",
                 "must_change_password": result.must_change_password,
                 "email_sent": email_sent,
             },
@@ -307,9 +362,10 @@ class AdminSmallSelfProfileView(APIView):
     throttle_scope = "admin_small_self_profile"
 
     @extend_schema(
-        operation_id="admin_small_self_profile_read",
+        operation_id="admin_small_profile_read",
         tags=["Quản lý tài khoản"],
-        summary="Admin Small xem hồ sơ của chính mình",
+        summary="Admin Small xem hồ sơ qua slug của chính mình",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         responses={
             200: AdminSmallSelfProfileResponseSerializer,
             401: OpenApiResponse(description="Chưa đăng nhập."),
@@ -317,14 +373,16 @@ class AdminSmallSelfProfileView(APIView):
             503: OpenApiResponse(description="Cơ sở chưa sẵn sàng."),
         },
     )
-    def get(self, request):
+    def get(self, request, slug: str):
         if request.user.role != "admin_small":
             return Response(
                 {"detail": "Chỉ Admin Small được truy cập hồ sơ cá nhân này."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if slug != request.user.slug:
+            return Response({"detail": "Không tìm thấy hồ sơ Admin Small."}, status=404)
         try:
-            profile = get_admin_small_self_profile(request.user)
+            profile = get_admin_small_self_profile(request.user, slug)
         except AdminSmallProfileNotFound:
             return Response({"detail": "Không tìm thấy hồ sơ Admin Small đang hoạt động."}, status=404)
         except AuthInfrastructureUnavailable as exc:
@@ -332,9 +390,10 @@ class AdminSmallSelfProfileView(APIView):
         return Response(profile, status=status.HTTP_200_OK)
 
     @extend_schema(
-        operation_id="admin_small_self_profile_update",
+        operation_id="admin_small_profile_update",
         tags=["Quản lý tài khoản"],
-        summary="Admin Small chỉnh sửa hồ sơ của chính mình",
+        summary="Admin Small chỉnh sửa hồ sơ qua slug của chính mình",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         description=(
             "Chỉ cho phép sửa họ tên và số điện thoại của hồ sơ NhanVien gắn với phiên đăng nhập. "
             "Không nhận mã tài khoản/hồ sơ, vai trò, cơ sở, email hoặc tên đăng nhập từ client. "
@@ -351,17 +410,20 @@ class AdminSmallSelfProfileView(APIView):
             503: OpenApiResponse(description="Cơ sở chưa sẵn sàng."),
         },
     )
-    def patch(self, request):
+    def patch(self, request, slug: str):
         if request.user.role != "admin_small":
             return Response(
                 {"detail": "Chỉ Admin Small được tự sửa hồ sơ."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if slug != request.user.slug:
+            return Response({"detail": "Không tìm thấy hồ sơ Admin Small."}, status=404)
         serializer = AdminSmallSelfProfileUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             profile = update_admin_small_self_profile(
                 request.user,
+                slug,
                 serializer.validated_data,
                 request.META.get("REMOTE_ADDR", "") or "unknown",
             )
@@ -380,9 +442,10 @@ class AdminBigSelfProfileView(APIView):
     throttle_scope = "admin_big_self_profile"
 
     @extend_schema(
-        operation_id="admin_big_self_profile_read",
+        operation_id="admin_big_profile_read",
         tags=["Quản lý tài khoản"],
-        summary="Admin Big xem thông tin tài khoản của chính mình",
+        summary="Admin Big xem tài khoản qua slug của chính mình",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         responses={
             200: AdminBigSelfProfileResponseSerializer,
             401: OpenApiResponse(description="Chưa đăng nhập."),
@@ -390,14 +453,16 @@ class AdminBigSelfProfileView(APIView):
             503: OpenApiResponse(description="Một hoặc nhiều cơ sở chưa sẵn sàng."),
         },
     )
-    def get(self, request):
+    def get(self, request, slug: str):
         if request.user.role != "admin_big":
             return Response(
                 {"detail": "Chỉ Admin Big được xem tài khoản cá nhân này."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if slug != request.user.slug:
+            return Response({"detail": "Không tìm thấy tài khoản Admin Big."}, status=404)
         try:
-            profile = get_admin_big_self_profile(request.user)
+            profile = get_admin_big_self_profile(request.user, slug)
         except AdminBigProfileNotFound:
             return Response({"detail": "Không tìm thấy tài khoản Admin Big đang hoạt động."}, status=404)
         except AuthInfrastructureUnavailable as exc:
@@ -405,9 +470,10 @@ class AdminBigSelfProfileView(APIView):
         return Response(profile, status=status.HTTP_200_OK)
 
     @extend_schema(
-        operation_id="admin_big_self_profile_update",
+        operation_id="admin_big_profile_update",
         tags=["Quản lý tài khoản"],
-        summary="Admin Big cập nhật tài khoản của chính mình",
+        summary="Admin Big cập nhật tài khoản qua slug của chính mình",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         description=(
             "Chỉ cho phép cập nhật username, email và slug của tài khoản gắn với phiên hiện tại; "
             "bắt buộc xác nhận mật khẩu hiện tại. Không nhận account_id, role hoặc site từ client, "
@@ -426,12 +492,14 @@ class AdminBigSelfProfileView(APIView):
             503: OpenApiResponse(description="Đồng bộ một hoặc nhiều CSDL site chưa hoàn tất; có thể gọi lại để tiếp tục."),
         },
     )
-    def patch(self, request):
+    def patch(self, request, slug: str):
         if request.user.role != "admin_big":
             return Response(
                 {"detail": "Chỉ Admin Big được cập nhật tài khoản cá nhân này."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if slug != request.user.slug:
+            return Response({"detail": "Không tìm thấy tài khoản Admin Big."}, status=404)
         serializer = AdminBigSelfProfileUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payload = dict(serializer.validated_data)
@@ -439,6 +507,7 @@ class AdminBigSelfProfileView(APIView):
         try:
             profile = update_admin_big_self_profile(
                 request.user,
+                slug,
                 payload,
                 current_password,
                 request.META.get("REMOTE_ADDR", "") or "unknown",
@@ -515,6 +584,74 @@ class AdminSmallDeleteView(APIView):
                 "role": "admin_small",
                 "status": result.status,
                 "detail": "Tài khoản đã được vô hiệu hóa; hồ sơ và lịch sử vẫn được lưu giữ.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AdminSmallStatusView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_small_delete"
+
+    @extend_schema(
+        operation_id="admin_small_account_status_update",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big bật hoặc tắt tài khoản Admin Small theo slug",
+        description=(
+            "Chỉ Admin Big được đổi trạng thái. TaiKhoan được cập nhật tới tất cả site đang hoạt động qua "
+            "Coordinator; phiên bản tăng để thu hồi phiên cũ. Tiến trình có thể retry nếu site tạm lỗi. "
+            "Đây là bật/tắt quyền đăng nhập, không sửa hồ sơ Admin Small."
+        ),
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
+        request=AccountStatusUpdateSerializer,
+        responses={
+            200: AccountStatusResponseSerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Chỉ Admin Big được bật/tắt Admin Small."),
+            404: OpenApiResponse(description="Không tìm thấy Admin Small."),
+            409: OpenApiResponse(description="Hồ sơ đã nghỉ việc hoặc trạng thái thay đổi đồng thời."),
+            429: OpenApiResponse(description="Vượt giới hạn yêu cầu."),
+            503: OpenApiResponse(description="Đồng bộ site chưa hoàn tất; có thể gọi lại để tiếp tục."),
+        },
+    )
+    def patch(self, request, slug: str):
+        if request.user.role != "admin_big":
+            return Response(
+                {"detail": "Chỉ Admin Big được bật/tắt tài khoản Admin Small."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = AccountStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = change_account_status(
+                slug=slug,
+                expected_role="admin_small",
+                desired_status=serializer.validated_data["status"],
+                actor_id=request.user.account_id,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AccountStatusTargetNotFound:
+            return Response({"detail": "Không tìm thấy Admin Small."}, status=status.HTTP_404_NOT_FOUND)
+        except AccountStatusConflict:
+            return Response(
+                {"detail": "Hồ sơ Admin Small đã nghỉ việc hoặc trạng thái đang được thay đổi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except AuthInfrastructureUnavailable:
+            return Response(
+                {"detail": "Đồng bộ site chưa hoàn tất; thao tác có thể gọi lại để tiếp tục."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(
+            {
+                "account_id": result.account_id,
+                "slug": result.slug,
+                "role": result.role,
+                "site_code": result.site_code,
+                "status": result.status,
             },
             status=status.HTTP_200_OK,
         )
@@ -617,16 +754,22 @@ class AdminResetPasswordView(APIView):
         )
 
 
-class AuthMeView(APIView):
+class AuthProfileView(APIView):
     authentication_classes = [AuthCookieAuthentication]
 
     @extend_schema(
-        operation_id="auth_me",
+        operation_id="auth_profile_read",
         tags=["Xác thực"],
-        summary="Lấy tài khoản và vai trò của phiên hiện tại",
-        responses={200: AuthMeResponseSerializer},
+        summary="Lấy tài khoản và vai trò phiên hiện tại theo slug",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
+        responses={
+            200: AuthProfileResponseSerializer,
+            404: OpenApiResponse(description="Slug không thuộc tài khoản đang đăng nhập."),
+        },
     )
-    def get(self, request):
+    def get(self, request, slug: str):
+        if slug != request.user.slug:
+            return Response({"detail": "Không tìm thấy hồ sơ tài khoản."}, status=status.HTTP_404_NOT_FOUND)
         session = request.auth
         return Response(
             {
@@ -648,7 +791,7 @@ class AuthActivityView(APIView):
             "không gọi bằng polling nền. Mỗi lần gia hạn đặt hạn phiên thành 3600 giây kể từ hiện tại."
         ),
         request=EmptyRequestSerializer,
-        responses={200: AuthMeResponseSerializer},
+        responses={200: AuthProfileResponseSerializer},
     )
     def post(self, request):
         try:

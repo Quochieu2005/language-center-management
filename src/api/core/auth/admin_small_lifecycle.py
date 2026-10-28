@@ -15,6 +15,7 @@ from django.core.mail import send_mail
 from django.db import DatabaseError, connections, transaction
 
 from core.slug_utils import make_slug
+from core.notifications.publisher import publish_notification
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.auth.service_common import (
     AdminSmallAccountConflict,
@@ -186,7 +187,7 @@ def _deactivate_admin_small_replica(
                     updated_version = cursor.fetchone()
                     if updated_version is None or int(updated_version[0]) != expected_version + 1:
                         raise AdminSmallDeleteConflict
-                elif account_status == "vo_hieu" and version == expected_version + 1:
+                elif account_status == "vo_hieu" and version in {expected_version, expected_version + 1}:
                     pass  # Retry after a prior site commit is safe and idempotent.
                 else:
                     raise AdminSmallDeleteConflict
@@ -243,6 +244,16 @@ def _deactivate_admin_small_replica(
                             """,
                             [audit_id, target_site, admin_big_id, account_id, remote_ip[:45]],
                         )
+                    publish_notification(
+                        cursor,
+                        site_code=target_site,
+                        event_key=f"admin-small-deactivated:{account_id}",
+                        category="account",
+                        severity="warning",
+                        title="Admin Small đã bị vô hiệu hóa",
+                        message=f"Tài khoản quản lý tại cơ sở {target_site} đã được vô hiệu hóa.",
+                        target_path=f"/admin/admins?site_code={target_site}",
+                    )
                 else:
                     cursor.execute(
                         "SELECT COUNT_BIG(*) FROM dbo.NhanVien WHERE ma_tai_khoan = %s",
@@ -347,7 +358,7 @@ def delete_admin_small(account_id: str, admin_big_id: str, remote_ip: str) -> Ad
                             with get_site_connection(target_site).cursor() as profile_cursor:
                                 profile_cursor.execute(
                                     """
-                                    SELECT TOP (2) ma_nhan_vien
+                                    SELECT TOP (2) ma_nhan_vien, trang_thai
                                     FROM dbo.NhanVien
                                     WHERE ma_tai_khoan = %s AND ma_co_so = %s
                                       AND chuc_vu = 'quan_ly_co_so'
@@ -356,8 +367,10 @@ def delete_admin_small(account_id: str, admin_big_id: str, remote_ip: str) -> Ad
                                 )
                                 existing_profiles = profile_cursor.fetchall()
                             if len(existing_profiles) == 1 and str(account[7]).lower() == "vo_hieu":
-                                raise AdminSmallDeleteConflict
-                            raise AdminSmallTargetNotFound
+                                if str(existing_profiles[0][1]).lower() != "dang_lam":
+                                    raise AdminSmallDeleteConflict
+                            else:
+                                raise AdminSmallTargetNotFound
 
                         job_id = str(uuid.uuid4())
                         cursor.execute(
@@ -548,6 +561,16 @@ def _ensure_admin_small_replica(site_code: str, account, job, remote_ip: str) ->
                     _admin_small_audit_if_missing(
                         cursor, target_site, admin_big_id, account_id, remote_ip
                     )
+                    publish_notification(
+                        cursor,
+                        site_code=target_site,
+                        event_key=f"admin-small-created:{account_id}",
+                        category="account",
+                        severity="success",
+                        title="Admin Small mới được tạo",
+                        message=f"Một tài khoản Admin Small mới đã được tạo tại cơ sở {target_site}.",
+                        target_path=f"/admin/admins?site_code={target_site}",
+                    )
                 else:
                     cursor.execute(
                         "SELECT COUNT_BIG(*) FROM dbo.NhanVien WHERE ma_tai_khoan = %s",
@@ -720,7 +743,7 @@ def _existing_admin_small_creation(email: str):
                 """
                 SELECT TOP (2) a.ma_tai_khoan, j.ma_nhan_vien, a.ten_dang_nhap,
                                a.email, a.ma_co_so, a.vai_tro, j.trang_thai,
-                               j.email_da_gui, a.bat_buoc_doi_mat_khau
+                               j.email_da_gui, a.bat_buoc_doi_mat_khau, a.slug
                 FROM dbo.GiaoDichTaoAdminSmall AS j
                 INNER JOIN dbo.TaiKhoan AS a ON a.ma_tai_khoan = j.ma_tai_khoan
                 WHERE LOWER(a.email) = %s
@@ -768,6 +791,7 @@ def create_admin_small(
             account_id=str(existing_job[0]), employee_id=str(existing_job[1]),
             username=str(existing_job[2]), email=str(existing_job[3]), site_code=target_site,
             must_change_password=bool(existing_job[8]),
+            slug=str(existing_job[9]),
         )
         return result, bool(existing_job[7])
 
@@ -827,4 +851,5 @@ def create_admin_small(
         email=normalized_email,
         site_code=target_site,
         must_change_password=True,
+        slug=slug,
     ), email_sent

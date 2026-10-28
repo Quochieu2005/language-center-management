@@ -15,29 +15,37 @@ from core.auth.service_common import (
     _next_sequence_number,
 )
 
-def _admin_small_profile_cursor(site_code: str, account_id: str, profile_id: str | None = None):
+def _admin_small_profile_cursor(
+    site_code: str, account_id: str, slug: str, profile_id: str | None = None
+):
     cursor = connections[get_site_database_alias(site_code)].cursor()
     query = """
         SELECT TOP (2) n.ma_nhan_vien, n.ma_co_so, n.ho_ten, n.sdt,
-                       t.ten_dang_nhap, t.email
+                       t.ten_dang_nhap, t.email, t.slug
         FROM dbo.NhanVien AS n
         INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
         WHERE n.ma_tai_khoan = %s AND n.ma_co_so = %s
           AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
           AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+          AND t.slug = %s
     """
-    params: list[Any] = [account_id, site_code, site_code]
+    params: list[Any] = [account_id, site_code, site_code, slug]
     if profile_id is not None:
         query += " AND n.ma_nhan_vien = %s"
         params.append(profile_id)
     cursor.execute(query, params)
     return cursor
 
-def get_admin_small_self_profile(user: AuthenticatedUser) -> dict[str, Any]:
-    if user.role != "admin_small" or not user.site_code or not user.profile_id:
+def get_admin_small_self_profile(user: AuthenticatedUser, slug: str) -> dict[str, Any]:
+    if (
+        user.role != "admin_small" or not user.site_code or not user.profile_id
+        or slug != user.slug
+    ):
         raise AdminSmallProfileNotFound
     try:
-        with _admin_small_profile_cursor(user.site_code, user.account_id, user.profile_id) as cursor:
+        with _admin_small_profile_cursor(
+            user.site_code, user.account_id, slug, user.profile_id
+        ) as cursor:
             rows = cursor.fetchall()
         if len(rows) != 1:
             raise AdminSmallProfileNotFound
@@ -51,6 +59,7 @@ def get_admin_small_self_profile(user: AuthenticatedUser) -> dict[str, Any]:
             "phone": str(row[3]) if row[3] is not None else None,
             "username": str(row[4]),
             "email": str(row[5]),
+            "slug": str(row[6]),
         }
     except AdminSmallProfileNotFound:
         raise
@@ -58,9 +67,12 @@ def get_admin_small_self_profile(user: AuthenticatedUser) -> dict[str, Any]:
         raise AuthInfrastructureUnavailable from exc
 
 def update_admin_small_self_profile(
-    user: AuthenticatedUser, updates: dict[str, Any], remote_ip: str
+    user: AuthenticatedUser, slug: str, updates: dict[str, Any], remote_ip: str
 ) -> dict[str, Any]:
-    if user.role != "admin_small" or not user.site_code or not user.profile_id:
+    if (
+        user.role != "admin_small" or not user.site_code or not user.profile_id
+        or slug != user.slug
+    ):
         raise AdminSmallProfileNotFound
     if not updates or not set(updates).issubset({"full_name", "phone"}):
         raise ValueError("Chỉ được cập nhật họ tên hoặc số điện thoại hồ sơ của chính mình.")
@@ -78,8 +90,9 @@ def update_admin_small_self_profile(
                     WHERE n.ma_tai_khoan = %s AND n.ma_nhan_vien = %s AND n.ma_co_so = %s
                       AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
                       AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+                      AND t.slug = %s
                     """,
-                    [user.account_id, user.profile_id, user.site_code, user.site_code],
+                    [user.account_id, user.profile_id, user.site_code, user.site_code, slug],
                 )
                 row = cursor.fetchone()
                 if row is None:
@@ -109,7 +122,7 @@ def update_admin_small_self_profile(
                     """,
                     [audit_id, user.site_code, user.account_id, user.profile_id, remote_ip[:45]],
                 )
-        return get_admin_small_self_profile(user)
+        return get_admin_small_self_profile(user, slug)
     except AdminSmallProfileNotFound:
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
