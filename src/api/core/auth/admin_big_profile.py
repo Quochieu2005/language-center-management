@@ -68,13 +68,15 @@ def _assert_admin_big(account, account_id: str) -> None:
         raise AdminBigProfileNotFound
 
 
-def get_admin_big_self_profile(user) -> dict[str, Any]:
-    if getattr(user, "role", None) != "admin_big":
+def get_admin_big_self_profile(user, slug: str) -> dict[str, Any]:
+    if getattr(user, "role", None) != "admin_big" or slug != getattr(user, "slug", None):
         raise AdminBigProfileNotFound
     try:
         sites = active_site_codes()
         account = _replicated_account_by_id(user.account_id, sites)
         _assert_admin_big(account, user.account_id)
+        if str(account[2]) != slug:
+            raise AdminBigProfileNotFound
         return _response(user.account_id, _account_values(account))
     except AdminBigProfileNotFound:
         raise
@@ -387,11 +389,16 @@ def _resume_pending_profile_job(
 
 def update_admin_big_self_profile(
     user,
+    slug: str,
     updates: dict[str, str],
     current_password: str,
     remote_ip: str,
 ) -> dict[str, Any]:
-    if getattr(user, "role", None) != "admin_big" or not updates:
+    if (
+        getattr(user, "role", None) != "admin_big"
+        or slug != getattr(user, "slug", None)
+        or not updates
+    ):
         raise AdminBigProfileNotFound
     if not set(updates).issubset(set(_IDENTITY_FIELDS)) or not remote_ip:
         raise ValueError("Dữ liệu cập nhật tài khoản Admin Big không hợp lệ.")

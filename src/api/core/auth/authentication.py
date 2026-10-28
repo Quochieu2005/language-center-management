@@ -38,7 +38,7 @@ class AuthCookieAuthentication(BaseAuthentication):
 
         user, session = loaded
         if user.must_change_password:
-            allowed_url_names = {"auth-me", "auth-password-change", "auth-logout"}
+            allowed_url_names = {"auth-profile", "auth-password-change", "auth-logout"}
             match = getattr(request, "resolver_match", None)
             if match is None or match.url_name not in allowed_url_names:
                 raise AuthenticationFailed(

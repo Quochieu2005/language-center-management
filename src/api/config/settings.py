@@ -162,9 +162,14 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "600/min",
         "admin_account_create": "10/hour",
+        "admin_account_read": "120/min",
         "admin_small_self_profile": "30/hour",
         "admin_big_self_profile": "20/hour",
         "admin_small_delete": "10/hour",
+        "teacher_create": "10/hour",
+        "teacher_management": "120/min",
+        "notification_read": "120/min",
+        "notification_write": "60/min",
     },
 }
 
@@ -203,6 +208,9 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").strip()
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER).strip()
 ADMIN_SMALL_TEMP_PASSWORD = os.getenv("ADMIN_SMALL_TEMP_PASSWORD", "").strip()
+TEACHER_INITIAL_PASSWORD = os.getenv(
+    "TEACHER_INITIAL_PASSWORD", ADMIN_SMALL_TEMP_PASSWORD
+).strip()
 WEB_APP_BASE_URL = os.getenv("WEB_APP_BASE_URL", "http://localhost:3001").rstrip("/")
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "120"))
 ACCOUNT_ACTIVATION_TIMEOUT = int(os.getenv("ACCOUNT_ACTIVATION_TIMEOUT", "86400"))

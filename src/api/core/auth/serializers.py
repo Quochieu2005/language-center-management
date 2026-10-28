@@ -138,6 +138,7 @@ class AdminSmallSelfProfileResponseSerializer(serializers.Serializer):
     profile_id = serializers.CharField()
     site_code = serializers.CharField()
     role = serializers.ChoiceField(choices=["admin_small"])
+    slug = serializers.CharField()
     full_name = serializers.CharField()
     phone = serializers.CharField(allow_null=True)
     username = serializers.CharField()
@@ -206,6 +207,50 @@ class AdminSmallDeleteResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
 
+class AccountStatusUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("active", "inactive"))
+
+
+class AccountStatusResponseSerializer(serializers.Serializer):
+    account_id = serializers.CharField()
+    slug = serializers.CharField()
+    role = serializers.ChoiceField(choices=("admin_small", "giao_vien"))
+    site_code = serializers.CharField()
+    status = serializers.ChoiceField(choices=("active", "inactive"))
+
+
+class AdminSmallListQuerySerializer(serializers.Serializer):
+    site_code = serializers.RegexField(regex=r"^[A-Za-z0-9_-]{2,10}$", max_length=10, required=False)
+    limit = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
+    offset = serializers.IntegerField(min_value=0, max_value=10000, required=False, default=0)
+
+    def validate_site_code(self, value):
+        return value.strip().upper()
+
+
+class AdminSmallListItemSerializer(serializers.Serializer):
+    employee_id = serializers.CharField()
+    site_code = serializers.CharField()
+    full_name = serializers.CharField()
+    phone = serializers.CharField(allow_null=True)
+    account_id = serializers.CharField()
+    slug = serializers.CharField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    account_status = serializers.ChoiceField(choices=("active", "inactive", "locked"))
+    profile_status = serializers.ChoiceField(choices=("dang_lam", "nghi_viec"))
+
+
+class AdminSmallListResponseSerializer(serializers.Serializer):
+    complete = serializers.BooleanField()
+    missing_sites = serializers.ListField(child=serializers.CharField())
+    site_codes = serializers.ListField(child=serializers.CharField())
+    count = serializers.IntegerField()
+    limit = serializers.IntegerField()
+    offset = serializers.IntegerField()
+    results = AdminSmallListItemSerializer(many=True)
+
+
 class AuthPasswordChangeResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
@@ -216,6 +261,8 @@ class AdminSmallCreateResponseSerializer(serializers.Serializer):
     username = serializers.CharField()
     email = serializers.EmailField()
     site_code = serializers.CharField()
+    slug = serializers.CharField()
+    account_status = serializers.ChoiceField(choices=("active",))
     role = serializers.ChoiceField(choices=["admin_small"])
     must_change_password = serializers.BooleanField()
     email_sent = serializers.BooleanField()
@@ -247,7 +294,7 @@ class AuthLoginResponseSerializer(serializers.Serializer):
     idle_timeout_seconds = serializers.IntegerField()
 
 
-class AuthMeResponseSerializer(serializers.Serializer):
+class AuthProfileResponseSerializer(serializers.Serializer):
     user = AuthUserSerializer()
     expires_at = serializers.DateTimeField()
 
