@@ -53,7 +53,11 @@ from core.academics.grade_views import (
 from core.academics.report_views import StudentCountsBySiteView
 from core.academics.transfer_views import TransferCollectionView, TransferDecisionView, TransferRetryView
 from core.academics.installment_views import TuitionInstallmentPlanView
-from core.academics.tuition_views import AdminTuitionListView, TuitionReceiptCreateView
+from core.academics.tuition_views import (
+    AdminTuitionListView,
+    TuitionInvoiceView,
+    TuitionReceiptCreateView,
+)
 from core.academics.reminder_views import ClassTuitionReminderView
 from core.employees.views import EmployeeCollectionView, EmployeeDetailView
 
@@ -95,6 +99,7 @@ urlpatterns = [
     path("admin/tuition/", AdminTuitionListView.as_view(), name="tuition-list"),
     path("admin/tuition/<str:tuition_id>/installments/", TuitionInstallmentPlanView.as_view(), name="tuition-installments"),
     path("admin/tuition/<str:tuition_id>/receipts/", TuitionReceiptCreateView.as_view(), name="tuition-receipt-create"),
+    path("admin/tuition/<str:tuition_id>/receipts/<str:receipt_id>/invoice/", TuitionInvoiceView.as_view(), name="tuition-invoice"),
     path("admin/classes/<str:class_id>/tuition-reminders/", ClassTuitionReminderView.as_view(), name="class-tuition-reminders"),
     path("admin/transfers/", TransferCollectionView.as_view(), name="transfer-request-list-create"),
     path("admin/transfers/<str:source_site>/<str:transfer_id>/decision/", TransferDecisionView.as_view(), name="transfer-request-decision"),

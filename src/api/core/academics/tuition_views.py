@@ -9,8 +9,14 @@ from rest_framework.views import APIView
 
 from core.academics.common import AcademicError, site_scope
 from core.academics.http import academic_error, remote_ip, validate_record_id
-from core.academics.serializers import TuitionQuerySerializer, TuitionReceiptSerializer
+from core.academics.serializers import (
+    TuitionInvoiceSerializer,
+    TuitionQuerySerializer,
+    TuitionReceiptSerializer,
+    TuitionReceiptResponseSerializer,
+)
 from core.academics.tuition import collect_tuition, list_tuition
+from core.academics.tuition_invoices import get_tuition_invoice, send_tuition_invoice_email
 from core.auth.authentication import AuthCookieAuthentication
 
 
@@ -69,7 +75,15 @@ class TuitionReceiptCreateView(_TuitionApiView):
         ),
         parameters=[OpenApiParameter("tuition_id", str, OpenApiParameter.PATH), OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         request=TuitionReceiptSerializer,
-        responses={200: OpenApiResponse(description="Retry đã khớp phiếu cũ."), 201: OpenApiResponse(description="Đã ghi phiếu thu."), 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
+        responses={
+            200: TuitionReceiptResponseSerializer,
+            201: TuitionReceiptResponseSerializer,
+            400: OpenApiResponse(),
+            403: OpenApiResponse(),
+            404: OpenApiResponse(),
+            409: OpenApiResponse(),
+            503: OpenApiResponse(),
+        },
     )
     def post(self, request, tuition_id):
         invalid = validate_record_id(tuition_id)
@@ -89,7 +103,43 @@ class TuitionReceiptCreateView(_TuitionApiView):
                 payment_method=serializer.validated_data["payment_method"],
                 note=serializer.validated_data.get("note"), remote_ip=remote_ip(request),
             )
+            result["invoice_email"] = send_tuition_invoice_email(
+                site_code=site, tuition_id=tuition_id,
+                receipt_id=result["receipt_id"], actor_id=request.user.account_id,
+            )
             response_status = status.HTTP_200_OK if result["replayed"] else status.HTTP_201_CREATED
             return Response(result, status=response_status)
+        except AcademicError as exc:
+            return academic_error(exc)
+
+
+class TuitionInvoiceView(_TuitionApiView):
+    @extend_schema(
+        operation_id="tuition_receipt_invoice",
+        tags=["Học phí"],
+        summary="Lấy hóa đơn nội bộ từ phiếu thu học phí",
+        description=(
+            "LOCAL: chỉ đọc phiếu thu và thông tin học viên/khóa học tại CSDL của cơ sở đã chọn. "
+            "Trả dữ liệu biên nhận nội bộ, không phải hóa đơn điện tử thuế. Email biên nhận được gửi "
+            "tự động sau khi API thu học phí commit thành công."
+        ),
+        parameters=[
+            OpenApiParameter("tuition_id", str, OpenApiParameter.PATH),
+            OpenApiParameter("receipt_id", str, OpenApiParameter.PATH),
+            OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
+        ],
+        responses={200: TuitionInvoiceSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def get(self, request, tuition_id, receipt_id):
+        for record_id in (tuition_id, receipt_id):
+            invalid = validate_record_id(record_id)
+            if invalid:
+                return invalid
+        try:
+            site = _tuition_site(request, request.query_params.get("site_code"))
+            invoice = get_tuition_invoice(
+                site_code=site, tuition_id=tuition_id, receipt_id=receipt_id,
+            )
+            return Response(TuitionInvoiceSerializer(invoice).data)
         except AcademicError as exc:
             return academic_error(exc)

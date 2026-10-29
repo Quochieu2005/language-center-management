@@ -89,6 +89,51 @@ class TuitionReceiptSerializer(StrictSerializer):
         return value.strip() or None
 
 
+class TuitionInvoiceSerializer(serializers.Serializer):
+    document_type = serializers.CharField()
+    invoice_number = serializers.CharField()
+    site_code = serializers.CharField()
+    branch_name = serializers.CharField()
+    branch_address = serializers.CharField(allow_null=True, allow_blank=True)
+    branch_phone = serializers.CharField(allow_null=True, allow_blank=True)
+    tuition_id = serializers.CharField()
+    student_id = serializers.CharField()
+    student_name = serializers.CharField()
+    student_email = serializers.EmailField(allow_null=True, allow_blank=True)
+    course_name = serializers.CharField()
+    class_name = serializers.CharField()
+    total_due = serializers.IntegerField(min_value=0)
+    discount = serializers.IntegerField(min_value=0)
+    net_total = serializers.IntegerField(min_value=0)
+    amount_received = serializers.IntegerField(min_value=1)
+    currency = serializers.ChoiceField(choices=("VND",))
+    payment_method = serializers.ChoiceField(choices=("tien_mat", "chuyen_khoan", "the"))
+    payment_method_label = serializers.CharField()
+    paid_at = serializers.DateTimeField()
+    paid_at_display = serializers.CharField()
+    cashier_name = serializers.CharField(allow_blank=True)
+    note = serializers.CharField(allow_null=True, allow_blank=True)
+
+
+class TuitionInvoiceEmailStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=("sent", "already_sent", "failed", "not_configured", "missing_email")
+    )
+
+
+class TuitionReceiptResponseSerializer(serializers.Serializer):
+    receipt_id = serializers.CharField()
+    tuition_id = serializers.CharField()
+    amount = serializers.IntegerField(min_value=1)
+    payment_method = serializers.ChoiceField(choices=("tien_mat", "chuyen_khoan", "the"))
+    amount_paid = serializers.IntegerField(min_value=0)
+    balance = serializers.IntegerField(min_value=0)
+    tuition_status = serializers.ChoiceField(choices=("chua_dong", "dong_mot_phan", "da_dong"))
+    site_code = serializers.CharField()
+    replayed = serializers.BooleanField()
+    invoice_email = TuitionInvoiceEmailStatusSerializer()
+
+
 class TransferRequestSerializer(StrictSerializer):
     student_slug = serializers.RegexField(regex=_SLUG, max_length=160)
     target_site = serializers.RegexField(regex=_SITE, max_length=10)
