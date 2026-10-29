@@ -8,11 +8,9 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import DatabaseError, connections, transaction
-from django.utils import timezone as django_timezone
+from django.db import DatabaseError, connections
 
 from core.sites.connections import UnknownSiteError, get_site_database_alias, get_site_connection
-from core.notifications.publisher import publish_notification
 
 
 class NotificationInfrastructureUnavailable(Exception):
@@ -21,6 +19,13 @@ class NotificationInfrastructureUnavailable(Exception):
 
 class NotificationNotFound(Exception):
     """The scoped notification does not exist or is not visible to this role."""
+
+
+_AUTO_SUMMARY_EVENT_FILTER = """
+AND n.event_key NOT LIKE 'system-available:%'
+AND n.event_key NOT LIKE 'system-unavailable:%'
+AND n.event_key NOT LIKE 'tuition-open:%'
+"""
 
 
 def _catalog(site_code: str) -> tuple[tuple[str, str], ...]:
@@ -85,65 +90,57 @@ def _audiences(role: str) -> tuple[str, ...]:
     raise PermissionError("Chỉ quản trị viên được xem thông báo quản trị.")
 
 
-def _refresh_site_summary(site_code: str, missing_sites: tuple[str, ...] = ()) -> None:
+def _live_tuition_summary(site_code: str) -> dict[str, Any] | None:
+    """Read a current tuition summary without writing an event during GET."""
     alias = get_site_database_alias(site_code)
     try:
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                today = django_timezone.localdate().isoformat()
-                publish_notification(
-                    cursor,
-                    site_code=site_code,
-                    event_key=f"system-available:{site_code}:{today}",
-                    category="system",
-                    severity="success",
-                    title=f"Cơ sở {site_code} đang hoạt động",
-                    message=f"CSDL site {site_code} đã phản hồi trong lần kiểm tra hôm nay.",
-                    target_path="/admin/dashboard",
-                )
-                if missing_sites:
-                    unavailable = ", ".join(sorted(missing_sites))
-                    digest = hashlib.sha256(unavailable.encode("utf-8")).hexdigest()[:20]
-                    publish_notification(
-                        cursor,
-                        site_code=site_code,
-                        event_key=f"system-unavailable:{today}:{digest}",
-                        category="system",
-                        severity="critical",
-                        title="Có cơ sở không phản hồi",
-                        message=f"Không đọc được hoặc cấu hình site chưa đồng bộ: {unavailable}.",
-                        target_path="/admin/dashboard",
-                    )
-                cursor.execute(
-                    """
-                    SELECT COUNT_BIG(*),
-                           COALESCE(SUM(so_tien_phai_dong - giam_gia - so_tien_da_dong), 0),
-                           COALESCE(MAX(ma_hoc_phi), '')
-                    FROM dbo.HocPhi
-                    WHERE trang_thai IN ('chua_dong', 'dong_mot_phan')
-                      AND so_tien_phai_dong - giam_gia - so_tien_da_dong > 0
-                    """
-                )
-                row = cursor.fetchone()
-                count, remaining, last_id = int(row[0]), int(row[1]), str(row[2])
-                if count:
-                    snapshot = f"{site_code}:{count}:{remaining}:{last_id}"
-                    digest = hashlib.sha256(snapshot.encode("utf-8")).hexdigest()[:32]
-                    publish_notification(
-                        cursor,
-                        site_code=site_code,
-                        event_key=f"tuition-open:{digest}",
-                        category="tuition",
-                        severity="warning",
-                        title=f"{count} khoản học phí chưa thu đủ",
-                        message=(
-                            f"Tại thời điểm tổng hợp ở cơ sở {site_code}: có {count} khoản chưa thu đủ, "
-                            f"tổng số tiền còn lại {remaining:,} VND. Đây là số dư hiện tại, không phải giao dịch đang xử lý."
-                        ),
-                        target_path=f"/admin/tuition?site_code={site_code}",
-                    )
+        with connections[alias].cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COUNT_BIG(*),
+                       COALESCE(SUM(so_tien_phai_dong - giam_gia - so_tien_da_dong), 0),
+                       COALESCE(MAX(ma_hoc_phi), '')
+                FROM dbo.HocPhi
+                WHERE trang_thai IN ('chua_dong', 'dong_mot_phan')
+                  AND so_tien_phai_dong - giam_gia - so_tien_da_dong > 0
+                """
+            )
+            count, remaining, last_id = cursor.fetchone()
+        count, remaining = int(count), int(remaining)
+        if not count:
+            return None
+        snapshot = f"{site_code}:{count}:{remaining}:{last_id}"
+        digest = hashlib.sha256(snapshot.encode("utf-8")).hexdigest()[:32]
+        return {
+            "slug": f"live-{site_code.lower()}-tuition-{digest}",
+            "site_code": site_code,
+            "category": "tuition",
+            "severity": "warning",
+            "title": f"{count} khoản học phí chưa thu đủ",
+            "message": (
+                f"Tại cơ sở {site_code}: có {count} khoản chưa thu đủ, "
+                f"tổng số tiền còn lại {remaining:,} VND. Đây là số dư hiện tại, không phải giao dịch đang xử lý."
+            ),
+            "target_path": f"/admin/tuition?site_code={site_code}",
+            "created_at": datetime.now(timezone.utc),
+        }
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise NotificationInfrastructureUnavailable from exc
+
+
+def _missing_site_summary(site_code: str, missing_sites: tuple[str, ...]) -> dict[str, Any]:
+    unavailable = ", ".join(sorted(missing_sites))
+    digest = hashlib.sha256(unavailable.encode("utf-8")).hexdigest()[:24]
+    return {
+        "slug": f"live-{site_code.lower()}-site-health-{digest}",
+        "site_code": site_code,
+        "category": "system",
+        "severity": "critical",
+        "title": "Có cơ sở không phản hồi",
+        "message": f"Không đọc được hoặc cấu hình chưa sẵn sàng tại: {unavailable}.",
+        "target_path": "/admin/dashboard",
+        "created_at": datetime.now(timezone.utc),
+    }
 
 
 def _site_counts(site_code: str, role: str, category: str | None) -> int:
@@ -160,6 +157,7 @@ def _site_counts(site_code: str, role: str, category: str | None) -> int:
                 SELECT COUNT_BIG(*)
                 FROM dbo.ThongBao AS n
                 WHERE n.doi_tuong IN (%s, %s){category_sql}
+                  {_AUTO_SUMMARY_EVENT_FILTER}
                 """,
                 params,
             )
@@ -186,6 +184,7 @@ def _site_items(
                        n.tieu_de, n.noi_dung, n.duong_dan, n.tao_luc_utc
                 FROM dbo.ThongBao AS n
                 WHERE n.doi_tuong IN (%s, %s){category_sql}
+                  {_AUTO_SUMMARY_EVENT_FILTER}
                 ORDER BY n.tao_luc_utc DESC, n.slug DESC
                 OFFSET 0 ROWS FETCH NEXT %s ROWS ONLY
                 """,
@@ -227,11 +226,18 @@ def list_notifications(
     take = offset + limit
     for site in sites:
         try:
-            _refresh_site_summary(site, missing_sites=missing)
             total_count += _site_counts(site, role, category)
             results.extend(_site_items(site, role, category, take))
+            if category in (None, "tuition"):
+                tuition_summary = _live_tuition_summary(site)
+                if tuition_summary:
+                    total_count += 1
+                    results.append(tuition_summary)
         except NotificationInfrastructureUnavailable:
             unavailable.append(site)
+    if role == "admin_big" and missing and category in (None, "system") and sites:
+        total_count += 1
+        results.append(_missing_site_summary(sites[0], missing))
     results.sort(key=lambda item: (item["created_at"], item["site_code"], item["slug"]), reverse=True)
     return {
         "complete": not unavailable,

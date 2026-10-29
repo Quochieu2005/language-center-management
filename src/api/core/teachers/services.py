@@ -6,7 +6,7 @@ from functools import wraps
 from typing import Any
 
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
 
@@ -311,6 +311,58 @@ def _ensure_teacher_profile(site_code: str, payload: dict[str, Any], remote_ip: 
         raise TeacherInfrastructureUnavailable from exc
 
 
+def _recover_teacher_provisioning(
+    *, site_code: str, email: str, username: str, full_name: str,
+    phone: str | None, specialty: str, temporary_password: str,
+) -> tuple[tuple[Any, ...], str] | None:
+    """Use the committed profile at its owning site as the retry checkpoint."""
+    try:
+        with get_site_connection(site_code).cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP (2)
+                       t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email, t.mat_khau,
+                       t.vai_tro, t.ma_co_so, t.trang_thai,
+                       t.bat_buoc_doi_mat_khau, t.phien_ban,
+                       g.ma_giao_vien, g.ma_co_so, g.ma_tai_khoan, g.ho_ten,
+                       g.sdt, g.email, g.chuyen_mon, g.trang_thai
+                FROM dbo.TaiKhoan AS t
+                LEFT JOIN dbo.GiaoVien AS g ON g.ma_tai_khoan = t.ma_tai_khoan
+                WHERE LOWER(t.email) = %s OR LOWER(t.ten_dang_nhap) = %s
+                """,
+                [email, username],
+            )
+            rows = cursor.fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise TeacherConflict
+        row = rows[0]
+        account_id, slug, stored_username, stored_email = map(str, row[:4])
+        password_hash = str(row[4])
+        account_site = str(row[6]).upper() if row[6] else None
+        if (
+            str(row[5]).lower() != "giao_vien" or account_site != site_code
+            or not account_status_bit(row[7]) or not bool(row[8])
+            or stored_email.casefold() != email or stored_username.lower() != username
+            or not check_password(temporary_password, password_hash)
+            or row[10] is None or str(row[11]).upper() != site_code
+            or str(row[12]) != account_id or str(row[13]) != full_name
+            or row[14] != phone or row[15] != email or str(row[16]) != specialty
+            or str(row[17]).lower() != "dang_day"
+        ):
+            raise TeacherConflict
+        account = (
+            account_id, slug, stored_username, stored_email, password_hash,
+            "giao_vien", site_code, account_status_bit(row[7]), bool(row[8]), int(row[9]),
+        )
+        return account, str(row[10])
+    except TeacherConflict:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise TeacherInfrastructureUnavailable from exc
+
+
 @_translate_infrastructure_errors
 def create_teacher(
     *, full_name: str, email: str, username: str | None, phone: str | None,
@@ -329,19 +381,27 @@ def create_teacher(
         raise ValueError("Thiếu thông tin giáo viên.")
     sites = active_site_codes()
     _ensure_site(target_site, sites)
-    if _replicated_account(normalized_email, sites) is not None:
-        raise TeacherConflict
-    if _replicated_account(normalized_username, sites) is not None:
-        raise TeacherConflict
-
-    account_id = _next_teacher_account_id(target_site, sites)
-    teacher_id = _next_teacher_profile_id(target_site)
-    slug = make_slug(f"giao-vien-{target_site}-{normalized_username}", max_length=120)
-    password_hash = make_password(temporary_password)
-    account = (
-        account_id, slug, normalized_username, normalized_email, password_hash,
-        "giao_vien", target_site, 1, True, 1,
+    recovered = _recover_teacher_provisioning(
+        site_code=target_site, email=normalized_email, username=normalized_username,
+        full_name=normalized_name, phone=normalized_phone, specialty=normalized_specialty,
+        temporary_password=temporary_password,
     )
+    if recovered is not None:
+        account, teacher_id = recovered
+        account_id, slug, normalized_username, normalized_email = account[:4]
+    else:
+        if _replicated_account(normalized_email, sites) is not None:
+            raise TeacherConflict
+        if _replicated_account(normalized_username, sites) is not None:
+            raise TeacherConflict
+        account_id = _next_teacher_account_id(target_site, sites)
+        teacher_id = _next_teacher_profile_id(target_site)
+        slug = make_slug(f"giao-vien-{target_site}-{normalized_username}", max_length=120)
+        password_hash = make_password(temporary_password)
+        account = (
+            account_id, slug, normalized_username, normalized_email, password_hash,
+            "giao_vien", target_site, 1, True, 1,
+        )
     payload = {
         "teacher_id": teacher_id,
         "account_id": account_id,
@@ -352,9 +412,19 @@ def create_teacher(
         "specialty": normalized_specialty,
         "actor_id": actor_id,
     }
-    for code in sites:
-        _ensure_teacher_account_replica(code, account)
-    _ensure_teacher_profile(target_site, payload, remote_ip)
+    target_alias = get_site_database_alias(target_site)
+    try:
+        # Keep the owning account and profile in one local commit before fan-out.
+        with transaction.atomic(using=target_alias):
+            _ensure_teacher_account_replica(target_site, account)
+            _ensure_teacher_profile(target_site, payload, remote_ip)
+        for code in sites:
+            if code != target_site:
+                _ensure_teacher_account_replica(code, account)
+    except (TeacherInfrastructureUnavailable, TeacherConflict):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise TeacherInfrastructureUnavailable from exc
     return TeacherProvisioningResult(
         teacher_id=teacher_id,
         account_id=account_id,

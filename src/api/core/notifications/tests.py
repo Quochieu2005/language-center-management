@@ -1,4 +1,5 @@
-from unittest.mock import Mock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, Mock, patch
 
 from django.test import SimpleTestCase
 from django.urls import reverse
@@ -6,6 +7,7 @@ from rest_framework.test import APIClient
 
 from core.auth.service_common import AuthenticatedUser
 from core.notifications.publisher import publish_notification
+from core.notifications import services as notification_services
 
 
 class NotificationApiTests(SimpleTestCase):
@@ -136,3 +138,44 @@ class NotificationPublisherTests(SimpleTestCase):
                 Mock(), site_code="Q1", event_key="bad-target", category="system",
                 title="Hệ thống", message="Thông tin", target_path="https://example.test",
             )
+
+
+class NotificationReadOnlySummaryTests(SimpleTestCase):
+    def test_tuition_summary_query_is_read_only(self):
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (2, 250000, "Q1-HP-000002")
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        connection_handler = MagicMock()
+        connection_handler.__getitem__.return_value = connection
+
+        with (
+            patch("core.notifications.services.get_site_database_alias", return_value="Q1"),
+            patch("core.notifications.services.connections", connection_handler),
+        ):
+            item = notification_services._live_tuition_summary("Q1")
+
+        self.assertIsNotNone(item)
+        self.assertEqual(item["category"], "tuition")
+        sql = cursor.execute.call_args.args[0].upper()
+        self.assertTrue(sql.lstrip().startswith("SELECT"))
+        self.assertNotRegex(sql, r"\b(INSERT|UPDATE|DELETE|MERGE)\b")
+
+    @patch("core.notifications.services._live_tuition_summary")
+    @patch("core.notifications.services._site_items", return_value=[])
+    @patch("core.notifications.services._site_counts", return_value=3)
+    @patch("core.notifications.services._global_sites", return_value=(("Q1",), ()))
+    def test_list_adds_live_summary_without_persisting_it(
+        self, _global_sites, _site_counts, _site_items, live_summary,
+    ):
+        live_summary.return_value = {
+            "slug": "live-q1-tuition-123", "site_code": "Q1", "category": "tuition",
+            "severity": "warning", "title": "Học phí còn thiếu", "message": "Có khoản cần thu.",
+            "target_path": "/admin/tuition?site_code=Q1", "created_at": datetime.now(timezone.utc),
+        }
+
+        result = notification_services.list_notifications(role="admin_big")
+
+        self.assertEqual(result["count"], 4)
+        self.assertEqual([item["slug"] for item in result["results"]], ["live-q1-tuition-123"])
+        live_summary.assert_called_once_with("Q1")
