@@ -33,19 +33,21 @@ def _record_password_reset_event(
 ) -> None:
     cursor.execute(
         """
-        INSERT INTO dbo.SuKienQuenMatKhau
-            (ma_su_kien, dinh_danh_bam, ip_bam, ma_token, loai_su_kien)
-        VALUES (NEWID(), %s, %s, %s, %s)
+        INSERT INTO dbo.Logs
+            (ma_log, loai_log, dinh_danh_bam, ip_bam, ma_token, hanh_dong, ket_qua)
+        VALUES
+            (CONVERT(NVARCHAR(120), NEWID()), 'password_reset', %s, %s, %s, %s,
+             CASE WHEN %s = 'otp_sai' THEN 'that_bai' ELSE 'thanh_cong' END)
         """,
-        [identifier_digest, ip_digest, token_id, event_type],
+        [identifier_digest, ip_digest, token_id, event_type, event_type],
     )
 
 def _password_reset_request_is_limited(cursor, identifier_digest: str, ip_digest: str) -> bool:
     cursor.execute(
         """
         SELECT COUNT_BIG(*)
-        FROM dbo.SuKienQuenMatKhau
-        WHERE ip_bam = %s AND loai_su_kien = 'yeu_cau'
+        FROM dbo.Logs
+        WHERE loai_log = 'password_reset' AND ip_bam = %s AND hanh_dong = 'yeu_cau'
           AND thoi_diem_utc >= DATEADD(HOUR, -1, SYSUTCDATETIME())
         """,
         [ip_digest],
@@ -56,8 +58,8 @@ def _password_reset_request_is_limited(cursor, identifier_digest: str, ip_digest
     cursor.execute(
         """
         SELECT COUNT_BIG(*)
-        FROM dbo.SuKienQuenMatKhau
-        WHERE dinh_danh_bam = %s AND loai_su_kien = 'yeu_cau'
+        FROM dbo.Logs
+        WHERE loai_log = 'password_reset' AND dinh_danh_bam = %s AND hanh_dong = 'yeu_cau'
           AND thoi_diem_utc >= DATEADD(HOUR, -1, SYSUTCDATETIME())
         """,
         [identifier_digest],
@@ -68,8 +70,9 @@ def _password_reset_request_is_limited(cursor, identifier_digest: str, ip_digest
     cursor.execute(
         """
         SELECT COUNT_BIG(*)
-        FROM dbo.SuKienQuenMatKhau
-        WHERE dinh_danh_bam = %s AND ip_bam = %s AND loai_su_kien = 'yeu_cau'
+        FROM dbo.Logs
+        WHERE loai_log = 'password_reset' AND dinh_danh_bam = %s
+          AND ip_bam = %s AND hanh_dong = 'yeu_cau'
           AND thoi_diem_utc >= DATEADD(SECOND, -%s, SYSUTCDATETIME())
         """,
         [identifier_digest, ip_digest, settings.AUTH_PASSWORD_RESET_COOLDOWN_SECONDS],
@@ -81,8 +84,8 @@ def _password_reset_verify_retry_after(cursor, identifier_digest: str, ip_digest
     cursor.execute(
         """
         SELECT COUNT_BIG(*), DATEDIFF(SECOND, MIN(thoi_diem_utc), SYSUTCDATETIME())
-        FROM dbo.SuKienQuenMatKhau
-        WHERE ip_bam = %s AND loai_su_kien = 'otp_sai'
+        FROM dbo.Logs
+        WHERE loai_log = 'password_reset' AND ip_bam = %s AND hanh_dong = 'otp_sai'
           AND thoi_diem_utc >= DATEADD(SECOND, -%s, SYSUTCDATETIME())
         """,
         [ip_digest, window_seconds],
@@ -94,8 +97,8 @@ def _password_reset_verify_retry_after(cursor, identifier_digest: str, ip_digest
     cursor.execute(
         """
         SELECT COUNT_BIG(*), DATEDIFF(SECOND, MIN(thoi_diem_utc), SYSUTCDATETIME())
-        FROM dbo.SuKienQuenMatKhau
-        WHERE dinh_danh_bam = %s AND loai_su_kien = 'otp_sai'
+        FROM dbo.Logs
+        WHERE loai_log = 'password_reset' AND dinh_danh_bam = %s AND hanh_dong = 'otp_sai'
           AND thoi_diem_utc >= DATEADD(SECOND, -%s, SYSUTCDATETIME())
         """,
         [identifier_digest, window_seconds],

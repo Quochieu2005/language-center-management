@@ -33,7 +33,7 @@ Thứ tự bắt buộc: xác định người dùng và phạm vi quyền trư�
 | Site Router | Đọc danh sách site hoạt động và ánh xạ sang cấu hình kết nối | Viết cứng vòng lặp ba site hoặc suy ra cơ sở hiện tại từ mã học viên |
 | Service nghiệp vụ | Áp dụng quy tắc đăng ký, học phí, điểm, lớp... | Tự triển khai lại logic đồng bộ nhiều site |
 | Global Query | Gọi site cần thiết, gắn nguồn kết quả, gộp và ghi nhận site thiếu | JOIN giữa CSDL hoặc che việc một site lỗi |
-| Đồng bộ dữ liệu dùng chung | Một điểm vào cho mọi ghi `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` | Trả thành công khi chưa ghi đủ các site hoạt động |
+| Đồng bộ dữ liệu dùng chung | Một điểm vào cho mọi ghi `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, gồm cả cột subject Google/Facebook | Trả thành công khi chưa ghi đủ các site hoạt động |
 | Điều phối chuyển cơ sở | Điều phối nguồn/đích, lưu tiến trình và phục hồi | Dùng hai câu ghi rời mà không có theo dõi trạng thái bền vững |
 | Audit/log | Ghi người, site, thời điểm, loại hành động, kết quả và thay đổi | Ghi mật khẩu/token hoặc cho phép sửa/xóa log |
 | Repository | Thực hiện truy vấn cục bộ với kết nối đã nhận | Tự quyết định site bằng tiền tố mã |

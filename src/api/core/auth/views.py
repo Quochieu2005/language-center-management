@@ -130,8 +130,10 @@ class AuthLoginView(APIView):
         summary="Đăng nhập theo vai trò đã cấp",
         description=(
             "Xác minh tài khoản đã được cấp trong TaiKhoan và tự xác định vai trò từ hồ sơ "
-            "NhanVien hoặc GiaoVien tại cơ sở tương ứng. Hỗ trợ Admin Big, Admin Small, lễ tân, "
-            "kế toán và giáo viên; không nhận vai trò hoặc cơ sở từ client. "
+            "NhanVien, GiaoVien hoặc HocVien. Hỗ trợ Admin Big, Admin Small, lễ tân, kế toán, "
+            "giáo viên và học viên; không nhận vai trò hoặc cơ sở từ client. Hồ sơ học viên được "
+            "định vị bằng Global Query trên các site đang hoạt động; chỉ đăng nhập khi tìm thấy "
+            "đúng một hồ sơ hiện hành. "
             "Phiên được lưu tại site cấu hình AUTH_SESSION_SITE_CODE, gửi qua cookie HttpOnly "
             "và hết hạn sau 3600 giây không có hoạt động. Gọi GET /auth/csrf/ trước và gửi "
             "csrf_token trong header X-CSRFToken."
@@ -340,7 +342,7 @@ class AdminSmallCreateView(APIView):
         return Response(
             {
                 "account_id": result.account_id,
-                "employee_id": result.employee_id,
+                "admin_id": result.admin_id,
                 "username": result.username,
                 "email": result.email,
                 "site_code": result.site_code,
@@ -395,7 +397,7 @@ class AdminSmallSelfProfileView(APIView):
         summary="Admin Small chỉnh sửa hồ sơ qua slug của chính mình",
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         description=(
-            "Chỉ cho phép sửa họ tên và số điện thoại của hồ sơ NhanVien gắn với phiên đăng nhập. "
+            "Chỉ cho phép sửa họ tên và số điện thoại của hồ sơ Admin gắn với phiên đăng nhập. "
             "Không nhận mã tài khoản/hồ sơ, vai trò, cơ sở, email hoặc tên đăng nhập từ client. "
             "Admin Big và các vai trò khác không được dùng endpoint này để sửa Admin Small."
         ),
@@ -541,7 +543,7 @@ class AdminSmallDeleteView(APIView):
         tags=["Quản lý tài khoản"],
         summary="Admin Big vô hiệu hóa Admin Small",
         description=(
-            "Chỉ Admin Big được gọi. Đây là xóa mềm: TaiKhoan được chuyển sang vo_hieu và tăng phien_ban "
+            "Chỉ Admin Big được gọi. Đây là vô hiệu hóa: TaiKhoan được chuyển sang 0 (inactive) và tăng phien_ban "
             "trên các site đã ghi nhận; hồ sơ NhanVien ở site của tài khoản chuyển sang nghi_viec. Phiên cũ bị thu hồi, "
             "nhật ký và dữ liệu lịch sử được giữ. Coordinator lưu tiến trình và retry tiến về phía trước nếu site lỗi; "
             "không tuyên bố giao dịch ACID nguyên tử xuyên CSDL. Admin Small không thể xóa ai, kể cả chính mình."
@@ -601,8 +603,8 @@ class AdminSmallStatusView(APIView):
         tags=["Quản lý tài khoản"],
         summary="Admin Big bật hoặc tắt tài khoản Admin Small theo slug",
         description=(
-            "Chỉ Admin Big được đổi trạng thái. TaiKhoan được cập nhật tới tất cả site đang hoạt động qua "
-            "Coordinator; phiên bản tăng để thu hồi phiên cũ. Tiến trình có thể retry nếu site tạm lỗi. "
+            "Chỉ Admin Big được đổi trạng thái. TaiKhoan được cập nhật tới tất cả site đang hoạt động; "
+            "phiên bản tăng để thu hồi phiên cũ và trạng thái hồ sơ được cập nhật trực tiếp trong Admin. "
             "Đây là bật/tắt quyền đăng nhập, không sửa hồ sơ Admin Small."
         ),
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],

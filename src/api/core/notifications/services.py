@@ -1,4 +1,4 @@
-"""Global Query and per-site read receipts for admin notifications."""
+"""Global Query for admin notifications."""
 
 from __future__ import annotations
 
@@ -146,41 +146,35 @@ def _refresh_site_summary(site_code: str, missing_sites: tuple[str, ...] = ()) -
         raise NotificationInfrastructureUnavailable from exc
 
 
-def _site_counts(site_code: str, user_id: str, role: str, category: str | None) -> tuple[int, int]:
+def _site_counts(site_code: str, role: str, category: str | None) -> int:
     alias = get_site_database_alias(site_code)
     audience = _audiences(role)
     category_sql = " AND n.danh_muc = %s" if category else ""
-    params: list[Any] = [user_id, *audience]
+    params: list[Any] = [*audience]
     if category:
         params.append(category)
     try:
         with connections[alias].cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT COUNT_BIG(*),
-                       COALESCE(SUM(CASE WHEN d.slug IS NULL THEN CONVERT(BIGINT, 1) ELSE CONVERT(BIGINT, 0) END), 0)
+                SELECT COUNT_BIG(*)
                 FROM dbo.ThongBao AS n
-                LEFT JOIN dbo.TrangThaiDocThongBao AS d
-                  ON d.ma_tai_khoan = %s AND d.slug = n.slug
                 WHERE n.doi_tuong IN (%s, %s){category_sql}
                 """,
                 params,
             )
-            row = cursor.fetchone()
-            return int(row[0]), int(row[1])
+            return int(cursor.fetchone()[0])
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise NotificationInfrastructureUnavailable from exc
 
 
 def _site_items(
-    site_code: str, user_id: str, role: str, category: str | None,
-    unread_only: bool, take: int,
+    site_code: str, role: str, category: str | None, take: int,
 ) -> list[dict[str, Any]]:
     alias = get_site_database_alias(site_code)
     audience = _audiences(role)
     category_sql = " AND n.danh_muc = %s" if category else ""
-    unread_sql = " AND d.slug IS NULL" if unread_only else ""
-    params: list[Any] = [user_id, *audience]
+    params: list[Any] = [*audience]
     if category:
         params.append(category)
     params.append(take)
@@ -189,12 +183,9 @@ def _site_items(
             cursor.execute(
                 f"""
                 SELECT n.slug, n.ma_co_so, n.danh_muc, n.muc_do,
-                       n.tieu_de, n.noi_dung, n.duong_dan, n.tao_luc_utc,
-                       CONVERT(BIT, CASE WHEN d.slug IS NULL THEN 0 ELSE 1 END)
+                       n.tieu_de, n.noi_dung, n.duong_dan, n.tao_luc_utc
                 FROM dbo.ThongBao AS n
-                LEFT JOIN dbo.TrangThaiDocThongBao AS d
-                  ON d.ma_tai_khoan = %s AND d.slug = n.slug
-                WHERE n.doi_tuong IN (%s, %s){category_sql}{unread_sql}
+                WHERE n.doi_tuong IN (%s, %s){category_sql}
                 ORDER BY n.tao_luc_utc DESC, n.slug DESC
                 OFFSET 0 ROWS FETCH NEXT %s ROWS ONLY
                 """,
@@ -206,7 +197,7 @@ def _site_items(
                 "slug": str(row[0]), "site_code": str(row[1]), "category": str(row[2]),
                 "severity": str(row[3]), "title": str(row[4]), "message": str(row[5]),
                 "target_path": str(row[6]) if row[6] is not None else None,
-                "created_at": _utc_datetime(row[7]), "is_read": bool(row[8]),
+                "created_at": _utc_datetime(row[7]),
             }
             for row in rows
         ]
@@ -219,9 +210,9 @@ def _utc_datetime(value: datetime) -> datetime:
 
 
 def list_notifications(
-    *, user_id: str, role: str, user_site_code: str | None = None,
+    *, role: str, user_site_code: str | None = None,
     site_code: str | None = None, category: str | None = None,
-    unread_only: bool = False, limit: int = 20, offset: int = 0,
+    limit: int = 20, offset: int = 0,
 ) -> dict[str, Any]:
     if role == "admin_small":
         if site_code:
@@ -230,129 +221,24 @@ def list_notifications(
     else:
         sites, missing = _global_sites(site_code)
 
-    all_count = unread_count = 0
+    total_count = 0
     results: list[dict[str, Any]] = []
     unavailable = list(missing)
     take = offset + limit
     for site in sites:
         try:
             _refresh_site_summary(site, missing_sites=missing)
-            total, unread = _site_counts(site, user_id, role, category)
-            all_count += total
-            unread_count += unread
-            results.extend(_site_items(site, user_id, role, category, unread_only, take))
+            total_count += _site_counts(site, role, category)
+            results.extend(_site_items(site, role, category, take))
         except NotificationInfrastructureUnavailable:
             unavailable.append(site)
     results.sort(key=lambda item: (item["created_at"], item["site_code"], item["slug"]), reverse=True)
-    count = unread_count if unread_only else all_count
     return {
         "complete": not unavailable,
         "missing_sites": sorted(set(unavailable)),
         "site_codes": list(sites),
-        "count": count,
-        "unread_count": unread_count,
+        "count": total_count,
         "limit": limit,
         "offset": offset,
         "results": results[offset:offset + limit],
-    }
-
-def mark_notification_read(
-    *, user_id: str, role: str, user_site_code: str | None,
-    site_code: str, slug: str,
-) -> dict[str, Any]:
-    if role == "admin_small":
-        if site_code.strip().upper() != str(user_site_code or "").strip().upper():
-            raise PermissionError("Admin Small chỉ được đánh dấu thông báo tại cơ sở của mình.")
-        sites = _local_site(user_site_code)
-    else:
-        sites, missing = _global_sites(site_code)
-        if missing:
-            raise NotificationInfrastructureUnavailable
-    site = sites[0]
-    alias = get_site_database_alias(site)
-    audiences = _audiences(role)
-    try:
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT n.slug, n.danh_muc, n.tao_luc_utc, n.doi_tuong
-                    FROM dbo.ThongBao AS n
-                    WHERE n.slug = %s AND n.ma_co_so = %s AND n.doi_tuong IN (%s, %s)
-                    """,
-                    [slug, site, *audiences],
-                )
-                row = cursor.fetchone()
-                if row is None:
-                    raise NotificationNotFound
-                cursor.execute(
-                    """
-                    IF NOT EXISTS (
-                        SELECT 1 FROM dbo.TrangThaiDocThongBao WITH (UPDLOCK, HOLDLOCK)
-                        WHERE ma_tai_khoan = %s AND slug = %s
-                    )
-                    BEGIN
-                        INSERT INTO dbo.TrangThaiDocThongBao (ma_tai_khoan, slug)
-                        VALUES (%s, %s)
-                    END
-                    """,
-                    [user_id, slug, user_id, slug],
-                )
-                cursor.execute(
-                    "SELECT da_doc_luc_utc FROM dbo.TrangThaiDocThongBao "
-                    "WHERE ma_tai_khoan = %s AND slug = %s",
-                    [user_id, slug],
-                )
-                read_at = cursor.fetchone()[0]
-                return {
-                    "slug": str(row[0]), "site_code": site, "category": str(row[1]),
-                    "created_at": _utc_datetime(row[2]), "is_read": True,
-                    "read_at": _utc_datetime(read_at),
-                }
-    except NotificationNotFound:
-        raise
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-        raise NotificationInfrastructureUnavailable from exc
-
-
-def mark_all_notifications_read(
-    *, user_id: str, role: str, user_site_code: str | None,
-    site_code: str | None = None, category: str | None = None,
-) -> dict[str, Any]:
-    if role == "admin_small":
-        if site_code:
-            raise PermissionError("Admin Small không được chọn site trong request.")
-        sites = _local_site(user_site_code)
-        missing: tuple[str, ...] = ()
-    else:
-        sites, missing = _global_sites(site_code)
-    marked_sites, failed_sites = [], list(missing)
-    audience = _audiences(role)
-    category_sql = " AND n.danh_muc = %s" if category else ""
-    for site in sites:
-        alias = get_site_database_alias(site)
-        try:
-            with transaction.atomic(using=alias):
-                with connections[alias].cursor() as cursor:
-                    cursor.execute(
-                        f"""
-                        MERGE dbo.TrangThaiDocThongBao WITH (HOLDLOCK) AS target
-                        USING (
-                            SELECT n.slug
-                            FROM dbo.ThongBao AS n
-                            WHERE n.doi_tuong IN (%s, %s){category_sql}
-                        ) AS source
-                          ON target.ma_tai_khoan = %s AND target.slug = source.slug
-                        WHEN NOT MATCHED THEN
-                          INSERT (ma_tai_khoan, slug) VALUES (%s, source.slug);
-                        """,
-                        [*audience, *([category] if category else []), user_id, user_id],
-                    )
-            marked_sites.append(site)
-        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
-            failed_sites.append(site)
-    return {
-        "complete": not failed_sites,
-        "marked_sites": marked_sites,
-        "missing_sites": sorted(set(failed_sites)),
     }

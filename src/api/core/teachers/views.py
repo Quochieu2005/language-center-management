@@ -146,8 +146,8 @@ class TeacherCollectionView(APIView):
         summary="Tạo giáo viên và tài khoản đăng nhập",
         description=(
             "Admin Big truyền site_code; Admin Small chỉ tạo tại site được xác thực. Hồ sơ GiaoVien "
-            "nằm riêng ở site đó; TaiKhoan được nhân bản tới các site đang hoạt động bằng tiến trình "
-            "có thể retry. Mật khẩu cấp ban đầu lấy từ cấu hình backend, được băm bằng BCrypt, buộc "
+            "nằm riêng ở site đó; TaiKhoan được ghi tại các site đang hoạt động và đồng bộ qua Logs (loai_log='sync'). "
+            "Mật khẩu cấp ban đầu lấy từ cấu hình backend, được băm bằng BCrypt, buộc "
             "đổi sau đăng nhập đầu và không trả trong response."
         ),
         request=TeacherCreateSerializer,
@@ -158,7 +158,7 @@ class TeacherCollectionView(APIView):
             403: OpenApiResponse(description="Vai trò không được tạo giáo viên hoặc Admin Small gửi site khác."),
             409: OpenApiResponse(description="Email/tên đăng nhập đã được sử dụng hoặc dữ liệu đang xung đột."),
             429: OpenApiResponse(description="Vượt giới hạn tạo giáo viên."),
-            503: OpenApiResponse(description="Thiếu cấu hình mật khẩu tạm hoặc site/Coordinator chưa sẵn sàng."),
+            503: OpenApiResponse(description="Thiếu cấu hình mật khẩu tạm hoặc một site SQL Server chưa sẵn sàng."),
         },
     )
     def post(self, request):
@@ -252,9 +252,10 @@ class TeacherDetailView(APIView):
         summary="Vô hiệu hóa tài khoản và xóa mềm hồ sơ giáo viên theo slug",
         description=(
             "Admin Big/Admin Small theo phạm vi site. DELETE không xóa vật lý: chuyển TaiKhoan thành "
-            "vo_hieu trên các site hoạt động, tăng phiên bản để vô hiệu phiên, đặt GiaoVien thành nghi_viec "
-            "tại site sở hữu và giữ lịch sử. Từ chối khi giáo viên còn lớp sap_mo/dang_hoc. Coordinator lưu "
-            "tiến trình để retry; đây không phải ACID nguyên tử xuyên CSDL."
+            "0 (inactive) trên các site hoạt động, tăng phiên bản để vô hiệu phiên, đặt GiaoVien thành nghi_viec "
+            "tại site sở hữu và giữ lịch sử. Từ chối khi giáo viên còn lớp sap_mo/dang_hoc. Trạng thái "
+            "được cập nhật trực tiếp trên TaiKhoan và GiaoVien; thao tác nhiều site không được tuyên bố "
+            "là ACID nguyên tử xuyên CSDL."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         responses={
@@ -264,7 +265,7 @@ class TeacherDetailView(APIView):
             403: OpenApiResponse(description="Không đủ quyền hoặc vượt phạm vi site."),
             404: OpenApiResponse(description="Không tìm thấy giáo viên."),
             409: OpenApiResponse(description="Còn lớp đang mở hoặc trạng thái tài khoản xung đột."),
-            503: OpenApiResponse(description="Site/Coordinator chưa sẵn sàng; tiến trình có thể retry."),
+            503: OpenApiResponse(description="Một site SQL Server chưa sẵn sàng; kiểm tra trạng thái các bản sao trước khi gọi lại."),
         },
     )
     def delete(self, request, slug: str):
@@ -304,8 +305,8 @@ class TeacherStatusView(APIView):
         tags=["Quản lý giáo viên"],
         summary="Admin Big/Admin Small bật hoặc tắt tài khoản giáo viên",
         description=(
-            "Ghi TaiKhoan tới mọi site đang hoạt động qua Coordinator, tăng phiên bản để thu hồi "
-            "phiên cũ và lưu tiến trình retry. Admin Big phải chọn site_code; Admin Small chỉ dùng site của mình. "
+            "Ghi trạng thái TaiKhoan tới mọi site đang hoạt động, tăng phiên bản để thu hồi phiên cũ "
+            "và cập nhật trạng thái GiaoVien tại site hồ sơ. Admin Big phải chọn site_code; Admin Small chỉ dùng site của mình. "
             "Giáo viên và các vai trò khác không được gọi endpoint này."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
@@ -317,7 +318,7 @@ class TeacherStatusView(APIView):
             403: OpenApiResponse(description="Không đủ quyền hoặc vượt phạm vi site."),
             404: OpenApiResponse(description="Không tìm thấy giáo viên trong site được chọn."),
             409: OpenApiResponse(description="Hồ sơ đã nghỉ việc hoặc trạng thái thay đổi đồng thời."),
-            503: OpenApiResponse(description="Đồng bộ site chưa hoàn tất; có thể gọi lại để tiếp tục."),
+            503: OpenApiResponse(description="Một site SQL Server chưa sẵn sàng; kiểm tra trạng thái các bản sao trước khi gọi lại."),
         },
     )
     def patch(self, request, slug: str):

@@ -153,7 +153,7 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
         )
         result = AdminSmallProvisioningResult(
             account_id="Q7-TK-000123",
-            employee_id="Q7-NV-000045",
+            admin_id="Q7-AD-000045",
             username="manager.q7",
             email="manager.q7@example.com",
             site_code="Q7",
@@ -213,7 +213,7 @@ class AdminSmallManagementApiTests(SimpleTestCase):
             response = self.client.delete("/api/v1/admin/admin-smalls/Q7-TK-000124/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "vo_hieu")
+        self.assertEqual(response.json()["status"], "inactive")
         self.assertEqual(response.json()["role"], "admin_small")
         self.assertNotIn("deleted", response.json())
         delete_account.assert_called_once_with("Q7-TK-000124", "Q1-TK-000001", "127.0.0.1")
@@ -227,7 +227,7 @@ class AdminSmallManagementApiTests(SimpleTestCase):
             "limit": 25,
             "offset": 0,
             "results": [{
-                "employee_id": "Q7-NV-000045", "site_code": "Q7", "full_name": "Quản lý",
+                "admin_id": "Q7-AD-000045", "site_code": "Q7", "full_name": "Quản lý",
                 "phone": None, "account_id": "Q7-TK-000123", "slug": "manager-q7",
                 "username": "manager.q7", "email": "manager.q7@example.com",
                 "account_status": "active", "profile_status": "dang_lam",

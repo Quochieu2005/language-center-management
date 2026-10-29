@@ -137,7 +137,7 @@ def load_user_session(token: str):
                   AND s.het_han_utc > SYSUTCDATETIME()
                   AND s.hoat_dong_cuoi_utc > DATEADD(SECOND, -%s, SYSUTCDATETIME())
                   AND s.phien_ban_tai_khoan = a.phien_ban
-                  AND a.trang_thai = 'hoat_dong'
+                  AND a.trang_thai = 1
                 """,
                 [token_digest, settings.AUTH_IDLE_TIMEOUT_SECONDS],
             )
@@ -175,7 +175,7 @@ def extend_user_session(token_digest: str):
                   AND s.thu_hoi_luc_utc IS NULL
                   AND s.het_han_utc > SYSUTCDATETIME()
                   AND s.phien_ban_tai_khoan = a.phien_ban
-                  AND a.trang_thai = 'hoat_dong'
+                  AND a.trang_thai = 1
                 """,
                 [settings.AUTH_IDLE_TIMEOUT_SECONDS, token_digest],
             )

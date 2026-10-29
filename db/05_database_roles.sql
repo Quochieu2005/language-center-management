@@ -15,8 +15,9 @@ END;
 
 IF OBJECT_ID(N'dbo.LichSuChuyenCoSo', N'U') IS NULL
    OR OBJECT_ID(N'dbo.GiaoDichChuyenCoSo', N'U') IS NULL
-   OR OBJECT_ID(N'dbo.NhatKyHeThong', N'U') IS NULL
-   OR OBJECT_ID(N'dbo.NhatKyDongBo', N'U') IS NULL
+   OR (OBJECT_ID(N'dbo.Logs', N'U') IS NULL
+       AND (OBJECT_ID(N'dbo.NhatKyHeThong', N'U') IS NULL
+            OR OBJECT_ID(N'dbo.NhatKyDongBo', N'U') IS NULL))
 BEGIN
     ;THROW 51051, N'Chưa tạo đủ schema. Hãy chạy 01_create_schema.sql trước.', 1;
 END;
@@ -31,10 +32,17 @@ GO
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO qlttnn_api;
 GRANT SELECT ON SCHEMA::dbo TO qlttnn_readonly;
 
-/* Bảo vệ nhật ký: API có thể INSERT/SELECT nhưng không sửa hoặc xóa lịch sử. */
+/* Bảo vệ lịch sử: Logs không được UPDATE; trigger chỉ cho DELETE trong luồng xóa học viên. */
 DENY UPDATE, DELETE ON OBJECT::dbo.LichSuChuyenCoSo TO qlttnn_api;
-DENY UPDATE, DELETE ON OBJECT::dbo.NhatKyHeThong TO qlttnn_api;
-DENY UPDATE, DELETE ON OBJECT::dbo.NhatKyDongBo TO qlttnn_api;
+IF OBJECT_ID(N'dbo.Logs', N'U') IS NOT NULL
+    EXEC(N'DENY UPDATE ON OBJECT::dbo.Logs TO qlttnn_api');
+ELSE
+BEGIN
+    IF OBJECT_ID(N'dbo.NhatKyHeThong', N'U') IS NOT NULL
+        EXEC(N'DENY UPDATE, DELETE ON OBJECT::dbo.NhatKyHeThong TO qlttnn_api');
+    IF OBJECT_ID(N'dbo.NhatKyDongBo', N'U') IS NOT NULL
+        EXEC(N'DENY UPDATE, DELETE ON OBJECT::dbo.NhatKyDongBo TO qlttnn_api');
+END;
 DENY DELETE ON OBJECT::dbo.GiaoDichChuyenCoSo TO qlttnn_api;
 GO
 

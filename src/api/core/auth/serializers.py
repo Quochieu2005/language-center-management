@@ -203,7 +203,7 @@ class AdminSmallDeleteResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
     site_code = serializers.CharField()
     role = serializers.ChoiceField(choices=["admin_small"])
-    status = serializers.ChoiceField(choices=["vo_hieu"])
+    status = serializers.ChoiceField(choices=["inactive"])
     detail = serializers.CharField()
 
 
@@ -229,7 +229,7 @@ class AdminSmallListQuerySerializer(serializers.Serializer):
 
 
 class AdminSmallListItemSerializer(serializers.Serializer):
-    employee_id = serializers.CharField()
+    admin_id = serializers.CharField()
     site_code = serializers.CharField()
     full_name = serializers.CharField()
     phone = serializers.CharField(allow_null=True)
@@ -237,7 +237,7 @@ class AdminSmallListItemSerializer(serializers.Serializer):
     slug = serializers.CharField()
     username = serializers.CharField()
     email = serializers.EmailField()
-    account_status = serializers.ChoiceField(choices=("active", "inactive", "locked"))
+    account_status = serializers.ChoiceField(choices=("active", "inactive"))
     profile_status = serializers.ChoiceField(choices=("dang_lam", "nghi_viec"))
 
 
@@ -257,7 +257,7 @@ class AuthPasswordChangeResponseSerializer(serializers.Serializer):
 
 class AdminSmallCreateResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
-    employee_id = serializers.CharField()
+    admin_id = serializers.CharField()
     username = serializers.CharField()
     email = serializers.EmailField()
     site_code = serializers.CharField()
@@ -282,7 +282,7 @@ class AuthUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
     username = serializers.CharField()
     role = serializers.ChoiceField(
-        choices=["admin_big", "admin_small", "le_tan", "ke_toan", "giao_vien"]
+        choices=["admin_big", "admin_small", "le_tan", "ke_toan", "giao_vien", "hoc_vien"]
     )
     site_code = serializers.CharField(allow_null=True)
     profile_id = serializers.CharField(allow_null=True)

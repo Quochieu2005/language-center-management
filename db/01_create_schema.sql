@@ -71,7 +71,7 @@ BEGIN TRY
         CONSTRAINT CK_KhoaHoc_phien_ban CHECK (phien_ban > 0)
     );
 
-    /* Tài khoản nhân bản; API phải lưu chuỗi băm, tuyệt đối không lưu mật khẩu gốc. */
+    /* Tài khoản nhân bản; mật khẩu lưu dạng băm, subject Google/Facebook cùng dòng. */
     CREATE TABLE dbo.TaiKhoan
     (
         ma_tai_khoan             VARCHAR(24)    NOT NULL,
@@ -79,9 +79,11 @@ BEGIN TRY
         ten_dang_nhap            NVARCHAR(100)  NOT NULL,
         email                    NVARCHAR(254)  NOT NULL,
         mat_khau                 NVARCHAR(255)  NOT NULL,
+        google_subject           NVARCHAR(255)  NULL,
+        facebook_subject         NVARCHAR(255)  NULL,
         vai_tro                  VARCHAR(20)    NOT NULL,
         ma_co_so                 VARCHAR(10)    NULL,
-        trang_thai               VARCHAR(20)    NOT NULL CONSTRAINT DF_TaiKhoan_trang_thai DEFAULT ('hoat_dong'),
+        trang_thai               BIT            NOT NULL CONSTRAINT DF_TaiKhoan_trang_thai DEFAULT (1), -- 1 = active, 0 = inactive
         bat_buoc_doi_mat_khau    BIT            NOT NULL CONSTRAINT DF_TaiKhoan_bat_buoc_doi DEFAULT (0),
         ngay_tao                 DATETIME2(0)   NOT NULL CONSTRAINT DF_TaiKhoan_ngay_tao DEFAULT (SYSUTCDATETIME()),
         ngay_doi_mat_khau_cuoi   DATETIME2(0)   NULL,
@@ -92,13 +94,24 @@ BEGIN TRY
         CONSTRAINT UQ_TaiKhoan_ten_dang_nhap UNIQUE (ten_dang_nhap),
         CONSTRAINT UQ_TaiKhoan_email UNIQUE (email),
         CONSTRAINT UQ_TaiKhoan_ma_va_co_so UNIQUE (ma_tai_khoan, ma_co_so),
+        CONSTRAINT CK_TaiKhoan_google_subject CHECK
+            (google_subject IS NULL OR LEN(LTRIM(RTRIM(google_subject))) > 0),
+        CONSTRAINT CK_TaiKhoan_facebook_subject CHECK
+            (facebook_subject IS NULL OR LEN(LTRIM(RTRIM(facebook_subject))) > 0),
         CONSTRAINT FK_TaiKhoan_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
-        CONSTRAINT CK_TaiKhoan_vai_tro CHECK (vai_tro IN ('admin_big', 'nhan_vien', 'giao_vien')),
-        CONSTRAINT CK_TaiKhoan_trang_thai CHECK (trang_thai IN ('hoat_dong', 'khoa', 'vo_hieu')),
+        CONSTRAINT CK_TaiKhoan_vai_tro CHECK (vai_tro IN ('admin_big', 'nhan_vien', 'giao_vien', 'hoc_vien')),
         CONSTRAINT CK_TaiKhoan_pham_vi CHECK
             ((vai_tro = 'admin_big' AND ma_co_so IS NULL) OR (vai_tro <> 'admin_big' AND ma_co_so IS NOT NULL)),
         CONSTRAINT CK_TaiKhoan_phien_ban CHECK (phien_ban > 0)
     );
+
+    CREATE UNIQUE INDEX UX_TaiKhoan_google_subject
+        ON dbo.TaiKhoan (google_subject)
+        WHERE google_subject IS NOT NULL;
+
+    CREATE UNIQUE INDEX UX_TaiKhoan_facebook_subject
+        ON dbo.TaiKhoan (facebook_subject)
+        WHERE facebook_subject IS NOT NULL;
 
     /* Session registry and hashed login attempts are site-local security state. */
     CREATE TABLE dbo.PhienDangNhap
@@ -148,37 +161,14 @@ BEGIN TRY
             ;THROW 51033, ''SuKienDangNhap chỉ được thêm mới.'', 1;
         END;';
 
-    /* Liên kết OAuth là dữ liệu dùng chung, phải được ghi giống nhau tại mọi site hoạt động. */
-    CREATE TABLE dbo.TaiKhoanLienKetOAuth
-    (
-        ma_lien_ket       UNIQUEIDENTIFIER NOT NULL,
-        ma_tai_khoan      VARCHAR(24)      NOT NULL,
-        nha_cung_cap      VARCHAR(16)      NOT NULL,
-        provider_subject  NVARCHAR(255)    NOT NULL,
-        trang_thai        VARCHAR(20)      NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_trang_thai DEFAULT ('hoat_dong'),
-        ngay_lien_ket      DATETIME2(0)     NOT NULL,
-        ngay_thu_hoi       DATETIME2(0)     NULL,
-        phien_ban          BIGINT           NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_phien_ban DEFAULT (1),
-        cap_nhat_luc       DATETIME2(0)     NOT NULL,
-        CONSTRAINT PK_TaiKhoanLienKetOAuth PRIMARY KEY (ma_lien_ket),
-        CONSTRAINT UQ_TaiKhoanLienKetOAuth_provider_subject UNIQUE (nha_cung_cap, provider_subject),
-        CONSTRAINT UQ_TaiKhoanLienKetOAuth_tai_khoan_provider UNIQUE (ma_tai_khoan, nha_cung_cap),
-        CONSTRAINT FK_TaiKhoanLienKetOAuth_TaiKhoan FOREIGN KEY (ma_tai_khoan)
-            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_nha_cung_cap CHECK (nha_cung_cap IN ('google', 'facebook')),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_trang_thai CHECK (trang_thai IN ('hoat_dong', 'da_thu_hoi')),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_thu_hoi CHECK
-            ((trang_thai = 'hoat_dong' AND ngay_thu_hoi IS NULL) OR
-             (trang_thai = 'da_thu_hoi' AND ngay_thu_hoi IS NOT NULL)),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_phien_ban CHECK (phien_ban > 0)
-    );
-
     /* Hồ sơ riêng theo site. ma_co_so trên bảng con là khóa phân mảnh. */
     CREATE TABLE dbo.HocVien
     (
         ma_hoc_vien   VARCHAR(24)    NOT NULL,
+        slug          VARCHAR(160)   NOT NULL,
         ma_co_so      VARCHAR(10)    NOT NULL,
         co_so_goc     VARCHAR(10)    NOT NULL,
+        ma_tai_khoan  VARCHAR(24)    NULL,
         ho_ten        NVARCHAR(150)  NOT NULL,
         ngay_sinh     DATE           NULL,
         gioi_tinh     NVARCHAR(20)   NULL,
@@ -188,11 +178,17 @@ BEGIN TRY
         ngay_nhap_hoc DATE           NOT NULL,
         trang_thai    VARCHAR(20)    NOT NULL CONSTRAINT DF_HocVien_trang_thai DEFAULT ('dang_hoc'),
         CONSTRAINT PK_HocVien PRIMARY KEY (ma_hoc_vien),
+        CONSTRAINT UQ_HocVien_slug UNIQUE (slug),
         CONSTRAINT UQ_HocVien_ma_va_co_so UNIQUE (ma_hoc_vien, ma_co_so),
         CONSTRAINT FK_HocVien_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_HocVien_CoSoGoc FOREIGN KEY (co_so_goc) REFERENCES dbo.CoSo(ma_co_so),
+        CONSTRAINT FK_HocVien_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_HocVien_trang_thai CHECK (trang_thai IN ('dang_hoc', 'bao_luu', 'da_chuyen_di', 'nghi_hoc'))
     );
+
+    CREATE UNIQUE INDEX UX_HocVien_ma_tai_khoan
+        ON dbo.HocVien (ma_tai_khoan)
+        WHERE ma_tai_khoan IS NOT NULL;
 
     CREATE TABLE dbo.GiaoVien
     (
@@ -230,6 +226,31 @@ BEGIN TRY
         CONSTRAINT CK_NhanVien_chuc_vu CHECK (chuc_vu IN ('le_tan', 'ke_toan', 'quan_ly_co_so')),
         CONSTRAINT CK_NhanVien_trang_thai CHECK (trang_thai IN ('dang_lam', 'nghi_viec'))
     );
+
+    /* Hồ sơ quản trị site; dữ liệu đăng nhập và quyền vẫn thuộc TaiKhoan. */
+    CREATE TABLE dbo.Admin
+    (
+        ma_admin      VARCHAR(24)    NOT NULL,
+        ma_tai_khoan  VARCHAR(24)    NOT NULL,
+        ma_co_so      VARCHAR(10)    NULL,
+        loai_admin    VARCHAR(20)    NOT NULL,
+        ho_ten        NVARCHAR(150)  NOT NULL,
+        sdt           VARCHAR(20)    NULL,
+        trang_thai    BIT            NOT NULL CONSTRAINT DF_Admin_trang_thai DEFAULT (1),
+        CONSTRAINT PK_Admin PRIMARY KEY (ma_admin),
+        CONSTRAINT UQ_Admin_ma_tai_khoan UNIQUE (ma_tai_khoan),
+        CONSTRAINT FK_Admin_TaiKhoan FOREIGN KEY (ma_tai_khoan)
+            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT FK_Admin_CoSo FOREIGN KEY (ma_co_so)
+            REFERENCES dbo.CoSo(ma_co_so),
+        CONSTRAINT CK_Admin_loai CHECK (loai_admin IN ('admin_big', 'admin_small')),
+        CONSTRAINT CK_Admin_pham_vi CHECK
+            ((loai_admin = 'admin_big' AND ma_co_so IS NULL)
+             OR (loai_admin = 'admin_small' AND ma_co_so IS NOT NULL))
+    );
+
+    CREATE INDEX IX_Admin_co_so_trang_thai
+        ON dbo.Admin (ma_co_so, loai_admin, trang_thai);
 
     CREATE TABLE dbo.PhongHoc
     (
@@ -571,6 +592,7 @@ BEGIN TRY
 
     /* Sequence cấp số; Django/API thêm mã site và mã loại để tạo mã bản ghi. */
     CREATE SEQUENCE dbo.Seq_TK    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
+    CREATE SEQUENCE dbo.Seq_AD    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_HV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_GV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_NV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;

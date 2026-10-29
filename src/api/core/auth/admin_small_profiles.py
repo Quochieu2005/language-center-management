@@ -20,18 +20,18 @@ def _admin_small_profile_cursor(
 ):
     cursor = connections[get_site_database_alias(site_code)].cursor()
     query = """
-        SELECT TOP (2) n.ma_nhan_vien, n.ma_co_so, n.ho_ten, n.sdt,
+        SELECT TOP (2) n.ma_admin, n.ma_co_so, n.ho_ten, n.sdt,
                        t.ten_dang_nhap, t.email, t.slug
-        FROM dbo.NhanVien AS n
+        FROM dbo.Admin AS n
         INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
         WHERE n.ma_tai_khoan = %s AND n.ma_co_so = %s
-          AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
-          AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+          AND n.loai_admin = 'admin_small' AND n.trang_thai = 1
+          AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 1
           AND t.slug = %s
     """
     params: list[Any] = [account_id, site_code, site_code, slug]
     if profile_id is not None:
-        query += " AND n.ma_nhan_vien = %s"
+        query += " AND n.ma_admin = %s"
         params.append(profile_id)
     cursor.execute(query, params)
     return cursor
@@ -84,12 +84,12 @@ def update_admin_small_self_profile(
                 cursor.execute(
                     """
                     SELECT n.ho_ten, n.sdt
-                    FROM dbo.NhanVien AS n WITH (UPDLOCK, ROWLOCK)
+                    FROM dbo.Admin AS n WITH (UPDLOCK, ROWLOCK)
                     INNER JOIN dbo.TaiKhoan AS t WITH (UPDLOCK, ROWLOCK)
                         ON t.ma_tai_khoan = n.ma_tai_khoan
-                    WHERE n.ma_tai_khoan = %s AND n.ma_nhan_vien = %s AND n.ma_co_so = %s
-                      AND n.chuc_vu = 'quan_ly_co_so' AND n.trang_thai = 'dang_lam'
-                      AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 'hoat_dong'
+                    WHERE n.ma_tai_khoan = %s AND n.ma_admin = %s AND n.ma_co_so = %s
+                      AND n.loai_admin = 'admin_small' AND n.trang_thai = 1
+                      AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = %s AND t.trang_thai = 1
                       AND t.slug = %s
                     """,
                     [user.account_id, user.profile_id, user.site_code, user.site_code, slug],
@@ -101,11 +101,11 @@ def update_admin_small_self_profile(
                 phone = updates.get("phone", str(row[1]) if row[1] is not None else None)
                 cursor.execute(
                     """
-                    UPDATE dbo.NhanVien
+                    UPDATE dbo.Admin
                     SET ho_ten = %s, sdt = %s
-                    OUTPUT INSERTED.ma_nhan_vien
-                    WHERE ma_tai_khoan = %s AND ma_nhan_vien = %s AND ma_co_so = %s
-                      AND chuc_vu = 'quan_ly_co_so' AND trang_thai = 'dang_lam'
+                    OUTPUT INSERTED.ma_admin
+                    WHERE ma_tai_khoan = %s AND ma_admin = %s AND ma_co_so = %s
+                      AND loai_admin = 'admin_small' AND trang_thai = 1
                     """,
                     [full_name, phone, user.account_id, user.profile_id, user.site_code],
                 )
@@ -114,10 +114,10 @@ def update_admin_small_self_profile(
                 audit_id = f"{user.site_code}-NK-{_next_sequence_number(user.site_code, 'Seq_NK'):06d}"
                 cursor.execute(
                     """
-                    INSERT INTO dbo.NhatKyHeThong
-                        (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong,
+                    INSERT INTO dbo.Logs
+                            (ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong,
                          bang_tac_dong, ma_ban_ghi, ip, ket_qua, ghi_chu)
-                    VALUES (%s, %s, %s, 'sua_ho_so_ca_nhan', 'NhanVien', %s, %s,
+                    VALUES (%s, 'system', %s, %s, 'sua_ho_so_ca_nhan', 'Admin', %s, %s,
                             'thanh_cong', N'Admin Small tự cập nhật hồ sơ của chính mình.')
                     """,
                     [audit_id, user.site_code, user.account_id, user.profile_id, remote_ip[:45]],

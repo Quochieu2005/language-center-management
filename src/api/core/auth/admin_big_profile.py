@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.hashers import check_password
 from django.db import DatabaseError, connections, transaction
 
+from core.auth.account_state import account_is_active
 from core.auth.services import (
     AuthInfrastructureUnavailable,
     _digest,
@@ -63,7 +64,7 @@ def _assert_admin_big(account, account_id: str) -> None:
         or str(account[0]) != account_id
         or str(account[5]).lower() != "admin_big"
         or account[6] is not None
-        or str(account[7]).lower() != "hoat_dong"
+        or not account_is_active(account[7])
     ):
         raise AdminBigProfileNotFound
 
@@ -186,7 +187,8 @@ def _ensure_site_logs(
     safe_fields = json.dumps({"changed_fields": changed_fields}, ensure_ascii=False)
 
     cursor.execute(
-        "SELECT ma_tai_khoan, hanh_dong, bang_tac_dong, ma_ban_ghi FROM dbo.NhatKyHeThong WHERE ma_nhat_ky = %s",
+        "SELECT ma_tai_khoan, hanh_dong, bang_tac_dong, ma_ban_ghi "
+        "FROM dbo.Logs WHERE loai_log = 'system' AND ma_log = %s",
         [audit_id],
     )
     audit = cursor.fetchone()
@@ -197,17 +199,18 @@ def _ensure_site_logs(
     else:
         cursor.execute(
             """
-            INSERT INTO dbo.NhatKyHeThong
-                (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
+            INSERT INTO dbo.Logs
+                (ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
                  ma_ban_ghi, du_lieu_cu, du_lieu_moi, ip, ket_qua, ghi_chu)
-            VALUES (%s, %s, %s, 'sua_tai_khoan_ca_nhan', 'TaiKhoan', %s,
+            VALUES (%s, 'system', %s, %s, 'sua_tai_khoan_ca_nhan', 'TaiKhoan', %s,
                     %s, %s, %s, 'thanh_cong', N'Admin Big tự cập nhật tài khoản của chính mình.')
             """,
             [audit_id, site_code, actor_id, account_id, safe_fields, safe_fields, remote_ip[:45]],
         )
 
     cursor.execute(
-        "SELECT bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai FROM dbo.NhatKyDongBo WHERE ma_dong_bo = %s",
+        "SELECT bang_tac_dong, ma_ban_ghi, hanh_dong, site_dich, ket_qua "
+        "FROM dbo.Logs WHERE loai_log = 'sync' AND ma_log = %s",
         [sync_id],
     )
     sync_event = cursor.fetchone()
@@ -218,9 +221,9 @@ def _ensure_site_logs(
         return
     cursor.execute(
         """
-        INSERT INTO dbo.NhatKyDongBo
-            (ma_dong_bo, bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai)
-        VALUES (%s, 'TaiKhoan', %s, 'sua', %s, 'thanh_cong')
+        INSERT INTO dbo.Logs
+            (ma_log, loai_log, bang_tac_dong, ma_ban_ghi, hanh_dong, site_dich, ket_qua)
+        VALUES (%s, 'sync', 'TaiKhoan', %s, 'sua', %s, 'thanh_cong')
         """,
         [sync_id, account_id, site_code],
     )
@@ -270,7 +273,7 @@ def _apply_profile_job(
                             SET slug = %s, ten_dang_nhap = %s, email = %s,
                                 cap_nhat_luc = SYSUTCDATETIME()
                             WHERE ma_tai_khoan = %s AND vai_tro = 'admin_big'
-                              AND ma_co_so IS NULL AND trang_thai = 'hoat_dong'
+                              AND ma_co_so IS NULL AND trang_thai = 1
                               AND slug = %s AND ten_dang_nhap = %s AND email = %s
                             """,
                             [new["slug"], new["username"], new["email"], account_id,

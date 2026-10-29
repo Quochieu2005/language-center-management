@@ -140,6 +140,6 @@ class TeacherDeleteResponseSerializer(serializers.Serializer):
     teacher_id = serializers.CharField()
     account_id = serializers.CharField()
     site_code = serializers.CharField()
-    status = serializers.ChoiceField(choices=("vo_hieu",))
+    status = serializers.ChoiceField(choices=("inactive",))
     teacher_status = serializers.ChoiceField(choices=("nghi_viec",))
     detail = serializers.CharField()

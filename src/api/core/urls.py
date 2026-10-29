@@ -19,9 +19,26 @@ from core.views import health_check
 from core.teachers.views import TeacherCollectionView, TeacherDetailView, TeacherProfileView, TeacherStatusView
 from core.notifications.views import (
     AdminNotificationListView,
-    AdminNotificationReadAllView,
-    AdminNotificationReadView,
-    AdminNotificationUnreadCountView,
+)
+from core.students.views import (
+    StudentAccountProvisionView,
+    StudentAdminCollectionView,
+    StudentDeleteView,
+    StudentEnrollmentListView,
+    StudentGradesView,
+    StudentProfileView,
+    StudentScheduleView,
+    StudentTuitionView,
+)
+from core.classes.views import (
+    ClassCollectionView,
+    ClassDetailView,
+    ClassRosterView,
+    ClassSessionsView,
+    ClassTeacherAssignView,
+    EnrollmentCollectionView,
+    EnrollmentClassAssignView,
+    RoomCollectionView,
 )
 
 
@@ -46,8 +63,21 @@ urlpatterns = [
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),
     path("admin/teachers/<str:slug>/", TeacherDetailView.as_view(), name="teacher-detail"),
+    path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),
+    path("admin/students/<str:slug>/", StudentDeleteView.as_view(), name="student-admin-delete"),
+    path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),
+    path("admin/classes/", ClassCollectionView.as_view(), name="class-list-create"),
+    path("admin/rooms/", RoomCollectionView.as_view(), name="room-list-create"),
+    path("admin/classes/<str:class_id>/", ClassDetailView.as_view(), name="class-detail"),
+    path("admin/classes/<str:class_id>/students/", ClassRosterView.as_view(), name="class-students"),
+    path("admin/classes/<str:class_id>/sessions/", ClassSessionsView.as_view(), name="class-sessions"),
+    path("admin/classes/<str:class_id>/teacher/", ClassTeacherAssignView.as_view(), name="class-assign-teacher"),
+    path("admin/enrollments/<str:enrollment_id>/class/", EnrollmentClassAssignView.as_view(), name="enrollment-assign-class"),
+    path("admin/enrollments/", EnrollmentCollectionView.as_view(), name="enrollment-create"),
+    path("students/profile/<str:slug>/", StudentProfileView.as_view(), name="student-profile"),
+    path("students/profile/<str:slug>/enrollments/", StudentEnrollmentListView.as_view(), name="student-enrollments"),
+    path("students/profile/<str:slug>/schedule/", StudentScheduleView.as_view(), name="student-schedule"),
+    path("students/profile/<str:slug>/tuition/", StudentTuitionView.as_view(), name="student-tuition"),
+    path("students/profile/<str:slug>/grades/", StudentGradesView.as_view(), name="student-grades"),
     path("admin/notifications/", AdminNotificationListView.as_view(), name="admin-notification-list"),
-    path("admin/notifications/unread-count/", AdminNotificationUnreadCountView.as_view(), name="admin-notification-unread-count"),
-    path("admin/notifications/read-all/", AdminNotificationReadAllView.as_view(), name="admin-notification-read-all"),
-    path("admin/notifications/<str:site_code>/<str:slug>/read/", AdminNotificationReadView.as_view(), name="admin-notification-read"),
 ]

@@ -1,7 +1,6 @@
-"""Site-scoped teacher CRUD with retryable distributed account lifecycle."""
+"""Site-scoped teacher profiles and replicated login accounts."""
 
 import json
-import uuid
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any
@@ -9,17 +8,15 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ImproperlyConfigured
-from django.db import DatabaseError, IntegrityError, connections, transaction
+from django.db import DatabaseError, connections, transaction
 
+from core.auth.account_state import account_is_active, account_status_bit, account_status_label
 from core.auth.service_common import (
     AuthInfrastructureUnavailable,
-    _acquire_named_lock,
-    _digest,
     _next_sequence_number,
     _replicated_account,
     _replicated_account_by_id,
     active_site_codes,
-    auth_session_alias,
 )
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
@@ -27,7 +24,7 @@ from core.notifications.publisher import publish_notification
 
 
 class TeacherInfrastructureUnavailable(Exception):
-    """A required site, coordinator table, or account replica is unavailable."""
+    """A required site database or account replica is unavailable."""
 
 
 class TeacherNotFound(Exception):
@@ -81,7 +78,7 @@ class TeacherDeactivationResult:
     teacher_id: str
     account_id: str
     site_code: str
-    status: str = "vo_hieu"
+    status: str = "inactive"
     teacher_status: str = "nghi_viec"
 
 
@@ -127,100 +124,13 @@ def _next_teacher_profile_id(site_code: str) -> str:
     raise TeacherInfrastructureUnavailable
 
 
-def _load_job(job_id: str):
-    alias = auth_session_alias()
-    with connections[alias].cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT ma_giao_dich, hanh_dong, ma_tai_khoan, ma_giao_vien, ma_co_so,
-                   ma_nguoi_thuc_hien, phien_ban_ban_dau, site_codes_json,
-                   du_lieu_json, trang_thai
-            FROM dbo.GiaoDichQuanLyGiaoVien
-            WHERE ma_giao_dich = CONVERT(uniqueidentifier, %s)
-            """,
-            [job_id],
-        )
-        row = cursor.fetchone()
-    if row is None:
-        raise TeacherInfrastructureUnavailable
-    return tuple(row)
-
-
-def _load_job_for_account(account_id: str, action: str):
-    alias = auth_session_alias()
-    with connections[alias].cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT ma_giao_dich, hanh_dong, ma_tai_khoan, ma_giao_vien, ma_co_so,
-                   ma_nguoi_thuc_hien, phien_ban_ban_dau, site_codes_json,
-                   du_lieu_json, trang_thai
-            FROM dbo.GiaoDichQuanLyGiaoVien
-            WHERE ma_tai_khoan = %s AND hanh_dong = %s
-            """,
-            [account_id, action],
-        )
-        rows = cursor.fetchall()
-    if len(rows) > 1:
-        raise TeacherInfrastructureUnavailable
-    return tuple(rows[0]) if rows else None
-
-
-def _load_pending_create_by_email(email: str):
-    alias = auth_session_alias()
-    with connections[alias].cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT ma_giao_dich, du_lieu_json, ma_co_so
-            FROM dbo.GiaoDichQuanLyGiaoVien
-            WHERE hanh_dong = 'tao' AND trang_thai = 'dang_xu_ly'
-              AND JSON_VALUE(du_lieu_json, '$.email') = %s
-            """,
-            [email],
-        )
-        rows = cursor.fetchall()
-    if len(rows) > 1:
-        raise TeacherInfrastructureUnavailable
-    return tuple(rows[0]) if rows else None
-
-
-def _update_job_sites(job_id: str, sites: tuple[str, ...]) -> None:
-    alias = auth_session_alias()
-    with transaction.atomic(using=alias):
-        with connections[alias].cursor() as cursor:
-            cursor.execute(
-                """
-                UPDATE dbo.GiaoDichQuanLyGiaoVien
-                SET site_codes_json = %s, cap_nhat_luc_utc = SYSUTCDATETIME()
-                WHERE ma_giao_dich = CONVERT(uniqueidentifier, %s)
-                  AND trang_thai = 'dang_xu_ly'
-                """,
-                [json.dumps(sites), job_id],
-            )
-
-
-def _load_coordinator_account(account_id: str):
-    alias = auth_session_alias()
-    with connections[alias].cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau,
-                   vai_tro, ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban
-            FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s
-            """,
-            [account_id],
-        )
-        rows = cursor.fetchall()
-    if len(rows) != 1:
-        raise TeacherInfrastructureUnavailable
-    return tuple(rows[0])
-
-
 def _append_sync_event(cursor, site_code: str, account_id: str, action: str) -> None:
     cursor.execute(
         """
-        SELECT COUNT_BIG(*) FROM dbo.NhatKyDongBo
-        WHERE bang = 'TaiKhoan' AND ma_ban_ghi = %s AND site_dich = %s
-          AND hanh_dong = %s AND trang_thai = 'thanh_cong'
+        SELECT COUNT_BIG(*) FROM dbo.Logs
+        WHERE loai_log = 'sync' AND bang_tac_dong = 'TaiKhoan'
+          AND ma_ban_ghi = %s AND site_dich = %s
+          AND hanh_dong = %s AND ket_qua = 'thanh_cong'
         """,
         [account_id, site_code, action],
     )
@@ -229,37 +139,11 @@ def _append_sync_event(cursor, site_code: str, account_id: str, action: str) -> 
     event_id = f"{site_code}-DB-{_next_sequence_number(site_code, 'Seq_DB'):06d}"
     cursor.execute(
         """
-        INSERT INTO dbo.NhatKyDongBo
-            (ma_dong_bo, bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai)
-        VALUES (%s, 'TaiKhoan', %s, %s, %s, 'thanh_cong')
+        INSERT INTO dbo.Logs
+            (ma_log, loai_log, bang_tac_dong, ma_ban_ghi, hanh_dong, site_dich, ket_qua)
+        VALUES (%s, 'sync', 'TaiKhoan', %s, %s, %s, 'thanh_cong')
         """,
         [event_id, account_id, action, site_code],
-    )
-
-
-def _append_lifecycle_sync_event(cursor, site_code: str, account_id: str, job_id: str) -> None:
-    event_id = f"{site_code}-DB-{uuid.uuid5(uuid.NAMESPACE_URL, f'{job_id}:{site_code}').hex[:10]}"
-    cursor.execute(
-        """
-        SELECT bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai
-        FROM dbo.NhatKyDongBo WHERE ma_dong_bo = %s
-        """,
-        [event_id],
-    )
-    event = cursor.fetchone()
-    expected = ("TaiKhoan", account_id, "sua", site_code, "thanh_cong")
-    if event is not None:
-        actual = (str(event[0]), str(event[1]), str(event[2]), str(event[3]), str(event[4]))
-        if actual != expected:
-            raise TeacherInfrastructureUnavailable
-        return
-    cursor.execute(
-        """
-        INSERT INTO dbo.NhatKyDongBo
-            (ma_dong_bo, bang, ma_ban_ghi, hanh_dong, site_dich, trang_thai)
-        VALUES (%s, 'TaiKhoan', %s, 'sua', %s, 'thanh_cong')
-        """,
-        [event_id, account_id, site_code],
     )
 
 
@@ -276,8 +160,8 @@ def _append_audit(
 ) -> None:
     cursor.execute(
         """
-        SELECT COUNT_BIG(*) FROM dbo.NhatKyHeThong
-        WHERE ma_co_so = %s AND ma_tai_khoan = %s AND hanh_dong = %s
+        SELECT COUNT_BIG(*) FROM dbo.Logs
+        WHERE loai_log = 'system' AND ma_co_so = %s AND ma_tai_khoan = %s AND hanh_dong = %s
           AND bang_tac_dong = 'GiaoVien' AND ma_ban_ghi = %s AND ket_qua = 'thanh_cong'
         """,
         [site_code, actor_id, action, teacher_id],
@@ -287,10 +171,10 @@ def _append_audit(
     audit_id = f"{site_code}-NK-{_next_sequence_number(site_code, 'Seq_NK'):06d}"
     cursor.execute(
         """
-        INSERT INTO dbo.NhatKyHeThong
-            (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
+        INSERT INTO dbo.Logs
+            (ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
              ma_ban_ghi, du_lieu_cu, du_lieu_moi, ip, ket_qua)
-        VALUES (%s, %s, %s, %s, 'GiaoVien', %s, %s, %s, %s, 'thanh_cong')
+        VALUES (%s, 'system', %s, %s, %s, 'GiaoVien', %s, %s, %s, %s, 'thanh_cong')
         """,
         [
             audit_id,
@@ -336,11 +220,11 @@ def _ensure_teacher_account_replica(site_code: str, expected: tuple[Any, ...]) -
                     actual = (
                         str(row[0]), str(row[1]), str(row[2]), str(row[3]), str(row[4]),
                         str(row[5]).lower(), str(row[6]).upper() if row[6] else None,
-                        str(row[7]).lower(), bool(row[8]), int(row[9]),
+                        account_status_bit(row[7]), bool(row[8]), int(row[9]),
                     )
                 normalized_expected = (
                     str(account_id), str(slug), str(username), str(email), str(password_hash),
-                    str(role).lower(), str(account_site).upper(), str(account_status).lower(),
+                    str(role).lower(), str(account_site).upper(), account_status_bit(account_status),
                     bool(forced), int(version),
                 )
                 if actual is None:
@@ -349,7 +233,7 @@ def _ensure_teacher_account_replica(site_code: str, expected: tuple[Any, ...]) -
                         INSERT INTO dbo.TaiKhoan
                             (ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro,
                              ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban)
-                        VALUES (%s, %s, %s, %s, %s, 'giao_vien', %s, 'hoat_dong', 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, 'giao_vien', %s, 1, 1, %s)
                         """,
                         [account_id, slug, username, email, password_hash, account_site, version],
                     )
@@ -427,63 +311,6 @@ def _ensure_teacher_profile(site_code: str, payload: dict[str, Any], remote_ip: 
         raise TeacherInfrastructureUnavailable from exc
 
 
-def _complete_lifecycle_job(job_id: str) -> None:
-    alias = auth_session_alias()
-    try:
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE dbo.GiaoDichQuanLyGiaoVien
-                    SET trang_thai = 'hoan_tat', cap_nhat_luc_utc = SYSUTCDATETIME(),
-                        hoan_tat_luc_utc = SYSUTCDATETIME()
-                    WHERE ma_giao_dich = CONVERT(uniqueidentifier, %s)
-                      AND trang_thai = 'dang_xu_ly'
-                    """,
-                    [job_id],
-                )
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-        raise TeacherInfrastructureUnavailable from exc
-
-
-def _create_result(job, payload: dict[str, Any]) -> TeacherProvisioningResult:
-    site_code = _normalize_site(str(job[4]))
-    username = str(payload["username"])
-    return TeacherProvisioningResult(
-        teacher_id=str(job[3]),
-        account_id=str(job[2]),
-        site_code=site_code,
-        full_name=str(payload["full_name"]),
-        phone=payload.get("phone"),
-        email=str(payload["email"]),
-        username=username,
-        slug=make_slug(f"giao-vien-{site_code}-{username}", max_length=120),
-        specialty=str(payload["specialty"]),
-    )
-
-
-def _resume_teacher_creation(job_id: str, remote_ip: str) -> TeacherProvisioningResult:
-    job = _load_job(job_id)
-    if str(job[1]).lower() != "tao":
-        raise TeacherConflict
-    payload = json.loads(str(job[8]))
-    if str(job[9]).lower() == "hoan_tat":
-        return _create_result(job, payload)
-    sites = active_site_codes()
-    target_site = _normalize_site(str(job[4]))
-    _ensure_site(target_site, sites)
-    _update_job_sites(job_id, sites)
-    account = _load_coordinator_account(str(job[2]))
-    if str(account[5]).lower() != "giao_vien" or _normalize_site(account[6]) != target_site:
-        raise TeacherConflict
-    for code in sites:
-        _ensure_teacher_account_replica(code, account)
-        if code == target_site:
-            _ensure_teacher_profile(code, payload, remote_ip)
-    _complete_lifecycle_job(job_id)
-    return _create_result(_load_job(job_id), payload)
-
-
 @_translate_infrastructure_errors
 def create_teacher(
     *, full_name: str, email: str, username: str | None, phone: str | None,
@@ -494,81 +321,51 @@ def create_teacher(
         raise TeacherInfrastructureUnavailable
     normalized_email = email.strip().casefold()
     target_site = _normalize_site(site_code)
-    normalized_username = (
-        username or make_slug(normalized_email.partition("@")[0], max_length=100)
-    ).strip().lower()
-    if not normalized_email or not full_name.strip() or not specialty.strip() or not remote_ip:
+    normalized_username = (username or make_slug(normalized_email.partition("@")[0], max_length=100)).strip().lower()
+    normalized_name = full_name.strip()
+    normalized_phone = phone.strip() if phone else None
+    normalized_specialty = specialty.strip()
+    if not normalized_email or not normalized_name or not normalized_specialty or not remote_ip:
         raise ValueError("Thiếu thông tin giáo viên.")
     sites = active_site_codes()
     _ensure_site(target_site, sites)
-    coordinator_alias = auth_session_alias()
-    email_lock = f"qlttnn-teacher-email:{_digest('teacher-email', normalized_email)}"
-    username_lock = f"qlttnn-teacher-username:{_digest('teacher-username', normalized_username)}"
-    normalized_phone = phone.strip() if phone else None
+    if _replicated_account(normalized_email, sites) is not None:
+        raise TeacherConflict
+    if _replicated_account(normalized_username, sites) is not None:
+        raise TeacherConflict
+
+    account_id = _next_teacher_account_id(target_site, sites)
+    teacher_id = _next_teacher_profile_id(target_site)
+    slug = make_slug(f"giao-vien-{target_site}-{normalized_username}", max_length=120)
+    password_hash = make_password(temporary_password)
+    account = (
+        account_id, slug, normalized_username, normalized_email, password_hash,
+        "giao_vien", target_site, 1, True, 1,
+    )
     payload = {
-        "full_name": full_name.strip(),
-        "email": normalized_email,
-        "username": normalized_username,
-        "phone": normalized_phone,
-        "specialty": specialty.strip(),
+        "teacher_id": teacher_id,
+        "account_id": account_id,
         "site_code": target_site,
+        "full_name": normalized_name,
+        "phone": normalized_phone,
+        "email": normalized_email,
+        "specialty": normalized_specialty,
         "actor_id": actor_id,
     }
-    job_id = None
-    try:
-        with transaction.atomic(using=coordinator_alias):
-            with connections[coordinator_alias].cursor() as cursor:
-                for resource in sorted((email_lock, username_lock)):
-                    _acquire_named_lock(cursor, resource)
-                pending = _load_pending_create_by_email(normalized_email)
-                if pending is not None:
-                    pending_payload = json.loads(str(pending[1]))
-                    if (
-                        _normalize_site(str(pending[2])) != target_site
-                        or any(pending_payload.get(key) != payload.get(key) for key in payload)
-                    ):
-                        raise TeacherConflict
-                    job_id = str(pending[0])
-                else:
-                    if _replicated_account(normalized_email, sites) is not None:
-                        raise TeacherConflict
-                    if _replicated_account(normalized_username, sites) is not None:
-                        raise TeacherConflict
-                    account_id = _next_teacher_account_id(target_site, sites)
-                    teacher_id = _next_teacher_profile_id(target_site)
-                    payload["teacher_id"] = teacher_id
-                    slug = make_slug(f"giao-vien-{target_site}-{normalized_username}", max_length=120)
-                    password_hash = make_password(temporary_password)
-                    job_id = str(uuid.uuid4())
-                    cursor.execute(
-                        """
-                        INSERT INTO dbo.TaiKhoan
-                            (ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro,
-                             ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban)
-                        VALUES (%s, %s, %s, %s, %s, 'giao_vien', %s, 'hoat_dong', 1, 1)
-                        """,
-                        [account_id, slug, normalized_username, normalized_email,
-                         password_hash, target_site],
-                    )
-                    cursor.execute(
-                        """
-                        INSERT INTO dbo.GiaoDichQuanLyGiaoVien
-                            (ma_giao_dich, hanh_dong, ma_tai_khoan, ma_giao_vien,
-                             ma_co_so, ma_nguoi_thuc_hien, phien_ban_ban_dau,
-                             site_codes_json, du_lieu_json, trang_thai)
-                        VALUES (CONVERT(uniqueidentifier, %s), 'tao', %s, %s, %s, %s,
-                                1, %s, %s, 'dang_xu_ly')
-                        """,
-                        [job_id, account_id, teacher_id, target_site, actor_id,
-                         json.dumps(sites), json.dumps(payload, ensure_ascii=False)],
-                    )
-    except (TeacherConflict, TeacherSiteUnavailable, TeacherInfrastructureUnavailable):
-        raise
-    except IntegrityError as exc:
-        raise TeacherConflict from exc
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError, AuthInfrastructureUnavailable) as exc:
-        raise TeacherInfrastructureUnavailable from exc
-    return _resume_teacher_creation(str(job_id), remote_ip)
+    for code in sites:
+        _ensure_teacher_account_replica(code, account)
+    _ensure_teacher_profile(target_site, payload, remote_ip)
+    return TeacherProvisioningResult(
+        teacher_id=teacher_id,
+        account_id=account_id,
+        site_code=target_site,
+        full_name=normalized_name,
+        phone=normalized_phone,
+        email=normalized_email,
+        username=normalized_username,
+        slug=slug,
+        specialty=normalized_specialty,
+    )
 
 
 _TEACHER_SELECT = """
@@ -593,10 +390,7 @@ def _teacher_dict(row) -> dict[str, Any]:
         "slug": str(row[7]) if row[7] is not None else None,
         "specialty": str(row[8]),
         "status": str(row[9]).lower(),
-        "account_status": {
-            "hoat_dong": "active",
-            "vo_hieu": "inactive",
-        }.get(str(row[10]).lower()) if len(row) > 10 and row[10] is not None else None,
+        "account_status": account_status_label(row[10]) if len(row) > 10 else None,
     }
 
 
@@ -665,10 +459,10 @@ def _append_profile_audit(
     audit_id = f"{site_code}-NK-{_next_sequence_number(site_code, 'Seq_NK'):06d}"
     cursor.execute(
         """
-        INSERT INTO dbo.NhatKyHeThong
-            (ma_nhat_ky, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
+        INSERT INTO dbo.Logs
+            (ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong, bang_tac_dong,
              ma_ban_ghi, du_lieu_cu, du_lieu_moi, ip, ket_qua)
-        VALUES (%s, %s, %s, 'sua_giao_vien', 'GiaoVien', %s, %s, %s, %s, 'thanh_cong')
+        VALUES (%s, 'system', %s, %s, 'sua_giao_vien', 'GiaoVien', %s, %s, %s, %s, 'thanh_cong')
         """,
         [audit_id, site_code, actor_id, teacher_id, json.dumps(old, ensure_ascii=False),
          json.dumps(new, ensure_ascii=False), remote_ip[:45]],
@@ -730,137 +524,6 @@ def update_teacher(
     return get_teacher(slug=slug, site_code=site)
 
 
-def _apply_teacher_deactivation_site(job, site_code: str, remote_ip: str) -> None:
-    job_id, _action, account_id, teacher_id, target_site, actor_id, initial_version, _sites, _data, _state = job
-    alias = get_site_database_alias(site_code)
-    target_site = _normalize_site(target_site)
-    try:
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT vai_tro, ma_co_so, trang_thai, phien_ban
-                    FROM dbo.TaiKhoan WITH (UPDLOCK, ROWLOCK)
-                    WHERE ma_tai_khoan = %s
-                    """,
-                    [account_id],
-                )
-                account = cursor.fetchone()
-                if account is None:
-                    raise TeacherInfrastructureUnavailable
-                role, account_site, account_status, version = (
-                    str(account[0]).lower(), _normalize_site(account[1]) if account[1] else None,
-                    str(account[2]).lower(), int(account[3]),
-                )
-                if role != "giao_vien" or account_site != target_site:
-                    raise TeacherConflict
-                account_changed = False
-                if account_status == "hoat_dong" and version == int(initial_version):
-                    cursor.execute(
-                        """
-                        UPDATE dbo.TaiKhoan
-                        SET trang_thai = 'vo_hieu', phien_ban = phien_ban + 1,
-                            cap_nhat_luc = SYSUTCDATETIME()
-                        WHERE ma_tai_khoan = %s AND vai_tro = 'giao_vien'
-                          AND ma_co_so = %s AND trang_thai = 'hoat_dong' AND phien_ban = %s
-                        """,
-                        [account_id, target_site, initial_version],
-                    )
-                    if cursor.rowcount != 1:
-                        raise TeacherConflict
-                    account_changed = True
-                elif not (
-                    account_status == "vo_hieu"
-                    and version in {int(initial_version), int(initial_version) + 1}
-                ):
-                    raise TeacherConflict
-                if account_changed:
-                    _append_lifecycle_sync_event(cursor, site_code, account_id, str(job_id))
-                if site_code == target_site:
-                    cursor.execute(
-                        """
-                        SELECT TOP (2) trang_thai FROM dbo.GiaoVien WITH (UPDLOCK, ROWLOCK)
-                        WHERE ma_giao_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                        """,
-                        [teacher_id, target_site, account_id],
-                    )
-                    profiles = cursor.fetchall()
-                    if len(profiles) != 1:
-                        raise TeacherConflict
-                    old_status = str(profiles[0][0]).lower()
-                    if old_status != "nghi_viec":
-                        cursor.execute(
-                            """
-                            UPDATE dbo.GiaoVien SET trang_thai = 'nghi_viec'
-                            WHERE ma_giao_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                              AND trang_thai IN ('dang_day', 'tam_nghi')
-                            """,
-                            [teacher_id, target_site, account_id],
-                        )
-                        if cursor.rowcount != 1:
-                            raise TeacherConflict
-                    _append_audit(
-                        cursor, target_site, actor_id, "xoa_giao_vien", teacher_id, remote_ip,
-                        before={"status": old_status}, after={"status": "nghi_viec"},
-                    )
-                    publish_notification(
-                        cursor,
-                        site_code=target_site,
-                        event_key=f"teacher-deactivated:{account_id}",
-                        category="teacher",
-                        severity="warning",
-                        title="Giáo viên đã nghỉ việc",
-                        message=f"Tài khoản giáo viên tại cơ sở {target_site} đã được vô hiệu hóa.",
-                        target_path=f"/admin/teachers?site_code={target_site}",
-                    )
-    except (TeacherInfrastructureUnavailable, TeacherConflict):
-        raise
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-        raise TeacherInfrastructureUnavailable from exc
-
-
-def _complete_teacher_deactivation(job_id: str, account_id: str) -> None:
-    alias = auth_session_alias()
-    try:
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE dbo.PhienDangNhap
-                    SET thu_hoi_luc_utc = COALESCE(thu_hoi_luc_utc, SYSUTCDATETIME())
-                    WHERE ma_tai_khoan = %s AND thu_hoi_luc_utc IS NULL
-                    """,
-                    [account_id],
-                )
-                cursor.execute(
-                    """
-                    UPDATE dbo.GiaoDichQuanLyGiaoVien
-                    SET trang_thai = 'hoan_tat', cap_nhat_luc_utc = SYSUTCDATETIME(),
-                        hoan_tat_luc_utc = SYSUTCDATETIME()
-                    WHERE ma_giao_dich = CONVERT(uniqueidentifier, %s)
-                      AND hanh_dong = 'vo_hieu_hoa' AND trang_thai = 'dang_xu_ly'
-                    """,
-                    [job_id],
-                )
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-        raise TeacherInfrastructureUnavailable from exc
-
-
-def _resume_teacher_deactivation(job, remote_ip: str) -> TeacherDeactivationResult:
-    job_id, action, account_id, teacher_id, site_code, _actor, _version, _sites, _data, state = job
-    if str(action).lower() != "vo_hieu_hoa":
-        raise TeacherConflict
-    if str(state).lower() == "hoan_tat":
-        return TeacherDeactivationResult(str(teacher_id), str(account_id), _normalize_site(site_code))
-    sites = active_site_codes()
-    _ensure_site(_normalize_site(site_code), sites)
-    _update_job_sites(str(job_id), sites)
-    for code in sites:
-        _apply_teacher_deactivation_site(job, code, remote_ip)
-    _complete_teacher_deactivation(str(job_id), str(account_id))
-    return TeacherDeactivationResult(str(teacher_id), str(account_id), _normalize_site(site_code))
-
-
 @_translate_infrastructure_errors
 def deactivate_teacher(
     *, slug: str, site_code: str, actor_id: str, remote_ip: str
@@ -881,17 +544,17 @@ def deactivate_teacher(
         raise TeacherNotFound
     teacher_id, account_id = str(profile[0]), str(profile[1])
 
-    existing_job = _load_job_for_account(account_id, "vo_hieu_hoa")
-    if existing_job is not None:
-        return _resume_teacher_deactivation(existing_job, remote_ip)
-
     sites = active_site_codes()
     _ensure_site(site, sites)
     try:
         account = _replicated_account_by_id(account_id, sites)
         if account is None or str(account[5]).lower() != "giao_vien" or _normalize_site(account[6]) != site:
             raise TeacherNotFound
-        if str(account[7]).lower() not in ("hoat_dong", "vo_hieu") or str(profile[2]).lower() not in ("dang_day", "tam_nghi"):
+        if account_status_bit(account[7]) not in (0, 1):
+            raise TeacherConflict
+        if str(profile[2]).lower() == "nghi_viec" and account_status_bit(account[7]) == 0:
+            return TeacherDeactivationResult(teacher_id, account_id, site)
+        if str(profile[2]).lower() not in ("dang_day", "tam_nghi"):
             raise TeacherConflict
         with get_site_connection(site).cursor() as cursor:
             cursor.execute(
@@ -911,35 +574,95 @@ def deactivate_teacher(
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise TeacherInfrastructureUnavailable from exc
 
-    coordinator_alias = auth_session_alias()
-    job_id = str(uuid.uuid4())
+    old_status = account_status_bit(account[7])
+    version = int(account[8])
+    changed_sites: list[str] = []
     try:
-        with transaction.atomic(using=coordinator_alias):
-            with connections[coordinator_alias].cursor() as cursor:
-                _acquire_named_lock(cursor, f"qlttnn-teacher-deactivate:{account_id}")
-                cursor.execute(
-                    """
-                    SELECT ma_giao_dich FROM dbo.GiaoDichQuanLyGiaoVien WITH (UPDLOCK, HOLDLOCK)
-                    WHERE ma_tai_khoan = %s AND hanh_dong = 'vo_hieu_hoa'
-                    """,
-                    [account_id],
-                )
-                prior = cursor.fetchone()
-                if prior is not None:
-                    job_id = str(prior[0])
-                else:
+        for code in (*[site_code for site_code in sites if site_code != site], site):
+            alias = get_site_database_alias(code)
+            with transaction.atomic(using=alias):
+                with connections[alias].cursor() as cursor:
                     cursor.execute(
                         """
-                        INSERT INTO dbo.GiaoDichQuanLyGiaoVien
-                            (ma_giao_dich, hanh_dong, ma_tai_khoan, ma_giao_vien,
-                             ma_co_so, ma_nguoi_thuc_hien, phien_ban_ban_dau,
-                             site_codes_json, du_lieu_json, trang_thai)
-                        VALUES (CONVERT(uniqueidentifier, %s), 'vo_hieu_hoa', %s, %s,
-                                %s, %s, %s, %s, %s, 'dang_xu_ly')
+                        UPDATE dbo.TaiKhoan
+                        SET trang_thai = 0, phien_ban = phien_ban + 1,
+                            cap_nhat_luc = SYSUTCDATETIME()
+                        WHERE ma_tai_khoan = %s AND vai_tro = 'giao_vien'
+                          AND ma_co_so = %s AND trang_thai = 1 AND phien_ban = %s
                         """,
-                        [job_id, account_id, teacher_id, site, actor_id, int(account[8]),
-                         json.dumps(sites), json.dumps({"teacher_id": teacher_id})],
+                        [account_id, site, version],
                     )
+                    if cursor.rowcount != 1:
+                        raise TeacherConflict
+                    cursor.execute(
+                        """
+                        UPDATE dbo.PhienDangNhap
+                        SET thu_hoi_luc_utc = COALESCE(thu_hoi_luc_utc, SYSUTCDATETIME())
+                        WHERE ma_tai_khoan = %s AND thu_hoi_luc_utc IS NULL
+                        """,
+                        [account_id],
+                    )
+                    _append_sync_event(cursor, code, account_id, "sua")
+                    if code == site:
+                        cursor.execute(
+                            """
+                            UPDATE dbo.GiaoVien SET trang_thai = 'nghi_viec'
+                            WHERE ma_giao_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
+                              AND trang_thai IN ('dang_day', 'tam_nghi')
+                            """,
+                            [teacher_id, site, account_id],
+                        )
+                        if cursor.rowcount != 1:
+                            raise TeacherConflict
+                        _append_audit(
+                            cursor, site, actor_id, "xoa_giao_vien", teacher_id, remote_ip,
+                            before={"status": str(profile[2])}, after={"status": "nghi_viec"},
+                        )
+                        publish_notification(
+                            cursor,
+                            site_code=site,
+                            event_key=f"teacher-deactivated:{account_id}",
+                            category="teacher",
+                            severity="warning",
+                            title="Giáo viên đã nghỉ việc",
+                            message=f"Tài khoản giáo viên tại cơ sở {site} đã được vô hiệu hóa.",
+                            target_path=f"/admin/teachers?site_code={site}",
+                        )
+            changed_sites.append(code)
+    except TeacherConflict:
+        for changed_site in reversed(changed_sites):
+            alias = get_site_database_alias(changed_site)
+            try:
+                with transaction.atomic(using=alias):
+                    with connections[alias].cursor() as cursor:
+                        cursor.execute(
+                            """
+                            UPDATE dbo.TaiKhoan
+                            SET trang_thai = 1, phien_ban = phien_ban + 1,
+                                cap_nhat_luc = SYSUTCDATETIME()
+                            WHERE ma_tai_khoan = %s AND trang_thai = 0 AND phien_ban = %s
+                            """,
+                            [account_id, version + 1],
+                        )
+            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+                raise TeacherInfrastructureUnavailable
+        raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        for changed_site in reversed(changed_sites):
+            alias = get_site_database_alias(changed_site)
+            try:
+                with transaction.atomic(using=alias):
+                    with connections[alias].cursor() as cursor:
+                        cursor.execute(
+                            """
+                            UPDATE dbo.TaiKhoan
+                            SET trang_thai = 1, phien_ban = phien_ban + 1,
+                                cap_nhat_luc = SYSUTCDATETIME()
+                            WHERE ma_tai_khoan = %s AND trang_thai = 0 AND phien_ban = %s
+                            """,
+                            [account_id, version + 1],
+                        )
+            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+                raise TeacherInfrastructureUnavailable from exc
         raise TeacherInfrastructureUnavailable from exc
-    return _resume_teacher_deactivation(_load_job(job_id), remote_ip)
+    return TeacherDeactivationResult(teacher_id, account_id, site)

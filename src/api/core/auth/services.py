@@ -52,23 +52,7 @@ from core.auth.admin_small_profiles import (
 )
 
 from core.auth.admin_small_lifecycle import (
-    _require_admin_small_email_configuration,
-    _next_admin_small_account_id,
-    _next_admin_small_employee_id,
-    _load_admin_small_deactivation,
-    _insert_admin_small_deactivation_sync_event,
-    _deactivate_admin_small_replica,
-    _complete_admin_small_deactivation,
     delete_admin_small,
-    _account_sync_log_if_missing,
-    _admin_small_audit_if_missing,
-    _ensure_admin_small_replica,
-    _load_admin_small_job,
-    _complete_admin_small_job,
-    _apply_admin_small_provisioning,
-    _send_admin_small_credentials,
-    _resume_pending_admin_small_creations,
-    _existing_admin_small_creation,
     create_admin_small,
 )
 
