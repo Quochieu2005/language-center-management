@@ -70,6 +70,29 @@ def _resolve_admin_site(user, requested_site: str | None):
     return requested_site, None
 
 
+def _resolve_student_list_site(user, requested_site: str | None):
+    """Allow consultants to search local student profiles without provisioning or deleting."""
+    allowed_roles = {"admin_big", "admin_small", "tu_van"}
+    if user.role not in allowed_roles:
+        return None, Response(
+            {"detail": "Chỉ Admin Big, Admin Small hoặc nhân viên tư vấn được tra cứu học viên."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if user.role == "admin_big":
+        if not requested_site:
+            return None, Response(
+                {"detail": "Admin Big cần chọn site_code."}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        return requested_site, None
+    own_site = str(user.site_code or "").upper()
+    if not own_site or requested_site:
+        return None, Response(
+            {"detail": "Tài khoản chỉ được tra cứu tại cơ sở trong phiên đăng nhập."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return own_site, None
+
+
 def _student_service_error(exc):
     if isinstance(exc, StudentPermissionDenied):
         return Response(
@@ -145,8 +168,9 @@ class StudentAdminCollectionView(APIView):
         tags=["Quản lý học viên"],
         summary="Liệt kê hồ sơ học viên tại một cơ sở",
         description=(
-            "Đọc LOCAL từ đúng CSDL site. Admin Big phải chọn site_code; Admin Small dùng site trong "
-            "phiên đăng nhập và không được chọn site khác. Trả slug, trạng thái và cờ đã cấp tài khoản; "
+            "Đọc LOCAL từ đúng CSDL site. Admin Big phải chọn site_code; Admin Small và tư vấn dùng site trong "
+            "phiên đăng nhập và không được chọn site khác. Tư vấn chỉ tra cứu, không cấp tài khoản hay xóa học viên. "
+            "Trả slug, trạng thái và cờ đã cấp tài khoản; "
             "không đọc hoặc nối dữ liệu giữa các CSDL site."
         ),
         parameters=[
@@ -169,7 +193,7 @@ class StudentAdminCollectionView(APIView):
         query = StudentListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
-        site_code, error = _resolve_admin_site(request.user, data.get("site_code"))
+        site_code, error = _resolve_student_list_site(request.user, data.get("site_code"))
         if error:
             return error
         try:

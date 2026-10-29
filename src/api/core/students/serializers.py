@@ -161,6 +161,16 @@ class StudentPaymentItemSerializer(serializers.Serializer):
     paid_at = serializers.DateTimeField()
 
 
+class StudentInstallmentItemSerializer(serializers.Serializer):
+    installment_id = serializers.CharField()
+    sequence = serializers.IntegerField(min_value=1)
+    due_date = serializers.DateField()
+    amount_due = serializers.DecimalField(max_digits=18, decimal_places=0)
+    amount_paid = serializers.DecimalField(max_digits=18, decimal_places=0)
+    balance = serializers.DecimalField(max_digits=18, decimal_places=0)
+    status = serializers.ChoiceField(choices=("chua_dong", "dong_mot_phan", "da_dong", "qua_han"))
+
+
 class StudentTuitionItemSerializer(serializers.Serializer):
     tuition_id = serializers.CharField()
     enrollment_id = serializers.CharField()
@@ -171,6 +181,7 @@ class StudentTuitionItemSerializer(serializers.Serializer):
     balance = serializers.DecimalField(max_digits=18, decimal_places=0)
     status = serializers.CharField()
     receipts = StudentPaymentItemSerializer(many=True)
+    installments = StudentInstallmentItemSerializer(many=True)
 
 
 class StudentTuitionResponseSerializer(serializers.Serializer):

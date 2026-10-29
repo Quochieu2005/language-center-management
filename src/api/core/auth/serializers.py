@@ -282,7 +282,10 @@ class AuthUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
     username = serializers.CharField()
     role = serializers.ChoiceField(
-        choices=["admin_big", "admin_small", "le_tan", "ke_toan", "giao_vien", "hoc_vien"]
+        choices=[
+            "admin_big", "admin_small", "le_tan", "tu_van", "ke_toan",
+            "xep_lop", "giao_vien", "hoc_vien",
+        ]
     )
     site_code = serializers.CharField(allow_null=True)
     profile_id = serializers.CharField(allow_null=True)

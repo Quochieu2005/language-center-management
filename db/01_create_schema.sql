@@ -223,7 +223,8 @@ BEGIN TRY
         CONSTRAINT FK_NhanVien_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_NhanVien_TaiKhoan FOREIGN KEY (ma_tai_khoan, ma_co_so)
             REFERENCES dbo.TaiKhoan(ma_tai_khoan, ma_co_so),
-        CONSTRAINT CK_NhanVien_chuc_vu CHECK (chuc_vu IN ('le_tan', 'ke_toan', 'quan_ly_co_so')),
+        CONSTRAINT CK_NhanVien_chuc_vu CHECK
+            (chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop', 'quan_ly_co_so')),
         CONSTRAINT CK_NhanVien_trang_thai CHECK (trang_thai IN ('dang_lam', 'nghi_viec'))
     );
 
@@ -360,6 +361,26 @@ BEGIN TRY
              AND so_tien_da_dong <= so_tien_phai_dong - giam_gia),
         CONSTRAINT CK_HocPhi_giam_gia CHECK (giam_gia <= so_tien_phai_dong),
         CONSTRAINT CK_HocPhi_trang_thai CHECK (trang_thai IN ('chua_dong', 'dong_mot_phan', 'da_dong', 'hoan_tien'))
+    );
+
+    CREATE TABLE dbo.DotHocPhi
+    (
+        ma_dot_hoc_phi    VARCHAR(24)    NOT NULL,
+        ma_co_so          VARCHAR(10)    NOT NULL,
+        ma_hoc_phi        VARCHAR(24)    NOT NULL,
+        so_thu_tu         SMALLINT       NOT NULL,
+        ngay_den_han      DATE           NOT NULL,
+        so_tien_phai_dong DECIMAL(18, 0) NOT NULL,
+        so_tien_da_dong   DECIMAL(18, 0) NOT NULL CONSTRAINT DF_DotHocPhi_da_dong DEFAULT (0),
+        trang_thai        VARCHAR(20)    NOT NULL CONSTRAINT DF_DotHocPhi_trang_thai DEFAULT ('chua_dong'),
+        CONSTRAINT PK_DotHocPhi PRIMARY KEY (ma_dot_hoc_phi),
+        CONSTRAINT UQ_DotHocPhi_hoc_phi_thu_tu UNIQUE (ma_hoc_phi, so_thu_tu),
+        CONSTRAINT FK_DotHocPhi_HocPhiCungCoSo FOREIGN KEY (ma_hoc_phi, ma_co_so)
+            REFERENCES dbo.HocPhi(ma_hoc_phi, ma_co_so),
+        CONSTRAINT CK_DotHocPhi_so_thu_tu CHECK (so_thu_tu >= 1),
+        CONSTRAINT CK_DotHocPhi_so_tien CHECK
+            (so_tien_phai_dong >= 0 AND so_tien_da_dong >= 0 AND so_tien_da_dong <= so_tien_phai_dong),
+        CONSTRAINT CK_DotHocPhi_trang_thai CHECK (trang_thai IN ('chua_dong', 'dong_mot_phan', 'da_dong'))
     );
 
     /* Đề nghị, quyết định và trạng thái điều phối chỉ tồn tại tại CSDL site nguồn. */
@@ -601,6 +622,7 @@ BEGIN TRY
     CREATE SEQUENCE dbo.Seq_BH    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DK    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_HP    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
+    CREATE SEQUENCE dbo.Seq_DH    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_PT    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DM    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DD    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
@@ -617,6 +639,7 @@ BEGIN TRY
     CREATE INDEX IX_DangKy_lop_trang_thai ON dbo.DangKy(ma_lop, trang_thai);
     CREATE INDEX IX_DangKy_hoc_vien ON dbo.DangKy(ma_hoc_vien);
     CREATE INDEX IX_BuoiHoc_lop_ngay ON dbo.BuoiHoc(ma_lop, ngay_hoc);
+    CREATE INDEX IX_DotHocPhi_site_han ON dbo.DotHocPhi(ma_co_so, ngay_den_han, trang_thai);
     CREATE INDEX IX_PhieuThu_hoc_phi_ngay ON dbo.PhieuThu(ma_hoc_phi, ngay_thu);
     CREATE UNIQUE INDEX UX_GiaoDichChuyenCoSo_khoa_chong_lap
         ON dbo.GiaoDichChuyenCoSo(khoa_chong_lap)

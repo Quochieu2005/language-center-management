@@ -49,14 +49,17 @@ from core.classes.services import (
 )
 
 
-_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan"}
+_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "xep_lop"}
+_CLASS_READ_ROLES = _MANAGEMENT_ROLES | {"tu_van"}
+_ENROLLMENT_ROLES = _MANAGEMENT_ROLES | {"tu_van"}
 _SITE_RECORD_ID = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 
 
-def _site_scope(user, requested_site: str | None):
-    if user.role not in _MANAGEMENT_ROLES:
+def _site_scope(user, requested_site: str | None, *, allowed_roles=None):
+    roles = allowed_roles if allowed_roles is not None else _MANAGEMENT_ROLES
+    if user.role not in roles:
         return None, Response(
-            {"detail": "Chỉ Admin Big, Admin Small hoặc lễ tân được xếp lớp."},
+            {"detail": "Tài khoản không có quyền thực hiện chức năng này."},
             status=status.HTTP_403_FORBIDDEN,
         )
     if user.role == "admin_big":
@@ -192,7 +195,9 @@ class EnrollmentCollectionView(_ClassApiView):
         if request.user.role != "admin_big" and data.get("site_code"):
             if data["site_code"] != str(request.user.site_code or "").upper():
                 return Response({"detail": "Không được chọn cơ sở khác."}, status=403)
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles=_ENROLLMENT_ROLES
+        )
         if error:
             return error
         try:
@@ -243,7 +248,9 @@ class ClassCollectionView(_ClassApiView):
         query = ClassListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles=_CLASS_READ_ROLES
+        )
         if error:
             return error
         try:
@@ -310,7 +317,9 @@ class ClassDetailView(_ClassApiView):
             return invalid_id
         query = ClassSiteQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        site_code, error = _site_scope(request.user, query.validated_data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles=_CLASS_READ_ROLES
+        )
         if error:
             return error
         try:
@@ -384,7 +393,9 @@ class ClassSessionsView(_ClassApiView):
         query = ClassRosterQuerySerializer(data=query_data)
         query.is_valid(raise_exception=True)
         data = query.validated_data
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles=_CLASS_READ_ROLES
+        )
         if error:
             return error
         try:

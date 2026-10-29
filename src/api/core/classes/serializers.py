@@ -99,8 +99,8 @@ class ClassCreateSerializer(StrictInputSerializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
     weekdays = serializers.ListField(
-        child=serializers.IntegerField(min_value=1, max_value=7), min_length=1, max_length=7,
-        help_text="Ngày học lặp theo tuần: 1=Chủ nhật, 2=Thứ 2, ..., 7=Thứ 7.",
+        child=serializers.IntegerField(min_value=2, max_value=6), min_length=1, max_length=5,
+        help_text="Ngày học lặp theo tuần: 2=Thứ 2, ..., 6=Thứ 6.",
     )
     start_time = serializers.TimeField()
     end_time = serializers.TimeField()

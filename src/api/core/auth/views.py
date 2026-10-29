@@ -130,8 +130,8 @@ class AuthLoginView(APIView):
         summary="Đăng nhập theo vai trò đã cấp",
         description=(
             "Xác minh tài khoản đã được cấp trong TaiKhoan và tự xác định vai trò từ hồ sơ "
-            "NhanVien, GiaoVien hoặc HocVien. Hỗ trợ Admin Big, Admin Small, lễ tân, kế toán, "
-            "giáo viên và học viên; không nhận vai trò hoặc cơ sở từ client. Hồ sơ học viên được "
+            "NhanVien, GiaoVien hoặc HocVien. Hỗ trợ Admin Big, Admin Small, lễ tân, tư vấn, "
+            "kế toán, nhân viên xếp lớp, giáo viên và học viên; không nhận vai trò hoặc cơ sở từ client. Hồ sơ học viên được "
             "định vị bằng Global Query trên các site đang hoạt động; chỉ đăng nhập khi tìm thấy "
             "đúng một hồ sơ hiện hành. "
             "Phiên được lưu tại site cấu hình AUTH_SESSION_SITE_CODE, gửi qua cookie HttpOnly "
