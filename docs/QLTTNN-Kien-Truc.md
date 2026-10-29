@@ -54,7 +54,7 @@ Luồng thêm site theo README 5.14:
 
 1. Tạo CSDL mới với cùng bộ schema; khai báo cấu hình kết nối ở Coordinator.
 2. Thêm site ở trạng thái `chuan_bi` vào bảng `CoSo` nhân bản để các site đang chạy biết site mới.
-3. Chép `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` sang site mới; đối soát phiên bản cho khớp.
+3. Chép `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (kể cả `google_subject` và `facebook_subject`) sang site mới; đối soát phiên bản cho khớp.
 4. Chỉ khi đồng nhất mới kích hoạt `hoat_dong` qua ghi nhân bản tới mọi site, bao gồm site mới.
 5. Tạo tài khoản quản lý/nhân viên/giáo viên tại cơ sở mới; sau đó site mới nhận dữ liệu nghiệp vụ.
 

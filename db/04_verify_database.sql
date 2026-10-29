@@ -17,26 +17,41 @@ BEGIN
     ;THROW 51021, N'Thiếu bảng cốt lõi hoặc bảng giao dịch chuyển cơ sở. Hãy kiểm tra lại 01_create_schema.sql.', 1;
 END;
 
-IF OBJECT_ID(N'dbo.TaiKhoanLienKetOAuth', N'U') IS NULL
+IF COL_LENGTH(N'dbo.TaiKhoan', N'google_subject') IS NULL
+   OR COL_LENGTH(N'dbo.TaiKhoan', N'facebook_subject') IS NULL
+   OR OBJECT_ID(N'dbo.TaiKhoanLienKetOAuth', N'U') IS NOT NULL
+   OR NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.TaiKhoan')
+                  AND name = N'UX_TaiKhoan_google_subject' AND is_unique = 1)
+   OR NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.TaiKhoan')
+                  AND name = N'UX_TaiKhoan_facebook_subject' AND is_unique = 1)
+   OR NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.TaiKhoan')
+                  AND name = N'CK_TaiKhoan_google_subject')
+   OR NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.TaiKhoan')
+                  AND name = N'CK_TaiKhoan_facebook_subject')
 BEGIN
-    ;THROW 51026, N'Thiếu bảng TaiKhoanLienKetOAuth. Với database đã tạo trước đó, chạy 06_add_oauth_identity_table.sql trên site này.', 1;
+    ;THROW 51026, N'Thiếu cột định danh đăng nhập trong TaiKhoan hoặc còn bảng OAuth cũ. Chạy 27_move_oauth_identity_to_account.sql trên site này.', 1;
 END;
 
 IF OBJECT_ID(N'dbo.PhienDangNhap', N'U') IS NULL
-   OR OBJECT_ID(N'dbo.SuKienDangNhap', N'U') IS NULL
+   OR OBJECT_ID(N'dbo.Logs', N'U') IS NULL
 BEGIN
-    ;THROW 51074, N'Thiếu bảng phiên hoặc giới hạn đăng nhập. Chạy 07_add_auth_session_tables.sql trên site này.', 1;
+    ;THROW 51074, N'Thiếu bảng phiên hoặc Logs. Chạy các migration xác thực và 26_consolidate_logs_and_remove_notification_reads.sql trên site này.', 1;
 END;
 
 IF COL_LENGTH(N'dbo.TokenDatLaiMatKhau', N'so_lan_sai') IS NULL
-   OR OBJECT_ID(N'dbo.SuKienQuenMatKhau', N'U') IS NULL
    OR OBJECT_ID(N'dbo.GiaoDichDatLaiMatKhau', N'U') IS NULL
-   OR NOT EXISTS
-      (SELECT 1 FROM sys.triggers
-       WHERE parent_id = OBJECT_ID(N'dbo.SuKienQuenMatKhau')
-         AND name = N'TR_SuKienQuenMatKhau_AppendOnly')
+   OR NOT EXISTS (SELECT 1 FROM sys.triggers WHERE name = N'TR_Logs_AppendOnly')
 BEGIN
-    ;THROW 51124, N'Thiếu cấu trúc OTP quên mật khẩu quản trị. Chạy 12_admin_password_reset_otp.sql trên site này.', 1;
+    ;THROW 51124, N'Thiếu cấu trúc OTP hoặc trigger bảo vệ Logs. Chạy migration OTP và 26_consolidate_logs_and_remove_notification_reads.sql trên site này.', 1;
+END;
+
+IF OBJECT_ID(N'dbo.TrangThaiDocThongBao', N'U') IS NOT NULL
+   OR OBJECT_ID(N'dbo.SuKienDangNhap', N'U') IS NOT NULL
+   OR OBJECT_ID(N'dbo.SuKienQuenMatKhau', N'U') IS NOT NULL
+   OR OBJECT_ID(N'dbo.NhatKyHeThong', N'U') IS NOT NULL
+   OR OBJECT_ID(N'dbo.NhatKyDongBo', N'U') IS NOT NULL
+BEGIN
+    ;THROW 51268, N'Còn bảng nhật ký cũ hoặc trạng thái đọc; hãy chạy migration 26 trên site này.', 1;
 END;
 
 IF (SELECT COUNT(*) FROM sys.check_constraints
@@ -113,9 +128,8 @@ FROM sys.tables AS t
 JOIN sys.partitions AS p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
 WHERE t.schema_id = SCHEMA_ID(N'dbo')
   AND t.name IN (N'HocVien', N'LopHoc', N'GiaoVien', N'MonHoc', N'DangKy', N'HocPhi', N'Diem',
-                 N'GiaoDichChuyenCoSo', N'LichSuChuyenCoSo', N'TaiKhoanLienKetOAuth',
-                 N'PhienDangNhap', N'SuKienDangNhap', N'TokenDatLaiMatKhau',
-                 N'SuKienQuenMatKhau', N'GiaoDichDatLaiMatKhau')
+                 N'GiaoDichChuyenCoSo', N'LichSuChuyenCoSo', N'TaiKhoan',
+                 N'PhienDangNhap', N'TokenDatLaiMatKhau', N'GiaoDichDatLaiMatKhau', N'Logs')
 GROUP BY t.name
 ORDER BY t.name;
 

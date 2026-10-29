@@ -24,7 +24,7 @@ class NotificationApiTests(SimpleTestCase):
     def test_admin_big_lists_global_notifications(self, list_service):
         list_service.return_value = {
             "complete": True, "missing_sites": [], "site_codes": ["Q1", "Q7", "TD"],
-            "count": 0, "unread_count": 0, "limit": 20, "offset": 0, "results": [],
+            "count": 0, "limit": 20, "offset": 0, "results": [],
         }
         self.client.force_authenticate(user=self.admin_big)
 
@@ -33,12 +33,10 @@ class NotificationApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["site_codes"], ["Q1", "Q7", "TD"])
         list_service.assert_called_once_with(
-            user_id=self.admin_big.account_id,
             role="admin_big",
             user_site_code=None,
             site_code=None,
             category=None,
-            unread_only=False,
             limit=20,
             offset=0,
         )
@@ -47,7 +45,7 @@ class NotificationApiTests(SimpleTestCase):
     def test_admin_small_is_limited_to_assigned_site(self, list_service):
         list_service.return_value = {
             "complete": True, "missing_sites": [], "site_codes": ["Q7"],
-            "count": 1, "unread_count": 1, "limit": 20, "offset": 0, "results": [],
+            "count": 1, "limit": 20, "offset": 0, "results": [],
         }
         self.client.force_authenticate(user=self.admin_small)
 
@@ -70,7 +68,7 @@ class NotificationApiTests(SimpleTestCase):
     def test_partial_global_result_is_not_reported_as_complete(self, list_service):
         list_service.return_value = {
             "complete": False, "missing_sites": ["TD"], "site_codes": ["Q1", "Q7"],
-            "count": 0, "unread_count": 0, "limit": 20, "offset": 0, "results": [],
+            "count": 0, "limit": 20, "offset": 0, "results": [],
         }
         self.client.force_authenticate(user=self.admin_big)
 
@@ -79,24 +77,6 @@ class NotificationApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.json()["complete"])
         self.assertEqual(response.json()["missing_sites"], ["TD"])
-
-    @patch("core.notifications.views.mark_notification_read")
-    def test_mark_read_uses_site_and_slug_from_route(self, mark_service):
-        mark_service.return_value = {"slug": "q7-teacher-abc", "site_code": "Q7", "is_read": True}
-        self.client.force_authenticate(user=self.admin_small)
-
-        response = self.client.patch(
-            reverse("core:admin-notification-read", kwargs={"site_code": "Q7", "slug": "q7-teacher-abc"})
-        )
-
-        self.assertEqual(response.status_code, 200)
-        mark_service.assert_called_once_with(
-            user_id=self.admin_small.account_id,
-            role="admin_small",
-            user_site_code="Q7",
-            site_code="Q7",
-            slug="q7-teacher-abc",
-        )
 
     def test_teacher_cannot_read_admin_notifications(self):
         teacher = AuthenticatedUser(
@@ -109,15 +89,15 @@ class NotificationApiTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_swagger_schema_exposes_all_inbox_operations(self):
+    def test_swagger_schema_exposes_notification_list_without_read_tracking_routes(self):
         response = self.client.get(reverse("schema"), {"format": "json"})
 
         self.assertEqual(response.status_code, 200)
         paths = response.json()["paths"]
         self.assertIn("get", paths["/api/v1/admin/notifications/"])
-        self.assertIn("get", paths["/api/v1/admin/notifications/unread-count/"])
-        self.assertIn("post", paths["/api/v1/admin/notifications/read-all/"])
-        self.assertIn("patch", paths["/api/v1/admin/notifications/{site_code}/{slug}/read/"])
+        self.assertNotIn("/api/v1/admin/notifications/unread-count/", paths)
+        self.assertNotIn("/api/v1/admin/notifications/read-all/", paths)
+        self.assertNotIn("/api/v1/admin/notifications/{site_code}/{slug}/read/", paths)
 
 
 class NotificationPublisherTests(SimpleTestCase):

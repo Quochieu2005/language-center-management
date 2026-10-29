@@ -22,7 +22,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `03_seed_demo_site.sql` | Tùy chọn: thêm một học viên, giáo viên, nhân viên, phòng, lớp, đăng ký, học phí, phiếu thu và điểm tại site đích để thử các luồng. Chạy tối đa một lần cho mỗi site. |
 | `04_verify_database.sql` | Kiểm tra database đang chọn, các bảng cốt lõi, dữ liệu danh mục và ràng buộc cục bộ. Chạy riêng tại từng site. |
 | `05_database_roles.sql` | Tạo role database cho API và truy vấn chỉ đọc; không tạo SQL login hay mật khẩu. Chạy riêng tại từng site. |
-| `06_add_oauth_identity_table.sql` | Migration an toàn để thêm bảng liên kết danh tính Google/Facebook vào CSDL site đã được tạo trước đó. Chạy riêng tại từng site; database mới đã có bảng này từ `01_create_schema.sql`. |
+| `06_add_oauth_identity_table.sql` | Đã ngừng sử dụng; giữ lại để cảnh báo khi đọc hướng dẫn cũ. Script không tạo bảng. |
+| `27_move_oauth_identity_to_account.sql` | Thêm `google_subject` và `facebook_subject` vào `TaiKhoan`, chuyển liên kết đang hoạt động từ bảng cũ nếu có, lưu dấu vết thu hồi vào `Logs`, rồi bỏ bảng OAuth cũ. Chạy riêng tại từng site sau khi `Logs` đã được cài. |
 
 ## Chạy bằng SSMS
 
@@ -30,7 +31,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 2. Mở `01_create_schema.sql`. Trong SSMS bật **Query → SQLCMD Mode**. Dòng `:setvar DatabaseName "QLTTNN_Q1"` là database đích; chọn một trong ba tên `QLTTNN_Q1`, `QLTTNN_Q7`, `QLTTNN_TD`, chạy script, rồi đổi tên và chạy lại cho hai database còn lại.
 3. Lặp bước tương tự với `02_seed_shared_catalog.sql`. Danh mục dùng chung phải giống nhau ở cả ba site.
 4. Nếu cần dữ liệu để demo, bật SQLCMD Mode trong `03_seed_demo_site.sql`, đặt cả `DatabaseName` và `SiteCode` theo site đang seed, rồi chạy một lần tại mỗi site. Script chỉ tạo dữ liệu kiểm thử và không tạo tài khoản/mật khẩu.
-5. Với database đã tạo trước khi có OAuth, chạy `06_add_oauth_identity_table.sql` riêng trên từng site. Thay `DatabaseName` mỗi lần; chạy cho tất cả site đang hoạt động để bảng dùng chung tồn tại cùng cấu trúc. Script không thêm tài khoản/liên kết mẫu và không sửa dữ liệu khác.
+5. Chạy các migration đã chọn theo hướng dẫn của từng file, bảo đảm `Logs` đã có trước khi chạy `27_move_oauth_identity_to_account.sql`. Chạy migration 27 riêng trên từng database/site; script an toàn khi chạy lại và không tạo bảng mới.
 6. Lặp bước tương tự với `04_verify_database.sql` để kiểm tra từng database. Kết quả của ba lần chạy phải cho thấy cùng schema và danh mục; bảng nghiệp vụ có thể có dữ liệu khác nhau theo site.
 7. Chạy `05_database_roles.sql` trong từng database. DBA tạo SQL login/user theo cấu hình môi trường rồi thêm database user vào `qlttnn_api` hoặc `qlttnn_readonly`. Không đưa mật khẩu vào script hoặc repository.
 
@@ -40,7 +41,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 
 - Mỗi cơ sở có một database riêng. Khóa ngoại chỉ trỏ tới bảng trong database đó; không có khóa ngoại hoặc JOIN giữa database của các cơ sở.
 - Khi demo trên một máy, có thể đặt cả ba database trên một SQL Server instance nhưng vẫn dùng tên database/kết nối riêng. `00_create_databases.sql` dành cho cách cài này. Nếu triển khai mỗi site trên một SQL Server khác nhau, chỉ tạo database của site tương ứng trên máy đó rồi chạy schema/seed/role riêng qua kết nối của site đó; không tạo cả ba database lặp lại trên từng máy.
-- `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` là dữ liệu nhân bản theo schema. Script seed chỉ thêm dữ liệu danh mục ban đầu; tài khoản phải được tạo qua ứng dụng với mật khẩu đã băm. Liên kết OAuth chỉ được thêm sau khi người dùng đã xác thực vào tài khoản nội bộ; không tạo liên kết mẫu.
+- `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` là dữ liệu nhân bản theo schema. Google/Facebook subject nằm trong dòng `TaiKhoan`; chỉ liên kết sau khi người dùng đã xác thực vào tài khoản nội bộ. Script seed không tạo tài khoản hoặc liên kết đăng nhập mẫu.
 - Script seed danh mục là thao tác nạp ban đầu, chưa phải đồng bộ runtime. Khi API được triển khai, mọi thay đổi danh mục dùng chung phải qua một luồng `REPLICATED-WRITE` tới các site đang hoạt động và phải đối soát lỗi.
 - Các bảng nghiệp vụ và bảng con được lưu tại site tương ứng. Cột `ma_co_so` trên bảng con là khóa phân mảnh để database kiểm tra các quan hệ cùng site bằng khóa ngoại ghép.
 - `GiaoDichChuyenCoSo` chỉ có bản ghi trong database của site nguồn; Admin Small tạo đề nghị `cho_duyet` tại đó, Admin Big quyết định qua Coordinator, và chỉ trạng thái đã duyệt mới được worker chuyển cơ sở xử lý. Bảng lưu người đề nghị, người quyết định và lý do; unique index giới hạn mỗi học viên còn tối đa một đề nghị/giao dịch mở. `LichSuChuyenCoSo` là nhật ký append-only tại nơi hành động xảy ra (nguồn hoặc đích); `ma_chuyen` chỉ dùng để đối chiếu giữa hai database, không tạo khóa ngoại xuyên site.

@@ -12,6 +12,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError
 
+from core.auth.account_state import account_is_active
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
 logger = logging.getLogger("core.auth")
@@ -72,7 +73,7 @@ class AuthenticatedSession:
 @dataclass(frozen=True)
 class AdminSmallProvisioningResult:
     account_id: str
-    employee_id: str
+    admin_id: str
     username: str
     email: str
     site_code: str
@@ -83,7 +84,7 @@ class AdminSmallProvisioningResult:
 class AdminSmallDeactivationResult:
     account_id: str
     site_code: str
-    status: str = "vo_hieu"
+    status: str = "inactive"
 
 def auth_session_alias() -> str:
     site_code = getattr(settings, "AUTH_SESSION_SITE_CODE", "")
@@ -175,7 +176,7 @@ def _replicated_account_by_id(account_id: str, site_codes: tuple[str, ...]):
 
 def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
     """Resolve the user's effective role and site from trusted account/profile rows."""
-    if account is None or str(account[7]).lower() != "hoat_dong":
+    if account is None or not account_is_active(account[7]):
         return None
 
     account_id, username, slug, email = map(str, account[:4])
@@ -191,6 +192,48 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
             slug=slug,
             email=email,
             role="admin_big",
+            must_change_password=bool(account[9]),
+        )
+
+    if account_role == "hoc_vien":
+        sites = active_codes if active_codes is not None else active_site_codes()
+        current_profiles = []
+        try:
+            for code in sites:
+                with get_site_connection(code).cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT TOP (2) ma_hoc_vien, slug, ma_co_so
+                        FROM dbo.HocVien
+                        WHERE ma_tai_khoan = %s AND trang_thai IN ('dang_hoc', 'bao_luu')
+                        """,
+                        [account_id],
+                    )
+                    rows = cursor.fetchall()
+                if len(rows) > 1:
+                    raise AuthInfrastructureUnavailable
+                if rows:
+                    if str(rows[0][2]).upper() != code:
+                        raise AuthInfrastructureUnavailable
+                    current_profiles.append(
+                        (str(rows[0][0]), str(rows[0][1]), str(rows[0][2]).upper())
+                    )
+        except AuthInfrastructureUnavailable:
+            raise
+        except (DatabaseError, KeyError, ImproperlyConfigured, UnknownSiteError) as exc:
+            raise AuthInfrastructureUnavailable from exc
+
+        if len(current_profiles) != 1:
+            return None
+        profile_id, student_slug, current_site = current_profiles[0]
+        return AuthenticatedUser(
+            account_id=account_id,
+            username=username,
+            slug=student_slug,
+            email=email,
+            role="hoc_vien",
+            site_code=current_site,
+            profile_id=profile_id,
             must_change_password=bool(account[9]),
         )
 
@@ -210,21 +253,32 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
             if account_role == "nhan_vien":
                 cursor.execute(
                     """
-                    SELECT TOP (2) ma_nhan_vien, chuc_vu
-                    FROM dbo.NhanVien
-                    WHERE ma_tai_khoan = %s AND ma_co_so = %s AND trang_thai = 'dang_lam'
+                    SELECT TOP (2) ma_admin, loai_admin
+                    FROM dbo.Admin
+                    WHERE ma_tai_khoan = %s AND ma_co_so = %s
+                      AND loai_admin = 'admin_small' AND trang_thai = 1
                     """,
                     [account_id, site_code],
                 )
                 profiles = cursor.fetchall()
-                if len(profiles) != 1:
-                    return None
-                profile_id, position = str(profiles[0][0]), str(profiles[0][1]).lower()
-                role = {
-                    "quan_ly_co_so": "admin_small",
-                    "le_tan": "le_tan",
-                    "ke_toan": "ke_toan",
-                }.get(position)
+                if len(profiles) > 1:
+                    raise AuthInfrastructureUnavailable
+                if profiles:
+                    profile_id, role = str(profiles[0][0]), "admin_small"
+                else:
+                    cursor.execute(
+                        """
+                        SELECT TOP (2) ma_nhan_vien, chuc_vu
+                        FROM dbo.NhanVien
+                        WHERE ma_tai_khoan = %s AND ma_co_so = %s
+                          AND chuc_vu IN ('le_tan', 'ke_toan') AND trang_thai = 'dang_lam'
+                        """,
+                        [account_id, site_code],
+                    )
+                    profiles = cursor.fetchall()
+                    if len(profiles) != 1:
+                        return None
+                    profile_id, role = str(profiles[0][0]), str(profiles[0][1]).lower()
             elif account_role == "giao_vien":
                 cursor.execute(
                     """
@@ -278,8 +332,8 @@ def _rate_limit_wait(cursor, ip_digest: str, identifier_digest: str) -> int | No
         """
         SELECT COUNT_BIG(*), MIN(thoi_diem_utc),
                DATEDIFF(SECOND, MIN(thoi_diem_utc), SYSUTCDATETIME())
-        FROM dbo.SuKienDangNhap
-        WHERE ip_bam = %s
+        FROM dbo.Logs
+        WHERE loai_log = 'login' AND ip_bam = %s
           AND thoi_diem_utc >= DATEADD(SECOND, -60, SYSUTCDATETIME())
         """,
         [ip_digest],
@@ -292,8 +346,9 @@ def _rate_limit_wait(cursor, ip_digest: str, identifier_digest: str) -> int | No
         """
         SELECT COUNT_BIG(*), MIN(thoi_diem_utc),
                DATEDIFF(SECOND, MIN(thoi_diem_utc), SYSUTCDATETIME())
-        FROM dbo.SuKienDangNhap
-        WHERE ip_bam = %s AND dinh_danh_bam = %s AND ket_qua = 'that_bai'
+        FROM dbo.Logs
+        WHERE loai_log = 'login' AND ip_bam = %s
+          AND dinh_danh_bam = %s AND ket_qua = 'that_bai'
           AND thoi_diem_utc >= DATEADD(SECOND, -%s, SYSUTCDATETIME())
         """,
         [ip_digest, identifier_digest, settings.AUTH_LOGIN_IDENTITY_WINDOW_SECONDS],
@@ -306,8 +361,8 @@ def _rate_limit_wait(cursor, ip_digest: str, identifier_digest: str) -> int | No
 def _record_attempt(cursor, ip_digest: str, identifier_digest: str, outcome: str) -> None:
     cursor.execute(
         """
-        INSERT INTO dbo.SuKienDangNhap (ma_su_kien, dinh_danh_bam, ip_bam, ket_qua)
-        VALUES (NEWID(), %s, %s, %s)
+        INSERT INTO dbo.Logs (ma_log, loai_log, dinh_danh_bam, ip_bam, ket_qua)
+        VALUES (CONVERT(NVARCHAR(120), NEWID()), 'login', %s, %s, %s)
         """,
         [identifier_digest, ip_digest, outcome],
     )
