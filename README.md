@@ -237,10 +237,10 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Cùng schema và bản sao theo site. Runtime replication hiện có luồng tài khoản và API cập nhật `MonHoc`; `CoSo`/`KhoaHoc` chưa có luồng ghi runtime đầy đủ |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
-| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện lịch sử chỉ ghi thêm tại site phát sinh; không nhân bản |
+| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện/log ghi tại site phát sinh; không nhân bản |
 
 | Dữ liệu mẫu | Q1 | Q7 | TD |
 |---|:---:|:---:|:---:|
@@ -256,7 +256,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 |---|---|---|---|
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản và subject đăng nhập trên TaiKhoan | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung qua Coordinator vào các CSDL site riêng | `PATCH /api/v1/admin/shared/subjects/{slug}/` cập nhật `MonHoc`; một số luồng tài khoản cũng có replication | Trả kết quả chưa hoàn tất nếu thiếu ACK; retry dùng lại `Idempotency-Key` và body |
 | `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
@@ -271,7 +271,9 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc` hoặc `TaiKhoan` (kể cả liên kết/thu hồi subject Google/Facebook) đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
+API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`: Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, khóa thao tác cùng môn, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+
+Phạm vi tối thiểu YC-03 đã có đường truyền thay đổi cho `MonHoc`. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: API ghi `CoSo`/`KhoaHoc` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Trước khi mở rộng chức năng ghi các bảng đó, cần gom chính sách đồng bộ vào một service chung và không bật song song SQL Server Publication trên cùng bảng.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -455,9 +457,9 @@ flowchart LR
     DangNhap["Đăng nhập"] -->|ghi nhận đăng nhập| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider rồi tìm `sub`/Facebook app-scoped ID trong `TaiKhoan.google_subject` hoặc `TaiKhoan.facebook_subject` ở các CSDL site riêng. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi subject là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao `TaiKhoan`; không có bảng identity riêng, CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
+Đăng nhập bằng tên đăng nhập/email và mật khẩu đã có API; API tìm tài khoản qua các CSDL site riêng, kiểm tra vai trò/trạng thái rồi tạo phiên có thể thu hồi. OAuth Google/Facebook hiện chưa có endpoint/callback hoạt động, dù schema có chỗ lưu subject đã liên kết. Khi bổ sung OAuth, backend phải xác minh danh tính với provider rồi tra cứu subject trong các CSDL site; không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi subject dùng `REPLICATED-WRITE`; tra cứu đăng nhập dùng `GLOBAL`. Mỗi site giữ dữ liệu tài khoản theo chính sách hiện hành; không có CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md).
 
-Mỗi phiên sau khi xác thực phải tự hết hạn sau **60 phút không có hoạt động người dùng thật**, áp dụng như nhau cho Admin Big, Admin Small, nhân viên và giáo viên. Request nền như polling, health check và tự refresh không được tính hoạt động. API phải xác minh idle expiry và thu hồi phiên; giao diện đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và đưa người dùng về đăng nhập khi hết hạn. Mỗi thiết bị là phiên riêng. Cơ chế lưu trạng thái phiên có thể thu hồi còn phải được chốt theo mô hình CSDL riêng từng site; không dùng CSDL nghiệp vụ trung tâm. Do xác thực hiện chưa được triển khai, chính sách này hiện là yêu cầu thiết kế chứ chưa phải hành vi đang chạy.
+Phiên đăng nhập hết hạn sau **60 phút không có hoạt động người dùng thật**. Backend kiểm tra hạn và thu hồi phiên; endpoint `/auth/activity/` là đường gia hạn tường minh, frontend không được gọi nó bằng polling/health check. Mỗi thiết bị có phiên riêng. Trạng thái phiên hiện được lưu tại CSDL site cấu hình `AUTH_SESSION_SITE_CODE`, không phải CSDL nghiệp vụ trung tâm; site này ngừng hoạt động có thể ảnh hưởng đăng nhập và xác thực phiên toàn hệ thống. Việc đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và chuyển hướng giao diện sau khi hết phiên cần được kiểm chứng/hoàn thiện ở frontend.
 
 ### 5.8. Quên và đặt lại mật khẩu
 
@@ -681,15 +683,15 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Worker phục hồi chuyển cơ sở | Nhịp quét, timeout/backoff, cảnh báo giao dịch `dang_xu_ly` quá lâu và cách vận hành worker được cấu hình thế nào? |
-| Phương pháp replication bắt buộc | Cơ chế nào truyền thay đổi bảng dùng chung? Nơi được phép ghi, các bản sao, phiên bản, ACK, xung đột và retry được xử lý thế nào? Nếu dùng Publication, chốt publisher/distributor/subscriber và tránh hai cơ chế ghi cùng bảng |
-| Trạng thái bền vững của đồng bộ | `NhatKyDongBo` hiện là nhật ký chỉ thêm theo site đích. Cần chốt cách lưu mã thao tác/phiên bản/trạng thái mỗi site và khôi phục sau timeout; xác định có cần bảng tiến trình/outbox và cập nhật schema/script không |
+| Phương pháp replication bắt buộc | YC-03 dùng replication tầng ứng dụng cho `MonHoc`: Admin Big là điểm vào ghi, từng site cập nhật bản riêng và ghi ACK trong `Logs`. Chưa bật SQL Server Publication; không dùng hai cơ chế ghi trùng cùng bảng |
+| Trạng thái bền vững của đồng bộ | Với `MonHoc`, `Logs.ma_log` xác định thao tác/site, `du_lieu_cu` và `du_lieu_moi` ghi phiên bản trước/sau; ACK commit cùng cập nhật từng site. Không cần thêm bảng cho luồng này; các bảng dùng chung khác chưa được bao phủ đầy đủ |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Cách bảo vệ kiểm tra/cập nhật chỗ cuối trong một transaction và cách tạo cạnh tranh giữa hai phiên ở TC-CON-01 là gì? |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |
 | Giao diện API và bảo mật | Hợp đồng endpoint, cơ chế lưu/thu hồi phiên phù hợp CSDL riêng từng site, CORS, cookie/CSRF và cách thực thi idle timeout 60 phút được thống nhất thế nào? |
 | Cấu hình môi trường | Tên biến môi trường và nơi lưu chuỗi kết nối/bí mật; tuyệt đối không commit bí mật vào Git |
 
-Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay đồng bộ vật lý đã hoàn tất. Replication, distributed transaction, concurrency, distributed query và phân mảnh phải có minh chứng; đồng bộ phải thử cả lỗi/phục hồi. Công cụ cụ thể phải bám yêu cầu cài đặt của giảng viên. Django vẫn hỏi từng CSDL rồi gộp ở ứng dụng; không tự đổi nghiệp vụ sang JOIN xuyên site hoặc để API và Publication ghi trùng cùng bảng. Kết quả kiểm chứng và quyết định cơ chế phải được ghi riêng với mô tả thiết kế.
+Việc đã chọn SQL Server **không** có nghĩa toàn bộ yêu cầu phân tán đã đạt. `MonHoc` đã có replication tầng ứng dụng; luồng này đã chạy kiểm tra runtime trên ba site trong transaction rollback và retry cùng key. Chưa có bằng chứng outage/recovery qua mạng thật, chuyển cơ sở chạy lỗi giữa hai site hoặc hai phiên SQL Server tranh chỗ cuối. Hiện Q1/Q7/TD là ba CSDL riêng trên cùng một SQL Server instance; đây là topology demo logic, chưa phải ba máy chủ vật lý. Xem [ma trận kiểm chứng](docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) để biết trạng thái từng YC/TC.
 
 ---
 

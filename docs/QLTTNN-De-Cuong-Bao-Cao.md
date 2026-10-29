@@ -76,15 +76,15 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 |---|---|---|---|---|---|
 | Đăng nhập bằng mật khẩu/Google/Facebook | `GLOBAL` đối chiếu tài khoản và subject đã liên kết | Máy trạm mọi cơ sở | Các site đang hoạt động; API đối chiếu rồi dựng phiên | Cao (đăng nhập mỗi phiên) | Đọc `TaiKhoan`, gồm `google_subject`/`facebook_subject`; ghi nhật ký đăng nhập an toàn |
 | Xem khóa học/lớp còn chỗ | `LOCAL` | Lễ tân/quản lý tại cơ sở | Site đang làm việc | Cao | Đọc `KhoaHoc`, `LopHoc`, `HocVien`, `DangKy` |
-| Đăng ký khóa học | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Cao theo mùa tuyển sinh | Ghi `DangKy`, `HocPhi`, `LopHoc`, `NhatKyHeThong` |
+| Đăng ký khóa học | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Cao theo mùa tuyển sinh | Ghi `DangKy`, `HocPhi`, `LopHoc`, `Logs` |
 | Đổi lớp | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Trung bình | Ghi `DangKy`, sĩ số `LopHoc`; đọc lịch và học phí |
 | Mở lớp/sinh lịch | `LOCAL` | Quản lý cơ sở/admin | Site sở hữu lớp | Trung bình/theo khóa | Ghi `LopHoc`, `BuoiHoc`; đọc giáo viên/phòng/khóa |
-| Thu hoặc hoàn học phí | `LOCAL` | Kế toán/quản lý/admin theo quyền | Site đăng ký | Cao, theo ngày | Ghi `PhieuThu`, cập nhật `HocPhi`, `NhatKyHeThong` |
+| Thu hoặc hoàn học phí | `LOCAL` | Kế toán/quản lý/admin theo quyền | Site đăng ký | Cao, theo ngày | Ghi `PhieuThu`, cập nhật `HocPhi`, `Logs` |
 | Điểm danh | `LOCAL` | Giáo viên | Site lớp/buổi học | Trung bình/cao vào ngày học | Ghi `DiemDanh`, cập nhật `BuoiHoc` |
-| Nhập/sửa điểm | `LOCAL` | Giáo viên/admin | Site lớp/đăng ký | Trung bình/theo kỳ | Ghi `Diem`, `NhatKyHeThong` |
+| Nhập/sửa điểm | `LOCAL` | Giáo viên/admin | Site lớp/đăng ký | Trung bình/theo kỳ | Ghi `Diem`, `Logs` |
 | Xem thống kê cơ sở | `LOCAL` | Quản lý/admin | Một site | Trung bình | Đọc `HocVien`, `DangKy`, `HocPhi`, `PhieuThu`, `Diem` |
 | Thống kê/tra cứu toàn cục | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp–trung bình | Đọc bảng nghiệp vụ tại từng site; Coordinator gộp |
-| Xem nhật ký toàn hệ thống | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp, chủ yếu kiểm tra/audit | Đọc `NhatKyHeThong`, `NhatKyDongBo` |
+| Xem nhật ký toàn hệ thống | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp, chủ yếu kiểm tra/audit | Đọc `Logs` riêng ở từng site và tổng hợp tại API |
 | Sửa danh mục/tài khoản/liên kết OAuth | `REPLICATED-WRITE` | Admin hoặc chủ tài khoản đã xác thực theo thao tác | Mọi site `hoat_dong` | Thấp hơn đọc, nhưng cần nhất quán | Ghi `MonHoc`, `KhoaHoc`, `TaiKhoan` (các cột subject), `CoSo` |
 | Đề nghị chuyển | `LOCAL` | Admin Small tại nguồn | CSDL nguồn | Theo nhu cầu | Ghi `GiaoDichChuyenCoSo` trạng thái `cho_duyet`, sự kiện `de_nghi` |
 | Hộp thư/duyệt đề nghị | `GLOBAL` đọc; quyết định ghi cục bộ tại nguồn | Admin Big | Đọc các site; ghi CSDL nguồn của đề nghị | Thấp, cần độ đúng cao | Đọc `GiaoDichChuyenCoSo`; ghi quyết định và `LichSuChuyenCoSo` tại nguồn |
@@ -185,7 +185,7 @@ Thiết kế gồm các bảng sau (bộ cột chi tiết xem trực tiếp sche
 | Danh mục/tài khoản nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm subject Google/Facebook) |
 | Hồ sơ phân mảnh nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` |
 | Bảng dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` |
-| Trạng thái giao dịch và nhật ký cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` |
+| Trạng thái giao dịch và nhật ký cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` |
 
 Danh sách cột logic, khóa chính/ngoại, duy nhất và ý nghĩa nghiệp vụ của từng bảng nằm tại [DATABASE_SCHEMA.md, mục 6](DATABASE_SCHEMA.md#6-chi-tiết-từng-bảng); các quan hệ nằm tại [mục 5](DATABASE_SCHEMA.md#5-các-bảng-liên-quan-với-nhau-thế-nào). Vì nhóm đã chọn SQL Server, khi triển khai schema cần ghi kiểu dữ liệu, độ dài, `NULL/NOT NULL`, giá trị mặc định, `CHECK`, chỉ mục và script tạo bảng phù hợp với SQL Server. Không ghi rằng schema đã cài vật lý nếu chưa có script và kết quả chạy trên từng CSDL site.
 
@@ -270,7 +270,7 @@ Sơ đồ logic là client/server: người dùng ở máy trạm gọi ứng d�
 1. Nguồn chuẩn cho site là bảng `CoSo` nhân bản; Coordinator chọn các dòng `hoat_dong` và đối chiếu cấu hình kết nối.
 2. Ghi chung luôn đi qua một module. Trước khi ghi phải xác nhận toàn bộ site hoạt động sẵn sàng; thiếu một site thì từ chối.
 3. Các bản ghi nhân bản có `phien_ban`, `cap_nhat_luc`; đối soát định kỳ phát hiện site cũ và đưa dữ liệu về bản mới nhất theo quy tắc được chốt.
-4. `NhatKyDongBo` ghi bảng/mã bản ghi/hành động/site đích/trạng thái/lỗi; không ghi bí mật.
+4. `Logs` ghi audit và ACK đồng bộ theo site, không ghi bí mật. ACK runtime hiện được áp dụng cho thay đổi `MonHoc`; không coi đây là bằng chứng mọi bảng dùng chung đã có replication.
 5. Admin Small tạo đề nghị `cho_duyet` và sự kiện append-only tại CSDL nguồn; Admin Big dùng Global Query đọc hộp thư rồi ghi quyết định về đúng nguồn. Chỉ sau khi duyệt mới tạo hồ sơ đích, đánh dấu bản nguồn `da_chuyen_di` và phục hồi tiến về phía trước nếu bị dừng giữa chừng. Không xóa hồ sơ đích đã commit. Global Query thống kê áp dụng quy tắc một hồ sơ hiện hành theo trạng thái/bước. Xem [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md) để biết trình tự và các điểm lỗi.
 
 Luồng này dùng các transaction cục bộ tại từng CSDL với Coordinator phục hồi tiến về phía trước. Không mô tả là ACID nguyên tử giữa hai CSDL; báo cáo kết quả kiểm thử theo trạng thái từng site, sự kiện đã ghi, cách retry và quy tắc thống kê khi giao dịch còn `dang_xu_ly`.
@@ -289,7 +289,7 @@ Theo README, đây là kiến trúc **Client/Server có Coordinator**: máy tr�
 
 #### Publication/Replication và tránh hai cơ chế ghi
 
-Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. Khi dùng SQL Server Publication theo phương án/hướng dẫn giảng viên, trước khi tạo phải chốt publisher, distributor, subscriber, article/table, hướng đồng bộ, lịch/độ trễ và xử lý xung đột. Nếu chọn cơ chế khác, ghi cụ thể phương pháp và bằng chứng tương đương theo yêu cầu môn học; không ghi replication là “không áp dụng”. Không vừa để Django tự ghi các site vừa để Publication ghi trùng cùng bảng nếu chưa có thiết kế rõ; nếu không, phiên bản và nhật ký có thể lệch.
+Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. Đồ án hiện chọn replication tầng ứng dụng cho `MonHoc`: Admin Big gửi một yêu cầu, Coordinator cập nhật từng CSDL site riêng và ghi ACK `Logs` trong cùng transaction cục bộ. Chưa bật SQL Server Publication; không cấu hình hai cơ chế ghi trùng cùng bảng. Nếu nhóm mở rộng sang Publication hoặc bảng dùng chung khác, phải chốt publisher/distributor/subscriber, article, hướng đồng bộ, lịch/độ trễ và xử lý xung đột trước khi triển khai.
 
 README hiện yêu cầu ghi đồng bộ vào mọi site hoạt động và từ chối nếu thiếu site. Cơ chế Publication mặc định của môi trường cần được kiểm tra có đạt được hợp đồng này không; báo cáo phải mô tả cấu hình và kết quả thực đo, không chỉ chụp wizard đã tạo.
 

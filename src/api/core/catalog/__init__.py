@@ -1,0 +1,1 @@
+"""Replicated shared catalog endpoints."""

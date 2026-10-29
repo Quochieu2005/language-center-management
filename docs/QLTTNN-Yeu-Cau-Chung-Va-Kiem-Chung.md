@@ -33,12 +33,12 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 | Nội dung | Đã xác định trong thiết kế | Cần chốt/kiểm chứng |
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
-| Replication | Bản sao đầy đủ của các bảng dùng chung được schema cho phép; một điểm vào ghi trong Coordinator | Phương pháp truyền thay đổi, nơi được phép ghi, phiên bản, ACK từng site, xử lý xung đột, lưu tiến trình và retry. Nếu dùng SQL Server Publication, ghi publisher/distributor/subscriber và article; không có hai cơ chế ghi trùng cùng bảng |
+| Replication | YC-03 chọn replication tầng ứng dụng cho `MonHoc`; endpoint là `PATCH /api/v1/admin/shared/subjects/{slug}/` | Đối chiếu update, `phien_ban`, ACK trong `Logs`, idempotency và retry. `CoSo`/`KhoaHoc` chưa có luồng ghi runtime đầy đủ; không bật Publication trùng cùng bảng |
 | Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |
 
-Đây không phải lựa chọn công cụ mới đã được duyệt. Người triển khai ghi quyết định vào README mục 9, FS mục 11 và tài liệu kỹ thuật liên quan; cập nhật schema/script nếu cơ chế cần thêm bảng/cột. Schema hiện chỉ định nghĩa `NhatKyDongBo` dạng log append-only, chưa chốt liệu log có đủ làm tiến trình durable/đối soát replication hay cần outbox/bảng trạng thái riêng; phải giải quyết OPEN-14 trước khi code phụ thuộc vào retry. Đăng ký với transaction cục bộ giúp kiểm chứng rollback, nhưng không thay thế YC-04. Phục hồi chuyển cơ sở cũng không thay thế việc chứng minh replication YC-03.
+Replication tối thiểu đã chốt và code cho `MonHoc`: Coordinator gọi các DB site riêng; update và ACK `Logs` commit cùng transaction cục bộ, mỗi ACK định danh bởi idempotency key/site. Không thêm bảng hoặc DB. Đây không phải SQL Server Publication, không bảo đảm ACID nguyên tử xuyên các site; nếu một site lỗi giữa lượt ghi, API báo chưa hoàn tất và retry cùng key/body tiếp tục bản sao chưa ACK. Phạm vi các bảng dùng chung khác chưa hoàn thành. Transaction cục bộ đăng ký không thay thế YC-04; phục hồi chuyển cơ sở không thay thế YC-03.
 
 ## 4. Kịch bản kiểm chứng có thể chạy lại
 
@@ -62,11 +62,12 @@ Chạy trên dữ liệu kiểm thử riêng, không thử lỗi trên dữ li�
 
 ### TC-REP-01 — Nhân bản thay đổi thực tế
 
-1. Chốt cơ chế replication và xác nhận các site hoạt động sẵn sàng. Chụp dữ liệu/`phien_ban` của một môn học kiểm thử ở từng site trước thao tác.
-2. Admin Big sửa môn học qua điểm vào ghi được phép. Cơ chế replication truyền thay đổi; không chạy tay cùng một lệnh UPDATE trên từng DB để giả lập.
-3. Đọc riêng từng bản sao, đối chiếu khóa, nội dung và phiên bản; lưu dấu vết truyền thay đổi/ACK hoặc log cơ chế thực tế.
+1. Xác nhận Q1/Q7/TD đều hoạt động và có cùng môn học/`phien_ban`. Ghi trước giá trị ở từng DB; chọn môn thử phù hợp, không dùng dữ liệu thật quan trọng.
+2. Đăng nhập Admin Big; gửi `PATCH /api/v1/admin/shared/subjects/{slug}/` với `Idempotency-Key` mới và chỉ các trường cần đổi. Không chạy UPDATE thủ công từng DB.
+3. Đọc từng DB, so sánh `ma_mon`, `ten_mon`, `mo_ta`, `phien_ban`; trong `Logs`, đối chiếu một ACK `sync` cho mỗi site với cùng mã thao tác.
+4. Gửi lại chính xác request và cùng `Idempotency-Key`: phiên bản không tăng lần hai. Gửi body khác với key đó: API phải trả `409`.
 
-**Đạt khi:** mọi bản sao bắt buộc có nội dung và phiên bản của thay đổi đã xác nhận. Chỉ nạp `02_seed_shared_catalog.sql` chưa đạt kịch bản này. Có Publication nhưng chưa chứng minh thay đổi đến subscriber cũng chưa đạt.
+**Đạt khi:** mọi bản sao bắt buộc có nội dung/phiên bản giống nhau, có ACK tại từng DB; retry không tăng version lần hai. Chỉ nạp `02_seed_shared_catalog.sql` chưa đạt. Kiểm tra integration có rollback chứng minh luồng code và DB chạy được, nhưng cần lần demo lưu thay đổi thật trên dữ liệu thử và ảnh/log không nhạy cảm để làm bằng chứng báo cáo.
 
 ### TC-DTX-01 — Chuyển cơ sở và phục hồi
 
@@ -117,9 +118,21 @@ Mỗi lần chạy ghi trong tài liệu kết quả tại `docs/evidence/<ma-ki
 | Phục hồi | Điểm gây lỗi, trạng thái sau lỗi, retry/recovery và kết quả đối soát |
 | Kết luận | Đạt / Không đạt / Chưa kiểm chứng; lý do, vấn đề còn mở và người review |
 
-Trong đợt cập nhật tài liệu này **chưa chạy các kịch bản trên hệ thống thật**. Không chuyển trạng thái sang “Đạt” chỉ vì đã bổ sung bảng tiêu chí. Bộ script SQL, Swagger và UI phải có kiểm thử tại các site thực tế trước khi được dùng làm bằng chứng.
+## 6. Trạng thái kiểm tra hiện tại (2026-10-29)
 
-## 6. Tài liệu phải khớp nhau
+| Kịch bản | Trạng thái kiểm tra | Phần còn thiếu để kết luận đạt |
+|---|---|---|
+| TC-SITE-01 | Đã xác nhận cấu hình Q1/Q7/TD trỏ tới ba database riêng; cả ba đang ở cùng một SQL Server instance | Demo vật lý vẫn là một instance; nếu giảng viên yêu cầu máy chủ/site vật lý tách riêng thì cần topology tương ứng |
+| TC-FRAG-01 | Script `30_enforce_site_fragment_boundaries.sql` chạy thành công trên cả ba DB; mỗi DB có 16 `CHECK` site-local. Script kiểm tra dữ liệu trước khi thêm constraint | Bảng nghiệp vụ hiện ít/không có dữ liệu kiểm thử; cần tạo bộ dữ liệu để chứng minh tái thiết mảnh và quan hệ cha/con |
+| TC-REP-01 | Luồng `MonHoc` chạy thật qua 3 DB trong transaction kiểm thử rollback; retry cùng key hoạt động; sau rollback không còn thay đổi/ACK thử | Cần chạy demo giữ thay đổi trên dữ liệu thử và chụp kết quả trước/sau ở từng site |
+| TC-SYNC-01 | Unit test mô phỏng lỗi ghi một site và xác nhận phản hồi chưa hoàn tất có nêu site lỗi; đây chưa phải outage SQL Server thật | Cần fault injection/outage trên topology nhiều site, khôi phục kết nối, retry cùng key và đối chiếu `Logs`/version |
+| TC-DTX-01 | Source có luồng đề nghị → Admin Big duyệt → Coordinator chuyển/retry; chưa chạy fault injection trên hai site | Cần bộ hồ sơ thử nguồn/đích, kiểm tra lỗi trước và sau commit đích, retry/recovery và Global Query |
+| TC-CON-01 | Source bảo vệ sĩ số trong transaction cục bộ; unit tests không phải kiểm thử hai SQL session chạy đồng thời | Cần hai request/session độc lập tranh đúng chỗ cuối và đọc dữ liệu sau cùng |
+| TC-DQ-01 | Đã gọi thống kê qua API với ba site đang sẵn sàng và response đầy đủ | Cần lặp lại với dữ liệu có học viên tại các site và thử một site thiếu để lưu bằng chứng |
+
+Các kết quả trên không chứng minh replication cho `CoSo`/`KhoaHoc`, ACID xuyên site, SQL Server Publication, ba máy chủ vật lý hoặc hoàn tất mọi yêu cầu môn học. Không đánh dấu toàn bộ YC-01–YC-07 là đạt cho tới khi các thiếu sót trong bảng được chạy và lưu bằng chứng.
+
+## 7. Tài liệu phải khớp nhau
 
 - [AGENTS.md](../AGENTS.md): quy tắc bắt buộc cho thành viên/AI; giữ quy trình Git.
 - [README](../README.md), [FS](../fs/Functional-Specification.md): phạm vi 2–4 site, năm nội dung chứng minh, đồng bộ và tiêu chí nghiệm thu.

@@ -60,6 +60,7 @@ from core.academics.tuition_views import (
 )
 from core.academics.reminder_views import ClassTuitionReminderView
 from core.employees.views import EmployeeCollectionView, EmployeeDetailView
+from core.catalog.views import SharedSubjectDetailView
 
 
 app_name = "core"
@@ -85,6 +86,7 @@ urlpatterns = [
     path("admin/teachers/<str:slug>/", TeacherDetailView.as_view(), name="teacher-detail"),
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),
     path("admin/employees/<str:slug>/", EmployeeDetailView.as_view(), name="employee-detail"),
+    path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),
     path("admin/students/<str:slug>/", StudentDeleteView.as_view(), name="student-admin-delete"),
     path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),

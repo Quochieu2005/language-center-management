@@ -56,7 +56,7 @@ Gọi từng cơ sở đang hoạt động, thực hiện truy vấn cục bộ 
 
 Chỉ service đồng bộ dùng chung được ghi bảng nhân bản. Xác định tất cả site `hoat_dong`; nếu site nào không sẵn sàng thì từ chối trước khi tuyên bố thành công. Thao tác bao gồm tạo/sửa/đóng danh mục, tài khoản, hoặc cập nhật trạng thái site theo luồng README.
 
-Không rải `for each site: UPDATE` trong từng màn hình. Bộ điều phối trong Django phải ghi kết quả mỗi site vào `NhatKyDongBo` và có quy trình xử lý lỗi/đối soát. SQL Server đã được chọn; cơ chế commit đa CSDL và phục hồi còn phải chốt.
+Không rải `for each site: UPDATE` trong từng màn hình. API có service replication cho `MonHoc`: cập nhật từng CSDL site riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ; retry tiếp tục site chưa ACK. Cơ chế này chưa áp dụng đầy đủ cho `CoSo`, `KhoaHoc` hoặc mọi luồng `TaiKhoan`. Đây không phải commit ACID nguyên tử xuyên database; các kịch bản outage/recovery vẫn cần kiểm chứng.
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 
