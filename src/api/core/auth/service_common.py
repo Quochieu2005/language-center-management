@@ -271,7 +271,8 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
                         SELECT TOP (2) ma_nhan_vien, chuc_vu
                         FROM dbo.NhanVien
                         WHERE ma_tai_khoan = %s AND ma_co_so = %s
-                          AND chuc_vu IN ('le_tan', 'ke_toan') AND trang_thai = 'dang_lam'
+                          AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+                          AND trang_thai = 'dang_lam'
                         """,
                         [account_id, site_code],
                     )

@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 
+from core.academics.tuition_installments import create_default_tuition_installment
 from core.auth.service_common import AuthInfrastructureUnavailable, _acquire_named_lock
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
@@ -108,6 +109,8 @@ def _weekday_number(value: date) -> int:
 def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int) -> list[date]:
     if expected_count < 1 or expected_count > 500:
         raise ClassInvalid("Số buổi của khóa học phải nằm trong khoảng 1 đến 500.")
+    if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 2 or day > 6 for day in weekdays):
+        raise ClassInvalid("Lịch học chỉ được chọn các ngày từ Thứ 2 đến Thứ 6, không chọn trùng.")
     dates: list[date] = []
     current = start
     while current <= end and len(dates) < expected_count:
@@ -557,15 +560,23 @@ def register_student_to_class(
                 INSERT INTO dbo.HocPhi
                     (ma_hoc_phi, ma_co_so, ma_dang_ky, so_tien_phai_dong,
                      giam_gia, so_tien_da_dong, trang_thai)
-                VALUES (%s, %s, %s, %s, 0, 0, 'chua_dong')
+                VALUES (%s, %s, %s, %s, 0, 0, %s)
                 """,
-                [tuition_id, site_code, enrollment_id, amount_due],
+                [
+                    tuition_id, site_code, enrollment_id, amount_due,
+                    "da_dong" if int(amount_due) == 0 else "chua_dong",
+                ],
+            )
+            create_default_tuition_installment(
+                cursor, site_code=site_code, tuition_id=tuition_id,
+                total=int(amount_due), first_due_date=timezone.localdate(),
             )
             _audit(
                 cursor, site_code, actor_id, "dang_ky", "DangKy", enrollment_id, remote_ip,
                 after={
                     "student_id": student_id, "class_id": class_id,
                     "course_id": course_id, "tuition_id": tuition_id,
+                    "payment_mode": "full", "installment_count": 1,
                 },
             )
             current_count = registered_count + 1

@@ -6,7 +6,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import timezone as datetime_timezone
+from datetime import datetime, timezone as datetime_timezone
 from functools import wraps
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -721,6 +721,40 @@ def get_student_tuition(user):
                 }
             )
     results = list(tuition.values())
+    if results:
+        tuition_ids = [item["tuition_id"] for item in results]
+        placeholders = ", ".join(["%s"] * len(tuition_ids))
+        installment_rows = _student_rows(
+            user,
+            f"""
+            SELECT ma_dot_hoc_phi AS installment_id, ma_hoc_phi AS tuition_id,
+                   so_thu_tu AS sequence, ngay_den_han AS due_date,
+                   so_tien_phai_dong AS amount_due, so_tien_da_dong AS amount_paid,
+                   so_tien_phai_dong - so_tien_da_dong AS balance,
+                   trang_thai AS status
+            FROM dbo.DotHocPhi
+            WHERE ma_co_so = %s AND ma_hoc_phi IN ({placeholders})
+            ORDER BY ma_hoc_phi, so_thu_tu
+            """,
+            [user.site_code, *tuition_ids],
+        )
+        today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+        by_tuition = {item["tuition_id"]: [] for item in results}
+        for row in installment_rows:
+            item = {
+                "installment_id": str(row["installment_id"]),
+                "sequence": int(row["sequence"]),
+                "due_date": row["due_date"],
+                "amount_due": row["amount_due"],
+                "amount_paid": row["amount_paid"],
+                "balance": row["balance"],
+                "status": str(row["status"]),
+            }
+            if item["balance"] > 0 and item["due_date"] < today:
+                item["status"] = "qua_han"
+            by_tuition[str(row["tuition_id"])].append(item)
+        for item in results:
+            item["installments"] = by_tuition[item["tuition_id"]]
     return {"site_code": user.site_code, "count": len(results), "results": results}
 
 
