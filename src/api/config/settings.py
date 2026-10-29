@@ -173,6 +173,7 @@ REST_FRAMEWORK = {
         "student_management": "120/min",
         "student_portal": "120/min",
         "class_management": "120/min",
+        "shared_catalog_write": "30/min",
         "enrollment_create": "60/hour",
         "attendance_management": "120/min",
         "grade_management": "120/min",

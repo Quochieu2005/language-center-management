@@ -51,7 +51,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 | **Nhân bản** | ① Dùng chung | Cả 3 site có bản sao **giống hệt nhau**; ghi đồng bộ | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` (gồm danh tính Google/Facebook nếu đã liên kết) |
 | **Phân mảnh nguyên thủy** | ② Riêng của cơ sở | Mỗi dòng nằm ở **đúng 1 site**, quyết định bởi cột `ma_co_so` | `HocVien` `GiaoVien` `NhanVien` `PhongHoc` `LopHoc` |
 | **Phân mảnh dẫn xuất** | ③ Đi theo lớp / đăng ký | Dòng nằm **cùng site với dòng cha** | `BuoiHoc` `DangKy` `DiemDanh` `HocPhi` `PhieuThu` `Diem` |
-| **Cục bộ** | ④ Trạng thái điều phối, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `TokenDatLaiMatKhau` `NhatKyHeThong` `NhatKyDongBo` |
+| **Cục bộ** | ④ Trạng thái điều phối, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `TokenDatLaiMatKhau` `Logs` |
 
 Bảng nhân bản có thêm 2 cột để **đối soát** khi 3 site bị lệch: `phien_ban` (số nguyên, tăng 1 mỗi lần sửa) và `cap_nhat_luc` (thời điểm sửa gần nhất).
 
@@ -59,8 +59,9 @@ Bảng nhân bản có thêm 2 cột để **đối soát** khi 3 site bị lệ
 
 - **YC-02 / TC-FRAG-01:** dùng `LopHoc` làm ví dụ mảnh ngang: mảnh tại site S gồm các dòng `ma_co_so = S`; `DangKy` dẫn xuất theo site của lớp cha. Đọc riêng từng DB để kiểm tra không có dòng sai site/thiếu cha; hợp kết quả tại công cụ kiểm thử hoặc API phải đúng tập lớp dự kiến, không thiếu/thừa và không trùng khóa giữa các mảnh. Không tạo JOIN/FK xuyên DB hoặc lưu hợp các mảnh vào DB trung tâm.
 - Các bảng phân mảnh được định vị theo site, nhưng `HocVien` có bản lịch sử sau chuyển và có thể tạm có hai dòng vật lý `dang_hoc`. Chứng minh không giao nhau bằng mảnh lớp; thống kê học viên phải chọn bản hiện hành theo trạng thái giao dịch, không đòi xóa bản lịch sử để đạt tiêu chí.
-- **YC-03 / TC-REP-01:** bản sao bảng dùng chung phải nhận được một thay đổi thực tế theo phương pháp replication đã chốt. Đối chiếu cùng khóa, nội dung, `phien_ban` và dấu vết đồng bộ; nạp cùng seed ở ba DB không phải bằng chứng replication.
-- **YC-07 / TC-SYNC-01:** kiểm tra bản sao sau lỗi và retry. Hai cột đối soát không tự tạo cơ chế truyền dữ liệu hay lưu toàn bộ tiến trình; nếu cơ chế cần thêm bảng/cột, cập nhật schema/script trước khi triển khai. Không đánh dấu đã đồng bộ khi một site bắt buộc chưa nhận thay đổi.
+- **YC-03 / TC-REP-01:** phương pháp tối thiểu đã triển khai là replication tầng ứng dụng cho `MonHoc` qua `PATCH /api/v1/admin/shared/subjects/{slug}/`. Mỗi DB site có bản `MonHoc` riêng; Coordinator truyền bản sửa đến từng site. `phien_ban` tăng có điều kiện; ACK `Logs` lưu mã thao tác theo `Idempotency-Key` và site, nội dung trước/sau. Cập nhật và ACK cùng transaction cục bộ. Seed giống nhau không phải bằng chứng replication.
+- **YC-07 / TC-SYNC-01:** lỗi được trả `complete=false`/HTTP 202 với `missing_sites`; retry cùng key và body chỉ ghi site chưa có ACK. Cùng key khác body hoặc bản sao lệch trả conflict để đối soát. Cơ chế không cần thêm bảng; kiểm tra outage qua mạng thật vẫn là bước chưa hoàn tất.
+- `db/30_enforce_site_fragment_boundaries.sql` thêm 16 ràng buộc `CHECK` cho từng CSDL site để SQL Server chặn ghi nhầm mảnh. Script kiểm tra dữ liệu hiện có trước khi thêm ràng buộc, chạy riêng trên từng DB và không tạo database/bảng.
 
 ---
 
@@ -103,8 +104,7 @@ flowchart LR
 | `GiaoDichChuyenCoSo` | Cục bộ | trạng thái hiện tại của một lần chuyển | Chỉ CSDL site nguồn; Coordinator cập nhật để phục hồi |
 | `LichSuChuyenCoSo` | Cục bộ | sự kiện append-only của lần chuyển | Site thực hiện sự kiện (thường nguồn và đích) |
 | `TokenDatLaiMatKhau` | Cục bộ | site nhận yêu cầu | Site nhận yêu cầu |
-| `NhatKyHeThong` | Cục bộ | site phát sinh hành động | Site phát sinh |
-| `NhatKyDongBo` | Cục bộ | site xử lý yêu cầu ghi | Site phát sinh |
+| `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
 
 ---
 
@@ -118,7 +118,7 @@ flowchart LR
 | R4 | `TaiKhoan.ten_dang_nhap` và `email` duy nhất **toàn hệ thống** | Lúc ghi phải kiểm tra lại trên cả 3 site |
 | R5 | **Không** có khóa ngoại vật lý xuyên site | Toàn vẹn xuyên site do tầng ứng dụng đảm bảo. FK tới bảng nhân bản vẫn kiểm tra cục bộ được |
 | R6 | **Không** JOIN trực tiếp giữa 2 site | Cần dữ liệu nhiều site → dùng Global Query, gộp ở tầng ứng dụng |
-| R7 | Đề nghị/trạng thái chuyển (`GiaoDichChuyenCoSo`) chỉ lưu tại CSDL nguồn; nhật ký (`NhatKyHeThong`, `NhatKyDongBo`, `LichSuChuyenCoSo`) chỉ **thêm**, không sửa, không xóa | Admin Small tạo đề nghị ở nguồn; Admin Big quyết định qua Coordinator; chỉ giao dịch đã duyệt mới chạy giữa nguồn và đích |
+| R7 | Đề nghị/trạng thái chuyển (`GiaoDichChuyenCoSo`) chỉ lưu tại CSDL nguồn; nhật ký (`Logs`, `LichSuChuyenCoSo`) chỉ **thêm**, không sửa/xóa trong luồng nghiệp vụ | Admin Small tạo đề nghị ở nguồn; Admin Big quyết định qua Coordinator; chỉ giao dịch đã duyệt mới chạy giữa nguồn và đích |
 | R8 | Mật khẩu và token chỉ lưu **bản băm** | Không bao giờ ghi vào nhật ký, không trả ra API |
 | R9 | `HocVien` là bảng **duy nhất** được di chuyển giữa các site | Chỉ di chuyển qua nghiệp vụ Chuyển cơ sở |
 
@@ -157,7 +157,7 @@ Mỗi dòng dưới đây đọc là "**một** bảng cha có **nhiều** bản
 | Giáo viên (`GiaoVien`) | `LopHoc` · `BuoiHoc` · `Diem` | Phụ trách lớp · dạy buổi học (kể cả dạy thay) · nhập điểm |
 | Phòng học (`PhongHoc`) | `LopHoc` · `BuoiHoc` | Phòng mặc định của lớp · phòng của từng buổi |
 | Tài khoản (`TaiKhoan`) | `GiaoVien` · `NhanVien` | 1 tài khoản ứng với tối đa 1 hồ sơ (có thể chưa có tài khoản) |
-| Tài khoản (`TaiKhoan`) | `TokenDatLaiMatKhau` · `NhatKyHeThong` | Mã đặt lại mật khẩu · nhật ký người đó thực hiện |
+| Tài khoản (`TaiKhoan`) | `TokenDatLaiMatKhau` · `Logs` | Mã đặt lại mật khẩu · log liên quan đến thao tác của tài khoản |
 | Lớp học (`LopHoc`) | `BuoiHoc` · `DangKy` | Các buổi học · các lượt đăng ký |
 | Học viên (`HocVien`) | `DangKy` | Một học viên đăng ký nhiều lớp |
 | Học viên (`HocVien`) | `GiaoDichChuyenCoSo` | Hồ sơ ở nguồn được tham chiếu bởi các lần chuyển; mỗi học viên tối đa một giao dịch đang xử lý tại cùng site nguồn |
@@ -436,20 +436,19 @@ Sự kiện được thêm tại site nơi hành động xảy ra. `de_nghi`, `d
 | `da_dung` | | `true` / `false` |
 | `ip_yeu_cau` | | |
 
-**`NhatKyHeThong`** (chỉ thêm)
+**`Logs`** (schema sau migration `db/26_consolidate_logs_and_remove_notification_reads.sql`)
 
 | Cột | Ràng buộc | Mô tả |
 |-----|-----------|-------|
-| `ma_nhat_ky` | PK | |
-| `thoi_diem` | | |
-| `ma_co_so` | | Site phát sinh |
-| `ma_tai_khoan` | FK, *null* | `null` khi không xác định (vd đăng nhập sai tên) |
-| `hanh_dong` | | Xem bảng dưới |
-| `bang_tac_dong`, `ma_ban_ghi` | | Bảng và bản ghi bị tác động |
-| `du_lieu_cu`, `du_lieu_moi` | | JSON; **KHÔNG** chứa mật khẩu hay token |
-| `ip` | | |
-| `ket_qua` | | `thanh_cong` · `that_bai` |
-| `ghi_chu` | | |
+| `ma_log` | PK | Mã log duy nhất trong site; với replication môn học là mã xác định từ key/site |
+| `loai_log` | CHECK | `login` · `password_reset` · `system` · `sync` |
+| `thoi_diem_utc` | mặc định UTC | Thời điểm ghi log |
+| `ma_co_so`, `ma_tai_khoan` | *null* được phép | Site phát sinh và tài khoản liên quan; không dùng để liên kết xuyên DB |
+| `hanh_dong`, `bang_tac_dong`, `ma_ban_ghi` | | Hành động, bảng và mã bản ghi |
+| `du_lieu_cu`, `du_lieu_moi` | JSON, *null* được phép | Thông tin tối thiểu để audit/ACK; **không** chứa mật khẩu, hash mật khẩu, token hay bí mật |
+| `ip`, `dinh_danh_bam`, `ip_bam`, `ma_token` | *null* được phép | Metadata bảo mật theo loại log; chỉ lưu digest phù hợp, không lưu token gốc |
+| `ket_qua`, `site_dich` | CHECK / *null* | `thanh_cong` · `that_bai`; site ACK đích khi `loai_log='sync'` |
+| `ghi_chu`, `thong_bao_loi` | *null* được phép | Ghi chú/lỗi đã lọc dữ liệu nhạy cảm |
 
 | Nhóm `hanh_dong` | Giá trị |
 |------------------|---------|
@@ -457,19 +456,9 @@ Sự kiện được thêm tại site nơi hành động xảy ra. `de_nghi`, `d
 | Nghiệp vụ | `dang_ky_khoa_hoc` `xep_lop` `huy_dang_ky` `dong_hoc_phi` `hoan_hoc_phi` `nhap_diem` `sua_diem` `diem_danh` `mo_lop` `doi_lich_buoi_hoc` |
 | Hệ thống | `chuyen_co_so` `sua_danh_muc` |
 
-**`NhatKyDongBo`** (chỉ thêm)
+`db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng xóa dữ liệu học viên đã bật cờ phiên theo quy trình.
 
-| Cột | Ràng buộc | Mô tả |
-|-----|-----------|-------|
-| `ma_dong_bo` | PK | |
-| `thoi_diem` | | |
-| `bang`, `ma_ban_ghi` | | Bảng nhân bản bị ghi |
-| `hanh_dong` | | `them` · `sua` · `xoa` |
-| `site_dich` | | `Q1` · `Q7` · `TD` |
-| `trang_thai` | | `thanh_cong` · `that_bai` |
-| `thong_bao_loi` | | |
-
-`NhatKyDongBo` ghi sự kiện/kết quả ở một site đích và là nhật ký append-only; không mặc định rằng bảng này là outbox hay state machine đủ thông tin để retry một lần ghi nhiều site sau khi Coordinator mất phản hồi. Trước khi code YC-03/YC-07, nhóm phải đối chiếu trường dữ liệu với phương pháp replication đã chọn và quyết định có cần bảng/lược đồ tiến trình bền vững (mã thao tác, version, trạng thái/ACK theo từng site, retry) hay không. Nếu cần, thêm thiết kế vào schema và script cho tất cả site trước khi triển khai; không tự sửa riêng một CSDL.
+Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_tac_dong='MonHoc'`, `ma_ban_ghi`, `site_dich`, `ket_qua='thanh_cong'`, JSON trước/sau và tài khoản Admin Big. `ma_log` xác định theo khóa idempotency và site. Dòng ACK và cập nhật `MonHoc` nằm trong cùng transaction cục bộ, nên một site không thể có ACK thành công nếu update ở site đó rollback. `Logs` là nơi ghi ACK của từng bản sao, không phải database trung tâm.
 
 ---
 

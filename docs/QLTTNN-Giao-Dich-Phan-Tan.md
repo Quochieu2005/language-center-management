@@ -32,9 +32,9 @@ Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 3. Nếu thiếu site: từ chối, không cập nhật site nào.
 4. Ghi cùng thay đổi vào các site tham gia.
 5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
-6. Ghi `NhatKyDongBo` cho từng site đích và đối soát các bản sao.
+6. Với luồng cập nhật `MonHoc` đã triển khai, ghi ACK cho từng site vào `Logs` cùng transaction cục bộ và dùng key/site để retry, đối soát. Không suy ra các luồng nhân bản khác đã có cơ chế này.
 
-Các bước trên là hợp đồng bắt buộc cho replication/đồng bộ, không phải mô tả cơ chế đã triển khai. Nhóm phải chốt phương pháp truyền thay đổi, nơi được phép ghi, phiên bản, tiến trình và ACK từng site (README mục 9). Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
+Các bước trên là hợp đồng cần áp dụng cho luồng replication. Đồ án đã chọn và triển khai replication tầng ứng dụng cho cập nhật `MonHoc`; route ghi rõ ở README mục 9. Các bảng dùng chung khác chưa có một cơ chế runtime chung đầy đủ. Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
 
 ## 3. Vai trò và dữ liệu đề nghị
 
