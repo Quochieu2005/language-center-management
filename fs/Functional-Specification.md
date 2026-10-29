@@ -79,7 +79,7 @@ Theo yêu cầu môn học, mỗi đề tài có **2–4 site** và phải tri�
 
 1. Mỗi site là một CSDL độc lập, không dùng một database với cột chi_nhanh để giả lập phân tán.
 2. Không có khóa ngoại vật lý hoặc JOIN trực tiếp qua hai CSDL. Các kiểm tra liên site do Coordinator thực hiện bằng truy vấn riêng.
-3. Bảng dùng chung theo schema hiện tại gồm CoSo, MonHoc, KhoaHoc, TaiKhoan và TaiKhoanLienKetOAuth; các thao tác ghi phải qua một service đồng bộ chung.
+3. Bảng dùng chung theo schema hiện tại gồm CoSo, MonHoc, KhoaHoc và TaiKhoan; `google_subject`/`facebook_subject` là các cột danh tính provider trên TaiKhoan. Mọi thao tác ghi phải qua một service đồng bộ chung.
 4. HocVien, GiaoVien, NhanVien, PhongHoc, LopHoc là các bảng phân mảnh theo cơ sở. BuoiHoc, DangKy, DiemDanh, HocPhi, PhieuThu và Diem ở cùng site với lớp/đăng ký cha.
 5. GiaoDichChuyenCoSo lưu trạng thái tại site nguồn. LichSuChuyenCoSo, NhatKyHeThong và NhatKyDongBo là nhật ký cục bộ theo nơi phát sinh; nhật ký lịch sử chỉ được thêm.
 6. Tiền tố mã chỉ cho biết site tạo mã. Muốn tìm site hiện tại của học viên phải định vị bản dang_hoc, không suy ra từ mã.
@@ -187,7 +187,7 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 ### FS-AUTH-02 — Đăng nhập Google/Facebook
 
-**Trạng thái:** đề xuất chưa bật. **Phân tán:** đọc TaiKhoanLienKetOAuth và TaiKhoan qua Global; liên kết/thu hồi danh tính là Replicated-Write.
+**Trạng thái:** đề xuất chưa bật. **Phân tán:** Global đọc các bản TaiKhoan riêng để đối chiếu `google_subject` hoặc `facebook_subject`; liên kết/thu hồi cập nhật cột subject trên TaiKhoan bằng Replicated-Write.
 
 1. Người dùng chọn Google hoặc Facebook.
 2. Backend tạo state/nonce chống CSRF/replay và khởi tạo OAuth Authorization Code flow.
@@ -195,9 +195,9 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 4. Chỉ đăng nhập nếu provider subject đã liên kết với tài khoản nội bộ còn hoạt động.
 5. Không tự tạo tài khoản, không tự liên kết bằng email trùng nhau, không tin profile do browser gửi.
 
-**Nghiệm thu:** callback lỗi/state không hợp lệ bị từ chối; access/refresh token của provider không lưu vào TaiKhoanLienKetOAuth hoặc log; một provider identity không thể gắn hai tài khoản.
+**Nghiệm thu:** callback lỗi/state không hợp lệ bị từ chối; access/refresh token của provider không lưu vào TaiKhoan hoặc Logs; một provider subject không thể gắn hai tài khoản.
 
-**Điều kiện mở chức năng:** cấu hình OAuth thật, HTTPS callback, quản lý session/revoke, migration OAuth ở mọi CSDL cũ và kiểm thử provider. API hiện chưa triển khai endpoint OAuth.
+**Điều kiện mở chức năng:** cấu hình OAuth thật, HTTPS callback, quản lý session/revoke, chạy migration `27_move_oauth_identity_to_account.sql` ở mọi CSDL cũ và kiểm thử provider. API hiện chưa triển khai endpoint OAuth.
 
 ### FS-AUTH-03 — Quên và đặt lại mật khẩu
 

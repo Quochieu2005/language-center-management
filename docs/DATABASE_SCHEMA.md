@@ -48,7 +48,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 
 | Kiểu | Nhóm (mục 3) | Ý nghĩa | Bảng |
 |------|:---------------:|---------|------|
-| **Nhân bản** | ① Dùng chung | Cả 3 site có bản sao **giống hệt nhau**; ghi đồng bộ | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` `TaiKhoanLienKetOAuth` |
+| **Nhân bản** | ① Dùng chung | Cả 3 site có bản sao **giống hệt nhau**; ghi đồng bộ | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` (gồm danh tính Google/Facebook nếu đã liên kết) |
 | **Phân mảnh nguyên thủy** | ② Riêng của cơ sở | Mỗi dòng nằm ở **đúng 1 site**, quyết định bởi cột `ma_co_so` | `HocVien` `GiaoVien` `NhanVien` `PhongHoc` `LopHoc` |
 | **Phân mảnh dẫn xuất** | ③ Đi theo lớp / đăng ký | Dòng nằm **cùng site với dòng cha** | `BuoiHoc` `DangKy` `DiemDanh` `HocPhi` `PhieuThu` `Diem` |
 | **Cục bộ** | ④ Trạng thái điều phối, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `TokenDatLaiMatKhau` `NhatKyHeThong` `NhatKyDongBo` |
@@ -70,7 +70,7 @@ Mỗi cơ sở (Q1, Q7, TD) có **cùng cấu trúc bảng** nhưng **chứa d�
 
 ```mermaid
 flowchart LR
-    DungChung["① Dữ liệu dùng chung"] -->|được sao chép giống nhau tại mọi cơ sở| BangDungChung["Cơ sở · Môn học · Khóa học · Tài khoản · Liên kết OAuth"]
+    DungChung["① Dữ liệu dùng chung"] -->|được sao chép giống nhau tại mọi cơ sở| BangDungChung["Cơ sở · Môn học · Khóa học · Tài khoản (có danh tính Google/Facebook)"]
     RiengCoSo["② Dữ liệu riêng của cơ sở"] -->|mỗi cơ sở chỉ lưu phần dữ liệu của mình| BangRiengCoSo["Học viên · Giáo viên · Nhân viên · Phòng học · Lớp học"]
     DanXuat["③ Dữ liệu đi theo lớp hoặc đăng ký"] -->|lưu cùng cơ sở với lớp hoặc đăng ký cha| BangDanXuat["Buổi học · Đăng ký · Điểm danh · Học phí · Phiếu thu · Điểm"]
     NhatKyTam["④ Trạng thái điều phối, nhật ký và dữ liệu tạm"] -->|trạng thái giao dịch ở nguồn; sự kiện ở site phát sinh; không nhân bản| BangNhatKyTam["Trạng thái giao dịch chuyển · Sự kiện chuyển · Mã đặt lại mật khẩu · Nhật ký hệ thống · Nhật ký đồng bộ"]
@@ -88,7 +88,7 @@ flowchart LR
 
 | Bảng | Kiểu | Tiêu chí phân mảnh | Vị trí |
 |------|------|--------------------|--------|
-| `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` | Nhân bản | – | Cả 3 site |
+| `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` | Nhân bản | – | Cả 3 site |
 | `HocVien` | Nguyên thủy | `ma_co_so` (cơ sở hiện tại) | Site tương ứng |
 | `GiaoVien` | Nguyên thủy | `ma_co_so` (cơ sở công tác) | Site tương ứng |
 | `NhanVien` | Nguyên thủy | `ma_co_so` | Site tương ứng |
@@ -145,7 +145,6 @@ flowchart LR
     DangKy -->|được điểm danh theo từng buổi| DiemDanh["Điểm danh"]
     HocVien["Học viên"] -->|thực hiện| DangKy["Đăng ký"]
     HocVien -->|có trạng thái các lần chuyển tại nguồn| GiaoDichChuyenCoSo["Trạng thái giao dịch chuyển cơ sở"]
-    TaiKhoan["Tài khoản"] -->|có danh tính đăng nhập đã liên kết| TaiKhoanLienKetOAuth["Liên kết OAuth"]
 ```
 
 Mỗi dòng dưới đây đọc là "**một** bảng cha có **nhiều** bảng con":
@@ -157,7 +156,6 @@ Mỗi dòng dưới đây đọc là "**một** bảng cha có **nhiều** bản
 | Khóa học (`KhoaHoc`) | `LopHoc` | Một khóa mở thành nhiều lớp |
 | Giáo viên (`GiaoVien`) | `LopHoc` · `BuoiHoc` · `Diem` | Phụ trách lớp · dạy buổi học (kể cả dạy thay) · nhập điểm |
 | Phòng học (`PhongHoc`) | `LopHoc` · `BuoiHoc` | Phòng mặc định của lớp · phòng của từng buổi |
-| Tài khoản (`TaiKhoan`) | `TaiKhoanLienKetOAuth` | Một tài khoản có tối đa một danh tính cho mỗi nhà cung cấp; định danh ngoài được giữ ổn định giữa các site |
 | Tài khoản (`TaiKhoan`) | `GiaoVien` · `NhanVien` | 1 tài khoản ứng với tối đa 1 hồ sơ (có thể chưa có tài khoản) |
 | Tài khoản (`TaiKhoan`) | `TokenDatLaiMatKhau` · `NhatKyHeThong` | Mã đặt lại mật khẩu · nhật ký người đó thực hiện |
 | Lớp học (`LopHoc`) | `BuoiHoc` · `DangKy` | Các buổi học · các lượt đăng ký |
@@ -206,38 +204,29 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | `so_buoi` | | Số buổi của khóa |
 | `hoc_phi_chuan` | | Số tiền |
 
-### 6.2. Tài khoản và liên kết đăng nhập (nhân bản, dùng chung admin / nhân viên / giáo viên)
+### 6.2. Tài khoản và phương thức đăng nhập (nhân bản, dùng chung các vai trò)
 
 **`TaiKhoan`**
 
 | Cột | Ràng buộc | Mô tả |
 |-----|-----------|-------|
 | `ma_tai_khoan` | PK | Tiền tố = site tạo |
+| `slug` | UQ | Định danh thân thiện của tài khoản |
 | `ten_dang_nhap` | UQ | Duy nhất toàn hệ thống |
 | `email` | UQ | Duy nhất toàn hệ thống |
-| `mat_khau_bam` | | Bản băm có salt, không lưu mật khẩu gốc |
-| `vai_tro` | | `admin` · `nhan_vien` · `giao_vien` |
-| `ma_co_so` | FK, *null* | `NULL` với admin; **bắt buộc** với nhân viên, giáo viên |
-| `trang_thai` | | `hoat_dong` · `khoa` · `vo_hieu` |
-| `bat_buoc_doi_mat_khau` | | `true` khi mới tạo hoặc vừa bị reset |
+| `mat_khau` | | Chuỗi bcrypt; không lưu mật khẩu gốc |
+| `google_subject` | UQ có lọc, *null* | Google `sub` ổn định; null khi chưa liên kết Google |
+| `facebook_subject` | UQ có lọc, *null* | Facebook app-scoped user ID; null khi chưa liên kết Facebook |
+| `vai_tro` | | `admin_big` · `nhan_vien` · `giao_vien` · `hoc_vien` |
+| `ma_co_so` | FK, *null* | `NULL` với Admin Big; bắt buộc với các vai trò còn lại |
+| `trang_thai` | BIT | `1` = active · `0` = inactive |
+| `bat_buoc_doi_mat_khau` | BIT | Bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp |
 | `ngay_tao`, `ngay_doi_mat_khau_cuoi` | | |
 | `phien_ban`, `cap_nhat_luc` | | Đối soát đồng bộ (mục 2) |
 
 > Chức vụ chi tiết của `nhan_vien` (lễ tân / kế toán / quản lý cơ sở) nằm ở `NhanVien.chuc_vu`.
 
-**`TaiKhoanLienKetOAuth`**
-
-| Cột | Ràng buộc | Mô tả |
-|-----|-----------|-------|
-| `ma_lien_ket` | PK | UUID do Coordinator tạo một lần rồi ghi cùng giá trị tới tất cả site |
-| `ma_tai_khoan` | FK → `TaiKhoan` | Chỉ liên kết với tài khoản nội bộ đã được tạo và đang được quản trị |
-| `nha_cung_cap` | | Chỉ nhận `google` hoặc `facebook` |
-| `provider_subject` | UQ cùng `nha_cung_cap` | Google `sub` hoặc Facebook app-scoped user ID; không dùng email làm định danh |
-| `trang_thai` | | `hoat_dong` · `da_thu_hoi`; thu hồi không xóa lịch sử liên kết |
-| `ngay_lien_ket`, `ngay_thu_hoi` | | Thời điểm UTC; Coordinator ghi cùng giá trị tại các site |
-| `phien_ban`, `cap_nhat_luc` | | Đối soát bản sao như các bảng dùng chung |
-
-Ràng buộc duy nhất trong mỗi CSDL: `(nha_cung_cap, provider_subject)` và `(ma_tai_khoan, nha_cung_cap)`. Coordinator phải kiểm tra cùng các ràng buộc này trên toàn bộ site hoạt động trước khi nhân bản thay đổi; một provider identity không được gắn vào hai tài khoản. Không lưu access token, refresh token, client secret, email provider hoặc ảnh đại diện trong bảng này. Không tự tạo tài khoản và không tự liên kết theo email trùng nhau.
+Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL để ngăn cùng một danh tính Google hoặc Facebook gắn với hai tài khoản tại cùng site. Coordinator vẫn phải kiểm tra các bản sao ở mọi site trước khi liên kết và ghi thay đổi tới đủ site đang hoạt động (`REPLICATED-WRITE`). Có thể liên kết đồng thời Google và Facebook; đăng nhập mật khẩu tiếp tục dùng `mat_khau_bam`. Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret, email provider hoặc ảnh đại diện trong `TaiKhoan`.
 
 **Phiên đăng nhập và idle timeout:** mỗi phiên phải hết hạn sau 3600 giây không có hoạt động người dùng và có thể bị thu hồi phía server. Schema hiện chưa có bảng phiên và API chưa có session backend. Trước khi triển khai đăng nhập, nhóm phải chốt nơi lưu trạng thái phiên (gồm mã phiên dạng băm, tài khoản, thời điểm hoạt động gần nhất, thời điểm hết hạn, trạng thái thu hồi); nếu chọn SQL Server thì phải định nghĩa vị trí sở hữu phiên, cập nhật lược đồ/script và triển khai riêng theo kiến trúc site. Không suy ra site từ tiền tố ID, không đặt mặc định trạng thái vào `default` dummy và không tạo CSDL nghiệp vụ trung tâm.
 

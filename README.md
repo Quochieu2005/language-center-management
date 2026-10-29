@@ -90,7 +90,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 | Nhiều CSDL độc lập | SQL Server có một CSDL riêng cho mỗi cơ sở; mỗi site có kết nối riêng |
 | Phân mảnh ngang | Hồ sơ nghiệp vụ của học viên, nhân viên, giáo viên, phòng và lớp nằm ở site quản lý hồ sơ đó |
 | Phân mảnh dẫn xuất | Đăng ký, học phí, điểm, buổi học và điểm danh nằm cùng site với bảng cha |
-| Nhân bản dữ liệu dùng chung | Cơ sở, môn học, khóa học, tài khoản và liên kết đăng nhập OAuth được giữ đồng nhất ở các site đang hoạt động |
+| Nhân bản dữ liệu dùng chung | Cơ sở, môn học, khóa học và tài khoản (gồm subject Google/Facebook đã liên kết) được giữ đồng nhất ở các site đang hoạt động |
 | Truy vấn toàn cục | Django hỏi các site cần thiết rồi gộp kết quả ở tầng ứng dụng |
 | Giao dịch phân tán | Chuyển cơ sở phối hợp site nguồn và site đích, có trạng thái phục hồi |
 | Truy cập đồng thời | Hai phiên đăng ký tranh chỗ cuối; chỉ một yêu cầu thành công, không vượt sĩ số |
@@ -237,7 +237,7 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `TaiKhoanLienKetOAuth` | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện lịch sử chỉ ghi thêm tại site phát sinh; không nhân bản |
@@ -256,7 +256,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 |---|---|---|---|
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản và liên kết OAuth | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản và subject đăng nhập trên TaiKhoan | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
 | `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
@@ -271,7 +271,7 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` hoặc `TaiKhoanLienKetOAuth` đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
+Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc` hoặc `TaiKhoan` (kể cả liên kết/thu hồi subject Google/Facebook) đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -449,13 +449,13 @@ flowchart LR
     API["API"] -->|điều phối nghiệp vụ| DangNhap["Đăng nhập"]
     GiaoDienWeb -->|chuyển hướng OAuth khi người dùng chọn| GoogleFacebook["Google / Facebook"]
     GoogleFacebook -->|authorization code về callback| API
-    DangNhap -->|đối chiếu subject đã liên kết| SiteRouter["Bộ định tuyến cơ sở"]
+    DangNhap -->|đối chiếu subject trong TaiKhoan| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|đọc tài khoản| SQLServer_CSDL_Site["SQL Server của cơ sở"]
     DangNhap["Đăng nhập"] -->|nạp phạm vi quyền| PhanQuyen["Phân quyền"]
     DangNhap["Đăng nhập"] -->|ghi nhận đăng nhập| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider, tra subject trong `TaiKhoanLienKetOAuth` ở các CSDL site riêng rồi đọc `TaiKhoan` để lấy trạng thái, vai trò và phạm vi. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi danh tính là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao của bảng dùng chung; không có CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
+Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider rồi tìm `sub`/Facebook app-scoped ID trong `TaiKhoan.google_subject` hoặc `TaiKhoan.facebook_subject` ở các CSDL site riêng. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi subject là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao `TaiKhoan`; không có bảng identity riêng, CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
 
 Mỗi phiên sau khi xác thực phải tự hết hạn sau **60 phút không có hoạt động người dùng thật**, áp dụng như nhau cho Admin Big, Admin Small, nhân viên và giáo viên. Request nền như polling, health check và tự refresh không được tính hoạt động. API phải xác minh idle expiry và thu hồi phiên; giao diện đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và đưa người dùng về đăng nhập khi hết hạn. Mỗi thiết bị là phiên riêng. Cơ chế lưu trạng thái phiên có thể thu hồi còn phải được chốt theo mô hình CSDL riêng từng site; không dùng CSDL nghiệp vụ trung tâm. Do xác thực hiện chưa được triển khai, chính sách này hiện là yêu cầu thiết kế chứ chưa phải hành vi đang chạy.
 

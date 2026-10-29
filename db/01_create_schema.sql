@@ -26,6 +26,7 @@ BEGIN TRY
     CREATE TABLE dbo.CoSo
     (
         ma_co_so       VARCHAR(10)    NOT NULL,
+        slug           VARCHAR(120)   NOT NULL,
         ten_co_so      NVARCHAR(100)  NOT NULL,
         dia_chi        NVARCHAR(300)  NULL,
         sdt            VARCHAR(20)    NULL,
@@ -33,6 +34,7 @@ BEGIN TRY
         phien_ban      BIGINT         NOT NULL CONSTRAINT DF_CoSo_phien_ban DEFAULT (1),
         cap_nhat_luc   DATETIME2(0)   NOT NULL CONSTRAINT DF_CoSo_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_CoSo PRIMARY KEY (ma_co_so),
+        CONSTRAINT UQ_CoSo_slug UNIQUE (slug),
         CONSTRAINT CK_CoSo_trang_thai CHECK (trang_thai IN ('chuan_bi', 'hoat_dong', 'dong_cua')),
         CONSTRAINT CK_CoSo_phien_ban CHECK (phien_ban > 0)
     );
@@ -40,17 +42,20 @@ BEGIN TRY
     CREATE TABLE dbo.MonHoc
     (
         ma_mon         VARCHAR(30)    NOT NULL,
+        slug           VARCHAR(120)   NOT NULL,
         ten_mon        NVARCHAR(100)  NOT NULL,
         mo_ta          NVARCHAR(500)  NULL,
         phien_ban      BIGINT         NOT NULL CONSTRAINT DF_MonHoc_phien_ban DEFAULT (1),
         cap_nhat_luc   DATETIME2(0)   NOT NULL CONSTRAINT DF_MonHoc_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_MonHoc PRIMARY KEY (ma_mon),
+        CONSTRAINT UQ_MonHoc_slug UNIQUE (slug),
         CONSTRAINT CK_MonHoc_phien_ban CHECK (phien_ban > 0)
     );
 
     CREATE TABLE dbo.KhoaHoc
     (
         ma_khoa_hoc    VARCHAR(30)    NOT NULL,
+        slug           VARCHAR(160)   NOT NULL,
         ma_mon         VARCHAR(30)    NOT NULL,
         ten_khoa_hoc   NVARCHAR(120)  NOT NULL,
         trinh_do       NVARCHAR(30)   NOT NULL,
@@ -59,70 +64,111 @@ BEGIN TRY
         phien_ban      BIGINT         NOT NULL CONSTRAINT DF_KhoaHoc_phien_ban DEFAULT (1),
         cap_nhat_luc   DATETIME2(0)   NOT NULL CONSTRAINT DF_KhoaHoc_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_KhoaHoc PRIMARY KEY (ma_khoa_hoc),
+        CONSTRAINT UQ_KhoaHoc_slug UNIQUE (slug),
         CONSTRAINT FK_KhoaHoc_MonHoc FOREIGN KEY (ma_mon) REFERENCES dbo.MonHoc(ma_mon),
         CONSTRAINT CK_KhoaHoc_so_buoi CHECK (so_buoi > 0),
         CONSTRAINT CK_KhoaHoc_hoc_phi CHECK (hoc_phi_chuan >= 0),
         CONSTRAINT CK_KhoaHoc_phien_ban CHECK (phien_ban > 0)
     );
 
-    /* Tài khoản nhân bản; API phải lưu chuỗi băm, tuyệt đối không lưu mật khẩu gốc. */
+    /* Tài khoản nhân bản; mật khẩu lưu dạng băm, subject Google/Facebook cùng dòng. */
     CREATE TABLE dbo.TaiKhoan
     (
         ma_tai_khoan             VARCHAR(24)    NOT NULL,
+        slug                     VARCHAR(120)   NOT NULL,
         ten_dang_nhap            NVARCHAR(100)  NOT NULL,
         email                    NVARCHAR(254)  NOT NULL,
-        mat_khau_bam             NVARCHAR(255)  NOT NULL,
+        mat_khau                 NVARCHAR(255)  NOT NULL,
+        google_subject           NVARCHAR(255)  NULL,
+        facebook_subject         NVARCHAR(255)  NULL,
         vai_tro                  VARCHAR(20)    NOT NULL,
         ma_co_so                 VARCHAR(10)    NULL,
-        trang_thai               VARCHAR(20)    NOT NULL CONSTRAINT DF_TaiKhoan_trang_thai DEFAULT ('hoat_dong'),
+        trang_thai               BIT            NOT NULL CONSTRAINT DF_TaiKhoan_trang_thai DEFAULT (1), -- 1 = active, 0 = inactive
         bat_buoc_doi_mat_khau    BIT            NOT NULL CONSTRAINT DF_TaiKhoan_bat_buoc_doi DEFAULT (0),
         ngay_tao                 DATETIME2(0)   NOT NULL CONSTRAINT DF_TaiKhoan_ngay_tao DEFAULT (SYSUTCDATETIME()),
         ngay_doi_mat_khau_cuoi   DATETIME2(0)   NULL,
         phien_ban                BIGINT         NOT NULL CONSTRAINT DF_TaiKhoan_phien_ban DEFAULT (1),
         cap_nhat_luc             DATETIME2(0)   NOT NULL CONSTRAINT DF_TaiKhoan_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_TaiKhoan PRIMARY KEY (ma_tai_khoan),
+        CONSTRAINT UQ_TaiKhoan_slug UNIQUE (slug),
         CONSTRAINT UQ_TaiKhoan_ten_dang_nhap UNIQUE (ten_dang_nhap),
         CONSTRAINT UQ_TaiKhoan_email UNIQUE (email),
         CONSTRAINT UQ_TaiKhoan_ma_va_co_so UNIQUE (ma_tai_khoan, ma_co_so),
+        CONSTRAINT CK_TaiKhoan_google_subject CHECK
+            (google_subject IS NULL OR LEN(LTRIM(RTRIM(google_subject))) > 0),
+        CONSTRAINT CK_TaiKhoan_facebook_subject CHECK
+            (facebook_subject IS NULL OR LEN(LTRIM(RTRIM(facebook_subject))) > 0),
         CONSTRAINT FK_TaiKhoan_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
-        CONSTRAINT CK_TaiKhoan_vai_tro CHECK (vai_tro IN ('admin', 'nhan_vien', 'giao_vien')),
-        CONSTRAINT CK_TaiKhoan_trang_thai CHECK (trang_thai IN ('hoat_dong', 'khoa', 'vo_hieu')),
+        CONSTRAINT CK_TaiKhoan_vai_tro CHECK (vai_tro IN ('admin_big', 'nhan_vien', 'giao_vien', 'hoc_vien')),
         CONSTRAINT CK_TaiKhoan_pham_vi CHECK
-            ((vai_tro = 'admin' AND ma_co_so IS NULL) OR (vai_tro <> 'admin' AND ma_co_so IS NOT NULL)),
+            ((vai_tro = 'admin_big' AND ma_co_so IS NULL) OR (vai_tro <> 'admin_big' AND ma_co_so IS NOT NULL)),
         CONSTRAINT CK_TaiKhoan_phien_ban CHECK (phien_ban > 0)
     );
 
-    /* Liên kết OAuth là dữ liệu dùng chung, phải được ghi giống nhau tại mọi site hoạt động. */
-    CREATE TABLE dbo.TaiKhoanLienKetOAuth
+    CREATE UNIQUE INDEX UX_TaiKhoan_google_subject
+        ON dbo.TaiKhoan (google_subject)
+        WHERE google_subject IS NOT NULL;
+
+    CREATE UNIQUE INDEX UX_TaiKhoan_facebook_subject
+        ON dbo.TaiKhoan (facebook_subject)
+        WHERE facebook_subject IS NOT NULL;
+
+    /* Session registry and hashed login attempts are site-local security state. */
+    CREATE TABLE dbo.PhienDangNhap
     (
-        ma_lien_ket       UNIQUEIDENTIFIER NOT NULL,
-        ma_tai_khoan      VARCHAR(24)      NOT NULL,
-        nha_cung_cap      VARCHAR(16)      NOT NULL,
-        provider_subject  NVARCHAR(255)    NOT NULL,
-        trang_thai        VARCHAR(20)      NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_trang_thai DEFAULT ('hoat_dong'),
-        ngay_lien_ket      DATETIME2(0)     NOT NULL,
-        ngay_thu_hoi       DATETIME2(0)     NULL,
-        phien_ban          BIGINT           NOT NULL CONSTRAINT DF_TaiKhoanLienKetOAuth_phien_ban DEFAULT (1),
-        cap_nhat_luc       DATETIME2(0)     NOT NULL,
-        CONSTRAINT PK_TaiKhoanLienKetOAuth PRIMARY KEY (ma_lien_ket),
-        CONSTRAINT UQ_TaiKhoanLienKetOAuth_provider_subject UNIQUE (nha_cung_cap, provider_subject),
-        CONSTRAINT UQ_TaiKhoanLienKetOAuth_tai_khoan_provider UNIQUE (ma_tai_khoan, nha_cung_cap),
-        CONSTRAINT FK_TaiKhoanLienKetOAuth_TaiKhoan FOREIGN KEY (ma_tai_khoan)
-            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_nha_cung_cap CHECK (nha_cung_cap IN ('google', 'facebook')),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_trang_thai CHECK (trang_thai IN ('hoat_dong', 'da_thu_hoi')),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_thu_hoi CHECK
-            ((trang_thai = 'hoat_dong' AND ngay_thu_hoi IS NULL) OR
-             (trang_thai = 'da_thu_hoi' AND ngay_thu_hoi IS NOT NULL)),
-        CONSTRAINT CK_TaiKhoanLienKetOAuth_phien_ban CHECK (phien_ban > 0)
+        ma_phien                 UNIQUEIDENTIFIER NOT NULL,
+        ma_tai_khoan             VARCHAR(24)      NOT NULL,
+        phien_ban_tai_khoan      BIGINT           NOT NULL,
+        token_bam                CHAR(64)         NOT NULL,
+        tao_luc_utc              DATETIME2(3)     NOT NULL CONSTRAINT DF_PhienDangNhap_tao DEFAULT (SYSUTCDATETIME()),
+        hoat_dong_cuoi_utc       DATETIME2(3)     NOT NULL CONSTRAINT DF_PhienDangNhap_hoat_dong DEFAULT (SYSUTCDATETIME()),
+        het_han_utc              DATETIME2(3)     NOT NULL,
+        thu_hoi_luc_utc          DATETIME2(3)     NULL,
+        CONSTRAINT PK_PhienDangNhap PRIMARY KEY (ma_phien),
+        CONSTRAINT UQ_PhienDangNhap_token_bam UNIQUE (token_bam),
+        CONSTRAINT FK_PhienDangNhap_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT CK_PhienDangNhap_phien_ban CHECK (phien_ban_tai_khoan > 0),
+        CONSTRAINT CK_PhienDangNhap_thoi_gian CHECK (het_han_utc > hoat_dong_cuoi_utc)
     );
+
+    CREATE INDEX IX_PhienDangNhap_tai_khoan_hieu_luc
+        ON dbo.PhienDangNhap (ma_tai_khoan, het_han_utc)
+        INCLUDE (thu_hoi_luc_utc, phien_ban_tai_khoan);
+
+    CREATE TABLE dbo.SuKienDangNhap
+    (
+        ma_su_kien       UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_SuKienDangNhap_id DEFAULT (NEWID()),
+        dinh_danh_bam    CHAR(64)         NOT NULL,
+        ip_bam           CHAR(64)         NOT NULL,
+        ket_qua          VARCHAR(20)      NOT NULL,
+        thoi_diem_utc    DATETIME2(3)     NOT NULL CONSTRAINT DF_SuKienDangNhap_thoi_diem DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT PK_SuKienDangNhap PRIMARY KEY (ma_su_kien),
+        CONSTRAINT CK_SuKienDangNhap_ket_qua CHECK (ket_qua IN ('thanh_cong', 'that_bai'))
+    );
+
+    CREATE INDEX IX_SuKienDangNhap_ip_thoi_diem
+        ON dbo.SuKienDangNhap (ip_bam, thoi_diem_utc);
+    CREATE INDEX IX_SuKienDangNhap_dinh_danh_ip_ket_qua_thoi_diem
+        ON dbo.SuKienDangNhap (dinh_danh_bam, ip_bam, ket_qua, thoi_diem_utc);
+
+    EXEC sys.sp_executesql N'
+        CREATE TRIGGER dbo.TR_SuKienDangNhap_AppendOnly
+        ON dbo.SuKienDangNhap
+        INSTEAD OF UPDATE, DELETE
+        AS
+        BEGIN
+            SET NOCOUNT ON;
+            ;THROW 51033, ''SuKienDangNhap chỉ được thêm mới.'', 1;
+        END;';
 
     /* Hồ sơ riêng theo site. ma_co_so trên bảng con là khóa phân mảnh. */
     CREATE TABLE dbo.HocVien
     (
         ma_hoc_vien   VARCHAR(24)    NOT NULL,
+        slug          VARCHAR(160)   NOT NULL,
         ma_co_so      VARCHAR(10)    NOT NULL,
         co_so_goc     VARCHAR(10)    NOT NULL,
+        ma_tai_khoan  VARCHAR(24)    NULL,
         ho_ten        NVARCHAR(150)  NOT NULL,
         ngay_sinh     DATE           NULL,
         gioi_tinh     NVARCHAR(20)   NULL,
@@ -132,11 +178,17 @@ BEGIN TRY
         ngay_nhap_hoc DATE           NOT NULL,
         trang_thai    VARCHAR(20)    NOT NULL CONSTRAINT DF_HocVien_trang_thai DEFAULT ('dang_hoc'),
         CONSTRAINT PK_HocVien PRIMARY KEY (ma_hoc_vien),
+        CONSTRAINT UQ_HocVien_slug UNIQUE (slug),
         CONSTRAINT UQ_HocVien_ma_va_co_so UNIQUE (ma_hoc_vien, ma_co_so),
         CONSTRAINT FK_HocVien_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_HocVien_CoSoGoc FOREIGN KEY (co_so_goc) REFERENCES dbo.CoSo(ma_co_so),
+        CONSTRAINT FK_HocVien_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_HocVien_trang_thai CHECK (trang_thai IN ('dang_hoc', 'bao_luu', 'da_chuyen_di', 'nghi_hoc'))
     );
+
+    CREATE UNIQUE INDEX UX_HocVien_ma_tai_khoan
+        ON dbo.HocVien (ma_tai_khoan)
+        WHERE ma_tai_khoan IS NOT NULL;
 
     CREATE TABLE dbo.GiaoVien
     (
@@ -174,6 +226,31 @@ BEGIN TRY
         CONSTRAINT CK_NhanVien_chuc_vu CHECK (chuc_vu IN ('le_tan', 'ke_toan', 'quan_ly_co_so')),
         CONSTRAINT CK_NhanVien_trang_thai CHECK (trang_thai IN ('dang_lam', 'nghi_viec'))
     );
+
+    /* Hồ sơ quản trị site; dữ liệu đăng nhập và quyền vẫn thuộc TaiKhoan. */
+    CREATE TABLE dbo.Admin
+    (
+        ma_admin      VARCHAR(24)    NOT NULL,
+        ma_tai_khoan  VARCHAR(24)    NOT NULL,
+        ma_co_so      VARCHAR(10)    NULL,
+        loai_admin    VARCHAR(20)    NOT NULL,
+        ho_ten        NVARCHAR(150)  NOT NULL,
+        sdt           VARCHAR(20)    NULL,
+        trang_thai    BIT            NOT NULL CONSTRAINT DF_Admin_trang_thai DEFAULT (1),
+        CONSTRAINT PK_Admin PRIMARY KEY (ma_admin),
+        CONSTRAINT UQ_Admin_ma_tai_khoan UNIQUE (ma_tai_khoan),
+        CONSTRAINT FK_Admin_TaiKhoan FOREIGN KEY (ma_tai_khoan)
+            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT FK_Admin_CoSo FOREIGN KEY (ma_co_so)
+            REFERENCES dbo.CoSo(ma_co_so),
+        CONSTRAINT CK_Admin_loai CHECK (loai_admin IN ('admin_big', 'admin_small')),
+        CONSTRAINT CK_Admin_pham_vi CHECK
+            ((loai_admin = 'admin_big' AND ma_co_so IS NULL)
+             OR (loai_admin = 'admin_small' AND ma_co_so IS NOT NULL))
+    );
+
+    CREATE INDEX IX_Admin_co_so_trang_thai
+        ON dbo.Admin (ma_co_so, loai_admin, trang_thai);
 
     CREATE TABLE dbo.PhongHoc
     (
@@ -410,15 +487,72 @@ BEGIN TRY
         ma_token      VARCHAR(30)    NOT NULL,
         ma_tai_khoan  VARCHAR(24)    NOT NULL,
         token_bam     NVARCHAR(255)  NOT NULL,
-        ngay_tao      DATETIME2(0)   NOT NULL CONSTRAINT DF_Token_ngay_tao DEFAULT (SYSUTCDATETIME()),
-        het_han       DATETIME2(0)   NOT NULL,
+        ngay_tao      DATETIME2(3)   NOT NULL CONSTRAINT DF_Token_ngay_tao DEFAULT (SYSUTCDATETIME()),
+        het_han       DATETIME2(3)   NOT NULL,
         da_dung       BIT            NOT NULL CONSTRAINT DF_Token_da_dung DEFAULT (0),
+        so_lan_sai    TINYINT        NOT NULL CONSTRAINT DF_Token_so_lan_sai DEFAULT (0),
         ip_yeu_cau    VARCHAR(45)    NULL,
         CONSTRAINT PK_TokenDatLaiMatKhau PRIMARY KEY (ma_token),
         CONSTRAINT UQ_TokenDatLaiMatKhau_token_bam UNIQUE (token_bam),
         CONSTRAINT FK_TokenDatLaiMatKhau_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
-        CONSTRAINT CK_TokenDatLaiMatKhau_han CHECK (het_han > ngay_tao)
+        CONSTRAINT CK_TokenDatLaiMatKhau_han CHECK (het_han > ngay_tao),
+        CONSTRAINT CK_TokenDatLaiMatKhau_so_lan_sai CHECK (so_lan_sai <= 5)
     );
+
+    /* Reset requests and OTP verification attempts are private coordinator state. */
+    CREATE TABLE dbo.SuKienQuenMatKhau
+    (
+        ma_su_kien       UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_SuKienQuenMatKhau_id DEFAULT (NEWID()),
+        dinh_danh_bam    CHAR(64)         NOT NULL,
+        ip_bam           CHAR(64)         NOT NULL,
+        ma_token         VARCHAR(30)      NULL,
+        loai_su_kien     VARCHAR(20)      NOT NULL,
+        thoi_diem_utc    DATETIME2(3)     NOT NULL CONSTRAINT DF_SuKienQuenMatKhau_thoi_diem DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT PK_SuKienQuenMatKhau PRIMARY KEY (ma_su_kien),
+        CONSTRAINT CK_SuKienQuenMatKhau_loai CHECK (loai_su_kien IN ('yeu_cau', 'otp_sai', 'dat_lai'))
+    );
+
+    CREATE INDEX IX_SuKienQuenMatKhau_ip_thoi_diem
+        ON dbo.SuKienQuenMatKhau (ip_bam, loai_su_kien, thoi_diem_utc);
+    CREATE INDEX IX_SuKienQuenMatKhau_dinh_danh_ip_thoi_diem
+        ON dbo.SuKienQuenMatKhau (dinh_danh_bam, ip_bam, loai_su_kien, thoi_diem_utc);
+    CREATE INDEX IX_SuKienQuenMatKhau_token
+        ON dbo.SuKienQuenMatKhau (ma_token, loai_su_kien, thoi_diem_utc)
+        WHERE ma_token IS NOT NULL;
+
+    EXEC sys.sp_executesql N'
+        CREATE TRIGGER dbo.TR_SuKienQuenMatKhau_AppendOnly
+        ON dbo.SuKienQuenMatKhau
+        INSTEAD OF UPDATE, DELETE
+        AS
+        BEGIN
+            SET NOCOUNT ON;
+            ;THROW 51034, ''SuKienQuenMatKhau chỉ được thêm mới.'', 1;
+        END;';
+
+    CREATE TABLE dbo.GiaoDichDatLaiMatKhau
+    (
+        ma_giao_dich       UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_GiaoDichDatLaiMatKhau_id DEFAULT (NEWID()),
+        ma_tai_khoan       VARCHAR(24)      NOT NULL,
+        mat_khau_moi_bam   NVARCHAR(255)    NULL,
+        trang_thai         VARCHAR(20)      NOT NULL CONSTRAINT DF_GiaoDichDatLaiMatKhau_trang_thai DEFAULT ('dang_xu_ly'),
+        tao_luc_utc        DATETIME2(3)     NOT NULL CONSTRAINT DF_GiaoDichDatLaiMatKhau_tao DEFAULT (SYSUTCDATETIME()),
+        cap_nhat_luc_utc   DATETIME2(3)     NOT NULL CONSTRAINT DF_GiaoDichDatLaiMatKhau_cap_nhat DEFAULT (SYSUTCDATETIME()),
+        hoan_tat_luc_utc   DATETIME2(3)     NULL,
+        CONSTRAINT PK_GiaoDichDatLaiMatKhau PRIMARY KEY (ma_giao_dich),
+        CONSTRAINT FK_GiaoDichDatLaiMatKhau_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT CK_GiaoDichDatLaiMatKhau_trang_thai CHECK (trang_thai IN ('dang_xu_ly', 'hoan_tat')),
+        CONSTRAINT CK_GiaoDichDatLaiMatKhau_noi_dung CHECK
+            ((trang_thai = 'dang_xu_ly' AND mat_khau_moi_bam IS NOT NULL AND hoan_tat_luc_utc IS NULL)
+             OR (trang_thai = 'hoan_tat' AND mat_khau_moi_bam IS NULL AND hoan_tat_luc_utc IS NOT NULL))
+    );
+
+    CREATE UNIQUE INDEX UX_GiaoDichDatLaiMatKhau_dang_xu_ly
+        ON dbo.GiaoDichDatLaiMatKhau (ma_tai_khoan)
+        WHERE trang_thai = 'dang_xu_ly';
+    CREATE INDEX IX_GiaoDichDatLaiMatKhau_trang_thai
+        ON dbo.GiaoDichDatLaiMatKhau (trang_thai, tao_luc_utc)
+        INCLUDE (ma_tai_khoan);
 
     CREATE TABLE dbo.NhatKyHeThong
     (
@@ -458,6 +592,7 @@ BEGIN TRY
 
     /* Sequence cấp số; Django/API thêm mã site và mã loại để tạo mã bản ghi. */
     CREATE SEQUENCE dbo.Seq_TK    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
+    CREATE SEQUENCE dbo.Seq_AD    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_HV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_GV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_NV    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
