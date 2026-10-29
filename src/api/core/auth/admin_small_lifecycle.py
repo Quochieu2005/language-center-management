@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
 from django.db import DatabaseError, IntegrityError, connections, transaction
@@ -231,6 +231,56 @@ def _send_credentials(email: str, full_name: str, username: str, password: str) 
         return False
 
 
+def _recover_admin_small_provisioning(
+    *, site_code: str, email: str, username: str, full_name: str, temporary_password: str,
+) -> tuple[tuple, str] | None:
+    """Return a committed local provision so a retry can finish account replication."""
+    try:
+        with get_site_connection(site_code).cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP (2)
+                       t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email, t.mat_khau,
+                       t.vai_tro, t.ma_co_so, t.trang_thai,
+                       t.bat_buoc_doi_mat_khau, t.phien_ban,
+                       a.ma_admin, a.ma_co_so, a.loai_admin, a.ho_ten, a.sdt, a.trang_thai
+                FROM dbo.TaiKhoan AS t
+                LEFT JOIN dbo.Admin AS a ON a.ma_tai_khoan = t.ma_tai_khoan
+                WHERE LOWER(t.email) = %s OR LOWER(t.ten_dang_nhap) = %s
+                """,
+                [email, username],
+            )
+            rows = cursor.fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise AdminSmallAccountConflict
+        row = rows[0]
+        account_id, slug, stored_username, stored_email = map(str, row[:4])
+        password_hash = str(row[4])
+        role = str(row[5]).lower()
+        account_site = str(row[6]).upper() if row[6] else None
+        if (
+            role != "nhan_vien" or account_site != site_code
+            or not account_status_bit(row[7]) or not bool(row[8])
+            or stored_email.casefold() != email or stored_username.lower() != username
+            or not check_password(temporary_password, password_hash)
+            or row[10] is None or str(row[11]).upper() != site_code
+            or str(row[12]).lower() != "admin_small" or str(row[13]) != full_name
+            or row[14] is not None or not bool(row[15])
+        ):
+            raise AdminSmallAccountConflict
+        account = (
+            account_id, slug, stored_username, stored_email, password_hash,
+            account_site, bool(row[8]), int(row[9]),
+        )
+        return account, str(row[10])
+    except AdminSmallAccountConflict:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
+
+
 def create_admin_small(
     *, email: str, full_name: str, site_code: str, username: str | None,
     admin_big_id: str, remote_ip: str,
@@ -245,20 +295,41 @@ def create_admin_small(
     normalized_name = full_name.strip()
     if not normalized_email or not normalized_name or not normalized_username or not remote_ip:
         raise ValueError("Thiếu thông tin Admin Small.")
-    if _replicated_account(normalized_email, sites) is not None or _replicated_account(normalized_username, sites) is not None:
-        raise AdminSmallAccountConflict
-
-    account_id = _next_admin_small_account_id(target_site, sites)
-    admin_id = f"{target_site}-AD-{_next_sequence_number(target_site, 'Seq_AD'):06d}"
-    account_slug = make_slug(f"admin-small-{target_site}-{normalized_username}", max_length=120)
-    password_hash = make_password(temporary_password)
-    account = (
-        account_id, account_slug, normalized_username, normalized_email,
-        password_hash, target_site, True, 1,
+    recovered = _recover_admin_small_provisioning(
+        site_code=target_site, email=normalized_email, username=normalized_username,
+        full_name=normalized_name, temporary_password=temporary_password,
     )
-    for site in sites:
-        _replicate_account(site, account, "them")
-    _create_admin_profile(target_site, admin_id, account_id, normalized_name, None, remote_ip)
+    if recovered is not None:
+        account, admin_id = recovered
+        account_id, account_slug, normalized_username, normalized_email = account[:4]
+    else:
+        if (
+            _replicated_account(normalized_email, sites) is not None
+            or _replicated_account(normalized_username, sites) is not None
+        ):
+            raise AdminSmallAccountConflict
+        account_id = _next_admin_small_account_id(target_site, sites)
+        admin_id = _next_admin_id(target_site)
+        account_slug = make_slug(f"admin-small-{target_site}-{normalized_username}", max_length=120)
+        password_hash = make_password(temporary_password)
+        account = (
+            account_id, account_slug, normalized_username, normalized_email,
+            password_hash, target_site, True, 1,
+        )
+
+    target_alias = get_site_database_alias(target_site)
+    try:
+        # Commit the profile and its login account together at the owning site first.
+        with transaction.atomic(using=target_alias):
+            _replicate_account(target_site, account, "them")
+            _create_admin_profile(target_site, admin_id, account_id, normalized_name, None, remote_ip)
+        for site in sites:
+            if site != target_site:
+                _replicate_account(site, account, "them")
+    except AdminSmallAccountConflict:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AuthInfrastructureUnavailable from exc
     email_sent = _send_credentials(normalized_email, normalized_name, normalized_username, temporary_password)
     return (
         AdminSmallProvisioningResult(

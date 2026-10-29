@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import wraps
 
 from django.conf import settings
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.mail import send_mail
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
@@ -115,6 +115,19 @@ def _account_id_exists(site_code: str, account_id: str) -> bool:
         return bool(cursor.fetchone()[0])
 
 
+def _unique_username(email: str, supplied: str | None, sites: tuple[str, ...]) -> str:
+    if supplied:
+        if _replicated_account(supplied.strip().lower(), sites) is not None:
+            raise EmployeeConflict
+        return supplied.strip().lower()
+    base = make_slug(email.partition("@")[0], max_length=80)
+    for suffix in range(1000):
+        candidate = base if suffix == 0 else f"{base[:88]}-{suffix}"
+        if _replicated_account(candidate, sites) is None:
+            return candidate
+    raise EmployeeInfrastructureUnavailable
+
+
 def _next_employee_id(site_code: str) -> str:
     for _ in range(1000):
         candidate = f"{site_code}-NV-{_next_sequence_number(site_code, 'Seq_NV'):06d}"
@@ -125,19 +138,6 @@ def _next_employee_id(site_code: str) -> str:
             )
             if not cursor.fetchone()[0]:
                 return candidate
-    raise EmployeeInfrastructureUnavailable
-
-
-def _unique_username(email: str, supplied: str | None, sites: tuple[str, ...]) -> str:
-    if supplied:
-        if _replicated_account(supplied, sites) is not None:
-            raise EmployeeConflict
-        return supplied
-    base = make_slug(email.partition("@")[0], max_length=80)
-    for suffix in range(1000):
-        candidate = base if suffix == 0 else f"{base[:88]}-{suffix}"
-        if _replicated_account(candidate, sites) is None:
-            return candidate
     raise EmployeeInfrastructureUnavailable
 
 
@@ -166,26 +166,95 @@ def _create_profile(
         with connections[alias].cursor() as cursor:
             acquire_record_lock(cursor, f"employee-create:{site_code}:{account_id}")
             cursor.execute(
-                "SELECT TOP (1) ma_nhan_vien FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK) "
-                "WHERE ma_tai_khoan = %s OR ma_nhan_vien = %s",
+                """
+                SELECT TOP (2) ma_nhan_vien, ma_co_so, ma_tai_khoan,
+                               ho_ten, sdt, email, chuc_vu, trang_thai
+                FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_tai_khoan = %s OR ma_nhan_vien = %s
+                """,
                 [account_id, employee_id],
             )
-            if cursor.fetchone() is not None:
+            rows = cursor.fetchall()
+            if len(rows) > 1:
                 raise EmployeeConflict
-            cursor.execute(
-                """
-                INSERT INTO dbo.NhanVien
-                    (ma_nhan_vien, ma_co_so, ma_tai_khoan, ho_ten, sdt, email, chuc_vu, trang_thai)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'dang_lam')
-                """,
-                [employee_id, site_code, account_id, full_name, phone, email, job_title],
-            )
+            if rows:
+                row = rows[0]
+                if (
+                    str(row[0]) != employee_id or str(row[1]).upper() != site_code
+                    or str(row[2]) != account_id or str(row[3]) != full_name
+                    or row[4] != phone or row[5] != email
+                    or str(row[6]).lower() != job_title or str(row[7]).lower() != "dang_lam"
+                ):
+                    raise EmployeeConflict
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO dbo.NhanVien
+                        (ma_nhan_vien, ma_co_so, ma_tai_khoan, ho_ten, sdt, email, chuc_vu, trang_thai)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'dang_lam')
+                    """,
+                    [employee_id, site_code, account_id, full_name, phone, email, job_title],
+                )
             append_audit(
                 cursor, site_code=site_code, actor_id=actor_id,
                 action="tao_nhan_vien", table_name="NhanVien", record_id=employee_id,
                 remote_ip=remote_ip,
                 after={"job_title": job_title, "site_code": site_code, "account_id": account_id},
             )
+
+
+def _recover_employee_provisioning(
+    *, site_code: str, email: str, username: str | None, full_name: str,
+    phone: str | None, job_title: str, temporary_password: str,
+) -> tuple[tuple, str] | None:
+    """Recover a locally committed employee so retries can finish replica fan-out."""
+    try:
+        with get_site_connection(site_code).cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP (2)
+                       t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email, t.mat_khau,
+                       t.vai_tro, t.ma_co_so, t.trang_thai,
+                       t.bat_buoc_doi_mat_khau, t.phien_ban,
+                       n.ma_nhan_vien, n.ma_co_so, n.ma_tai_khoan, n.ho_ten,
+                       n.sdt, n.email, n.chuc_vu, n.trang_thai
+                FROM dbo.TaiKhoan AS t
+                LEFT JOIN dbo.NhanVien AS n ON n.ma_tai_khoan = t.ma_tai_khoan
+                WHERE LOWER(t.email) = %s
+                   OR (%s IS NOT NULL AND LOWER(t.ten_dang_nhap) = %s)
+                """,
+                [email, username, username],
+            )
+            rows = cursor.fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise EmployeeConflict
+        row = rows[0]
+        account_id, slug, stored_username, stored_email = map(str, row[:4])
+        password_hash = str(row[4])
+        account_site = str(row[6]).upper() if row[6] else None
+        if (
+            str(row[5]).lower() != "nhan_vien" or account_site != site_code
+            or not account_status_bit(row[7]) or not bool(row[8])
+            or stored_email.casefold() != email
+            or (username is not None and stored_username.lower() != username)
+            or not check_password(temporary_password, password_hash)
+            or row[10] is None or str(row[11]).upper() != site_code
+            or str(row[12]) != account_id or str(row[13]) != full_name
+            or row[14] != phone or row[15] != email
+            or str(row[16]).lower() != job_title or str(row[17]).lower() != "dang_lam"
+        ):
+            raise EmployeeConflict
+        account = (
+            account_id, slug, stored_username, stored_email, password_hash,
+            site_code, bool(row[8]), int(row[9]),
+        )
+        return account, str(row[10])
+    except EmployeeConflict:
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise EmployeeInfrastructureUnavailable from exc
 
 
 def _send_credentials(email: str, full_name: str, username: str, password: str) -> bool:
@@ -222,30 +291,51 @@ def create_employee(
     normalized_name = full_name.strip()
     if not normalized_email or not normalized_name or not remote_ip:
         raise ValueError("Thiếu thông tin nhân viên.")
-    if _replicated_account(normalized_email, sites) is not None:
-        raise EmployeeConflict
-
-    normalized_username = _unique_username(normalized_email, username, sites)
-    account_id = _next_account_id(site, sites)
-    account_slug = _unique_account_slug(site, normalized_username, sites)
-    employee_id = _next_employee_id(site)
-    password_hash = make_password(temporary_password)
-    account = (
-        account_id, account_slug, normalized_username, normalized_email,
-        password_hash, site, True, 1,
+    normalized_phone = phone.strip() if phone else None
+    normalized_username = (username or make_slug(normalized_email.partition("@")[0], max_length=100)).strip().lower()
+    recovered = _recover_employee_provisioning(
+        site_code=site, email=normalized_email,
+        username=username.strip().lower() if username else None,
+        full_name=normalized_name, phone=normalized_phone, job_title=job_title,
+        temporary_password=temporary_password,
     )
-    for active_site in sites:
-        _replicate_account(active_site, account, "them")
-    _create_profile(
-        site_code=site, employee_id=employee_id, account_id=account_id,
-        full_name=normalized_name, phone=phone, email=normalized_email,
-        job_title=job_title, actor_id=actor_id, remote_ip=remote_ip,
-    )
+    if recovered is not None:
+        account, employee_id = recovered
+        account_id, account_slug, normalized_username, normalized_email = account[:4]
+    else:
+        if _replicated_account(normalized_email, sites) is not None:
+            raise EmployeeConflict
+        normalized_username = _unique_username(normalized_email, username, sites)
+        account_id = _next_account_id(site, sites)
+        account_slug = _unique_account_slug(site, normalized_username, sites)
+        employee_id = _next_employee_id(site)
+        password_hash = make_password(temporary_password)
+        account = (
+            account_id, account_slug, normalized_username, normalized_email,
+            password_hash, site, True, 1,
+        )
+    target_alias = get_site_database_alias(site)
+    try:
+        # Persist the site-local employee and its login account in one commit first.
+        with transaction.atomic(using=target_alias):
+            _replicate_account(site, account, "them")
+            _create_profile(
+                site_code=site, employee_id=employee_id, account_id=account_id,
+                full_name=normalized_name, phone=normalized_phone, email=normalized_email,
+                job_title=job_title, actor_id=actor_id, remote_ip=remote_ip,
+            )
+        for active_site in sites:
+            if active_site != site:
+                _replicate_account(active_site, account, "them")
+    except (EmployeeConflict, AdminSmallAccountConflict):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise EmployeeInfrastructureUnavailable from exc
     email_sent = _send_credentials(normalized_email, normalized_name, normalized_username, temporary_password)
     return EmployeeProvisioningResult(
         employee_id=employee_id, account_id=account_id, slug=account_slug,
         username=normalized_username, email=normalized_email, site_code=site,
-        job_title=job_title, full_name=normalized_name, phone=phone,
+        job_title=job_title, full_name=normalized_name, phone=normalized_phone,
         email_sent=email_sent,
     )
 
