@@ -1,0 +1,193 @@
+.footer {
+  background: #0b1120;
+  color: #94a3b8;
+  border-top: 1px solid #1e293b;
+  padding-top: 64px;
+}
+
+.footerInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+  gap: 40px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.brandCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .footerLogo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+
+    .logoIcon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--pws-gradient-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    .brandTitle {
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+
+      span {
+        color: #38bdf8;
+      }
+    }
+  }
+
+  .brandDesc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #94a3b8;
+    margin: 0;
+  }
+
+  .techBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #38bdf8;
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+  }
+}
+
+.footerCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .colTitle {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f1f5f9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .linkList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    li a {
+      color: #94a3b8;
+      font-size: 14px;
+      text-decoration: none;
+      transition: color 0.15s ease;
+
+      &:hover {
+        color: #38bdf8;
+      }
+    }
+  }
+}
+
+.branchesList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  .branchItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+
+    .branchName {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .branchTag {
+        font-size: 10px;
+        background: rgba(56, 189, 248, 0.2);
+        color: #38bdf8;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+    }
+
+    .branchAddr {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin: 0;
+    }
+  }
+}
+
+.bottomBar {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 20px 24px;
+  background: #080d1a;
+
+  .bottomInner {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 13px;
+    color: #64748b;
+
+    @media (max-width: 640px) {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .copyright {
+      margin: 0;
+    }
+
+    .metaInfo {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+  }
+}
+

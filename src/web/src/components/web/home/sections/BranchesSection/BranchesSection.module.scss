@@ -1,0 +1,246 @@
+.branchSection {
+  padding: 80px 0;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--pws-border);
+
+  @media (max-width: 768px) {
+    padding: 56px 0;
+  }
+}
+
+.branchInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pws-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: var(--pws-primary-tint);
+    padding: 4px 12px;
+    border-radius: 9999px;
+  }
+
+  .title {
+    font-size: 36px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.8px;
+    margin: 0;
+
+    @media (max-width: 768px) {
+      font-size: 28px;
+    }
+  }
+
+  .description {
+    font-size: 16px;
+    color: #475467;
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.branchGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+.branchCard {
+  background: #ffffff;
+  border: 1px solid var(--pws-border);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--pws-card-shadow);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.25s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    border-color: rgba(16, 92, 226, 0.35);
+    box-shadow: var(--pws-card-hover-shadow);
+  }
+
+  .cardBanner {
+    height: 120px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    position: relative;
+
+    .campusBadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(15, 23, 42, 0.7);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .statusPill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #10b981;
+      background: rgba(16, 185, 129, 0.15);
+      padding: 4px 8px;
+      border-radius: 9999px;
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+      }
+    }
+  }
+
+  .cardMain {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+
+    .branchTitle {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .addressBox {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: #475467;
+      line-height: 1.5;
+
+      svg {
+        width: 18px;
+        height: 18px;
+        color: var(--pws-primary);
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+    }
+
+    .phoneBox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+
+      svg {
+        width: 16px;
+        height: 16px;
+        color: var(--pws-accent-orange);
+      }
+    }
+
+    .statsRow {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px solid var(--pws-border-light);
+
+      .statItem {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .statVal {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0f172a;
+        }
+
+        .statLbl {
+          font-size: 11px;
+          color: #64748b;
+        }
+      }
+    }
+
+    .amenities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: auto;
+
+      .amenityTag {
+        font-size: 11px;
+        color: #475467;
+        background: #f1f5f9;
+        padding: 4px 8px;
+        border-radius: 6px;
+      }
+    }
+  }
+
+  .cardAction {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--pws-border-light);
+
+    .viewClassesBtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 1px solid var(--pws-border);
+      color: #0f172a;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--pws-primary-tint);
+        border-color: var(--pws-primary);
+        color: var(--pws-primary);
+      }
+    }
+  }
+}
+

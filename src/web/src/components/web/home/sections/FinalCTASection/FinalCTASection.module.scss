@@ -1,0 +1,248 @@
+.ctaSection {
+  background: linear-gradient(135deg, #0b1120 0%, #0f172a 50%, #172554 100%);
+  color: #ffffff;
+  padding: 80px 0;
+  position: relative;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    padding: 56px 0;
+  }
+}
+
+.ctaInner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  gap: 48px;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+.ctaPitch {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .pitchBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #38bdf8;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    width: fit-content;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .pitchTitle {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.8px;
+    margin: 0;
+
+    span {
+      background: linear-gradient(90deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 30px;
+    }
+  }
+
+  .pitchLead {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #94a3b8;
+    margin: 0;
+    max-width: 540px;
+  }
+
+  .benefitsList {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #e2e8f0;
+
+      svg {
+        width: 18px;
+        height: 18px;
+        color: #10b981;
+        flex-shrink: 0;
+      }
+    }
+  }
+}
+
+.formBox {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px;
+  color: #0f172a;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  @media (max-width: 640px) {
+    padding: 24px;
+  }
+
+  .formTitle {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+
+  .formSub {
+    font-size: 13px;
+    color: #64748b;
+    margin: -12px 0 0;
+  }
+
+  .formGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    input,
+    select {
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.15s ease;
+
+      &:focus {
+        border-color: var(--pws-primary);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(16, 92, 226, 0.15);
+      }
+    }
+  }
+
+  .rowTwo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .submitBtn {
+    height: 48px;
+    border-radius: 10px;
+    background: var(--pws-gradient-primary);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(16, 92, 226, 0.35);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 6px;
+
+    &:hover {
+      box-shadow: 0 6px 20px rgba(16, 92, 226, 0.45);
+      transform: translateY(-1px);
+    }
+  }
+
+  .successCard {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+
+    .successIcon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #10b981;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .successTitle {
+      font-size: 18px;
+      font-weight: 800;
+      color: #065f46;
+      margin: 0;
+    }
+
+    .successText {
+      font-size: 14px;
+      color: #047857;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .resetBtn {
+      margin-top: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #059669;
+      background: #ffffff;
+      color: #065f46;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  }
+}
+
