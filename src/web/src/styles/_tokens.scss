@@ -6,5 +6,26 @@ $petrol: #2c746b;
   --color-ink: #{$ink};
   --color-paper: #{$paper};
   --color-petrol: #{$petrol};
-  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* PWS Solutions Design Tokens */
+  --pws-primary: #105ce2;
+  --pws-primary-light: #4096ff;
+  --pws-primary-hover: #094bb8;
+  --pws-primary-tint: #f0f6ff;
+  --pws-accent-orange: #ff8600;
+  --pws-accent-amber: #ffb300;
+  --pws-gradient-primary: linear-gradient(292deg, #4096ff 14.54%, #105ce2 85.46%);
+  --pws-gradient-accent: linear-gradient(106deg, #ff8600, #ffb300);
+  --pws-gradient-subtle: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  --pws-bg-page: #ffffff;
+  --pws-text-title: #111827;
+  --pws-text-subtitle: #1d2939;
+  --pws-text-body: #475467;
+  --pws-text-muted: #667085;
+  --pws-border: #e4e7ec;
+  --pws-border-light: #f2f4f7;
+  --pws-card-bg: #ffffff;
+  --pws-card-shadow: 0 10px 30px -10px rgba(16, 92, 226, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --pws-card-hover-shadow: 0 20px 40px -15px rgba(16, 92, 226, 0.16), 0 0 0 1px rgba(16, 92, 226, 0.25);
 }

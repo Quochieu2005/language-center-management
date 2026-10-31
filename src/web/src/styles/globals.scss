@@ -4,6 +4,57 @@
   box-sizing: border-box;
 }
 
+/* Zenith Shadcn Design Tokens */
+[data-theme="dark"] {
+  --admin-bg: #09090b;
+  --admin-card-bg: #18181b;
+  --admin-card-hover: #222226;
+  --admin-border: #27272a;
+  --admin-border-subtle: #1f1f23;
+  --admin-text: #f4f4f5;
+  --admin-text-secondary: #a1a1aa;
+  --admin-text-muted: #71717a;
+  --admin-header-bg: rgba(18, 18, 21, 0.85);
+  --admin-input-bg: #121215;
+  --admin-sidebar-bg: #0d0d10;
+  --admin-footer-bg: #0d0d10;
+  --admin-hover-bg: rgba(255, 255, 255, 0.05);
+  --admin-active-bg: rgba(44, 116, 107, 0.16);
+  --admin-active-border: rgba(44, 116, 107, 0.4);
+  --admin-accent: #2c746b;
+  --admin-accent-glow: rgba(44, 116, 107, 0.35);
+  --admin-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --admin-table-row-hover: #1e1e22;
+  --admin-badge-count-bg: #27272a;
+  --admin-badge-count-text: #e4e4e7;
+  --admin-radius: 10px;
+}
+
+[data-theme="light"] {
+  --admin-bg: #f8fafc;
+  --admin-card-bg: #ffffff;
+  --admin-card-hover: #f1f5f9;
+  --admin-border: #e2e8f0;
+  --admin-border-subtle: #f1f5f9;
+  --admin-text: #0f172a;
+  --admin-text-secondary: #475569;
+  --admin-text-muted: #94a3b8;
+  --admin-header-bg: rgba(255, 255, 255, 0.85);
+  --admin-input-bg: #ffffff;
+  --admin-sidebar-bg: #ffffff;
+  --admin-footer-bg: #ffffff;
+  --admin-hover-bg: rgba(0, 0, 0, 0.04);
+  --admin-active-bg: rgba(44, 116, 107, 0.1);
+  --admin-active-border: rgba(44, 116, 107, 0.3);
+  --admin-accent: #2c746b;
+  --admin-accent-glow: rgba(44, 116, 107, 0.2);
+  --admin-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --admin-table-row-hover: #f8fafc;
+  --admin-badge-count-bg: #f1f5f9;
+  --admin-badge-count-text: #334155;
+  --admin-radius: 10px;
+}
+
 html {
   min-height: 100%;
   background: tokens.$paper;

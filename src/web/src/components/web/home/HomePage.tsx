@@ -1,57 +1,49 @@
-import styles from "./HomePage.module.scss";
+"use client";
 
-const platformParts = [
-  {
-    label: "Giao diện",
-    value: "Next.js App Router và TypeScript",
-  },
-  {
-    label: "Thành phần và kiểu dáng",
-    value: "Ant Design, Tailwind CSS và SCSS Modules",
-  },
-  {
-    label: "Kết nối nghiệp vụ",
-    value: "Frontend gọi Django API; không kết nối SQL Server trực tiếp",
-  },
-  {
-    label: "Dữ liệu",
-    value: "Mỗi cơ sở dùng CSDL SQL Server riêng theo thiết kế phân tán",
-  },
-];
+import React from "react";
+import styles from "./HomePage.module.scss";
+import WebHeader from "@/components/web/layout/WebHeader";
+import WebFooter from "@/components/web/layout/WebFooter";
+import HeroSection from "./sections/HeroSection/HeroSection";
+import ProofSection from "./sections/ProofSection/ProofSection";
+import CoursePreviewSection from "./sections/CoursePreviewSection/CoursePreviewSection";
+import BranchesSection from "./sections/BranchesSection/BranchesSection";
+import BenefitsSection from "./sections/BenefitsSection/BenefitsSection";
+import FAQSection from "./sections/FAQSection/FAQSection";
+import FinalCTASection from "./sections/FinalCTASection/FinalCTASection";
 
 export default function HomePage() {
   return (
-    <main className={styles.page}>
-      <div className={styles.content}>
-        <p className={styles.eyebrow}>Khởi tạo frontend</p>
-        <h1>Quản lý trung tâm đào tạo ngoại ngữ</h1>
-        <p className={styles.lead}>
-          Dự án Next.js đã sẵn sàng. Đây là màn hình khởi tạo dành cho nhóm phát
-          triển; các trang nghiệp vụ sẽ được xây theo đặc tả UI/UX và hợp đồng API.
-        </p>
+    <div className={styles.homeContainer}>
+      {/* PWS Solutions Style Web Header */}
+      <WebHeader />
 
-        <section className={styles.setup} aria-labelledby="setup-title">
-          <div className={styles.setupHeader}>
-            <p className={styles.eyebrow}>Nền tảng</p>
-            <h2 id="setup-title">Các phần đã được cấu hình</h2>
-          </div>
-          <dl className={styles.parts}>
-            {platformParts.map((part) => (
-              <div className={styles.part} key={part.label}>
-                <dt>{part.label}</dt>
-                <dd>{part.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+      {/* Main Sections */}
+      <main className={styles.mainContent}>
+        {/* 1. Hero & Course Finder */}
+        <HeroSection />
 
-        <div className={styles.nextStep}>
-          <span className={styles.statusMark} aria-hidden="true" />
-          <p>
-            Chạy giao diện bằng <code>npm run dev</code> trong thư mục frontend.
-          </p>
-        </div>
-      </div>
-    </main>
+        {/* 2. Real Stats & Metrics */}
+        <ProofSection />
+
+        {/* 3. Core Courses */}
+        <CoursePreviewSection />
+
+        {/* 4. 3 Campuses Network */}
+        <BranchesSection />
+
+        {/* 5. Distributed Architecture Benefits */}
+        <BenefitsSection />
+
+        {/* 6. FAQ Accordion */}
+        <FAQSection />
+
+        {/* 7. Final Interactive Consultation CTA */}
+        <FinalCTASection />
+      </main>
+
+      {/* PWS Solutions Style Web Footer */}
+      <WebFooter />
+    </div>
   );
 }
