@@ -6,8 +6,17 @@ import { RequireSession, useSession } from "@/lib/auth/session";
 import { authApi, type SessionUser } from "@/lib/api/auth";
 import { adminApi } from "@/lib/api/admin";
 import { academicsApi } from "@/lib/api/academics";
+import AdminLayout from "@/components/admin/layout/AdminLayout";
 
-export default function ProfileRoute() { return <RequireSession><ProfilePage /></RequireSession>; }
+export default function ProfileRoute() { return <RequireSession><ProfileRouteContent /></RequireSession>; }
+
+function ProfileRouteContent() {
+  const { user } = useSession();
+  const hasAdminShell = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan", "xep_lop"].includes(user?.role || "");
+  const content = <ProfilePage />;
+
+  return hasAdminShell ? <AdminLayout>{content}</AdminLayout> : <main>{content}</main>;
+}
 
 function ProfilePage() {
   const { user, refreshProfile } = useSession();
@@ -48,7 +57,7 @@ function ProfilePage() {
       setProfile(result); await refreshProfile(); message.success("Đã cập nhật hồ sơ.");
     } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không cập nhật được hồ sơ."); }
   };
-  return <main style={{ maxWidth: 880, margin: "32px auto", padding: 16 }}><Space direction="vertical" size="middle" style={{ width: "100%" }}><Card title="Hồ sơ tài khoản" extra={<Typography.Text>{roleName(user?.role)}</Typography.Text>}>
+  return <div style={{ maxWidth: 880, margin: "32px auto", padding: 16 }}><Space direction="vertical" size="middle" style={{ width: "100%" }}><Card title="Hồ sơ tài khoản" extra={<Typography.Text>{roleName(user?.role)}</Typography.Text>}>
     <Typography.Paragraph type="secondary">Slug tài khoản: {user?.slug} · Cơ sở: {user?.site_code || "Toàn hệ thống"}</Typography.Paragraph>
     {error && <Alert type="error" title={error} style={{ marginBottom: 16 }} />}
     <Form form={form} layout="vertical" onFinish={save} disabled={loading}>
@@ -60,7 +69,7 @@ function ProfilePage() {
       {(["admin_big", "admin_small", "giao_vien", "hoc_vien"] as SessionUser["role"][]).includes(user?.role || "admin_big") && <Button type="primary" htmlType="submit" loading={loading}>Lưu thay đổi</Button>}
     </Form>
     <Typography.Title level={5} style={{ marginTop: 24 }}>Dữ liệu hồ sơ từ API</Typography.Title><pre style={{ whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 360 }}>{JSON.stringify(profile, null, 2)}</pre>
-    </Card><Button href="/password/change">Đổi mật khẩu</Button></Space></main>;
+    </Card><Button href="/password/change">Đổi mật khẩu</Button></Space></div>;
 }
 
 function roleName(role?: string) { return ({ admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Lễ tân", tu_van: "Tư vấn", ke_toan: "Kế toán", xep_lop: "Nhân viên xếp lớp", giao_vien: "Giáo viên", hoc_vien: "Học viên" } as Record<string, string>)[role || ""] || "Tài khoản"; }
