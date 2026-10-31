@@ -3,6 +3,7 @@
 import { ConfigProvider } from "antd";
 import viVN from "antd/locale/vi_VN";
 import type { ReactNode } from "react";
+import { SessionProvider } from "@/lib/auth/session";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -28,7 +29,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
         },
       }}
     >
-      {children}
+      <SessionProvider>{children}</SessionProvider>
     </ConfigProvider>
   );
 }
