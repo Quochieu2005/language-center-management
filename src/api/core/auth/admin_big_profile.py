@@ -20,6 +20,7 @@ from core.auth.services import (
     auth_session_alias,
     auth_session_site_code,
 )
+from core.media.avatars import AvatarConflict, AvatarUnavailable, get_admin_avatar_url
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
 
@@ -47,7 +48,7 @@ def _account_values(account) -> dict[str, str]:
     }
 
 
-def _response(account_id: str, values: dict[str, str]) -> dict[str, Any]:
+def _response(account_id: str, values: dict[str, str], account) -> dict[str, Any]:
     return {
         "account_id": account_id,
         "slug": values["slug"],
@@ -55,6 +56,8 @@ def _response(account_id: str, values: dict[str, str]) -> dict[str, Any]:
         "email": values["email"],
         "role": "admin_big",
         "site_code": None,
+        "account_status": "active" if account_is_active(account[7]) else "inactive",
+        "must_change_password": bool(account[9]),
     }
 
 
@@ -78,9 +81,13 @@ def get_admin_big_self_profile(user, slug: str) -> dict[str, Any]:
         _assert_admin_big(account, user.account_id)
         if str(account[2]) != slug:
             raise AdminBigProfileNotFound
-        return _response(user.account_id, _account_values(account))
+        profile = _response(user.account_id, _account_values(account), account)
+        profile["avatar_secure_url"] = get_admin_avatar_url(user.account_id, "admin_big")
+        return profile
     except AdminBigProfileNotFound:
         raise
+    except (AvatarConflict, AvatarUnavailable) as exc:
+        raise AuthInfrastructureUnavailable from exc
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise AuthInfrastructureUnavailable from exc
 
@@ -434,7 +441,7 @@ def update_admin_big_self_profile(
 
                     new["slug"] = make_slug(new["username"], max_length=120)
                 if old == new:
-                    return _response(user.account_id, old)
+                    return _response(user.account_id, old, account)
 
                 for resource in sorted(_identity_lock_resources(old) + _identity_lock_resources(new)):
                     if resource in held_locks:
@@ -465,7 +472,7 @@ def update_admin_big_self_profile(
                 job = {"job_id": job_id, "sites": sites, "old": old, "new": new}
                 _apply_profile_job(user.account_id, user.account_id, job, sites, remote_ip)
                 _complete_profile_job(coordinator_alias, job_id)
-                return _response(user.account_id, new)
+                return _response(user.account_id, new, account)
             finally:
                 _release_session_locks(connection, lock_cursor, held_locks)
     except (

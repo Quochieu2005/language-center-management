@@ -31,6 +31,14 @@ export type Student = {
   phone: string | null; email: string | null; status: string; account_issued: boolean;
 };
 export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
+export type AdminAvatarUploadIntent = {
+  intent_token: string;
+  upload_url: string;
+  cloud_name: string;
+  api_key: string;
+  fields: Record<string, string>;
+  max_file_bytes: number;
+};
 
 export const adminApi = {
   studentCounts: (site_code?: string) => apiRequest<SiteCounts>(`/admin/reports/students-by-site/${query({ site_code })}`),
@@ -50,6 +58,12 @@ export const adminApi = {
   adminBigProfile: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/admin-bigs/profile/${encodeURIComponent(slug)}/`),
   updateAdminBigProfile: (slug: string, body: { current_password: string; username?: string; email?: string; slug?: string }) =>
     apiRequest<Record<string, unknown>>(`/admin/admin-bigs/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
+  createAdminAvatarUploadIntent: (slug: string) =>
+    apiRequest<AdminAvatarUploadIntent>(`/admin/profile/${encodeURIComponent(slug)}/avatar/upload-intents/`, { method: "POST", body: "{}" }),
+  completeAdminAvatarUpload: (slug: string, body: { intent_token: string; public_id: string }) =>
+    apiRequest<{ account_id: string; role: "admin_big" | "admin_small"; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
+      `/admin/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
+    ),
   teachers: (site_code: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Teacher>>(`/admin/teachers/${query({ site_code, ...options })}`),
   createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; specialty: string }) =>

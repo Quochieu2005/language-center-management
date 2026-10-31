@@ -14,6 +14,7 @@ from core.auth.service_common import (
     AuthenticatedUser,
     _next_sequence_number,
 )
+from core.media.avatars import AvatarConflict, AvatarUnavailable, get_admin_avatar_url
 
 def _admin_small_profile_cursor(
     site_code: str, account_id: str, slug: str, profile_id: str | None = None
@@ -21,7 +22,8 @@ def _admin_small_profile_cursor(
     cursor = connections[get_site_database_alias(site_code)].cursor()
     query = """
         SELECT TOP (2) n.ma_admin, n.ma_co_so, n.ho_ten, n.sdt,
-                       t.ten_dang_nhap, t.email, t.slug
+                       t.ten_dang_nhap, t.email, t.slug, n.trang_thai,
+                       t.trang_thai, t.bat_buoc_doi_mat_khau
         FROM dbo.Admin AS n
         INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
         WHERE n.ma_tai_khoan = %s AND n.ma_co_so = %s
@@ -60,9 +62,17 @@ def get_admin_small_self_profile(user: AuthenticatedUser, slug: str) -> dict[str
             "username": str(row[4]),
             "email": str(row[5]),
             "slug": str(row[6]),
+            "profile_status": "active" if bool(row[7]) else "inactive",
+            "account_status": "active" if bool(row[8]) else "inactive",
+            "must_change_password": bool(row[9]),
+            "avatar_secure_url": get_admin_avatar_url(
+                user.account_id, "admin_small", user.site_code
+            ),
         }
     except AdminSmallProfileNotFound:
         raise
+    except (AvatarConflict, AvatarUnavailable) as exc:
+        raise AuthInfrastructureUnavailable from exc
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise AuthInfrastructureUnavailable from exc
 

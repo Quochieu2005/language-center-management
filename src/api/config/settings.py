@@ -165,6 +165,7 @@ REST_FRAMEWORK = {
         "admin_account_read": "120/min",
         "admin_small_self_profile": "30/hour",
         "admin_big_self_profile": "20/hour",
+        "profile_avatar": "20/hour",
         "admin_small_delete": "10/hour",
         "teacher_create": "10/hour",
         "teacher_management": "120/min",

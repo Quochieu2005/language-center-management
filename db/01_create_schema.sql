@@ -89,6 +89,8 @@ BEGIN TRY
         ngay_doi_mat_khau_cuoi   DATETIME2(0)   NULL,
         phien_ban                BIGINT         NOT NULL CONSTRAINT DF_TaiKhoan_phien_ban DEFAULT (1),
         cap_nhat_luc             DATETIME2(0)   NOT NULL CONSTRAINT DF_TaiKhoan_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
+        avatar_public_id         NVARCHAR(255)  NULL,
+        avatar_secure_url        NVARCHAR(1024) NULL,
         CONSTRAINT PK_TaiKhoan PRIMARY KEY (ma_tai_khoan),
         CONSTRAINT UQ_TaiKhoan_slug UNIQUE (slug),
         CONSTRAINT UQ_TaiKhoan_ten_dang_nhap UNIQUE (ten_dang_nhap),
