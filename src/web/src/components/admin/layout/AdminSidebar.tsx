@@ -12,18 +12,24 @@ import {
   UsergroupAddOutlined,
   IdcardOutlined,
   BarChartOutlined,
-  FileTextOutlined,
 } from "@ant-design/icons";
 import styles from "./AdminLayout.module.scss";
+import { useSession } from "@/lib/auth/session";
+import type { Role } from "@/lib/api/auth";
+import type { ReactNode } from "react";
 
 type AdminSidebarProps = {
   isCollapsed: boolean;
 };
 
+type MenuItem = { label: string; href: string; icon: ReactNode; badge: { text: string; type: "hot" | "new" | "count" } | null; roles?: Role[] };
+type MenuSection = { title: string; items: MenuItem[] };
+
 export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
+  const { user } = useSession();
 
-  const menuSections = [
+  const menuSections: MenuSection[] = [
     {
       title: "Tổng quan",
       items: [
@@ -43,24 +49,28 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
           href: "/admin/students",
           icon: <TeamOutlined />,
           badge: { text: "Global", type: "count" },
+          roles: ["admin_big", "admin_small", "tu_van"],
         },
         {
           label: "Lớp học & Xếp lớp",
           href: "/admin/classes",
           icon: <CalendarOutlined />,
           badge: null,
+          roles: ["admin_big", "admin_small", "le_tan", "xep_lop", "tu_van"],
         },
         {
           label: "Chuyển cơ sở",
           href: "/admin/transfers",
           icon: <SwapOutlined />,
           badge: { text: "2PC", type: "hot" },
+          roles: ["admin_big", "admin_small"],
         },
         {
           label: "Học phí & Thu tiền",
           href: "/admin/tuition",
           icon: <DollarCircleOutlined />,
           badge: null,
+          roles: ["admin_big", "admin_small", "ke_toan"],
         },
       ],
     },
@@ -72,37 +82,27 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
           href: "/admin/subjects",
           icon: <BookOutlined />,
           badge: { text: "Sync", type: "new" },
+          roles: ["admin_big"],
         },
         {
           label: "Giảng viên & Roster",
           href: "/admin/teachers",
           icon: <UsergroupAddOutlined />,
           badge: null,
+          roles: ["admin_big", "admin_small"],
         },
         {
           label: "Quản trị cơ sở",
           href: "/admin/accounts",
           icon: <IdcardOutlined />,
           badge: null,
+          roles: ["admin_big", "admin_small"],
         },
       ],
     },
     {
-      title: "Báo cáo & Kiểm toán",
-      items: [
-        {
-          label: "Thống kê toàn cục",
-          href: "/admin/reports",
-          icon: <BarChartOutlined />,
-          badge: null,
-        },
-        {
-          label: "Nhật ký phân tán",
-          href: "/admin/audit",
-          icon: <FileTextOutlined />,
-          badge: null,
-        },
-      ],
+      title: "Báo cáo",
+      items: [{ label: "Thống kê theo cơ sở", href: "/admin/reports", icon: <BarChartOutlined />, badge: null, roles: ["admin_big", "admin_small"] }],
     },
   ];
 
@@ -119,11 +119,14 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
 
       {/* Nav items */}
       <div className={styles.sidebarContent}>
-        {menuSections.map((sec, secIdx) => (
+        {menuSections.map((sec, secIdx) => {
+          const items = sec.items.filter((item) => !item.roles || item.roles.includes(user?.role as Role));
+          if (!items.length) return null;
+          return (
           <div key={secIdx} className={styles.menuGroup}>
             <div className={styles.groupTitle}>{sec.title}</div>
             <ul className={styles.menuList}>
-              {sec.items.map((item, itemIdx) => {
+              {items.map((item, itemIdx) => {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== "/admin" && pathname?.startsWith(item.href));
@@ -156,7 +159,8 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
     </aside>
   );

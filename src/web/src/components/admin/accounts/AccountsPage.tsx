@@ -1,291 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import {
-  IdcardOutlined,
-  PlusOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  SafetyOutlined,
-} from "@ant-design/icons";
-import styles from "../common/AdminPageCommon.module.scss";
-
-type AccountItem = {
-  id: string;
-  username: string;
-  fullName: string;
-  role: "admin_big" | "admin_small" | "ke_toan" | "le_tan";
-  assignedSite: "ALL" | "Q1" | "Q7" | "TD";
-  email: string;
-  status: "active" | "locked";
-  lastLogin: string;
-};
-
-const INITIAL_ACCOUNTS: AccountItem[] = [
-  {
-    id: "1",
-    username: "quochieu_big",
-    fullName: "Thái Trung Quốc Hiếu",
-    role: "admin_big",
-    assignedSite: "ALL",
-    email: "quochieu@languagecenter.vn",
-    status: "active",
-    lastLogin: "30/10/2026 09:15",
-  },
-  {
-    id: "2",
-    username: "admin_q1",
-    fullName: "Trần Văn Bình",
-    role: "admin_small",
-    assignedSite: "Q1",
-    email: "admin.q1@languagecenter.vn",
-    status: "active",
-    lastLogin: "30/10/2026 08:30",
-  },
-  {
-    id: "3",
-    username: "admin_q7",
-    fullName: "Lê Thị Thanh",
-    role: "admin_small",
-    assignedSite: "Q7",
-    email: "admin.q7@languagecenter.vn",
-    status: "active",
-    lastLogin: "29/10/2026 17:45",
-  },
-  {
-    id: "4",
-    username: "admin_td",
-    fullName: "Nguyễn Hoàng Nam",
-    role: "admin_small",
-    assignedSite: "TD",
-    email: "admin.td@languagecenter.vn",
-    status: "active",
-    lastLogin: "30/10/2026 07:50",
-  },
-];
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, message } from "antd";
+import { adminApi, type AdminSmall, type Employee } from "@/lib/api/admin";
+import { ApiError } from "@/lib/api/client";
+import { useSession } from "@/lib/auth/session";
+import { useSiteScope } from "@/lib/auth/site-scope";
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<AccountItem[]>(INITIAL_ACCOUNTS);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newAcc, setNewAcc] = useState({
-    username: "",
-    fullName: "",
-    site: "Q1",
-    email: "",
-    role: "admin_small",
-  });
-
-  const handleToggleLock = (id: string) => {
-    setAccounts(
-      accounts.map((a) =>
-        a.id === id
-          ? { ...a, status: a.status === "active" ? "locked" : "active" }
-          : a
-      )
-    );
-  };
-
-  const handleCreateAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAcc.username.trim() || !newAcc.fullName.trim()) return;
-
-    const created: AccountItem = {
-      id: Date.now().toString(),
-      username: newAcc.username.trim(),
-      fullName: newAcc.fullName.trim(),
-      role: newAcc.role as "admin_small" | "ke_toan" | "le_tan",
-      assignedSite: newAcc.site as "Q1" | "Q7" | "TD",
-      email: newAcc.email.trim() || `${newAcc.username}@languagecenter.vn`,
-      status: "active",
-      lastLogin: "Chưa đăng nhập",
-    };
-
-    setAccounts([...accounts, created]);
-    setIsAddModalOpen(false);
-    setNewAcc({ username: "", fullName: "", site: "Q1", email: "", role: "admin_small" });
-  };
-
-  const renderRoleBadge = (role: AccountItem["role"]) => {
-    switch (role) {
-      case "admin_big":
-        return <span className={`${styles.badge} ${styles.global}`}>Admin Big (Toàn quyền)</span>;
-      case "admin_small":
-        return <span className={`${styles.badge} ${styles.site}`}>Admin Cơ sở</span>;
-      case "ke_toan":
-        return <span className={`${styles.badge} ${styles.active}`}>Kế toán</span>;
-      case "le_tan":
-        return <span className={`${styles.badge} ${styles.pending}`}>Lễ tân</span>;
+  const { user } = useSession();
+  const { siteCodes, selectedSite } = useSiteScope();
+  const [admins, setAdmins] = useState<AdminSmall[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState<"admin" | "employee" | null>(null);
+  const [form] = Form.useForm();
+  const site = user?.role === "admin_big" ? selectedSite || undefined : user?.site_code || undefined;
+  const load = useCallback(async () => {
+    const [adminResult, employeeResult] = await Promise.allSettled([
+      user?.role === "admin_big" ? adminApi.adminSmalls() : Promise.resolve({ results: [] as AdminSmall[], complete: true, missing_sites: [] as string[], site_codes: [] as string[] }),
+      site ? adminApi.employees(site) : Promise.resolve({ results: [] as Employee[] }),
+    ]);
+    if (adminResult.status === "fulfilled") {
+      setAdmins(adminResult.value.results);
+      if (!adminResult.value.complete) setError(`Danh sách Admin Small chưa đầy đủ; thiếu site: ${adminResult.value.missing_sites.join(", ")}`);
+    } else {
+      setError(adminResult.reason instanceof Error ? adminResult.reason.message : "Không tải được Admin Small.");
+      if (adminResult.reason instanceof ApiError && Array.isArray(adminResult.reason.payload.results)) {
+        const partial = adminResult.reason.payload.results.filter((item): item is AdminSmall => Boolean(item) && typeof item === "object");
+        setAdmins(partial);
+      }
     }
+    if (employeeResult.status === "fulfilled") setEmployees(employeeResult.value.results);
+    else setError((prev) => [prev, employeeResult.reason instanceof Error ? employeeResult.reason.message : "Không tải được nhân viên."].filter(Boolean).join(" · "));
+    const failures = [adminResult.status === "rejected" ? adminResult.reason : null, employeeResult.status === "rejected" ? employeeResult.reason : null].filter(Boolean);
+    if (failures.length) setError(failures.map((value) => value instanceof Error ? value.message : "Không tải được dữ liệu.").join(" · "));
+    setLoading(false);
+  }, [site, user?.role]);
+  useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) void load(); }); return () => { cancelled = true; }; }, [load]);
+  const submit = async (values: { full_name: string; email: string; username?: string; phone?: string; site_code?: string; job_title?: Employee["job_title"] }) => {
+    try {
+      if (creating === "admin") await adminApi.createAdminSmall({ full_name: values.full_name, email: values.email, username: values.username, site_code: values.site_code || site || "" });
+      else if (creating === "employee" && values.job_title) await adminApi.createEmployee({ full_name: values.full_name, email: values.email, username: values.username, phone: values.phone, site_code: values.site_code || site, job_title: values.job_title });
+      message.success("Đã tạo tài khoản theo phản hồi của API."); form.resetFields(); setCreating(null); void load();
+    } catch (reason) { message.error(reason instanceof ApiError ? reason.message : "Không tạo được tài khoản."); }
   };
-
-  return (
-    <div className={styles.pageContainer}>
-      <div className={styles.pageHeader}>
-        <div className={styles.headerLeft}>
-          <div className={styles.titleRow}>
-            <h1>Quản trị cơ sở & Nhân sự</h1>
-            <span className={`${styles.badge} ${styles.global}`}>
-              <SafetyOutlined /> Phân quyền phân tán
-            </span>
-          </div>
-          <p className={styles.subtitle}>
-            Tạo tài khoản Admin Small phụ trách cơ sở. Admin Small chỉ có quyền truy cập dữ liệu trong phạm vi site được phân công.
-          </p>
-        </div>
-
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.primary}`}
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <PlusOutlined /> Cấp tài khoản Admin Small
-          </button>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className={styles.tableCard}>
-        <div className={styles.tableWrapper}>
-          <table className={styles.dataTable}>
-            <thead>
-              <tr>
-                <th>Tên đăng nhập</th>
-                <th>Họ và tên</th>
-                <th>Vai trò</th>
-                <th>Cơ sở phụ trách</th>
-                <th>Email nội bộ</th>
-                <th>Lần đăng nhập cuối</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    <span className={styles.codeCell}>{a.username}</span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{a.fullName}</td>
-                  <td>{renderRoleBadge(a.role)}</td>
-                  <td>
-                    <span className={`${styles.badge} ${styles.site}`}>
-                      {a.assignedSite === "ALL" ? "Toàn bộ 3 cơ sở" : `Cơ sở ${a.assignedSite}`}
-                    </span>
-                  </td>
-                  <td>{a.email}</td>
-                  <td style={{ fontSize: "12px", color: "var(--admin-text-muted)" }}>
-                    {a.lastLogin}
-                  </td>
-                  <td>
-                    {a.status === "active" ? (
-                      <span className={`${styles.badge} ${styles.active}`}>Hoạt động</span>
-                    ) : (
-                      <span className={`${styles.badge} ${styles.rejected}`}>Đã khóa</span>
-                    )}
-                  </td>
-                  <td>
-                    {a.role !== "admin_big" && (
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.sm}`}
-                        onClick={() => handleToggleLock(a.id)}
-                        title={a.status === "active" ? "Khóa tài khoản" : "Mở khóa"}
-                      >
-                        {a.status === "active" ? <LockOutlined /> : <UnlockOutlined />}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className={styles.tableFooter}>
-          <span>Bảo mật hệ thống: Mật khẩu được băm bằng bcrypt, phiên đăng nhập tự hết hạn sau 60 phút.</span>
-        </div>
-      </div>
-
-      {/* Modal Thêm tài khoản */}
-      {isAddModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalCard}>
-            <div className={styles.modalHeader}>
-              <h3>Cấp tài khoản Admin Small</h3>
-              <button
-                type="button"
-                className={styles.closeBtn}
-                onClick={() => setIsAddModalOpen(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateAccount}>
-              <div className={styles.modalBody}>
-                <div className={styles.formGroup}>
-                  <label>Cơ sở phân công (*)</label>
-                  <select
-                    value={newAcc.site}
-                    onChange={(e) => setNewAcc({ ...newAcc, site: e.target.value })}
-                  >
-                    <option value="Q1">Cơ sở Quận 1 (QLTTNN_Q1)</option>
-                    <option value="Q7">Cơ sở Quận 7 (QLTTNN_Q7)</option>
-                    <option value="TD">Cơ sở Thủ Đức (QLTTNN_TD)</option>
-                  </select>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Tên đăng nhập (*)</label>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: admin_q1_tan"
-                    value={newAcc.username}
-                    onChange={(e) => setNewAcc({ ...newAcc, username: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Họ và tên (*)</label>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: Nguyễn Văn Tân"
-                    value={newAcc.fullName}
-                    onChange={(e) => setNewAcc({ ...newAcc, fullName: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Email cơ sở</label>
-                  <input
-                    type="email"
-                    placeholder="tan.nguyen@languagecenter.vn"
-                    value={newAcc.email}
-                    onChange={(e) => setNewAcc({ ...newAcc, email: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.modalFooter}>
-                <button
-                  type="button"
-                  className={styles.btn}
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  Hủy
-                </button>
-                <button type="submit" className={`${styles.btn} ${styles.primary}`}>
-                  Cấp tài khoản
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const adminColumns = [
+    { title: "Tên", dataIndex: "full_name" }, { title: "Email", dataIndex: "email" }, { title: "Cơ sở", dataIndex: "site_code" },
+    { title: "Trạng thái", dataIndex: "account_status", render: (v: string) => <Tag color={v === "active" ? "green" : "default"}>{v}</Tag> },
+    { title: "Thao tác", render: (_: unknown, row: AdminSmall) => <Space><Button size="small" onClick={async () => { try { await adminApi.updateAdminSmallStatus(row.slug, row.account_status === "active" ? "inactive" : "active"); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Lỗi cập nhật"); } }}>{row.account_status === "active" ? "Ngưng" : "Kích hoạt"}</Button><Popconfirm title="Vô hiệu hóa Admin Small?" onConfirm={async () => { try { await adminApi.deactivateAdminSmall(row.account_id); message.success("Đã vô hiệu hóa tài khoản."); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Lỗi thao tác"); } }}><Button danger size="small">Xóa</Button></Popconfirm></Space> },
+  ];
+  const employeeColumns = [
+    { title: "Tên", dataIndex: "full_name" }, { title: "Email", dataIndex: "email" }, { title: "Cơ sở", dataIndex: "site_code" },
+    { title: "Chức vụ", dataIndex: "job_title" }, { title: "Trạng thái", dataIndex: "account_status", render: (v: string) => <Tag color={v === "active" ? "green" : "default"}>{v}</Tag> },
+    { title: "Thao tác", render: (_: unknown, row: Employee) => <Popconfirm title="Vô hiệu hóa tài khoản nhân viên này?" onConfirm={async () => { try { await adminApi.deleteEmployee(row.slug, row.site_code); message.success("Đã vô hiệu hóa tài khoản."); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Lỗi thao tác"); } }}><Button danger size="small">Xóa</Button></Popconfirm> },
+  ];
+  return <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+    <Card title="Quản lý tài khoản và nhân viên" extra={<Space>{user?.role === "admin_big" && <Button onClick={() => { setCreating("admin"); form.resetFields(); }}>Tạo Admin Small</Button>}<Button type="primary" onClick={() => { setCreating("employee"); form.resetFields(); }}>Tạo nhân viên</Button></Space>}>
+      {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
+      {user?.role === "admin_big" && <Tabs items={[{ key: "admins", label: "Admin Small", children: <Table rowKey="account_id" loading={loading} columns={adminColumns} dataSource={admins} scroll={{ x: 700 }} /> }, { key: "employees", label: "Nhân viên", children: <Table rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 700 }} /> }]} />}
+      {user?.role !== "admin_big" && <Table rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 700 }} />}
+    </Card>
+    <Modal title={creating === "admin" ? "Tạo Admin Small" : "Tạo nhân viên"} open={Boolean(creating)} onCancel={() => setCreating(null)} footer={null} destroyOnClose>
+      <Form form={form} layout="vertical" onFinish={submit}>
+        <Form.Item name="full_name" label="Họ tên" rules={[{ required: true, max: 120 }]}><Input maxLength={120} /></Form.Item>
+        <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
+        <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>
+        <Form.Item name="phone" label="Số điện thoại"><Input maxLength={20} /></Form.Item>
+        {user?.role === "admin_big" && <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true }]}><Select options={siteCodes.map((value) => ({ value, label: value }))} /></Form.Item>}
+        {creating === "employee" && <Form.Item name="job_title" label="Chức vụ" rules={[{ required: true }]}><Select options={[{ value: "le_tan", label: "Lễ tân" }, { value: "tu_van", label: "Tư vấn" }, { value: "ke_toan", label: "Kế toán" }, { value: "xep_lop", label: "Xếp lớp" }]} /></Form.Item>}
+        <Button type="primary" htmlType="submit" block>Tạo tài khoản</Button>
+      </Form>
+    </Modal>
+  </Space>;
 }
-

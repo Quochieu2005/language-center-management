@@ -22,9 +22,9 @@ class NotificationNotFound(Exception):
 
 
 _AUTO_SUMMARY_EVENT_FILTER = """
-AND n.event_key NOT LIKE 'system-available:%'
-AND n.event_key NOT LIKE 'system-unavailable:%'
-AND n.event_key NOT LIKE 'tuition-open:%'
+AND n.event_key NOT LIKE 'system-available:%%'
+AND n.event_key NOT LIKE 'system-unavailable:%%'
+AND n.event_key NOT LIKE 'tuition-open:%%'
 """
 
 

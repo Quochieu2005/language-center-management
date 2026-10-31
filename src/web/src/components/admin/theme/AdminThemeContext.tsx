@@ -23,10 +23,11 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    let savedTheme: AdminTheme = "dark";
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY) as AdminTheme | null;
       if (saved === "light" || saved === "dark") {
-        setThemeState(saved);
+        savedTheme = saved;
         document.documentElement.setAttribute("data-theme", saved);
         if (saved === "dark") {
           document.documentElement.classList.add("dark");
@@ -41,7 +42,7 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
       document.documentElement.setAttribute("data-theme", "dark");
       document.documentElement.classList.add("dark");
     }
-    setMounted(true);
+    queueMicrotask(() => { setThemeState(savedTheme); setMounted(true); });
   }, []);
 
   const setTheme = (newTheme: AdminTheme) => {
