@@ -61,6 +61,7 @@ from core.academics.tuition_views import (
 from core.academics.reminder_views import ClassTuitionReminderView
 from core.employees.views import EmployeeCollectionView, EmployeeDetailView
 from core.catalog.views import SharedSubjectDetailView
+from core.media.views import AdminAvatarCompleteView, AdminAvatarUploadIntentView
 
 
 app_name = "core"
@@ -80,6 +81,8 @@ urlpatterns = [
     path("admin/admin-smalls/<str:slug>/status/", AdminSmallStatusView.as_view(), name="admin-small-status"),
     path("admin/admin-smalls/<str:account_id>/", AdminSmallDeleteView.as_view(), name="admin-small-delete"),
     path("admin/admin-bigs/profile/<str:slug>/", AdminBigSelfProfileView.as_view(), name="admin-big-profile"),
+    path("admin/profile/<str:slug>/avatar/upload-intents/", AdminAvatarUploadIntentView.as_view(), name="admin-avatar-upload-intent"),
+    path("admin/profile/<str:slug>/avatar/complete/", AdminAvatarCompleteView.as_view(), name="admin-avatar-complete"),
     path("teachers/profile/<str:slug>/", TeacherProfileView.as_view(), name="teacher-profile"),
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),

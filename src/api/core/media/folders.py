@@ -9,6 +9,7 @@ from django.conf import settings
 _RESOURCE_LAYOUTS = {
     "student": ("hoc-vien", "site"),
     "teacher": ("giao-vien", "site"),
+    "account": ("tai-khoan", "shared"),
     "course": ("khoa-hoc", "shared"),
     "branch": ("co-so", "shared"),
     "brand": ("thuong-hieu", "shared"),

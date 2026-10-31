@@ -143,6 +143,10 @@ class AdminSmallSelfProfileResponseSerializer(serializers.Serializer):
     phone = serializers.CharField(allow_null=True)
     username = serializers.CharField()
     email = serializers.EmailField()
+    profile_status = serializers.ChoiceField(choices=["active", "inactive"])
+    account_status = serializers.ChoiceField(choices=["active", "inactive"])
+    must_change_password = serializers.BooleanField()
+    avatar_secure_url = serializers.URLField(allow_null=True)
 
 
 class AdminBigSelfProfileUpdateSerializer(serializers.Serializer):
@@ -197,6 +201,9 @@ class AdminBigSelfProfileResponseSerializer(serializers.Serializer):
     email = serializers.EmailField()
     role = serializers.ChoiceField(choices=["admin_big"])
     site_code = serializers.CharField(allow_null=True)
+    account_status = serializers.ChoiceField(choices=["active", "inactive"])
+    must_change_password = serializers.BooleanField()
+    avatar_secure_url = serializers.URLField(allow_null=True)
 
 
 class AdminSmallDeleteResponseSerializer(serializers.Serializer):
