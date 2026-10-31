@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { ConfigProvider, theme as antdTheme } from "antd";
 
 export type AdminTheme = "dark" | "light";
 
@@ -67,9 +68,11 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <AdminThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
-      <div data-theme={mounted ? theme : "dark"} style={{ minHeight: "100vh" }}>
-        {children}
-      </div>
+      <ConfigProvider theme={{ algorithm: theme === "dark" ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+        <div data-theme={mounted ? theme : "dark"} style={{ minHeight: "100vh" }}>
+          {children}
+        </div>
+      </ConfigProvider>
     </AdminThemeContext.Provider>
   );
 }
