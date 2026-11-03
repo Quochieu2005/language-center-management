@@ -13,6 +13,7 @@ export type EnrollmentRow = { enrollment_id: string; student_id: string; student
 export type SessionRow = { session_id: string; session_number: number; date: string; start_time: string; end_time: string; room_id: string; room_name: string; teacher_id: string; teacher_name: string; status: string; note: string | null };
 export type TuitionRow = { tuition_id: string; site_code: string; enrollment_id: string; student_id: string; student_slug: string; student_name: string; student_email: string | null; class_id: string; class_name: string; course_name: string; total_due: number; amount_paid: number; balance: number; status: string; due_date: string | null };
 export type TransferRow = { transfer_id: string; source_site: string; target_site: string; student_slug: string; student_id: string; student_name: string; status: string; reason: string; requested_at: string; decision_reason?: string | null };
+export type StudentSePayPayment = { site_code: string; attempt_id: string; installment_id: string; amount: number; payment_code: string; bank_code: string; bank_account: string; qr_url: string; status: "cho_thanh_toan" | "da_thanh_toan" | "het_han" | "can_doi_soat" | "da_huy"; expires_at: string };
 
 export const academicsApi = {
   health: () => apiRequest<{ status: string; service?: string }>("/health/"),
@@ -46,6 +47,8 @@ export const academicsApi = {
   studentEnrollments: (slug: string) => apiRequest<ApiList<ApiRow>>(`/students/profile/${encodeURIComponent(slug)}/enrollments/`),
   studentSchedule: (slug: string) => apiRequest<ApiList<ApiRow>>(`/students/profile/${encodeURIComponent(slug)}/schedule/`),
   studentTuition: (slug: string) => apiRequest<ApiList<ApiRow>>(`/students/profile/${encodeURIComponent(slug)}/tuition/`),
+  createStudentSePayPayment: (slug: string, tuitionId: string, body: { installment_id: string; amount: number }, idempotencyKey: string) => apiRequest<StudentSePayPayment>(`/students/profile/${encodeURIComponent(slug)}/tuition/${encodeURIComponent(tuitionId)}/payments/sepay/`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
+  studentPaymentStatus: (slug: string, attemptId: string) => apiRequest<StudentSePayPayment>(`/students/profile/${encodeURIComponent(slug)}/payments/${encodeURIComponent(attemptId)}/`),
   studentGrades: (slug: string) => apiRequest<ApiList<ApiRow>>(`/students/profile/${encodeURIComponent(slug)}/grades/`),
   studentProfile: (slug: string) => apiRequest<ApiRow>(`/students/profile/${encodeURIComponent(slug)}/`),
   updateStudentProfile: (slug: string, body: ApiRow) => apiRequest<ApiRow>(`/students/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),

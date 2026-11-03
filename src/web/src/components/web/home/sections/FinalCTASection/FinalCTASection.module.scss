@@ -1,4 +1,5 @@
 .ctaSection {
+  scroll-margin-top: 120px;
   background: linear-gradient(135deg, #0b1120 0%, #0f172a 50%, #172554 100%);
   color: #ffffff;
   padding: 80px 0;
@@ -243,6 +244,169 @@
       font-size: 13px;
       cursor: pointer;
     }
+  }
+}
+
+.contactPage {
+  padding: clamp(56px, 6vw, 80px) 0;
+}
+
+.ctaSection.contactPage {
+  background:
+    radial-gradient(circle at 12% 20%, rgba(59, 130, 246, 0.2), transparent 30%),
+    linear-gradient(125deg, #0b1120 0%, #111d38 58%, #172f68 100%);
+  color: #f8fafc;
+}
+
+.contactPage .ctaInner {
+  max-width: 1160px;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: clamp(36px, 6vw, 84px);
+}
+
+.contactPage .ctaPitch {
+  gap: 22px;
+  max-width: 540px;
+}
+
+.contactLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #7dd3fc;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.contactLabel::before {
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.contactPage .pitchTitle {
+  max-width: 560px;
+  color: #ffffff;
+  font-size: clamp(40px, 5vw, 62px);
+  letter-spacing: -1.8px;
+  line-height: 1.06;
+}
+
+.contactPage .pitchLead {
+  max-width: 500px;
+  color: #cbd5e1;
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.contactPhone {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(191, 219, 254, 0.42);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.contactPhone svg {
+  width: 18px;
+  height: 18px;
+}
+
+.contactPhone:hover {
+  border-color: #93c5fd;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.contactFormBox {
+  position: relative;
+  border: 1px solid #e0e7f0;
+  border-radius: 22px;
+  padding: clamp(26px, 3.5vw, 42px);
+  box-shadow: 0 30px 80px rgba(2, 8, 23, 0.3);
+}
+
+.contactFormBox::before {
+  position: absolute;
+  top: 0;
+  left: 32px;
+  right: 32px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--pws-gradient-primary);
+  content: "";
+}
+
+.contactFormBox .formTitle {
+  font-size: 24px;
+  letter-spacing: -0.4px;
+}
+
+.contactFormBox .formSub {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.contactFormBox .inputGroup label {
+  color: #475569;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (max-width: 1024px) {
+  .contactPage .ctaInner {
+    max-width: 760px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+  }
+
+  .contactPage .ctaPitch {
+    max-width: 650px;
+  }
+}
+
+@media (max-width: 640px) {
+  .contactPage {
+    min-height: auto;
+    padding: 36px 0 48px;
+  }
+
+  .contactPage .ctaInner {
+    gap: 24px;
+    padding: 0 18px;
+  }
+
+  .contactPage .ctaPitch {
+    gap: 16px;
+  }
+
+  .contactPage .pitchTitle {
+    font-size: 38px;
+    letter-spacing: -1px;
+  }
+
+  .contactPage .pitchLead {
+    font-size: 16px;
+  }
+
+  .contactFormBox {
+    gap: 16px;
+    padding: 20px 16px;
   }
 }
 

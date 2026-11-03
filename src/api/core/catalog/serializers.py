@@ -1,6 +1,36 @@
 from rest_framework import serializers
 
 
+class PublicCourseBranchSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    site_name = serializers.CharField()
+    open_class_count = serializers.IntegerField(min_value=1)
+
+
+class PublicCourseSerializer(serializers.Serializer):
+    course_id = serializers.CharField()
+    slug = serializers.CharField()
+    subject_id = serializers.CharField()
+    subject_slug = serializers.CharField()
+    subject_name = serializers.CharField()
+    name = serializers.CharField()
+    level = serializers.CharField()
+    session_count = serializers.IntegerField(min_value=1)
+    standard_fee = serializers.IntegerField(min_value=0)
+    version = serializers.IntegerField(min_value=1)
+    branches = PublicCourseBranchSerializer(many=True)
+
+
+class PublicCourseListSerializer(serializers.Serializer):
+    scope = serializers.ChoiceField(choices=("GLOBAL",))
+    complete = serializers.BooleanField()
+    site_codes = serializers.ListField(child=serializers.CharField())
+    missing_sites = serializers.ListField(child=serializers.CharField())
+    inconsistent_sites = serializers.ListField(child=serializers.CharField())
+    count = serializers.IntegerField(min_value=0)
+    results = PublicCourseSerializer(many=True)
+
+
 class SharedSubjectPatchSerializer(serializers.Serializer):
     ten_mon = serializers.CharField(max_length=100, required=False, trim_whitespace=True)
     mo_ta = serializers.CharField(

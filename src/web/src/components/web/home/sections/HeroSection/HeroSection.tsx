@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import styles from "./HeroSection.module.scss";
 
 interface HeroSectionProps {
@@ -17,10 +18,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
     if (onSearch) {
       onSearch(selectedBranch, selectedCourse, selectedTime);
     }
-    const coursesElem = document.getElementById("courses");
-    if (coursesElem) {
-      coursesElem.scrollIntoView({ behavior: "smooth" });
-    }
+    document.getElementById("courses")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -30,17 +28,17 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
         <div className={styles.heroContent}>
           <div className={styles.badgeWrapper}>
             <span className={styles.badgePulse} />
-            <span className={styles.badgeText}>Hệ thống Đào tạo & Quản lý Phân tán 3 Cơ sở</span>
+            <span className={styles.badgeText}>Khóa học ngoại ngữ tại TP. Hồ Chí Minh</span>
           </div>
 
           <h1 className={styles.heroTitle}>
-            Đào tạo Ngoại ngữ Chuẩn Quốc tế với{" "}
-            <span className={styles.highlight}>Hạ tầng CSDL Phân tán</span>
+            Chọn khóa học phù hợp với{" "}
+            <span className={styles.highlight}>mục tiêu của bạn</span>
           </h1>
 
           <p className={styles.heroLead}>
-            Trải nghiệm học tập linh hoạt và nhất quán tại Quận 1, Quận 7 và Thủ Đức. Hệ thống phân tán
-            giúp bảo toàn toàn diện lịch sử học viên, kết quả học tập và chuyển đổi cơ sở thuận tiện.
+            Xem các chương trình TOEIC, IELTS, giao tiếp và VSTEP. Chọn cơ sở cùng khung giờ bạn quan tâm,
+            rồi gửi yêu cầu để được tư vấn trước khi đăng ký.
           </p>
 
           {/* Quick Course Finder Box */}
@@ -49,7 +47,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <span>Tìm kiếm & Đăng ký Lớp học tại 3 Cơ sở</span>
+              <span>Tìm chương trình và lớp học</span>
             </div>
 
             <div className={styles.finderGrid}>
@@ -101,33 +99,30 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-              <span>Xem danh sách lớp khả dụng</span>
+              <span>Xem khóa học</span>
             </button>
           </form>
 
           {/* Quick CTAs */}
           <div className={styles.heroActions}>
-            <a href="#consultation" className={styles.ctaPrimary}>
+            <Link href="/#consultation" className={styles.ctaPrimary}>
               <span>Nhận tư vấn xếp lớp</span>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
-            </a>
-            <a href="#branches" className={styles.ctaSecondary}>
-              Khám phá 3 Cơ sở
-            </a>
+            </Link>
           </div>
         </div>
 
-        {/* Right Column: Visual Architecture Stack & Cards */}
+        {/* Right Column: Course and campus overview */}
         <div className={styles.heroVisual}>
-          {/* Architecture Status Card */}
+          {/* Campus choices */}
           <div className={styles.architectureCard}>
             <div className={styles.archHeader}>
-              <span className={styles.archTitle}>Cấu trúc Hạ tầng CSDL 3 Site</span>
+              <span className={styles.archTitle}>Chọn cơ sở thuận tiện</span>
               <div className={styles.archStatus}>
                 <span className={styles.dot} />
-                <span>Hoạt động 100%</span>
+                <span>TP. Hồ Chí Minh</span>
               </div>
             </div>
 
@@ -135,27 +130,23 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               <div className={styles.sitePill}>
                 <span className={styles.siteCode}>Q1</span>
                 <span className={styles.siteName}>Quận 1</span>
-                <span className={styles.siteDb}>QLTTNN_Q1</span>
               </div>
               <div className={styles.sitePill}>
                 <span className={styles.siteCode}>Q7</span>
                 <span className={styles.siteName}>Quận 7</span>
-                <span className={styles.siteDb}>QLTTNN_Q7</span>
               </div>
               <div className={styles.sitePill}>
                 <span className={styles.siteCode}>TD</span>
                 <span className={styles.siteName}>Thủ Đức</span>
-                <span className={styles.siteDb}>QLTTNN_TD</span>
               </div>
             </div>
 
             <p className={styles.archFootnote}>
-              Dữ liệu lớp học và học viên phân mảnh ngang độc lập theo từng cơ sở; bảng môn học được
-              nhân bản đồng bộ thời gian thực.
+              Chọn cơ sở dự kiến trong biểu mẫu tư vấn để trung tâm tiếp nhận đúng nhu cầu của bạn.
             </p>
           </div>
 
-          {/* Value prop 1: Concurrency Control */}
+          {/* Course selection */}
           <div className={styles.visualCard}>
             <div className={styles.cardIcon}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,13 +154,13 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               </svg>
             </div>
             <div className={styles.cardBody}>
-              <div className={styles.cardLabel}>Kiểm soát Đồng thời (Concurrency)</div>
-              <div className={styles.cardDesc}>Khóa giao dịch giữ chỗ tự động, đảm bảo sĩ số không vượt quá sức chứa lớp học.</div>
+              <div className={styles.cardLabel}>Chọn chương trình học</div>
+              <div className={styles.cardDesc}>Xem các khóa TOEIC, IELTS, giao tiếp và VSTEP trước khi chọn lớp.</div>
             </div>
-            <span className={styles.cardTag}>Chống trùng chỗ</span>
+            <span className={styles.cardTag}>Theo mục tiêu học tập</span>
           </div>
 
-          {/* Value prop 2: 2PC Transfers */}
+          {/* Consultation */}
           <div className={styles.visualCard}>
             <div className={styles.cardIcon}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -177,10 +168,10 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               </svg>
             </div>
             <div className={styles.cardBody}>
-              <div className={styles.cardLabel}>Chuyển Cơ Sở Liền Mạch (2PC)</div>
-              <div className={styles.cardDesc}>Điều phối giao dịch phân tán giữa nguồn và đích, bảo toàn lịch sử và điểm số.</div>
+              <div className={styles.cardLabel}>Cần tư vấn trước khi đăng ký?</div>
+              <div className={styles.cardDesc}>Gửi thông tin khóa học và cơ sở bạn quan tâm ở biểu mẫu bên dưới.</div>
             </div>
-            <span className={styles.cardTag}>Bảo toàn hồ sơ</span>
+            <span className={styles.cardTag}>Gửi yêu cầu tư vấn</span>
           </div>
         </div>
       </div>

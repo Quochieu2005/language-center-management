@@ -15,6 +15,12 @@ from core.auth.views import (
     AdminSmallSelfProfileView,
     CsrfTokenView,
 )
+from core.auth.oauth_views import (
+    AuthSessionView,
+    OAuthCallbackView,
+    OAuthStartView,
+    StudentOAuthConnectionsView,
+)
 from core.views import health_check
 from core.teachers.views import TeacherCollectionView, TeacherDetailView, TeacherProfileView, TeacherStatusView
 from core.notifications.views import (
@@ -59,8 +65,16 @@ from core.academics.tuition_views import (
     TuitionReceiptCreateView,
 )
 from core.academics.reminder_views import ClassTuitionReminderView
+from core.academics.sepay_views import (
+    SePayWebhookView,
+    StudentSePayPaymentCreateView,
+    StudentSePayPaymentStatusView,
+)
 from core.employees.views import EmployeeCollectionView, EmployeeDetailView
-from core.catalog.views import SharedSubjectDetailView
+from core.catalog.views import (
+    PublicCourseListView,
+    SharedSubjectDetailView,
+)
 from core.media.views import AdminAvatarCompleteView, AdminAvatarUploadIntentView
 
 
@@ -68,8 +82,13 @@ app_name = "core"
 
 urlpatterns = [
     path("health/", health_check, name="health"),
+    path("webhooks/sepay/", SePayWebhookView.as_view(), name="sepay-webhook"),
     path("auth/csrf/", CsrfTokenView.as_view(), name="auth-csrf"),
     path("auth/login/", AuthLoginView.as_view(), name="auth-login"),
+    path("auth/session/", AuthSessionView.as_view(), name="auth-session"),
+    path("auth/oauth/<str:provider>/start/", OAuthStartView.as_view(), name="auth-oauth-start"),
+    path("auth/oauth/<str:provider>/callback/", OAuthCallbackView.as_view(), name="auth-oauth-callback"),
+    path("auth/oauth/connections/<str:slug>/", StudentOAuthConnectionsView.as_view(), name="auth-oauth-connections"),
     path("auth/password/change/", AuthChangePasswordView.as_view(), name="auth-password-change"),
     path("auth/password/forgot/", AdminForgotPasswordView.as_view(), name="auth-password-forgot"),
     path("auth/password/reset/", AdminResetPasswordView.as_view(), name="auth-password-reset"),
@@ -90,6 +109,7 @@ urlpatterns = [
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),
     path("admin/employees/<str:slug>/", EmployeeDetailView.as_view(), name="employee-detail"),
     path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),
+    path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),
     path("admin/students/<str:slug>/", StudentDeleteView.as_view(), name="student-admin-delete"),
     path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),
@@ -120,6 +140,8 @@ urlpatterns = [
     path("students/profile/<str:slug>/enrollments/", StudentEnrollmentListView.as_view(), name="student-enrollments"),
     path("students/profile/<str:slug>/schedule/", StudentScheduleView.as_view(), name="student-schedule"),
     path("students/profile/<str:slug>/tuition/", StudentTuitionView.as_view(), name="student-tuition"),
+    path("students/profile/<str:slug>/tuition/<str:tuition_id>/payments/sepay/", StudentSePayPaymentCreateView.as_view(), name="student-sepay-payment-create"),
+    path("students/profile/<str:slug>/payments/<str:attempt_id>/", StudentSePayPaymentStatusView.as_view(), name="student-payment-status"),
     path("students/profile/<str:slug>/grades/", StudentGradesView.as_view(), name="student-grades"),
     path("admin/notifications/", AdminNotificationListView.as_view(), name="admin-notification-list"),
 ]

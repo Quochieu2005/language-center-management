@@ -39,14 +39,6 @@ BEGIN TRY
         INSERT dbo.MonHoc (ma_mon, slug, ten_mon, mo_ta)
         VALUES ('MH-JPN', 'tieng-nhat', N'Tiếng Nhật', N'Danh mục môn học dùng chung');
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.KhoaHoc WHERE ma_khoa_hoc = 'KH-IELTS-65')
-        INSERT dbo.KhoaHoc (ma_khoa_hoc, slug, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
-        VALUES ('KH-IELTS-65', 'ielts-6-5', 'MH-ENG', N'IELTS 6.5', N'IELTS 6.5', 24, 12000000);
-
-    IF NOT EXISTS (SELECT 1 FROM dbo.KhoaHoc WHERE ma_khoa_hoc = 'KH-JP-N5')
-        INSERT dbo.KhoaHoc (ma_khoa_hoc, slug, ma_mon, ten_khoa_hoc, trinh_do, so_buoi, hoc_phi_chuan)
-        VALUES ('KH-JP-N5', 'tieng-nhat-n5', 'MH-JPN', N'Tiếng Nhật N5', N'N5', 30, 6000000);
-
     IF (SELECT COUNT(*) FROM dbo.CoSo WHERE ma_co_so IN ('Q1', 'Q7', 'TD')) <> 3
        OR EXISTS
        (
@@ -66,14 +58,8 @@ BEGIN TRY
            WHERE (ma_mon = 'MH-ENG' AND ten_mon <> N'Tiếng Anh')
               OR (ma_mon = 'MH-JPN' AND ten_mon <> N'Tiếng Nhật')
        )
-       OR EXISTS
-       (
-           SELECT 1 FROM dbo.KhoaHoc
-           WHERE (ma_khoa_hoc = 'KH-IELTS-65' AND (ma_mon <> 'MH-ENG' OR ten_khoa_hoc <> N'IELTS 6.5' OR so_buoi <> 24 OR hoc_phi_chuan <> 12000000))
-              OR (ma_khoa_hoc = 'KH-JP-N5' AND (ma_mon <> 'MH-JPN' OR ten_khoa_hoc <> N'Tiếng Nhật N5' OR so_buoi <> 30 OR hoc_phi_chuan <> 6000000))
-       )
     BEGIN
-        ;THROW 51013, N'Danh mục môn/khóa học khác với bộ seed ban đầu; cần đối soát trước khi tiếp tục.', 1;
+        ;THROW 51013, N'Danh mục môn học khác với bộ seed ban đầu; cần đối soát trước khi tiếp tục.', 1;
     END;
 
     COMMIT TRANSACTION;

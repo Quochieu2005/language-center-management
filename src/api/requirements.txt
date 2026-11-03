@@ -6,3 +6,4 @@ mssql-django==2.0.0
 django-cors-headers==4.9.0
 python-dotenv==1.2.4
 bcrypt==5.0.0
+google-auth[requests]==2.62.1
