@@ -13,12 +13,19 @@ export type SessionUser = {
 };
 export type LoginResponse = { user: SessionUser; idle_timeout_seconds: number };
 export type ProfileResponse = { user: SessionUser; expires_at: string };
+export type OAuthProvider = "google" | "facebook";
 
 export const authApi = {
   csrf: () => apiRequest<{ csrf_token: string }>("/auth/csrf/"),
   login: (identifier: string, password: string) =>
     apiRequest<LoginResponse>("/auth/login/", { method: "POST", body: jsonBody({ identifier, password }) }),
   profile: (slug: string) => apiRequest<ProfileResponse>(`/auth/profile/${encodeURIComponent(slug)}/`),
+  session: () => apiRequest<{ user: SessionUser }>("/auth/session/"),
+  oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
+  startOAuthLink: (provider: OAuthProvider) =>
+    apiRequest<{ authorization_url: string }>(`/auth/oauth/${provider}/start/`, { method: "POST", body: "{}" }),
+  oauthConnections: (slug: string) =>
+    apiRequest<{ connections: Record<OAuthProvider, boolean> }>(`/auth/oauth/connections/${encodeURIComponent(slug)}/`),
   activity: () => apiRequest<{ expires_at: string }>("/auth/activity/", { method: "POST", body: "{}" }),
   logout: () => apiRequest<{ detail: string }>("/auth/logout/", { method: "POST", body: "{}" }),
   changePassword: (current_password: string, new_password: string, confirm_password: string) =>

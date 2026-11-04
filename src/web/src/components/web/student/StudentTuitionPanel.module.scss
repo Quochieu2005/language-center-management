@@ -1,0 +1,100 @@
+.list {
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  border-radius: 14px;
+}
+
+.heading,
+.amounts,
+.installment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.heading {
+  align-items: flex-start;
+}
+
+.heading h5 {
+  margin: 0 0 4px;
+}
+
+.amounts {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 18px 0;
+}
+
+.installments {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0 16px;
+  border-top: 1px solid var(--ant-color-border-secondary);
+  margin-bottom: 14px;
+}
+
+.installment {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  color: var(--ant-color-text-secondary);
+}
+
+.installment :global(.ant-tag) {
+  margin-inline-end: 0;
+}
+
+.paymentDetails {
+  width: 100%;
+}
+
+.qr {
+  display: block;
+  width: min(100%, 320px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.bankInfo {
+  display: grid;
+  gap: 10px;
+}
+
+.bankInfo div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bankInfo b {
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.loading {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+}
+
+@media (max-width: 480px) {
+  .amounts {
+    display: grid;
+    gap: 8px;
+  }
+
+  .bankInfo div {
+    display: grid;
+    gap: 2px;
+  }
+
+  .bankInfo b {
+    text-align: left;
+  }
+}

@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import styles from "./FinalCTASection.module.scss";
 
-export default function FinalCTASection() {
+export default function FinalCTASection({ variant = "home" }: { variant?: "home" | "contact" }) {
+  const isContactPage = variant === "contact";
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -31,54 +32,47 @@ export default function FinalCTASection() {
   };
 
   return (
-    <section className={styles.ctaSection} id="consultation">
+    <section className={`${styles.ctaSection} ${isContactPage ? styles.contactPage : ""}`} id="consultation">
       <div className={styles.ctaInner}>
-        {/* Left Column: Pitch & Value propositions */}
         <div className={styles.ctaPitch}>
-          <div className={styles.pitchBadge}>
-            <span>Đăng ký nhận ưu đãi kỳ học mới</span>
-          </div>
-
-          <h2 className={styles.pitchTitle}>
-            Bắt đầu Hành trình Nâng tầm Ngoại ngữ cùng{" "}
-            <span>Hệ thống 3 Cơ sở</span>
-          </h2>
-
-          <p className={styles.pitchLead}>
-            Đăng ký hôm nay để nhận bài kiểm tra năng lực 4 kỹ năng miễn phí tại phòng Lab và tư vấn
-            lộ trình cá nhân hóa trực tiếp từ chuyên gia khảo thí.
-          </p>
-
-          <ul className={styles.benefitsList}>
-            <li>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Miễn phí 100% bài thi thử phân loại trình độ tại phòng máy</span>
-            </li>
-            <li>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Ưu đãi 10% học phí khi đăng ký theo nhóm từ 2 học viên</span>
-            </li>
-            <li>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Chính sách chuyển đổi chi nhánh (Q1, Q7, TD) bảo toàn hồ sơ</span>
-            </li>
-            <li>
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Cam kết chuẩn đầu ra CEFR bằng hợp đồng đào tạo bằng văn bản</span>
-            </li>
-          </ul>
+          {isContactPage ? (
+            <>
+              <p className={styles.contactLabel}>Liên hệ tư vấn</p>
+              <h1 className={styles.pitchTitle}>Trao đổi về khóa học và lịch học</h1>
+              <p className={styles.pitchLead}>
+                Chọn chương trình và cơ sở bạn quan tâm. Điền thông tin để trung tâm liên hệ trao đổi cụ thể.
+              </p>
+              <a className={styles.contactPhone} href="tel:0901234567">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                Gọi tổng đài 0901.234.567
+              </a>
+            </>
+          ) : (
+            <>
+              <div className={styles.pitchBadge}>
+                <span>Đăng ký nhận ưu đãi kỳ học mới</span>
+              </div>
+              <h2 className={styles.pitchTitle}>
+                Bắt đầu Hành trình Nâng tầm Ngoại ngữ cùng{" "}
+                <span>Hệ thống 3 Cơ sở</span>
+              </h2>
+              <p className={styles.pitchLead}>
+                Đăng ký hôm nay để nhận bài kiểm tra năng lực 4 kỹ năng miễn phí tại phòng Lab và tư vấn
+                lộ trình cá nhân hóa trực tiếp từ chuyên gia khảo thí.
+              </p>
+              <ul className={styles.benefitsList}>
+                <li><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span>Miễn phí 100% bài thi thử phân loại trình độ tại phòng máy</span></li>
+                <li><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span>Ưu đãi 10% học phí khi đăng ký theo nhóm từ 2 học viên</span></li>
+                <li><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span>Chính sách chuyển đổi chi nhánh (Q1, Q7, TD) bảo toàn hồ sơ</span></li>
+                <li><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg><span>Cam kết chuẩn đầu ra CEFR bằng hợp đồng đào tạo bằng văn bản</span></li>
+              </ul>
+            </>
+          )}
         </div>
 
-        {/* Right Column: Interactive Consultation Form */}
-        <div className={styles.formBox}>
+        <div className={`${styles.formBox} ${isContactPage ? styles.contactFormBox : ""}`}>
           {submitted ? (
             <div className={styles.successCard}>
               <div className={styles.successIcon}>
@@ -104,8 +98,12 @@ export default function FinalCTASection() {
             </div>
           ) : (
             <>
-              <h3 className={styles.formTitle}>Đăng Ký Nhận Tư Vấn & Thi Thử</h3>
-              <p className={styles.formSub}>Điền thông tin để phòng đào tạo liên hệ xếp lịch kiểm tra xếp lớp.</p>
+              <h3 className={styles.formTitle}>{isContactPage ? "Gửi yêu cầu tư vấn" : "Đăng Ký Nhận Tư Vấn & Thi Thử"}</h3>
+              <p className={styles.formSub}>
+                {isContactPage
+                  ? "Cho biết cách liên hệ và khóa học bạn đang quan tâm."
+                  : "Điền thông tin để phòng đào tạo liên hệ xếp lịch kiểm tra xếp lớp."}
+              </p>
 
               <form className={styles.formGrid} onSubmit={handleSubmit}>
                 <div className={styles.inputGroup}>

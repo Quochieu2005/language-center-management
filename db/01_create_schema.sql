@@ -376,6 +376,7 @@ BEGIN TRY
         so_tien_da_dong   DECIMAL(18, 0) NOT NULL CONSTRAINT DF_DotHocPhi_da_dong DEFAULT (0),
         trang_thai        VARCHAR(20)    NOT NULL CONSTRAINT DF_DotHocPhi_trang_thai DEFAULT ('chua_dong'),
         CONSTRAINT PK_DotHocPhi PRIMARY KEY (ma_dot_hoc_phi),
+        CONSTRAINT UQ_DotHocPhi_ma_va_co_so UNIQUE (ma_dot_hoc_phi, ma_co_so),
         CONSTRAINT UQ_DotHocPhi_hoc_phi_thu_tu UNIQUE (ma_hoc_phi, so_thu_tu),
         CONSTRAINT FK_DotHocPhi_HocPhiCungCoSo FOREIGN KEY (ma_hoc_phi, ma_co_so)
             REFERENCES dbo.HocPhi(ma_hoc_phi, ma_co_so),
@@ -451,11 +452,12 @@ BEGIN TRY
         ma_phieu       VARCHAR(24)    NOT NULL,
         ma_co_so       VARCHAR(10)    NOT NULL,
         ma_hoc_phi     VARCHAR(24)    NOT NULL,
+        ma_yeu_cau     VARCHAR(24)    NULL,
         loai           VARCHAR(10)    NOT NULL,
         so_tien        DECIMAL(18, 0) NOT NULL,
         hinh_thuc      VARCHAR(20)    NOT NULL,
         ngay_thu       DATETIME2(0)   NOT NULL CONSTRAINT DF_PhieuThu_ngay DEFAULT (SYSUTCDATETIME()),
-        ma_nhan_vien   VARCHAR(24)    NOT NULL,
+        ma_nhan_vien   VARCHAR(24)    NULL,
         ghi_chu        NVARCHAR(500)  NULL,
         CONSTRAINT PK_PhieuThu PRIMARY KEY (ma_phieu),
         CONSTRAINT FK_PhieuThu_HocPhiCungCoSo FOREIGN KEY (ma_hoc_phi, ma_co_so)
@@ -466,6 +468,83 @@ BEGIN TRY
         CONSTRAINT CK_PhieuThu_so_tien CHECK (so_tien > 0),
         CONSTRAINT CK_PhieuThu_hinh_thuc CHECK (hinh_thuc IN ('tien_mat', 'chuyen_khoan', 'the'))
     );
+
+    CREATE TABLE dbo.YeuCauThanhToan
+    (
+        ma_yeu_cau       VARCHAR(24)    NOT NULL,
+        ma_co_so         VARCHAR(10)    NOT NULL,
+        ma_hoc_phi       VARCHAR(24)    NOT NULL,
+        ma_dot_hoc_phi   VARCHAR(24)    NOT NULL,
+        ma_tai_khoan     VARCHAR(24)    NOT NULL,
+        so_tien          DECIMAL(18, 0) NOT NULL,
+        ma_tham_chieu    VARCHAR(40)    NOT NULL,
+        khoa_idempotency CHAR(36)       NOT NULL,
+        trang_thai       VARCHAR(24)    NOT NULL CONSTRAINT DF_YeuCauThanhToan_trang_thai DEFAULT ('cho_thanh_toan'),
+        tao_luc_utc      DATETIME2(3)   NOT NULL CONSTRAINT DF_YeuCauThanhToan_tao_luc DEFAULT (SYSUTCDATETIME()),
+        het_han_utc      DATETIME2(3)   NOT NULL,
+        cap_nhat_luc_utc DATETIME2(3)   NOT NULL CONSTRAINT DF_YeuCauThanhToan_cap_nhat DEFAULT (SYSUTCDATETIME()),
+        thanh_toan_luc_utc DATETIME2(3) NULL,
+        CONSTRAINT PK_YeuCauThanhToan PRIMARY KEY (ma_yeu_cau),
+        CONSTRAINT UQ_YeuCauThanhToan_ma_yeu_cau_site UNIQUE (ma_yeu_cau, ma_co_so),
+        CONSTRAINT UQ_YeuCauThanhToan_tham_chieu UNIQUE (ma_tham_chieu),
+        CONSTRAINT UQ_YeuCauThanhToan_idempotency UNIQUE (khoa_idempotency),
+        CONSTRAINT FK_YeuCauThanhToan_HocPhiCungCoSo FOREIGN KEY (ma_hoc_phi, ma_co_so)
+            REFERENCES dbo.HocPhi(ma_hoc_phi, ma_co_so),
+        CONSTRAINT FK_YeuCauThanhToan_DotHocPhiCungCoSo
+            FOREIGN KEY (ma_dot_hoc_phi, ma_co_so)
+            REFERENCES dbo.DotHocPhi(ma_dot_hoc_phi, ma_co_so),
+        CONSTRAINT FK_YeuCauThanhToan_TaiKhoan FOREIGN KEY (ma_tai_khoan)
+            REFERENCES dbo.TaiKhoan(ma_tai_khoan),
+        CONSTRAINT CK_YeuCauThanhToan_so_tien CHECK (so_tien > 0),
+        CONSTRAINT CK_YeuCauThanhToan_trang_thai CHECK
+            (trang_thai IN ('cho_thanh_toan', 'da_thanh_toan', 'het_han', 'can_doi_soat', 'da_huy')),
+        CONSTRAINT CK_YeuCauThanhToan_thoi_han CHECK (het_han_utc > tao_luc_utc)
+    );
+
+    ALTER TABLE dbo.PhieuThu
+        ADD CONSTRAINT FK_PhieuThu_YeuCauThanhToanCungCoSo
+        FOREIGN KEY (ma_yeu_cau, ma_co_so)
+        REFERENCES dbo.YeuCauThanhToan(ma_yeu_cau, ma_co_so);
+
+    CREATE TABLE dbo.SuKienThanhToan
+    (
+        ma_su_kien             UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_SuKienThanhToan_id DEFAULT (NEWID()),
+        ma_co_so               VARCHAR(10)      NOT NULL,
+        ma_yeu_cau             VARCHAR(24)      NULL,
+        ma_giao_dich_sepay     BIGINT           NOT NULL,
+        ma_tham_chieu          VARCHAR(40)      NULL,
+        so_tien                DECIMAL(18, 0)   NOT NULL,
+        tai_khoan_nhan         VARCHAR(34)      NULL,
+        ma_tham_chieu_ngan_hang VARCHAR(100)    NULL,
+        thoi_diem_giao_dich    DATETIME2(0)     NULL,
+        ket_qua                VARCHAR(24)      NOT NULL,
+        thoi_diem_nhan_utc     DATETIME2(3)     NOT NULL CONSTRAINT DF_SuKienThanhToan_nhan DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT PK_SuKienThanhToan PRIMARY KEY (ma_su_kien),
+        CONSTRAINT UQ_SuKienThanhToan_giao_dich UNIQUE (ma_giao_dich_sepay),
+        CONSTRAINT FK_SuKienThanhToan_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
+        CONSTRAINT FK_SuKienThanhToan_YeuCauCungCoSo FOREIGN KEY (ma_yeu_cau, ma_co_so)
+            REFERENCES dbo.YeuCauThanhToan(ma_yeu_cau, ma_co_so),
+        CONSTRAINT CK_SuKienThanhToan_so_tien CHECK (so_tien >= 0),
+        CONSTRAINT CK_SuKienThanhToan_ket_qua CHECK
+            (ket_qua IN ('da_ghi_nhan', 'can_doi_soat', 'khong_tim_thay'))
+    );
+
+    EXEC sys.sp_executesql N'
+        CREATE TRIGGER dbo.TR_SuKienThanhToan_AppendOnly
+        ON dbo.SuKienThanhToan
+        AFTER UPDATE, DELETE
+        AS
+        BEGIN
+            SET NOCOUNT ON;
+            IF EXISTS (SELECT 1 FROM inserted)
+            BEGIN
+                ;THROW 51061, ''SuKienThanhToan không được cập nhật.'', 1;
+            END;
+            IF ISNULL(TRY_CONVERT(bit, SESSION_CONTEXT(N''qlttnn_student_purge'')), 0) <> 1
+            BEGIN
+                ;THROW 51062, ''Chỉ luồng xóa học viên được phép xóa sự kiện thanh toán liên quan.'', 1;
+            END;
+        END;';
 
     CREATE TABLE dbo.Diem
     (
@@ -626,6 +705,7 @@ BEGIN TRY
     CREATE SEQUENCE dbo.Seq_HP    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DH    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_PT    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
+    CREATE SEQUENCE dbo.Seq_SP    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DM    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_DD    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
     CREATE SEQUENCE dbo.Seq_CC    AS BIGINT START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 999999 NO CYCLE;
@@ -643,6 +723,13 @@ BEGIN TRY
     CREATE INDEX IX_BuoiHoc_lop_ngay ON dbo.BuoiHoc(ma_lop, ngay_hoc);
     CREATE INDEX IX_DotHocPhi_site_han ON dbo.DotHocPhi(ma_co_so, ngay_den_han, trang_thai);
     CREATE INDEX IX_PhieuThu_hoc_phi_ngay ON dbo.PhieuThu(ma_hoc_phi, ngay_thu);
+    CREATE UNIQUE INDEX UX_PhieuThu_ma_yeu_cau
+        ON dbo.PhieuThu(ma_yeu_cau) WHERE ma_yeu_cau IS NOT NULL;
+    CREATE UNIQUE INDEX UX_YeuCauThanhToan_mot_yeu_cau_mo
+        ON dbo.YeuCauThanhToan(ma_hoc_phi, ma_co_so)
+        WHERE trang_thai = 'cho_thanh_toan';
+    CREATE INDEX IX_YeuCauThanhToan_het_han
+        ON dbo.YeuCauThanhToan(trang_thai, het_han_utc);
     CREATE UNIQUE INDEX UX_GiaoDichChuyenCoSo_khoa_chong_lap
         ON dbo.GiaoDichChuyenCoSo(khoa_chong_lap)
         WHERE khoa_chong_lap IS NOT NULL;

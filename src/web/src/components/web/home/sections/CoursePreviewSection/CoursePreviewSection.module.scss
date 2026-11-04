@@ -1,4 +1,5 @@
 .courseSection {
+  scroll-margin-top: 120px;
   padding: 80px 0;
   background: #ffffff;
   border-bottom: 1px solid var(--pws-border);
@@ -159,6 +160,11 @@
           background: #fffbeb;
           color: #d97706;
         }
+
+        &.general {
+          background: #eff6ff;
+          color: #2563eb;
+        }
       }
 
       .priceTag {
@@ -231,6 +237,7 @@
 
       .branchPills {
         display: flex;
+        flex-wrap: wrap;
         gap: 4px;
 
         .branchPill {
@@ -241,6 +248,11 @@
           background: #f1f5f9;
           color: #334155;
         }
+      }
+
+      .noBranches {
+        font-size: 12px;
+        color: #64748b;
       }
     }
   }
@@ -289,5 +301,41 @@
       }
     }
   }
+}
+
+.catalogNotice,
+.catalogState {
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--pws-border);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475467;
+  line-height: 1.5;
+}
+
+.catalogNotice {
+  border-color: #f2d28b;
+  background: #fffbeb;
+  color: #8a5a00;
+}
+
+.catalogState p {
+  margin: 0 0 12px;
+}
+
+.retryButton {
+  padding: 8px 14px;
+  border: 1px solid var(--pws-border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--pws-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background: #eff6ff;
 }
 

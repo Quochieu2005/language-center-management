@@ -1,19 +1,53 @@
 from django.db import DatabaseError
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication
-from core.catalog.serializers import SharedSubjectPatchSerializer, SharedSubjectUpdateResponseSerializer
+from core.catalog.serializers import (
+    PublicCourseListSerializer,
+    SharedSubjectPatchSerializer,
+    SharedSubjectUpdateResponseSerializer,
+)
 from core.catalog.services import (
     SharedCatalogConflict,
     SharedCatalogNotFound,
     SharedCatalogUnavailable,
     update_shared_subject,
 )
+from core.catalog.public_courses import list_public_courses
+
+
+class PublicCourseListView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        operation_id="public_course_list",
+        tags=["Khóa học"],
+        summary="Danh sách khóa học và cơ sở đang mở lớp",
+        description=(
+            "Global Query chỉ đọc từng CSDL site riêng, kiểm tra bản sao danh mục dùng chung, "
+            "rồi tổng hợp kết quả trong API. Cơ sở chỉ xuất hiện khi có lớp còn chỗ ở trạng thái "
+            "sắp mở hoặc đang học. Trả complete=false nếu thiếu site hoặc bản sao không thống nhất."
+        ),
+        responses={
+            200: PublicCourseListSerializer,
+            503: OpenApiResponse(description="Không đọc được danh sách site hoặc CSDL site nào."),
+        },
+    )
+    def get(self, request):
+        try:
+            return Response(list_public_courses())
+        except SharedCatalogUnavailable as exc:
+            return Response(
+                {"detail": str(exc), "complete": False,
+                 "missing_sites": list(getattr(exc, "missing_sites", ()))},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
 
 class SharedSubjectDetailView(APIView):

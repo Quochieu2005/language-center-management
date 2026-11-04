@@ -64,24 +64,6 @@
     margin: 0;
   }
 
-  .techBadge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(30, 41, 59, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #38bdf8;
-
-    .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #10b981;
-    }
-  }
 }
 
 .footerCol {
@@ -141,13 +123,6 @@
       align-items: center;
       justify-content: space-between;
 
-      .branchTag {
-        font-size: 10px;
-        background: rgba(56, 189, 248, 0.2);
-        color: #38bdf8;
-        padding: 2px 6px;
-        border-radius: 4px;
-      }
     }
 
     .branchAddr {

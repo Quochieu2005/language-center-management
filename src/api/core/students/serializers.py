@@ -171,6 +171,10 @@ class StudentInstallmentItemSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=("chua_dong", "dong_mot_phan", "da_dong", "qua_han"))
 
 
+class StudentActivePaymentSerializer(serializers.Serializer):
+    attempt_id = serializers.CharField()
+
+
 class StudentTuitionItemSerializer(serializers.Serializer):
     tuition_id = serializers.CharField()
     enrollment_id = serializers.CharField()
@@ -182,6 +186,7 @@ class StudentTuitionItemSerializer(serializers.Serializer):
     status = serializers.CharField()
     receipts = StudentPaymentItemSerializer(many=True)
     installments = StudentInstallmentItemSerializer(many=True)
+    active_payment = StudentActivePaymentSerializer(allow_null=True)
 
 
 class StudentTuitionResponseSerializer(serializers.Serializer):

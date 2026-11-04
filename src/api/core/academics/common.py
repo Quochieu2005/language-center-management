@@ -47,6 +47,7 @@ _SEQUENCES = {
     "attendance": ("DD", "Seq_DD"),
     "grade": ("DM", "Seq_DM"),
     "receipt": ("PT", "Seq_PT"),
+    "sepay": ("SP", "Seq_SP"),
     "installment": ("DH", "Seq_DH"),
     "transfer": ("CC", "Seq_CC"),
     "transfer_event": ("LS", "Seq_LS"),

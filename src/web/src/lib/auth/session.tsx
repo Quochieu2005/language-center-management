@@ -8,7 +8,7 @@ import { authApi, type Role, type SessionUser } from "@/lib/api/auth";
 
 type SessionContextValue = { user: SessionUser | null; loading: boolean; signIn: (user: SessionUser) => void; signOut: () => Promise<void>; refreshProfile: () => Promise<void> };
 const SessionContext = createContext<SessionContextValue | null>(null);
-const PUBLIC_PATHS = ["/", "/login", "/forgot-password"];
+const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/blog", "/courses", "/contact"];
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);

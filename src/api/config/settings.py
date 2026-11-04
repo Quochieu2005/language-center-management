@@ -183,6 +183,9 @@ REST_FRAMEWORK = {
         "report_read": "120/min",
         "notification_read": "120/min",
         "notification_write": "60/min",
+        "oauth_start": "30/min",
+        "oauth_callback": "30/min",
+        "oauth_connections": "60/min",
     },
 }
 
@@ -233,6 +236,15 @@ STUDENT_INITIAL_PASSWORD = os.getenv("STUDENT_INITIAL_PASSWORD", "").strip()
 WEB_APP_BASE_URL = os.getenv("WEB_APP_BASE_URL", "http://localhost:3001").rstrip("/")
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "120"))
 ACCOUNT_ACTIVATION_TIMEOUT = int(os.getenv("ACCOUNT_ACTIVATION_TIMEOUT", "86400"))
+SEPAY_ENABLED = env_bool("SEPAY_ENABLED", False)
+SEPAY_BANK_CODE = os.getenv("SEPAY_BANK_CODE", "").strip()
+SEPAY_BANK_ACCOUNT = os.getenv("SEPAY_BANK_ACCOUNT", "").strip()
+SEPAY_WEBHOOK_SECRET = os.getenv("SEPAY_WEBHOOK_SECRET", "").strip()
+SEPAY_PAYMENT_CODE_PREFIX = os.getenv("SEPAY_PAYMENT_CODE_PREFIX", "TT").strip().upper()
+try:
+    SEPAY_PAYMENT_TTL_SECONDS = int(os.getenv("SEPAY_PAYMENT_TTL_SECONDS", "900"))
+except ValueError as exc:
+    raise ImproperlyConfigured("SEPAY_PAYMENT_TTL_SECONDS phải là số nguyên.") from exc
 AUTH_PASSWORD_RESET_IP_LIMIT_PER_HOUR = 10
 AUTH_PASSWORD_RESET_IDENTITY_LIMIT_PER_HOUR = 3
 AUTH_PASSWORD_RESET_COOLDOWN_SECONDS = 60
@@ -242,6 +254,14 @@ AUTH_PASSWORD_RESET_OTP_ATTEMPT_LIMIT = 5
 
 if not 1 <= EMAIL_PORT <= 65535:
     raise ImproperlyConfigured("EMAIL_PORT phải nằm trong khoảng 1–65535.")
+if not 60 <= SEPAY_PAYMENT_TTL_SECONDS <= 3600:
+    raise ImproperlyConfigured("SEPAY_PAYMENT_TTL_SECONDS phải nằm trong khoảng 60–3600.")
+if not re.fullmatch(r"[A-Z0-9]{2,5}", SEPAY_PAYMENT_CODE_PREFIX):
+    raise ImproperlyConfigured("SEPAY_PAYMENT_CODE_PREFIX chỉ gồm 2–5 chữ cái/số in hoa.")
+if SEPAY_ENABLED and not all((SEPAY_BANK_CODE, SEPAY_BANK_ACCOUNT, SEPAY_WEBHOOK_SECRET)):
+    raise ImproperlyConfigured(
+        "Bật SEPAY_ENABLED cần cấu hình SEPAY_BANK_CODE, SEPAY_BANK_ACCOUNT và SEPAY_WEBHOOK_SECRET."
+    )
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured("Chỉ bật một trong EMAIL_USE_TLS hoặc EMAIL_USE_SSL.")
 if EMAIL_TIMEOUT <= 0 or ACCOUNT_ACTIVATION_TIMEOUT <= 0:
@@ -259,15 +279,16 @@ CLOUDINARY_ROOT_FOLDER = (
     or "language-center-management"
 )
 
-# OAuth settings are placeholders for the future authorization-code callbacks.
-# No OAuth route is enabled until provider verification, distributed account
-# resolution, revocable app sessions, and the schema migration are implemented.
+# OAuth authorization-code callbacks authenticate only previously linked students.
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "").strip()
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "").strip()
 GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "").strip()
 FACEBOOK_OAUTH_APP_ID = os.getenv("FACEBOOK_OAUTH_APP_ID", "").strip()
 FACEBOOK_OAUTH_APP_SECRET = os.getenv("FACEBOOK_OAUTH_APP_SECRET", "").strip()
 FACEBOOK_OAUTH_REDIRECT_URI = os.getenv("FACEBOOK_OAUTH_REDIRECT_URI", "").strip()
+FACEBOOK_GRAPH_API_VERSION = os.getenv("FACEBOOK_GRAPH_API_VERSION", "v26.0").strip()
+if not re.fullmatch(r"v\d{1,3}\.0", FACEBOOK_GRAPH_API_VERSION):
+    raise ImproperlyConfigured("FACEBOOK_GRAPH_API_VERSION phải có dạng vNN.0.")
 OAUTH_WEB_RETURN_URL = os.getenv("OAUTH_WEB_RETURN_URL", "").strip()
 
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)

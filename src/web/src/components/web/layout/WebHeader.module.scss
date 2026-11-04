@@ -32,6 +32,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
 
+    @media (max-width: 768px) {
+      width: 100%;
+      min-width: 0;
+      flex-wrap: wrap;
+      white-space: normal;
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -293,41 +300,6 @@
   }
 }
 
-.hotlineBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--pws-border);
-  background: #ffffff;
-  color: #1e293b;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-
-  @media (max-width: 1280px) {
-    padding: 0 10px;
-    font-size: 13px;
-  }
-
-  svg {
-    width: 16px;
-    height: 16px;
-    color: var(--pws-accent-orange);
-    flex-shrink: 0;
-  }
-
-  &:hover {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-  }
-}
-
 .adminBtn {
   display: inline-flex;
   align-items: center;
@@ -447,6 +419,11 @@
     transition: background 0.15s ease;
 
     &:hover {
+      background: var(--pws-primary-tint);
+      color: var(--pws-primary);
+    }
+
+    &.active {
       background: var(--pws-primary-tint);
       color: var(--pws-primary);
     }
