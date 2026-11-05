@@ -1,0 +1,18 @@
+.page { min-height: 100vh; background: #f8f8f4; }
+.main { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 56px 0 30px; }
+.inner { min-height: 510px; display: grid; grid-template-columns: 0.9fr 1.1fr; background: #fff; box-shadow: 0 24px 70px rgba(29, 41, 38, 0.07); }
+.story { position: relative; min-height: 510px; padding: clamp(30px, 5vw, 64px); overflow: hidden; color: #eff4ef; background: #1d2926; }
+.story::before,.story::after { position: absolute; right: -90px; bottom: -110px; width: 300px; height: 300px; border: 1px solid rgba(205, 229, 213, 0.15); border-radius: 50%; content: ""; }
+.story::after { right: -25px; bottom: -165px; width: 300px; height: 300px; }
+.eyebrow { position: relative; z-index: 1; margin: 0; color: #b9d8c9; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
+.story h1 { position: relative; z-index: 1; max-width: 400px; margin: 20px 0 0; font-family: var(--font-display); font-size: clamp(38px, 4vw, 56px); font-weight: 500; letter-spacing: -0.055em; line-height: 1.08; }
+.description { position: relative; z-index: 1; max-width: 380px; margin: 17px 0 0; color: #c1cec6; font-size: 14px; line-height: 1.7; }
+.wordCard { position: relative; z-index: 1; display: grid; width: min(100%, 310px); margin: 45px auto 0; padding: 21px 23px; color: #1d2926; background: #edf0e7; transform: rotate(-2deg); }
+.wordCard span { color: #668078; font-size: 8px; font-weight: 700; letter-spacing: 0.16em; }
+.wordCard strong { margin-top: 7px; font-family: var(--font-display); font-size: 50px; font-weight: 500; letter-spacing: -0.07em; }
+.wordCard i { margin-top: 3px; color: #617069; font-family: var(--font-display); font-size: 12px; }
+.wordCard small { margin-top: 14px; padding-top: 12px; border-top: 1px solid #cbd4cb; color: #5d6c64; font-size: 11px; }
+.caption { position: relative; z-index: 1; margin: 30px 0 0; color: #aebdb4; font-family: var(--font-display); font-size: 13px; font-style: normal; }
+.formPanel { display: grid; align-content: center; padding: clamp(28px, 6vw, 76px); }
+
+@media (max-width: 760px) { .main { width: min(100% - 32px, 520px); padding-top: 28px; } .inner { grid-template-columns: 1fr; } .story { min-height: auto; padding: 31px 26px; } .story h1 { font-size: 39px; } .wordCard { width: 230px; margin-top: 27px; padding: 16px 18px; } .wordCard strong { font-size: 39px; } .caption { margin-top: 20px; } .formPanel { padding: 30px 24px 36px; } }

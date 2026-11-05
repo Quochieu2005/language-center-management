@@ -8,7 +8,11 @@ import { authApi, type Role, type SessionUser } from "@/lib/api/auth";
 
 type SessionContextValue = { user: SessionUser | null; loading: boolean; signIn: (user: SessionUser) => void; signOut: () => Promise<void>; refreshProfile: () => Promise<void> };
 const SessionContext = createContext<SessionContextValue | null>(null);
-const PUBLIC_PATHS = ["/", "/login", "/forgot-password"];
+const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/courses", "/branches", "/programs", "/blog", "/contact"];
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/courses/") || pathname.startsWith("/blog/");
+}
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -47,7 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (!user && !PUBLIC_PATHS.includes(pathname)) router.replace("/login");
+    if (!user && !isPublicPath(pathname)) router.replace("/login");
     if (user && ["/login", "/forgot-password"].includes(pathname)) router.replace(user.must_change_password ? "/password/change" : homeForRole(user.role));
     if (user?.must_change_password && pathname !== "/password/change") router.replace("/password/change");
   }, [loading, pathname, router, user]);

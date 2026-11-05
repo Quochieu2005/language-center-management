@@ -1,14 +1,1 @@
-.homeContainer {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-  color: #111827;
-  font-family: var(--font-sans);
-}
-
-.mainContent {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+.page { min-height: 100vh; overflow: clip; background: #f8f8f4; }
