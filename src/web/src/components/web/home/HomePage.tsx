@@ -1,7 +1,7 @@
 import WebFooter from "@/components/web/layout/WebFooter";
 import WebHeader from "@/components/web/layout/WebHeader";
 import BenefitsSection from "./sections/BenefitsSection/BenefitsSection";
-import CoursePreviewSection from "./sections/CoursePreviewSection/CoursePreviewSection";
+import PublicCourseCatalog from "@/components/web/catalog/PublicCourseCatalog";
 import FAQSection from "./sections/FAQSection/FAQSection";
 import FinalCTASection from "./sections/FinalCTASection/FinalCTASection";
 import HeroSection from "./sections/HeroSection/HeroSection";
@@ -18,7 +18,7 @@ export default function HomePage() {
         <HeroSection />
         <BenefitsSection />
         <ProgramSection />
-        <CoursePreviewSection />
+        <PublicCourseCatalog preview />
         <BlogPreviewSection />
         <FAQSection />
         <ContactSection />

@@ -12,6 +12,7 @@
 .submit { min-height: 50px; border-radius: 4px; background: #2c746b; box-shadow: none; font-size: 14px; font-weight: 700; }
 .submit:hover { background: #205a53 !important; }
 .submit span { margin-left: 10px; }
+.socialLogin { display: grid; gap: 12px; margin-top: 18px; padding-top: 19px; border-top: 1px solid #e5eae4; color: #7b8780; font-size: 11px; }.socialLogin :global(.ant-btn) { min-height: 40px; border-color: #d8dfd7; border-radius: 4px; color: #35463e; font-family: var(--font-sans); }
 .securityNote { display: flex; align-items: flex-start; gap: 10px; margin-top: 25px; padding-top: 18px; border-top: 1px solid #e5eae4; color: #7b8780; font-size: 11px; line-height: 1.55; }
 .securityNote > span:first-child { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: #2c746b; background: #edf3ed; font-family: Georgia, serif; font-size: 12px; font-style: italic; }
 .backLink { display: inline-flex; min-height: 44px; align-items: center; margin-top: 13px; }
