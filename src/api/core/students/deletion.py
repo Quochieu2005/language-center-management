@@ -386,6 +386,24 @@ def _related_record_predicate() -> str:
 def _delete_append_only_events(
     cursor, *, student_id: str, profile_slugs: tuple[str, ...], account_id: str | None,
 ) -> None:
+    cursor.execute(
+        """
+        DELETE FROM dbo.SuKienThanhToan
+        WHERE ma_yeu_cau IN
+        (
+            SELECT yt.ma_yeu_cau
+            FROM dbo.YeuCauThanhToan AS yt
+            WHERE yt.ma_hoc_phi IN
+            (
+                SELECT hp.ma_hoc_phi
+                FROM dbo.HocPhi AS hp
+                INNER JOIN dbo.DangKy AS dk ON dk.ma_dang_ky = hp.ma_dang_ky
+                WHERE dk.ma_hoc_vien = %s
+            ) OR yt.ma_tai_khoan = %s
+        )
+        """,
+        [student_id, account_id],
+    )
     account_clause = " OR ma_tai_khoan = %s" if account_id else ""
     record_ids = [student_id, *profile_slugs]
     if account_id:
@@ -537,6 +555,19 @@ def _delete_site_data(job: _PurgeJob, site_code: str) -> None:
                     WHERE hp.ma_dang_ky IN (SELECT ma_dang_ky FROM dbo.DangKy WHERE ma_hoc_vien = %s)
                     """,
                     [job.student_id],
+                )
+                cursor.execute(
+                    """
+                    DELETE FROM dbo.YeuCauThanhToan
+                    WHERE ma_hoc_phi IN
+                    (
+                        SELECT hp.ma_hoc_phi
+                        FROM dbo.HocPhi AS hp
+                        INNER JOIN dbo.DangKy AS dk ON dk.ma_dang_ky = hp.ma_dang_ky
+                        WHERE dk.ma_hoc_vien = %s
+                    ) OR ma_tai_khoan = %s
+                    """,
+                    [job.student_id, account_id],
                 )
                 cursor.execute(
                     "DELETE FROM dbo.HocPhi WHERE ma_dang_ky IN "

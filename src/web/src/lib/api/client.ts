@@ -23,9 +23,13 @@ const apiBase = `${apiOrigin}/api/v1`;
 let csrfToken: string | null = null;
 const pendingGetRequests = new Map<string, Promise<unknown>>();
 
+export function apiUrl(path: string) {
+  return `${apiBase}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 async function getCsrfToken(): Promise<string> {
   if (csrfToken) return csrfToken;
-  const response = await fetch(`${apiBase}/auth/csrf/`, { credentials: "include", cache: "no-store" });
+  const response = await fetch(apiUrl("/auth/csrf/"), { credentials: "include", cache: "no-store" });
   const data = (await response.json()) as { csrf_token?: string };
   if (!response.ok || !data.csrf_token) throw new ApiError("Không lấy được CSRF token.", response.status, data, null);
   csrfToken = data.csrf_token;
@@ -43,7 +47,7 @@ export function query(values: Record<string, string | number | boolean | undefin
 
 export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || "GET").toUpperCase();
-  const requestKey = method === "GET" && !init.signal && !init.headers ? `${apiBase}${path}` : null;
+  const requestKey = method === "GET" && !init.signal && !init.headers ? apiUrl(path) : null;
   if (!requestKey) return sendApiRequest<T>(path, init, method);
 
   const pending = pendingGetRequests.get(requestKey);
@@ -63,7 +67,7 @@ async function sendApiRequest<T>(path: string, init: RequestInit, method: string
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("X-CSRFToken", await getCsrfToken());
 
-  const response = await fetch(`${apiBase}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     method,
     headers,

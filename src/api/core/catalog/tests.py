@@ -6,7 +6,7 @@ from django.db import DatabaseError
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from core.catalog import services
+from core.catalog import public_courses, services
 from core.catalog.serializers import SharedSubjectPatchSerializer
 from core.catalog.views import SharedSubjectDetailView
 
@@ -161,3 +161,61 @@ class SharedCatalogPermissionTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 403)
         update.assert_not_called()
+
+class PublicCourseCatalogTests(SimpleTestCase):
+    sites = (
+        ("Q1", "Cơ sở Quận 1", "hoat_dong"),
+        ("Q7", "Cơ sở Quận 7", "hoat_dong"),
+        ("TD", "Cơ sở Thủ Đức", "hoat_dong"),
+    )
+    course = {
+        "course_id": "KH-EN-01",
+        "slug": "english-a1",
+        "subject_id": "MH-ENG",
+        "subject_slug": "tieng-anh",
+        "subject_name": "Tiếng Anh",
+        "name": "Tiếng Anh A1",
+        "level": "A1",
+        "session_count": 24,
+        "standard_fee": 4200000,
+        "version": 1,
+    }
+
+    @override_settings(AUTH_SESSION_SITE_CODE="Q1")
+    @patch.object(public_courses, "_read_site_snapshot")
+    @patch.object(public_courses, "_read_site_catalog", return_value=sites)
+    def test_global_list_uses_site_rows_and_only_open_class_sites(self, _catalog, read_snapshot):
+        read_snapshot.side_effect = lambda site, _today: (
+            self.sites,
+            {"KH-EN-01": self.course.copy()},
+            {"KH-EN-01": 0 if site == "Q7" else 1},
+        )
+
+        result = public_courses.list_public_courses()
+
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["scope"], "GLOBAL")
+        self.assertEqual(result["results"][0]["name"], "Tiếng Anh A1")
+        self.assertEqual(
+            [branch["site_code"] for branch in result["results"][0]["branches"]],
+            ["Q1", "TD"],
+        )
+    @override_settings(AUTH_SESSION_SITE_CODE="Q1")
+    @patch.object(public_courses, "_read_site_catalog", return_value=sites)
+    @patch.object(public_courses, "_read_site_snapshot")
+    def test_unavailable_site_is_reported_without_claiming_complete_data(self, read_snapshot, _catalog):
+        def snapshot(site, _today):
+            if site == "Q7":
+                raise DatabaseError("injected unavailable site")
+            return self.sites, {"KH-EN-01": self.course.copy()}, {"KH-EN-01": 1}
+
+        read_snapshot.side_effect = snapshot
+
+        result = public_courses.list_public_courses()
+
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["missing_sites"], ["Q7"])
+        self.assertEqual(
+            [branch["site_code"] for branch in result["results"][0]["branches"]],
+            ["Q1", "TD"],
+        )

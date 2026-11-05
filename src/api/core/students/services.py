@@ -690,12 +690,15 @@ def get_student_tuition(user):
                hp.so_tien_phai_dong - hp.giam_gia - hp.so_tien_da_dong AS balance,
                hp.trang_thai AS status, pt.ma_phieu AS receipt_id, pt.loai AS receipt_type,
                pt.so_tien AS receipt_amount, pt.hinh_thuc AS receipt_method,
-               pt.ngay_thu AS receipt_date
+               pt.ngay_thu AS receipt_date, yt.ma_yeu_cau AS active_payment_attempt_id
         FROM dbo.DangKy AS d
         INNER JOIN dbo.HocPhi AS hp ON hp.ma_dang_ky = d.ma_dang_ky AND hp.ma_co_so = d.ma_co_so
         INNER JOIN dbo.LopHoc AS l ON l.ma_lop = d.ma_lop AND l.ma_co_so = d.ma_co_so
         INNER JOIN dbo.KhoaHoc AS k ON k.ma_khoa_hoc = l.ma_khoa_hoc
         LEFT JOIN dbo.PhieuThu AS pt ON pt.ma_hoc_phi = hp.ma_hoc_phi AND pt.ma_co_so = hp.ma_co_so
+        LEFT JOIN dbo.YeuCauThanhToan AS yt
+          ON yt.ma_hoc_phi = hp.ma_hoc_phi AND yt.ma_co_so = hp.ma_co_so
+         AND yt.trang_thai = 'cho_thanh_toan' AND yt.het_han_utc > SYSUTCDATETIME()
         WHERE d.ma_hoc_vien = %s AND d.ma_co_so = %s
         ORDER BY hp.ma_hoc_phi, pt.ngay_thu, pt.ma_phieu
         """,
@@ -710,6 +713,10 @@ def get_student_tuition(user):
                 "course_name": str(row["course_name"]), "amount_due": row["amount_due"],
                 "discount": row["discount"], "amount_paid": row["amount_paid"],
                 "balance": row["balance"], "status": str(row["status"]), "receipts": [],
+                "active_payment": (
+                    {"attempt_id": str(row["active_payment_attempt_id"])}
+                    if row["active_payment_attempt_id"] is not None else None
+                ),
             },
         )
         if row["receipt_id"] is not None:
