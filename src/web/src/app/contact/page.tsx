@@ -1,12 +1,5 @@
-import FinalCTASection from "@/components/web/home/sections/FinalCTASection/FinalCTASection";
-import ContactGuide from "@/components/web/contact/ContactGuide";
-import WebPageLayout from "@/components/web/layout/WebPageLayout";
+import type { Metadata } from "next";
+import { ContactPage } from "@/components/web/catalog/PublicInfoPage";
 
-export default function ContactPage() {
-  return (
-    <WebPageLayout>
-      <FinalCTASection variant="contact" />
-      <ContactGuide />
-    </WebPageLayout>
-  );
-}
+export const metadata: Metadata = { title: "Liên hệ | [Tên trung tâm]", description: "Thông tin liên hệ và trạng thái tư vấn." };
+export default function Page() { return <ContactPage />; }

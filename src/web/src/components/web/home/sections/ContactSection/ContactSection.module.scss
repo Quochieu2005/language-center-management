@@ -1,0 +1,10 @@
+.section { padding: 90px 0; color: #eff4ee; background: #233a34; }
+.inner { display: grid; width: min(100% - 48px, 1240px); grid-template-columns: 1fr .8fr; align-items: center; gap: 80px; margin: 0 auto; }
+.eyebrow { margin: 0 0 18px; color: #a9c9bb; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.inner h2 { margin: 0; font-family: var(--font-display); font-size: clamp(44px, 5.5vw, 70px); font-weight: 500; letter-spacing: -.055em; line-height: 1.04; }
+.inner h2 span { color: #b2d7c5; }
+.copy > p { max-width: 510px; margin: 0; color: #d0dbd3; font-size: 15px; line-height: 1.8; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px 27px; margin-top: 25px; }
+.actions a { color: #c6e4d4; font-size: 13px; font-weight: 700; text-decoration: none; }.actions a span { margin-left: 8px; }
+.note { display: block; margin-top: 30px; color: #a5b7ac; font-size: 9px; font-weight: 700; letter-spacing: .1em; line-height: 1.7; }
+@media (max-width: 760px) { .section { padding: 68px 0; }.inner { width: min(100% - 32px, 560px); grid-template-columns: 1fr; gap: 27px; } }

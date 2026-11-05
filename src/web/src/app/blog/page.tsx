@@ -1,10 +1,5 @@
-import BlogSection from "@/components/web/home/sections/BlogSection/BlogSection";
-import WebPageLayout from "@/components/web/layout/WebPageLayout";
+import type { Metadata } from "next";
+import { BlogPage } from "@/components/web/catalog/PublicInfoPage";
 
-export default function BlogPage() {
-  return (
-    <WebPageLayout>
-      <BlogSection />
-    </WebPageLayout>
-  );
-}
+export const metadata: Metadata = { title: "Blog học tập | [Tên trung tâm]", description: "Gợi ý phương pháp học ngoại ngữ." };
+export default function Page() { return <BlogPage />; }

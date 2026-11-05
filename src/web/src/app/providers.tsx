@@ -18,7 +18,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
           colorPrimary: "#2C746B",
           colorInfo: "#2C746B",
           colorSuccess: "#2C746B",
-          fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           borderRadius: 10,
           controlHeight: 44,
         },
