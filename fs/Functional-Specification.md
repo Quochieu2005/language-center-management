@@ -299,6 +299,16 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 **Nghiệm thu:** không có buổi ngoài khoảng ngày; giờ hiển thị 24 tiếng Việt Nam; ngày kết thúc trước ngày bắt đầu bị từ chối; xung đột không tạo lớp/buổi một phần.
 
+### FS-ROOM-01 — Quản lý phòng học
+
+**Người dùng:** Admin Big chọn site hoặc Admin Small tại site được phân công. **Kiểu:** LOCAL. **Bảng:** PhongHoc, LopHoc, BuoiHoc, Logs.
+
+- Admin có thể liệt kê, tạo và xóa phòng trong một CSDL site qua Site Router.
+- Chỉ xóa vật lý phòng chưa được `LopHoc` hoặc `BuoiHoc` tham chiếu. Nếu đang được sử dụng, API từ chối với xung đột; không xóa lịch sử lớp/buổi và không bỏ qua khóa ngoại.
+- Ghi nhật ký xóa cùng transaction site-local. Admin Big không dùng một request để xóa phòng ở nhiều site; Admin Small không thể chọn site khác.
+
+**Nghiệm thu:** Admin Big/Small đúng site xóa được phòng chưa sử dụng; nhân viên không có quyền quản trị và Admin Small vượt site bị từ chối; phòng đang được lớp/buổi sử dụng nhận `409` và dữ liệu giữ nguyên.
+
 ### FS-CLASS-02 — Xếp học viên vào lớp hoặc đổi lớp
 
 **Người dùng:** Admin Small/lễ tân. **Kiểu:** LOCAL. **Bảng:** HocVien, DangKy, LopHoc, Logs.

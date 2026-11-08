@@ -265,6 +265,12 @@ class RoomCreateResponseSerializer(RoomItemSerializer):
     pass
 
 
+class RoomDeleteResponseSerializer(serializers.Serializer):
+    room_id = serializers.CharField()
+    site_code = serializers.CharField()
+    deleted = serializers.BooleanField()
+
+
 class EnrollmentCreateResponseSerializer(serializers.Serializer):
     enrollment_id = serializers.CharField()
     student_id = serializers.CharField()

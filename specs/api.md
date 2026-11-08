@@ -243,6 +243,8 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `GET /api/v1/students/{ma_hoc_vien}` | Admin Big; nhân viên đúng site | Admin Big: `GLOBAL` định vị hồ sơ hiện hành; nhân viên: `LOCAL` | Trả hồ sơ theo quyền; không JOIN xuyên CSDL |
 | `PATCH /api/v1/students/{ma_hoc_vien}` | Admin Small/lễ tân đúng site | `LOCAL` | Chỉ cho sửa trường hồ sơ được phép; kiểm tra version để tránh ghi đè cập nhật mới |
 | `GET /api/v1/classes` / `POST /api/v1/classes` | Admin Small đúng site | `LOCAL` | Đọc/tạo `LopHoc`; khi tạo lịch phải kiểm tra khóa học, giáo viên, phòng, lịch và sức chứa cùng site |
+| `GET /api/v1/admin/rooms/?site_code=...` / `POST /api/v1/admin/rooms/` | Admin Big chọn site; Admin Small/lễ tân/xếp lớp tại site được phân công | `LOCAL` | Đọc/tạo `PhongHoc` trong đúng CSDL site; không thao tác nhiều site trong một request |
+| `DELETE /api/v1/admin/rooms/{ma_phong}/?site_code=...` | Admin Big chọn site; Admin Small tại site được phân công | `LOCAL` | Xóa phòng chưa được LopHoc/BuoiHoc sử dụng; ghi `Logs` cùng transaction. Trả `409` nếu còn tham chiếu để giữ lịch sử và khóa ngoại |
 | `GET /api/v1/classes/{ma_lop}` / `PATCH /api/v1/classes/{ma_lop}` | Admin Small đúng site; giáo viên chỉ đọc lớp được giao | `LOCAL` | Không cho đổi lớp sang site khác; ghi nhật ký các thay đổi quan trọng |
 | `GET /api/v1/classes/{ma_lop}/sessions` / `POST /api/v1/classes/{ma_lop}/sessions` | Admin Small đúng site; giáo viên được phân công chỉ đọc | `LOCAL` | Đọc/tạo `BuoiHoc`; kiểm tra phòng, giờ, giáo viên và trùng lịch trong cùng site |
 | `PATCH /api/v1/classes/{ma_lop}/sessions/{ma_buoi}` | Admin Small đúng site | `LOCAL` | Sửa lịch/buổi hợp lệ, cập nhật audit và từ chối nếu phát sinh xung đột |

@@ -420,6 +420,42 @@ def create_room(*, site_code: str, actor_id: str, remote_ip: str, name: str, cap
 
 
 @_translate_errors
+def delete_room(*, site_code: str, room_id: str, actor_id: str, remote_ip: str) -> dict[str, Any]:
+    alias = get_site_database_alias(site_code)
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            _active_site(cursor, site_code)
+            cursor.execute(
+                "SELECT ten_phong FROM dbo.PhongHoc WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_phong = %s AND ma_co_so = %s",
+                [room_id, site_code],
+            )
+            room = cursor.fetchone()
+            if room is None:
+                raise ClassNotFound
+            cursor.execute(
+                "SELECT TOP (1) ma_lop FROM dbo.LopHoc WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_phong = %s AND ma_co_so = %s "
+                "UNION ALL SELECT TOP (1) ma_buoi FROM dbo.BuoiHoc WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_phong = %s AND ma_co_so = %s",
+                [room_id, site_code, room_id, site_code],
+            )
+            if cursor.fetchone() is not None:
+                raise ClassConflict("Phòng đã được lớp hoặc buổi học sử dụng nên không thể xóa.")
+            cursor.execute(
+                "DELETE FROM dbo.PhongHoc WHERE ma_phong = %s AND ma_co_so = %s",
+                [room_id, site_code],
+            )
+            if cursor.rowcount != 1:
+                raise ClassNotFound
+            _audit(
+                cursor, site_code, actor_id, "xoa", "PhongHoc", room_id, remote_ip,
+                before={"name": str(room[0])},
+            )
+    return {"room_id": room_id, "site_code": site_code, "deleted": True}
+
+
+@_translate_errors
 def register_student_to_class(
     *, site_code: str, student_id: str, class_id: str,
     actor_id: str | None, remote_ip: str,
