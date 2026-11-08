@@ -104,6 +104,7 @@ flowchart LR
 | `GiaoDichChuyenCoSo` | Cục bộ | trạng thái hiện tại của một lần chuyển | Chỉ CSDL site nguồn; Coordinator cập nhật để phục hồi |
 | `LichSuChuyenCoSo` | Cục bộ | sự kiện append-only của lần chuyển | Site thực hiện sự kiện (thường nguồn và đích) |
 | `TokenDatLaiMatKhau` | Cục bộ | site nhận yêu cầu | Site nhận yêu cầu |
+| `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
 | `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
 
 ---
@@ -158,6 +159,7 @@ Mỗi dòng dưới đây đọc là "**một** bảng cha có **nhiều** bản
 | Phòng học (`PhongHoc`) | `LopHoc` · `BuoiHoc` | Phòng mặc định của lớp · phòng của từng buổi |
 | Tài khoản (`TaiKhoan`) | `GiaoVien` · `NhanVien` | 1 tài khoản ứng với tối đa 1 hồ sơ (có thể chưa có tài khoản) |
 | Tài khoản (`TaiKhoan`) | `TokenDatLaiMatKhau` · `Logs` | Mã đặt lại mật khẩu · log liên quan đến thao tác của tài khoản |
+| Cơ sở (`CoSo`) | `ThongBao` | Mỗi thông báo được lưu tại đúng CSDL site và tham chiếu cơ sở cục bộ |
 | Lớp học (`LopHoc`) | `BuoiHoc` · `DangKy` | Các buổi học · các lượt đăng ký |
 | Học viên (`HocVien`) | `DangKy` | Một học viên đăng ký nhiều lớp |
 | Học viên (`HocVien`) | `GiaoDichChuyenCoSo` | Hồ sơ ở nguồn được tham chiếu bởi các lần chuyển; mỗi học viên tối đa một giao dịch đang xử lý tại cùng site nguồn |
@@ -383,6 +385,22 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | | UQ (`ma_buoi`, `ma_dang_ky`) | |
 
 ### 6.6. Log và bảo mật (cục bộ)
+
+**`ThongBao`** — thông báo quản trị lưu riêng tại từng CSDL site. Không có bảng trung tâm và không lưu trạng thái từng người đã đọc.
+
+| Cột | Ràng buộc | Mô tả |
+|-----|-----------|-------|
+| `slug` | PK | Mã thông báo ổn định trong site |
+| `event_key` | UQ | Khóa idempotency sự kiện trong site; retry không tạo bản ghi trùng |
+| `ma_co_so` | FK → `CoSo` cục bộ | Site phát sinh thông báo |
+| `danh_muc` | CHECK | `system`, `tuition`, `account`, `teacher`, `enrollment`, `class`, `grade`, `transfer`, `payment`, `security` |
+| `muc_do` | CHECK | `info`, `success`, `warning`, `critical` |
+| `doi_tuong` | CHECK | `admin_all`, `admin_big`, `admin_small` |
+| `tieu_de`, `noi_dung` | | Tối đa 160 và 500 ký tự |
+| `duong_dan` | *null* được phép | Chỉ là đường dẫn nội bộ trong khu vực admin |
+| `tao_luc_utc` | mặc định UTC | Thời điểm tạo thông báo |
+
+Admin Small chỉ ghi tại site được gán. Admin Big gửi cùng sự kiện qua các site đang hoạt động theo `REPLICATED-WRITE`; mỗi site ghi `ThongBao` và `Logs` trong transaction cục bộ. Khi có site thiếu, API báo rõ và cho retry cùng key; đây không phải transaction ACID xuyên site. Migration `db/26_consolidate_logs_and_remove_notification_reads.sql` đã bỏ bảng `TrangThaiDocThongBao`; không theo dõi ai đã đọc.
 
 **`GiaoDichChuyenCoSo`** — đề nghị, quyết định duyệt/từ chối và trạng thái hiện tại; mỗi lần chuyển chỉ có một dòng ở CSDL nguồn. Đây là bảng trạng thái cập nhật được, không phải nhật ký append-only.
 

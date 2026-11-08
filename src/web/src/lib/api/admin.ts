@@ -39,6 +39,39 @@ export type AdminAvatarUploadIntent = {
   fields: Record<string, string>;
   max_file_bytes: number;
 };
+export type AdminNotification = {
+  slug: string;
+  site_code: string;
+  category: string;
+  severity: string;
+  title: string;
+  message: string;
+  target_path: string | null;
+  created_at: string;
+};
+export type AdminNotificationList = {
+  complete: boolean;
+  missing_sites: string[];
+  site_codes: string[];
+  count: number;
+  limit: number;
+  offset: number;
+  results: AdminNotification[];
+};
+export type CreateAdminNotification = {
+  category: string;
+  severity: string;
+  audience: "admin_all" | "admin_big" | "admin_small";
+  title: string;
+  message: string;
+  target_path: string | null;
+};
+export type AdminNotificationCreateResponse = {
+  complete: boolean;
+  site_codes: string[];
+  missing_sites: string[];
+  results: { site_code: string; slug: string; created: boolean }[];
+};
 
 export const adminApi = {
   studentCounts: (site_code?: string) => apiRequest<SiteCounts>(`/admin/reports/students-by-site/${query({ site_code })}`),
@@ -88,5 +121,11 @@ export const adminApi = {
   updateSubject: (slug: string, body: { ten_mon?: string; mo_ta?: string | null }) =>
     apiRequest<Record<string, unknown>>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   notifications: (options: { site_code?: string; category?: string; limit?: number; offset?: number } = {}) =>
-    apiRequest<{ complete: boolean; missing_sites: string[]; site_codes: string[]; count: number; limit: number; offset: number; results: Record<string, unknown>[] }>(`/admin/notifications/${query(options)}`),
+    apiRequest<AdminNotificationList>(`/admin/notifications/${query(options)}`),
+  createNotification: (body: CreateAdminNotification, idempotencyKey: string) =>
+    apiRequest<AdminNotificationCreateResponse>("/admin/notifications/", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: jsonBody(body),
+    }),
 };

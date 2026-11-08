@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 
 from core.auth.service_common import AuthenticatedUser
 from core.notifications.publisher import publish_notification
+from core.notifications.creation import NotificationCreateConflict, create_notification
 from core.notifications import services as notification_services
 
 
@@ -66,6 +67,50 @@ class NotificationApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 403)
         list_service.assert_not_called()
 
+    @patch("core.notifications.views.create_notification")
+    def test_admin_small_creates_only_at_assigned_site(self, create_service):
+        create_service.return_value = {
+            "complete": True, "site_codes": ["Q7"], "missing_sites": [],
+            "results": [{"site_code": "Q7", "slug": "q7-system-abc", "created": True}],
+        }
+        self.client.force_authenticate(user=self.admin_small)
+
+        response = self.client.post(
+            reverse("core:admin-notification-list"),
+            {"category": "system", "title": "Thông báo", "message": "Nội dung"},
+            format="json", HTTP_IDEMPOTENCY_KEY="notice-001",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        create_service.assert_called_once()
+        self.assertEqual(create_service.call_args.kwargs["user_site_code"], "Q7")
+
+    @patch("core.notifications.views.create_notification")
+    def test_admin_small_cannot_target_admin_big(self, create_service):
+        self.client.force_authenticate(user=self.admin_small)
+
+        response = self.client.post(
+            reverse("core:admin-notification-list"),
+            {"category": "system", "title": "Thông báo", "message": "Nội dung", "audience": "admin_big"},
+            format="json", HTTP_IDEMPOTENCY_KEY="notice-001",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        create_service.assert_not_called()
+
+    @patch("core.notifications.views.create_notification")
+    def test_notification_create_requires_idempotency_key(self, create_service):
+        self.client.force_authenticate(user=self.admin_big)
+
+        response = self.client.post(
+            reverse("core:admin-notification-list"),
+            {"category": "system", "title": "Thông báo", "message": "Nội dung"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        create_service.assert_not_called()
+
     @patch("core.notifications.views.list_notifications")
     def test_partial_global_result_is_not_reported_as_complete(self, list_service):
         list_service.return_value = {
@@ -97,6 +142,7 @@ class NotificationApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         paths = response.json()["paths"]
         self.assertIn("get", paths["/api/v1/admin/notifications/"])
+        self.assertIn("post", paths["/api/v1/admin/notifications/"])
         self.assertNotIn("/api/v1/admin/notifications/unread-count/", paths)
         self.assertNotIn("/api/v1/admin/notifications/read-all/", paths)
         self.assertNotIn("/api/v1/admin/notifications/{site_code}/{slug}/read/", paths)
@@ -161,6 +207,7 @@ class NotificationReadOnlySummaryTests(SimpleTestCase):
         self.assertTrue(sql.lstrip().startswith("SELECT"))
         self.assertNotRegex(sql, r"\b(INSERT|UPDATE|DELETE|MERGE)\b")
 
+
     @patch("core.notifications.services._live_tuition_summary")
     @patch("core.notifications.services._site_items", return_value=[])
     @patch("core.notifications.services._site_counts", return_value=3)
@@ -179,3 +226,45 @@ class NotificationReadOnlySummaryTests(SimpleTestCase):
         self.assertEqual(result["count"], 4)
         self.assertEqual([item["slug"] for item in result["results"]], ["live-q1-tuition-123"])
         live_summary.assert_called_once_with("Q1")
+
+
+class NotificationCreationServiceTests(SimpleTestCase):
+    @patch("core.notifications.creation._write_site")
+    @patch("core.notifications.creation._global_sites", return_value=(("Q1", "Q7"), ("TD",)))
+    def test_admin_big_replicates_and_reports_missing_sites(self, _global_sites, write_site):
+        write_site.side_effect = lambda **kwargs: {
+            "site_code": kwargs["site_code"], "slug": f"{kwargs['site_code'].lower()}-notice", "created": True,
+        }
+
+        result = create_notification(
+            role="admin_big", user_site_code=None, actor_id="Q1-TK-1", idempotency_key="notice-001",
+            notification={
+                "category": "system", "severity": "info", "audience": "admin_all",
+                "title": "Thông báo", "message": "Nội dung", "target_path": None,
+            },
+        )
+
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["site_codes"], ["Q1", "Q7"])
+        self.assertEqual(result["missing_sites"], ["TD"])
+        self.assertEqual(write_site.call_args_list[0].kwargs["event_key"], write_site.call_args_list[1].kwargs["event_key"])
+
+    def test_idempotent_payload_conflict_is_not_swallowed(self):
+        with patch("core.notifications.creation.get_site_database_alias", return_value="Q7"), \
+             patch("core.notifications.creation.connections") as connection_handler, \
+             patch("core.notifications.creation.transaction.atomic"):
+            cursor = Mock()
+            cursor.fetchone.return_value = (
+                "q7-system-existing", "Q7", "system", "info", "admin_all", "Old title", "Old body", None,
+            )
+            connection_handler.__getitem__.return_value.cursor.return_value.__enter__.return_value = cursor
+
+            with self.assertRaises(NotificationCreateConflict):
+                from core.notifications.creation import _write_site
+                _write_site(
+                    site_code="Q7", event_key="manual:key", actor_id="Q7-TK-1",
+                    notification={
+                        "category": "system", "severity": "info", "audience": "admin_all",
+                        "title": "New title", "message": "New body", "target_path": None,
+                    },
+                )

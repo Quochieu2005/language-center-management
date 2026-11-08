@@ -12,6 +12,7 @@ import {
   UsergroupAddOutlined,
   IdcardOutlined,
   BarChartOutlined,
+  BellOutlined,
 } from "@ant-design/icons";
 import styles from "./AdminLayout.module.scss";
 import { useSession } from "@/lib/auth/session";
@@ -103,6 +104,10 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
     {
       title: "Báo cáo",
       items: [{ label: "Thống kê theo cơ sở", href: "/admin/reports", icon: <BarChartOutlined />, badge: null, roles: ["admin_big", "admin_small"] }],
+    },
+    {
+      title: "Hệ thống",
+      items: [{ label: "Thông báo", href: "/admin/notifications", icon: <BellOutlined />, badge: null, roles: ["admin_big", "admin_small"] }],
     },
   ];
 

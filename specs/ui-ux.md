@@ -386,6 +386,7 @@ Danh mục dưới đây làm rõ page nào cần thiết kế để không gộ
 | `/portal/admin-big/transfers` và `/portal/admin-big/transfers/[transferId]` | Hộp thư/chi tiết chuyển cơ sở | Lọc yêu cầu, xem hồ sơ nguồn/đích, duyệt/từ chối, theo dõi phục hồi |
 | `/portal/admin-big/reports` | Báo cáo toàn hệ thống | Lọc theo cơ sở/khoảng ngày, có thống kê học phí/thu/hoàn theo site, kết quả từng site và cảnh báo kết quả chưa đủ |
 | `/portal/admin-big/audit-logs` | Nhật ký toàn hệ thống | Tìm sự kiện theo người dùng/site/thời gian; không lộ secret hoặc dữ liệu xác thực |
+| `/admin/notifications` | Thông báo quản trị | Danh sách theo site, lọc nhóm/mức độ, nút tạo và form thông báo; Admin Big ghi tới site hoạt động, thấy cảnh báo site thiếu và có thể retry cùng nội dung |
 
 #### Admin Small, lễ tân và kế toán — các trang tại cơ sở
 
@@ -409,6 +410,7 @@ Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy
 | `/portal/admin-small/transfers/new` | Tạo đề nghị chuyển | Chọn học viên, cơ sở đích, lý do; trạng thái chờ Admin Big duyệt |
 | `/portal/admin-small/transfers/[transferId]` | Theo dõi đề nghị chuyển | Người đề nghị, quyết định, trạng thái giao dịch và kết quả phục hồi; không có nút duyệt |
 | `/portal/admin-small/reports` | Báo cáo cơ sở | Học viên, lớp, công nợ và thu/hoàn trong site được gán |
+| `/admin/notifications` | Thông báo quản trị | Danh sách và form tạo tại site được gán; chỉ gửi cho Admin Small hoặc cả hai nhóm admin, không chọn cơ sở khác hay gửi riêng cho Admin Big |
 
 #### Giáo viên — các trang giảng dạy
 
