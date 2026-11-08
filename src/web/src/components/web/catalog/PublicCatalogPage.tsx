@@ -84,6 +84,16 @@ export default function PublicCatalogPage({ kind, slug }: { kind: CatalogKind; s
             </section>
           </>
         )}
+        {kind === "courses" && (
+          <section className={styles.contactSection} aria-labelledby="course-contact-title">
+            <div>
+              <p className={styles.eyebrow}>BƯỚC TIẾP THEO</p>
+              <h2 id="course-contact-title">Muốn hỏi lịch học trước khi đăng ký?</h2>
+              <p>Gửi chương trình và cơ sở bạn quan tâm để trung tâm tiếp nhận yêu cầu tư vấn.</p>
+            </div>
+            <Link href="/contact">Gửi yêu cầu tư vấn <span aria-hidden="true">→</span></Link>
+          </section>
+        )}
         <div className={styles.bottomLine}><span>TRUNG TÂM ĐÀO TẠO NGOẠI NGỮ</span><span>THÔNG TIN CHỈ HIỂN THỊ KHI ĐƯỢC API XÁC NHẬN</span></div>
       </main>
       <WebFooter />

@@ -46,6 +46,7 @@ from core.classes.views import (
     EnrollmentClassAssignView,
     RoomCollectionView,
 )
+from core.classes.public_views import PublicCourseClassListView, PublicEnrollmentCreateView
 from core.academics.attendance_views import (
     TeacherClassListView,
     TeacherSessionAttendanceView,
@@ -72,6 +73,8 @@ from core.academics.sepay_views import (
 )
 from core.employees.views import EmployeeCollectionView, EmployeeDetailView
 from core.catalog.views import (
+    SharedCourseCollectionView,
+    SharedCourseDetailView,
     PublicCourseListView,
     SharedSubjectDetailView,
 )
@@ -109,7 +112,11 @@ urlpatterns = [
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),
     path("admin/employees/<str:slug>/", EmployeeDetailView.as_view(), name="employee-detail"),
     path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),
+    path("admin/courses/", SharedCourseCollectionView.as_view(), name="admin-course-create"),
+    path("admin/courses/<str:slug>/", SharedCourseDetailView.as_view(), name="admin-course-detail"),
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
+    path("courses/<str:course_slug>/classes/", PublicCourseClassListView.as_view(), name="public-course-classes"),
+    path("public/enrollments/", PublicEnrollmentCreateView.as_view(), name="public-enrollment-create"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),
     path("admin/students/<str:slug>/", StudentDeleteView.as_view(), name="student-admin-delete"),
     path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),
