@@ -45,6 +45,25 @@ export type AdminNotificationList = {
   offset: number;
   results: AdminNotification[];
 };
+export type CreateAdminNotification = {
+  category: string;
+  severity: string;
+  audience: "admin_all" | "admin_big" | "admin_small";
+  title: string;
+  message: string;
+  target_path: string | null;
+};
+export type AdminNotificationCreateResult = {
+  site_code: string;
+  slug: string;
+  created: boolean;
+};
+export type AdminNotificationCreateResponse = {
+  complete: boolean;
+  site_codes: string[];
+  missing_sites: string[];
+  results: AdminNotificationCreateResult[];
+};
 export type AdminAuditLog = {
   log_id: string;
   log_type: "login" | "password_reset" | "system" | "sync";
@@ -130,6 +149,12 @@ export const adminApi = {
     apiRequest<Record<string, unknown>>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   notifications: (options: { site_code?: string; category?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<AdminNotificationList>(`/admin/notifications/${query(options)}`),
+  createNotification: (body: CreateAdminNotification, idempotencyKey: string) =>
+    apiRequest<AdminNotificationCreateResponse>("/admin/notifications/", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: jsonBody(body),
+    }),
   auditLogs: (options: { site_code?: string; account_id?: string; log_type?: string; from_date?: string; to_date?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<AdminAuditLogList>(`/reports/audit-logs/${query({
       ma_co_so: options.site_code,

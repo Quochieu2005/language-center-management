@@ -380,7 +380,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 |---|---|---|
 | `/admin/employees` | Nhân viên | Admin Big/Admin Small xem và tạo nhân viên theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. |
 | `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem, tạo, đổi trạng thái hoặc vô hiệu hóa Admin Small. |
-| `/admin/notifications` | Thông báo | Đọc API thông báo hiện có; Admin Big xem toàn hệ thống hoặc lọc site, Admin Small chỉ xem site được cấp. Thiếu site phải hiển thị cảnh báo; không có thao tác đánh dấu đã đọc. |
+| `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
 | `/blog`, `/contact` | Blog, Liên hệ | Mở trang công khai trong tab mới. Chưa có chức năng Admin tạo/sửa bài Blog hoặc xử lý yêu cầu liên hệ. |
 
