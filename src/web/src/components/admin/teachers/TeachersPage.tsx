@@ -38,7 +38,7 @@ export default function TeachersPage() {
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     <Table rowKey="teacher_id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 850 }} />
     <Modal title="Chi tiết hồ sơ giáo viên" open={Boolean(detail)} onCancel={() => setDetail(null)} footer={null}><pre style={{ whiteSpace: "pre-wrap", overflow: "auto" }}>{detail ? JSON.stringify(detail, null, 2) : ""}</pre></Modal>
-    <Modal title="Tạo giáo viên" open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose><Form form={form} layout="vertical" onFinish={create}>
+    <Modal title="Tạo giáo viên" open={open} onCancel={() => setOpen(false)} footer={null} destroyOnHidden><Form form={form} layout="vertical" onFinish={create}>
       <Form.Item name="full_name" label="Họ tên" rules={[{ required: true, max: 120 }]}><Input maxLength={120} /></Form.Item>
       <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
       <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>

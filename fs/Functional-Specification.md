@@ -454,7 +454,7 @@ Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng ph�
 
 Không ghi password/hash, token, cookie, header xác thực, secret Cloudinary/SMTP/OAuth/SQL, PAN/CVV hay payload thanh toán thô. Không trả nội dung nội bộ trong lỗi API.
 
-**Nghiệm thu:** log nghiệp vụ có thể truy vết theo request ID nhưng không chứa secret; nhân sự cơ sở không đọc log của site khác; Admin Big thấy được trạng thái thiếu site khi truy vấn toàn cục.
+**Nghiệm thu:** log nghiệp vụ có thể truy vết theo mã log/tài khoản và bộ lọc ngày Việt Nam nhưng không chứa secret; Admin Big đọc toàn cục hoặc một site, Admin Small chỉ đọc site được gán; site lỗi phải được báo là dữ liệu chưa đầy đủ. API chỉ trả mã log, thời điểm, site, tài khoản, loại, thao tác, bảng, mã bản ghi, kết quả và site đích; không trả IP, hash định danh/IP, token, JSON dữ liệu trước/sau, ghi chú tự do hay nội dung lỗi nội bộ.
 
 ## 7. Quy tắc trạng thái nghiệp vụ
 

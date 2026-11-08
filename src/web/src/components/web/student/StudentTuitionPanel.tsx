@@ -130,7 +130,7 @@ export function StudentTuitionPanel({ rows, loading, slug, onRefresh }: {
     </div>
 
     <Modal title={payment ? "Thanh toán học phí" : "Nhập số tiền muốn thanh toán"} open={open}
-      onCancel={() => setOpen(false)} footer={null} destroyOnClose>
+      onCancel={() => setOpen(false)} footer={null} destroyOnHidden>
       {busy && !payment ? <Spin description="Đang tải yêu cầu..." /> : payment ? <Space orientation="vertical" size="middle" className={styles.paymentDetails}>
         {payment.status === "da_thanh_toan" ? <Alert type="success" showIcon title="Đã nhận thanh toán" description="Học phí đã được cập nhật. Biên nhận sẽ được gửi tới email học viên." />
           : payment.status === "cho_thanh_toan" ? <Alert type="info" showIcon title="Đang chờ ngân hàng xác nhận" description="Sau khi chuyển khoản, giữ cửa sổ này mở hoặc quay lại để kiểm tra trạng thái." />

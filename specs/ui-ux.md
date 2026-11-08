@@ -372,6 +372,18 @@ Danh mục dưới đây làm rõ page nào cần thiết kế để không gộ
 | `/auth/register` | Đăng ký | Không hiển thị hoặc giữ trang thông báo chưa mở | Tắt cho tới khi nhóm duyệt đăng ký công khai và schema/API phù hợp |
 | `/portal/account/security` | Phương thức đăng nhập | Trạng thái liên kết Google/Facebook, bắt xác thực lại trước khi thêm/gỡ, trạng thái đồng bộ | Chỉ mở khi API triển khai endpoint link/unlink; dữ liệu liên kết được nhân bản ở các CSDL site |
 
+#### Điều hướng Admin đang có trong source
+
+Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang công khai trong tab mới, không phải màn hình CMS.
+
+| Route | Mục sidebar | Nội dung và giới hạn |
+|---|---|---|
+| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem và tạo nhân viên theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. |
+| `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem, tạo, đổi trạng thái hoặc vô hiệu hóa Admin Small. |
+| `/admin/notifications` | Thông báo | Đọc API thông báo hiện có; Admin Big xem toàn hệ thống hoặc lọc site, Admin Small chỉ xem site được cấp. Thiếu site phải hiển thị cảnh báo; không có thao tác đánh dấu đã đọc. |
+| `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
+| `/blog`, `/contact` | Blog, Liên hệ | Mở trang công khai trong tab mới. Chưa có chức năng Admin tạo/sửa bài Blog hoặc xử lý yêu cầu liên hệ. |
+
 #### Admin Big — các trang toàn hệ thống
 
 | Route minh họa | Page | Nội dung chính |
