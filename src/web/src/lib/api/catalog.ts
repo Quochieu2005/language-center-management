@@ -51,8 +51,29 @@ export type PublicEnrollmentResult = {
   message: string;
 };
 
+export type SharedCourseCreateInput = {
+  ma_khoa_hoc: string; slug?: string; ma_mon: string; ten_khoa_hoc: string;
+  trinh_do: string; so_buoi: number; hoc_phi_chuan: number;
+};
+export type SharedCoursePatchInput = Omit<SharedCourseCreateInput, "ma_khoa_hoc" | "slug">;
+export type SharedCourseWriteResult = {
+  ma_khoa_hoc: string; slug: string; ma_mon: string; ten_khoa_hoc: string;
+  trinh_do: string; so_buoi: number; hoc_phi_chuan: number; phien_ban: number;
+  complete: boolean; sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
+};
+export type SharedCourseDeleteResult = {
+  ma_khoa_hoc: string; slug: string; deleted: boolean; complete: boolean;
+  sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
+};
+
 export const catalogApi = {
   publicCourses: () => apiRequest<PublicCourseList>("/courses/"),
+  createCourse: (body: SharedCourseCreateInput, idempotencyKey: string) =>
+    apiRequest<SharedCourseWriteResult>("/admin/courses/", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
+  updateCourse: (slug: string, body: SharedCoursePatchInput, idempotencyKey: string) =>
+    apiRequest<SharedCourseWriteResult>(`/admin/courses/${encodeURIComponent(slug)}/`, { method: "PATCH", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
+  deleteCourse: (slug: string, idempotencyKey: string) =>
+    apiRequest<SharedCourseDeleteResult>(`/admin/courses/${encodeURIComponent(slug)}/`, { method: "DELETE", headers: { "Idempotency-Key": idempotencyKey } }),
   publicClasses: (courseSlug: string, siteCode: string) => apiRequest<PublicCourseClassList>(
     `/courses/${encodeURIComponent(courseSlug)}/classes/${query({ site_code: siteCode })}`,
   ),
