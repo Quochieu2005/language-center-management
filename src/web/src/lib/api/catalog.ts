@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, jsonBody, query } from "./client";
 
 export type PublicCourse = {
   course_id: string;
@@ -24,6 +24,38 @@ export type PublicCourseList = {
   results: PublicCourse[];
 };
 
+export type PublicCourseClass = {
+  class_id: string;
+  site_code: string;
+  name: string;
+  start_date: string;
+  end_date: string | null;
+  schedule: string;
+  start_time: string;
+  end_time: string;
+  remaining_seats: number;
+};
+
+export type PublicCourseClassList = {
+  site_code: string;
+  course_slug: string;
+  count: number;
+  results: PublicCourseClass[];
+};
+
+export type PublicEnrollmentResult = {
+  site_code: string;
+  class_id: string;
+  accepted: boolean;
+  already_registered: boolean;
+  message: string;
+};
+
 export const catalogApi = {
   publicCourses: () => apiRequest<PublicCourseList>("/courses/"),
+  publicClasses: (courseSlug: string, siteCode: string) => apiRequest<PublicCourseClassList>(
+    `/courses/${encodeURIComponent(courseSlug)}/classes/${query({ site_code: siteCode })}`,
+  ),
+  publicEnroll: (body: { site_code: string; class_id: string; full_name: string; email: string; phone?: string }) =>
+    apiRequest<PublicEnrollmentResult>("/public/enrollments/", { method: "POST", body: jsonBody(body) }),
 };

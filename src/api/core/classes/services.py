@@ -64,7 +64,7 @@ def _active_site(cursor, site_code: str) -> None:
 
 def _next_identifier(cursor, site_code: str, prefix: str, sequence_name: str) -> str:
     sequence_names = {
-        "class": "Seq_LH", "session": "Seq_BH", "room": "Seq_PH",
+        "class": "Seq_LH", "session": "Seq_BH", "room": "Seq_PH", "student": "Seq_HV",
         "enrollment": "Seq_DK", "tuition": "Seq_HP", "audit": "Seq_NK",
     }
     safe_sequence = sequence_names[sequence_name]
@@ -75,7 +75,7 @@ def _next_identifier(cursor, site_code: str, prefix: str, sequence_name: str) ->
 def _audit(
     cursor,
     site_code: str,
-    actor_id: str,
+    actor_id: str | None,
     action: str,
     table_name: str,
     record_id: str,
@@ -422,7 +422,7 @@ def create_room(*, site_code: str, actor_id: str, remote_ip: str, name: str, cap
 @_translate_errors
 def register_student_to_class(
     *, site_code: str, student_id: str, class_id: str,
-    actor_id: str, remote_ip: str,
+    actor_id: str | None, remote_ip: str,
 ) -> dict[str, Any]:
     """Create one local enrollment and its unpaid tuition row atomically."""
     alias = get_site_database_alias(site_code)

@@ -292,3 +292,66 @@ class EnrollmentClassAssignResponseSerializer(serializers.Serializer):
     current_count = serializers.IntegerField()
     remaining_seats = serializers.IntegerField()
     changed = serializers.BooleanField()
+
+
+class PublicCourseClassItemSerializer(serializers.Serializer):
+    class_id = serializers.CharField()
+    site_code = serializers.CharField()
+    name = serializers.CharField()
+    start_date = serializers.DateField()
+    end_date = serializers.DateField(allow_null=True)
+    schedule = serializers.CharField()
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+    remaining_seats = serializers.IntegerField(min_value=1)
+
+
+class PublicCourseClassListSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    course_slug = serializers.CharField()
+    count = serializers.IntegerField(min_value=0)
+    results = PublicCourseClassItemSerializer(many=True)
+
+
+class PublicCourseClassQuerySerializer(StrictInputSerializer):
+    site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10)
+    allowed_fields = {"site_code"}
+
+    def validate_site_code(self, value):
+        return value.strip().upper()
+
+
+class PublicEnrollmentCreateSerializer(StrictInputSerializer):
+    site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10)
+    class_id = serializers.RegexField(regex=r"^[A-Za-z0-9_-]{2,24}$", max_length=24)
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True)
+    email = serializers.EmailField(max_length=254, trim_whitespace=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, trim_whitespace=True)
+    allowed_fields = {"site_code", "class_id", "full_name", "email", "phone"}
+
+    def validate_site_code(self, value):
+        return value.strip().upper()
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value or any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Họ tên không hợp lệ.")
+        return value
+
+    def validate_email(self, value):
+        return value.strip().casefold()
+
+    def validate_phone(self, value):
+        value = value.strip()
+        digits = "".join(character for character in value if character.isdigit())
+        if value and (len(digits) < 9 or len(digits) > 15 or any(character not in "+0123456789(). -" for character in value)):
+            raise serializers.ValidationError("Số điện thoại không hợp lệ.")
+        return value or None
+
+
+class PublicEnrollmentResponseSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    class_id = serializers.CharField()
+    accepted = serializers.BooleanField()
+    already_registered = serializers.BooleanField()
+    message = serializers.CharField()
