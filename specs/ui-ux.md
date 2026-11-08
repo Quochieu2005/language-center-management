@@ -21,6 +21,8 @@ Tài liệu quy định cách chia component, page, section, SCSS, SVG, nội du
 
 Không dùng các câu sáo rỗng như “Nâng tầm”, “Hàng đầu”, “Đột phá”, “Đồng hành cùng bạn”, “Chinh phục ước mơ”, “Uy tín tạo nên thương hiệu” hoặc văn mẫu trung tâm/bảo hiểm. Không bịa lời chứng thực, điểm số, tỷ lệ thành công, số năm hoạt động, ưu đãi, sĩ số hay số lượng khóa học. Nội dung động phải lấy từ API; thông tin chưa được cung cấp phải ghi `[Cần nhóm xác nhận]` hoặc ẩn khỏi bản phát hành.
 
+Tiếng Việt là ngôn ngữ chính của giao diện: font display serif dùng Cambria trước Georgia để các glyph tiếng Việt được render đồng nhất, Georgia chỉ là fallback. Kiểm tra tiêu đề nhiều dấu ở trạng thái thường/in nghiêng; không dùng font thiếu glyph tiếng Việt làm font chính và giữ khoảng cách chữ vừa phải để dấu không bị tách khỏi ký tự.
+
 ## 2. Cấu trúc thư mục component
 
 Component vẫn chia thành hai khu vực chính `web` và `admin`, cùng thư mục `shared` cho phần tái sử dụng. `admin` là vùng làm việc sau đăng nhập cho các vai trò nội bộ, không phải một website Admin tách riêng; bên trong có workspace riêng cho Admin Big, Admin Small và giáo viên. Đăng nhập là luồng chung trước khi biết vai trò nên nằm trong `web/auth`. Workspace học viên chỉ là đề xuất, chưa triển khai cho tới khi nhóm chốt phạm vi tài khoản học viên và cập nhật README, API, schema. Trong từng page, các phần lớn được tách thành section riêng; section phức tạp có thư mục và SCSS riêng.
@@ -119,12 +121,15 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 
 | Page | Sections chính | Mục tiêu |
 |---|---|---|
-| Đăng nhập | Nhận diện thương hiệu, form tài khoản/mật khẩu, nút tiếp tục với Google/Facebook, hiện/ẩn mật khẩu, quên mật khẩu, lỗi và trạng thái đang gửi | Một trang cho mọi chức vụ; API xác định quyền. OAuth chỉ dùng cho tài khoản nội bộ đã liên kết; không có chọn role hoặc tự đăng ký |
+| Đăng nhập | Nhận diện thương hiệu, form tài khoản/mật khẩu, nút Google/Facebook khi API và provider đã cấu hình, hiện/ẩn mật khẩu, quên mật khẩu, lỗi và trạng thái đang gửi | Một trang cho vai trò được API hỗ trợ; OAuth hiện chỉ dành cho học viên đã liên kết; không có chọn role hoặc tự đăng ký |
 | Quên mật khẩu | Form email/tên đăng nhập, xác nhận đã nhận yêu cầu, giới hạn gửi lại và thông báo chung | Không tiết lộ tài khoản có tồn tại hay không; trạng thái gửi do API trả về |
 | Đặt lại mật khẩu | Form mật khẩu mới/xác nhận, tiêu chí hợp lệ, trạng thái token hết hạn/đã dùng/thành công | Token dùng một lần; không lưu/ghi token vào log hoặc analytics |
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
-| Trang chủ | Điều hướng chung có liên kết đăng nhập, Hero, tìm khóa học, vấn đề người học, giải pháp/lợi ích, khóa học đang mở, cơ sở, bằng chứng có thật, FAQ, CTA, footer | Giúp người xem hiểu khóa học và tìm bước tiếp theo trong vài giây; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
-| Danh sách khóa học | Tiêu đề, bộ lọc môn/trình độ/cơ sở, danh sách kết quả, phân trang hoặc tải thêm | So sánh khóa học/lớp đang được API trả về |
+| Trang chủ | Điều hướng chung tới Chương trình, Khóa học, Blog, Liên hệ và Đăng nhập; Hero, định hướng học, lợi ích, trạng thái khóa học, bài viết, FAQ, liên hệ, CTA, footer | Giúp người xem hiểu hướng học và tìm bước tiếp theo; nội dung động chỉ hiển thị khi API xác nhận; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
+| Chương trình | Hero định hướng, nhóm mục tiêu học tập, câu hỏi xác định nhu cầu, trạng thái danh mục, FAQ | Nhóm mục tiêu và ví dụ chỉ mang tính định hướng; không mô tả như khóa/lớp đang tuyển sinh khi chưa có API |
+| Blog | Bài viết gợi ý, chủ đề, danh sách/chi tiết bài và hướng dẫn áp dụng nội dung | Nội dung biên tập tĩnh, không dùng số liệu, tác giả hoặc chứng thực giả |
+| Liên hệ | Lối tắt khóa học/cơ sở, các bước tra cứu, trạng thái kênh liên hệ và FAQ | Không tự tạo email, số điện thoại, địa chỉ hoặc form gửi thành công khi API chưa có |
+| Danh sách khóa học | Trạng thái danh mục, hướng dẫn chọn khóa, các trường thông tin cần xem, FAQ | So sánh khóa học/lớp đang được API trả về; khi API chưa có thì hiển thị trạng thái và hướng dẫn, không dựng bộ lọc/lớp giả |
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
 | Cơ sở | Danh sách cơ sở, địa chỉ/liên hệ nếu có dữ liệu được duyệt, hướng dẫn xem lớp tại cơ sở | Chọn địa điểm học từ dữ liệu cơ sở đang hoạt động |
 
@@ -354,12 +359,15 @@ Danh mục dưới đây làm rõ page nào cần thiết kế để không gộ
 | Route minh họa | Page | Nội dung chính | Trạng thái/phụ thuộc |
 |---|---|---|---|
 | `/` | Trang chủ | Hero, tìm khóa học, lợi ích, khóa học, cơ sở, FAQ và CTA | Thiết kế trong phạm vi Web |
-| `/courses` | Danh sách khóa học | Tìm kiếm, lọc, sắp xếp allowlist, phân trang, loading/empty/error | Cần API danh mục công khai |
-| `/courses/[courseId]` | Chi tiết khóa học | Mô tả, trình độ, học phí chuẩn, lớp và lịch khả dụng | Cần API danh mục công khai |
+| `/programs` | Định hướng chương trình | Nhóm mục tiêu, cách xác định nhu cầu, FAQ và trạng thái danh mục | Nội dung định hướng; không đại diện lớp đang mở |
+| `/courses` | Danh sách khóa học | Kết quả GLOBAL, lọc theo môn từ dữ liệu trả về, trạng thái thiếu site, loading/empty/error, hướng dẫn và FAQ | Dùng `GET /api/v1/courses/`; không tự bỏ qua site lỗi |
+| `/courses/[slug]` | Chi tiết khóa học | Môn, trình độ, số buổi, học phí chuẩn, cơ sở/lớp đang mở và trạng thái danh mục | Tìm trong danh mục API; không tuyên bố đã đăng ký lớp |
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
-| `/auth/login` | Đăng nhập dùng chung | Form mật khẩu, nút Google/Facebook khi API bật, lỗi chung, giới hạn gửi, loading, quên mật khẩu | Dùng chung mọi chức vụ; OAuth không tự đăng ký hoặc tự chọn role |
+| `/blog` và `/blog/[slug]` | Bài viết học tập | Bài gợi ý, chủ đề, danh sách/chi tiết và hướng dẫn áp dụng | Nội dung biên tập tĩnh; không bịa tác giả hay thành tích |
+| `/contact` | Liên hệ và hướng dẫn | Lối tắt khóa học/cơ sở, chuẩn bị trao đổi, FAQ và trạng thái kênh liên hệ | Không bịa địa chỉ/điện thoại hoặc giả vờ gửi form |
+| `/login` | Đăng nhập dùng chung | Form mật khẩu, nút Google/Facebook theo trạng thái API/provider, lỗi, loading, quên mật khẩu | API xác định quyền; OAuth chỉ đăng nhập học viên đã liên kết; không tự đăng ký hoặc chọn role |
 | `/auth/activate` | Kích hoạt tài khoản nội bộ | Kiểm tra liên kết mời, nhập mật khẩu mới/xác nhận, trạng thái hết hạn/đã dùng/thành công | Chỉ mở từ liên kết mời dùng một lần; chưa triển khai cho tới khi API và schema có token kích hoạt |
-| `/auth/forgot-password` | Quên mật khẩu | Nhập email/tài khoản, trạng thái gửi; không tiết lộ tài khoản tồn tại | Cần API reset mật khẩu |
+| `/forgot-password` | Quên mật khẩu | Nhập email/tài khoản, trạng thái gửi; không tiết lộ tài khoản tồn tại | Theo API reset mật khẩu |
 | `/auth/reset-password` | Đặt lại mật khẩu | Mật khẩu mới, xác nhận, token hợp lệ/hết hạn/đã dùng | Mở từ liên kết một lần gửi qua email; token mặc định hết hạn sau 15 phút; cần API reset mật khẩu |
 | `/auth/register` | Đăng ký | Không hiển thị hoặc giữ trang thông báo chưa mở | Tắt cho tới khi nhóm duyệt đăng ký công khai và schema/API phù hợp |
 | `/portal/account/security` | Phương thức đăng nhập | Trạng thái liên kết Google/Facebook, bắt xác thực lại trước khi thêm/gỡ, trạng thái đồng bộ | Chỉ mở khi API triển khai endpoint link/unlink; dữ liệu liên kết được nhân bản ở các CSDL site |
@@ -564,6 +572,7 @@ Animation chỉ dùng để giải thích kết quả thao tác: mở/đóng men
 
 | Trang/luồng đã có trong phạm vi | Trạng thái phải thể hiện từ API | Liên kết kiểm chứng |
 |---|---|---|
+| Trang công khai khóa học/chi tiết khóa học/cơ sở | Chỉ hiển thị nội dung do API công khai trả về. Khi endpoint hoặc dữ liệu chưa sẵn sàng, nêu rõ danh mục chưa khả dụng; không dùng lớp, địa chỉ, học phí hay cơ sở mẫu viết cứng để giả làm dữ liệu thật | Nội dung động phải lấy từ nguồn được duyệt; không liên quan kết luận YC phân tán |
 | Danh sách lớp, học viên và đăng ký | Hiện tên cơ sở/phạm vi đang xem; Admin Small chỉ thao tác tại cơ sở được giao; không lấy site từ tiền tố mã học viên | YC-01/YC-02, TC-SITE-01 và TC-FRAG-01 |
 | Danh mục môn/khóa học của Admin Big | Đang lưu, hoàn tất hoặc chưa đồng bộ đủ; khi API chưa xác nhận đủ bản sao, thông báo “Thay đổi chưa hoàn tất đồng bộ” và cho xem/kiểm tra lại trạng thái theo quyền | YC-03/YC-07, TC-REP-01 và TC-SYNC-01 |
 | Tạo đề nghị và chi tiết chuyển cơ sở | Phân biệt chờ duyệt, bị từ chối, đang chuyển/phục hồi và hoàn tất; reload đọc lại tiến trình; không hiển thị “Chuyển thành công” chỉ vì đã duyệt | YC-04, TC-DTX-01 |

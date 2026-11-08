@@ -1,77 +1,27 @@
-"use client";
-
-import React, { useState } from "react";
 import styles from "./FAQSection.module.scss";
 
-interface FAQItem {
-  question: string;
-  answer: string;
-}
-
-const FAQS: FAQItem[] = [
-  {
-    question: "Trung tâm có những cơ sở nào?",
-    answer: "Trung tâm có các cơ sở tại Quận 1, Quận 7 và Thủ Đức. Địa chỉ liên hệ được liệt kê ở cuối trang.",
-  },
-  {
-    question: "Làm sao chọn khóa học phù hợp?",
-    answer: "Bạn có thể xem các chương trình đang được giới thiệu ở mục Khóa học. Nếu chưa biết nên bắt đầu từ đâu, hãy gửi yêu cầu tư vấn và chọn chương trình bạn đang quan tâm.",
-  },
-  {
-    question: "Tôi xem học phí và lịch học ở đâu?",
-    answer: "Học phí được hiển thị trong thông tin khóa học. Để hỏi lịch khai giảng theo cơ sở, bạn có thể gửi yêu cầu ở biểu mẫu Liên hệ cuối trang.",
-  },
-  {
-    question: "Làm sao để nhận tư vấn?",
-    answer: "Điền họ tên, số điện thoại, khóa học và cơ sở bạn quan tâm vào biểu mẫu Liên hệ cuối trang. Trung tâm sẽ tiếp nhận thông tin theo quy trình đang áp dụng.",
-  },
+const questions = [
+  { question: "Tôi có thể tự đăng ký tài khoản học viên trên website không?", answer: "Hiện tại hệ thống chưa mở tài khoản hoặc cổng đăng ký dành cho học viên. Tài khoản nội bộ được cấp theo quy trình của trung tâm." },
+  { question: "Tôi có thể thanh toán học phí trực tuyến không?", answer: "Thanh toán trực tuyến chưa được bật. Thông tin và trạng thái thanh toán chỉ được xác nhận qua quy trình của trung tâm." },
+  { question: "Làm sao để xem khóa học và lịch đang mở?", answer: "Danh mục công khai đang chờ kết nối API. Trang khóa học sẽ hiển thị thông tin khi dữ liệu được cung cấp từ hệ thống." },
 ];
 
 export default function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const toggle = (idx: number) => {
-    setOpenIndex(openIndex === idx ? null : idx);
-  };
-
   return (
-    <section className={styles.faqSection} id="faq">
-      <div className={styles.faqInner}>
-        {/* Section Header */}
-        <div className={styles.sectionHeader}>
-          <span className={styles.eyebrow}>Giải đáp thắc mắc</span>
-          <h2 className={styles.title}>Câu Hỏi Thường Gặp Của Học Viên</h2>
-          <p className={styles.description}>
-            Một số thông tin cơ bản giúp bạn chọn chương trình và gửi yêu cầu tư vấn.
-          </p>
+    <section className={styles.section} aria-labelledby="faq-title">
+      <div className={styles.inner}>
+        <div className={styles.heading}>
+          <p className={styles.eyebrow}>THÔNG TIN CẦN BIẾT</p>
+          <h2 id="faq-title">Rõ ràng ngay<br />từ bước đầu.</h2>
+          <p>Những câu trả lời về cách sử dụng website hiện tại.</p>
         </div>
-
-        {/* FAQs List */}
-        <div className={styles.faqList}>
-          {FAQS.map((faq, idx) => {
-            const isOpen = openIndex === idx;
-            return (
-              <div
-                className={`${styles.faqItem} ${isOpen ? styles.open : ""}`}
-                key={idx}
-              >
-                <button
-                  type="button"
-                  className={`${styles.faqQuestion} ${isOpen ? styles.open : ""}`}
-                  onClick={() => toggle(idx)}
-                  aria-expanded={isOpen}
-                >
-                  <span>{faq.question}</span>
-                  <div className={styles.iconToggle}>
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-                {isOpen && <p className={styles.faqAnswer}>{faq.answer}</p>}
-              </div>
-            );
-          })}
+        <div className={styles.list}>
+          {questions.map((item, index) => (
+            <details className={styles.item} key={item.question}>
+              <summary><span className={styles.index}>0{index + 1}</span><span>{item.question}</span><span className={styles.toggle} aria-hidden="true" /></summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
         </div>
       </div>
     </section>

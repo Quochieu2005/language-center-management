@@ -1,10 +1,8 @@
-import CoursePreviewSection from "@/components/web/home/sections/CoursePreviewSection/CoursePreviewSection";
-import WebPageLayout from "@/components/web/layout/WebPageLayout";
+import type { Metadata } from "next";
+import PublicCatalogPage from "@/components/web/catalog/PublicCatalogPage";
+
+export const metadata: Metadata = { title: "Khóa học | [Tên trung tâm]", description: "Khám phá danh mục khóa học ngoại ngữ." };
 
 export default function CoursesPage() {
-  return (
-    <WebPageLayout>
-      <CoursePreviewSection />
-    </WebPageLayout>
-  );
+  return <PublicCatalogPage kind="courses" />;
 }

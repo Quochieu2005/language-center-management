@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Button, Card, Form, Input, Space, Typography, message } from "antd";
+import { Alert, Button, Form, Input, Typography, message } from "antd";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
+import AuthPageShell from "@/components/web/auth/AuthPageShell";
+import styles from "@/components/web/auth/AuthForm.module.scss";
 
 export default function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false);
@@ -25,15 +27,31 @@ export default function ForgotPasswordPage() {
     catch (reason) { setError(reason instanceof ApiError ? reason.message : "Không đặt lại được mật khẩu."); }
     finally { setBusy(false); }
   };
-  return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 20 }}>
-    <Card style={{ width: "min(100%, 480px)" }}>
-      <Space direction="vertical" size="large" style={{ width: "100%" }}>
-        <div><Typography.Title level={2}>Khôi phục mật khẩu</Typography.Title><Typography.Text type="secondary">Mã OTP có hiệu lực 2 phút. API luôn trả cùng thông báo để bảo vệ email.</Typography.Text></div>
-        {error && <Alert type="error" showIcon title={error} />}
-        {!sent ? <Form layout="vertical" onFinish={forgot}><Form.Item name="email" label="Email tài khoản" rules={[{ required: true, type: "email" }]}><Input autoComplete="email" maxLength={254} /></Form.Item><Button type="primary" htmlType="submit" loading={busy} block>Gửi mã OTP</Button></Form>
-          : <Form layout="vertical" onFinish={reset}><Alert type="info" title="Nếu email thuộc tài khoản quản trị, mã sẽ được gửi đến hộp thư." /><Form.Item name="otp" label="Mã OTP 6 chữ số" rules={[{ required: true, len: 6 }]}><Input inputMode="numeric" maxLength={6} /></Form.Item><Form.Item name="new_password" label="Mật khẩu mới" rules={[{ required: true, min: 12, max: 128 }]}><Input.Password autoComplete="new-password" /></Form.Item><Form.Item name="confirm_password" label="Nhập lại mật khẩu" dependencies={["new_password"]} rules={[{ required: true }, ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("new_password") === value ? Promise.resolve() : Promise.reject(new Error("Mật khẩu xác nhận không khớp.")); } })]}><Input.Password autoComplete="new-password" /></Form.Item><Button type="primary" htmlType="submit" loading={busy} block>Đặt lại mật khẩu</Button></Form>}
-        <Link href="/login">Quay lại đăng nhập</Link>
-      </Space>
-    </Card>
-  </main>;
+  return <AuthPageShell eyebrow="HỖ TRỢ TÀI KHOẢN" title="Lấy lại quyền truy cập." description="Dùng địa chỉ email đã đăng ký với trung tâm để xác minh tài khoản.">
+    <div className={styles.heading}>
+      <span className={styles.kicker}>{sent ? "BƯỚC 2 / 2" : "BƯỚC 1 / 2"}</span>
+      <Typography.Title level={2}>{sent ? "Nhập mã xác minh" : "Khôi phục mật khẩu"}</Typography.Title>
+      <Typography.Paragraph>{sent ? "Nếu email thuộc tài khoản đủ điều kiện, mã sẽ được gửi tới hộp thư. Mã có hiệu lực 2 phút." : "Nhập email tài khoản. Hệ thống luôn trả lời theo cùng một cách để bảo vệ thông tin của bạn."}</Typography.Paragraph>
+    </div>
+    {error && <Alert className={styles.error} type="error" showIcon title={error} />}
+    {!sent ? <Form className={styles.form} layout="vertical" onFinish={forgot} requiredMark={false}>
+      <Form.Item name="email" label="Email tài khoản" rules={[{ required: true, type: "email", message: "Nhập địa chỉ email hợp lệ." }]}>
+        <Input autoComplete="email" maxLength={254} size="large" />
+      </Form.Item>
+      <Button className={styles.submit} type="primary" htmlType="submit" loading={busy} block size="large">Gửi mã xác minh <span aria-hidden="true">→</span></Button>
+    </Form> : <Form className={styles.form} layout="vertical" onFinish={reset} requiredMark={false}>
+      <Alert className={styles.info} type="info" showIcon title="Kiểm tra cả thư mục thư rác nếu bạn chưa thấy email." />
+      <Form.Item name="otp" label="Mã OTP 6 chữ số" rules={[{ required: true, len: 6, message: "Nhập đủ 6 chữ số." }]}>
+        <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} size="large" />
+      </Form.Item>
+      <Form.Item name="new_password" label="Mật khẩu mới" rules={[{ required: true, min: 12, max: 128, message: "Mật khẩu cần có từ 12 đến 128 ký tự." }]}>
+        <Input.Password autoComplete="new-password" maxLength={128} size="large" />
+      </Form.Item>
+      <Form.Item name="confirm_password" label="Nhập lại mật khẩu" dependencies={["new_password"]} rules={[{ required: true, message: "Nhập lại mật khẩu mới." }, ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("new_password") === value ? Promise.resolve() : Promise.reject(new Error("Mật khẩu xác nhận không khớp.")); } })]}>
+        <Input.Password autoComplete="new-password" maxLength={128} size="large" />
+      </Form.Item>
+      <Button className={styles.submit} type="primary" htmlType="submit" loading={busy} block size="large">Đặt lại mật khẩu <span aria-hidden="true">→</span></Button>
+    </Form>}
+    <Link className={styles.backLink} href="/login">← Quay lại đăng nhập</Link>
+  </AuthPageShell>;
 }

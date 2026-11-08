@@ -1,0 +1,19 @@
+.section { padding: 104px 0; background: #edf1e9; }
+.inner { width: min(100% - 48px, 1240px); margin: 0 auto; }
+.heading { display: flex; align-items: end; justify-content: space-between; gap: 48px; margin-bottom: 42px; }
+.eyebrow { margin: 0 0 15px; color: #58756b; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
+.heading h2 { margin: 0; color: #1d2926; font-family: var(--font-display); font-size: clamp(42px, 5vw, 64px); font-weight: 500; letter-spacing: -.055em; line-height: 1.08; }
+.heading h2 span { color: #2c746b; }
+.heading > p { max-width: 390px; margin: 0 0 5px; color: #68756e; font-size: 14px; line-height: 1.8; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #cfd8ce; border-bottom: 1px solid #cfd8ce; }
+.card { position: relative; min-height: 246px; padding: 26px 30px 30px 0; }
+.card + .card { padding-left: 30px; border-left: 1px solid #cfd8ce; }
+.tag { color: #668078; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+.number { position: absolute; top: 20px; right: 24px; color: #9aaa9f; font-family: var(--font-display); font-size: 14px; }
+.card h3 { margin: 38px 0 10px; color: #1d2926; font-family: var(--font-display); font-size: 24px; font-weight: 500; letter-spacing: -.025em; }
+.card p { max-width: 330px; margin: 0; color: #627069; font-size: 14px; line-height: 1.75; }
+.rule { display: block; width: 35px; height: 2px; margin-top: 23px; background: #42867b; }
+.foot { display: flex; justify-content: space-between; gap: 20px; padding-top: 18px; color: #728078; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.foot a { color: #2c746b; font-size: 12px; letter-spacing: 0; text-decoration: none; }
+.foot a span { margin-left: 8px; }
+@media (max-width: 760px) { .section { padding: 72px 0; } .inner { width: min(100% - 32px, 560px); } .heading { align-items: start; flex-direction: column; gap: 18px; } .grid { grid-template-columns: 1fr; } .card, .card + .card { min-height: auto; padding: 23px 35px 25px 0; border-left: 0; } .card + .card { border-top: 1px solid #cfd8ce; } .card h3 { margin-top: 22px; } .foot { flex-direction: column; } }

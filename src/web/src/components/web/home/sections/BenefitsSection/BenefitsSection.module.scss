@@ -1,0 +1,15 @@
+.section { padding: 103px 0 108px; background: #edf1e9; }
+.inner { width: min(100% - 40px, 1240px); margin: 0 auto; display: grid; grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.18fr); gap: clamp(42px, 9vw, 130px); }
+.heading { align-self: start; padding-top: 12px; }
+.eyebrow { margin: 0 0 19px; color: #52716a; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
+.heading h2 { margin: 0; color: #1d2926; font-family: var(--font-display); font-size: clamp(39px, 4vw, 56px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
+.heading h2 em { color: #2c746b; font-style: italic; font-weight: 500; }
+.heading > p:last-child { max-width: 390px; margin: 21px 0 0; color: #5c6862; font-size: 15px; line-height: 1.75; }
+.steps { border-top: 1px solid #cbd4ca; }
+.step { position: relative; display: grid; grid-template-columns: 46px 1fr 24px; align-items: start; gap: 16px; padding: 26px 0 25px; border-bottom: 1px solid #cbd4ca; }
+.number { padding-top: 2px; color: #71827a; font-family: var(--font-display); font-size: 14px; }
+.step h3 { margin: 0; color: #1d2926; font-family: var(--font-display); font-size: 22px; font-weight: 500; letter-spacing: 0; }
+.step p { max-width: 440px; margin: 8px 0 0; color: #5f6b64; font-size: 14px; line-height: 1.65; }
+.arrow { color: #2c746b; font-size: 19px; }
+
+@media (max-width: 760px) { .section { padding: 70px 0; } .inner { width: min(100% - 32px, 560px); grid-template-columns: 1fr; gap: 35px; } .heading h2 { font-size: 44px; } }

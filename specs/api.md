@@ -167,20 +167,18 @@ SQL Server lưu metadata như `public_id`, `secure_url`, định dạng, kích t
 
 ## Endpoint dùng chung: Web công khai và xác thực
 
-Các method/path trong bảng gồm cả route đã triển khai và route đề xuất. Route đăng nhập, đăng xuất, đổi/đặt lại mật khẩu và hồ sơ cần đối chiếu URL thực tế trong source; các route OAuth và đăng ký công khai bên dưới chưa được triển khai. Đăng ký công khai không mở trong phạm vi hiện tại.
+Các method/path trong bảng cần được đối chiếu với source. Danh mục khóa học công khai và các route OAuth có code trong source; OAuth còn phụ thuộc cấu hình provider ở từng môi trường. Các route khác được ghi là đề xuất khi chưa có route tương ứng. Đăng ký công khai không mở trong phạm vi hiện tại.
 
 | Method và path | Người gọi | Kiểu truy cập | Dữ liệu đọc/ghi và hành vi |
 |---|---|---|---|
 | `GET /api/v1/public/sites` | Khách chưa đăng nhập | Đọc bản sao dùng chung | Đọc `CoSo`; chỉ trả trường công khai của site đang hoạt động |
-| `GET /api/v1/public/courses?search=...&ma_mon_hoc=...&trinh_do=...&sort=...&cursor=...&limit=...` | Khách chưa đăng nhập | Đọc bản sao dùng chung | Đọc `MonHoc`, `KhoaHoc`; chỉ cho sort theo allowlist; không trả khóa học đã đóng |
-| `GET /api/v1/public/courses/{ma_khoa_hoc}` | Khách chưa đăng nhập | Đọc bản sao dùng chung | Chi tiết khóa học; mã không tồn tại trả `404` |
+| `GET /api/v1/courses/` | Khách chưa đăng nhập | `GLOBAL` đọc từng CSDL site riêng | Đọc danh mục `KhoaHoc`/`MonHoc` và số lớp đang mở theo site; trả `scope`, `complete`, `site_codes`, `missing_sites`, `inconsistent_sites`, `count`, `results`; nếu thiếu site, kết quả đánh dấu chưa đầy đủ |
 | `GET /api/v1/public/classes?ma_co_so=...&ma_khoa_hoc=...` | Khách chưa đăng nhập | `LOCAL` nếu lọc một site; `GLOBAL` nếu xem nhiều site | Đọc `LopHoc`, lịch cần công khai; Global Query phải trả `meta.complete` và `missing_sites` |
 | `POST /api/v1/auth/login/` | Vai trò nội bộ hiện có | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả phiên và ngữ cảnh quyền, không trả hash mật khẩu hoặc chuỗi kết nối |
-| `GET /api/v1/auth/oauth/{provider}/start?intent=login` | Người chưa đăng nhập; `provider` chỉ `google` hoặc `facebook` | Khởi tạo OAuth; chưa truy cập CSDL nghiệp vụ | Tạo state một lần rồi chuyển hướng tới provider; redirect URI lấy từ cấu hình server |
-| `GET /api/v1/auth/oauth/{provider}/callback` | Callback Google/Facebook | `GLOBAL` xác minh liên kết nhân bản và đọc `TaiKhoan` | Đổi authorization code ở server; xác minh provider subject; chỉ tài khoản nội bộ hoạt động mới được cấp phiên |
-| `GET /api/v1/auth/oauth/{provider}/link/start` | Người đã đăng nhập và xác thực lại gần đây | Khởi tạo liên kết; callback ghi bằng `REPLICATED-WRITE` | Bắt đầu ghép danh tính provider với `ma_tai_khoan` lấy từ phiên; không tìm tài khoản theo email |
-| `GET /api/v1/auth/oauth/{provider}/link/callback` | Callback Google/Facebook trong luồng link | `REPLICATED-WRITE` | Ghi liên kết giống nhau tới mọi site hoạt động; nếu thiếu site hoặc xung đột thì không báo thành công toàn phần |
-| `DELETE /api/v1/auth/oauth/{provider}/link` | Người đã đăng nhập, xác thực lại gần đây | `REPLICATED-WRITE` | Thu hồi liên kết ở mọi site; giữ lịch sử và bảo đảm còn phương thức đăng nhập hợp lệ |
+| `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập; `provider` chỉ `google` hoặc `facebook` | Khởi tạo OAuth; provider subject được tra cứu `GLOBAL` sau callback | Tạo state dùng một lần rồi chuyển hướng; chỉ học viên đã liên kết subject được đăng nhập, không tự tạo hoặc tự ghép tài khoản |
+| `GET /api/v1/auth/oauth/{provider}/callback/` | Callback Google/Facebook | `GLOBAL` xác minh liên kết nhân bản và đọc `TaiKhoan` | Đổi authorization code ở server; xác minh provider subject; chỉ học viên có liên kết hợp lệ được cấp phiên |
+| `POST /api/v1/auth/oauth/{provider}/start/` | Học viên đã đăng nhập, đổi mật khẩu cấp lần đầu | Khởi tạo liên kết; callback ghi bằng `REPLICATED-WRITE` | Trả URL ủy quyền và đặt cookie state; danh tính tài khoản lấy từ phiên, không nhận mã tài khoản từ client |
+| `GET /api/v1/auth/oauth/connections/{slug}/` | Học viên đã đăng nhập | Đọc trạng thái liên kết tài khoản theo phiên | Chỉ trả trạng thái liên kết của chính học viên đã xác thực |
 | `POST /api/v1/auth/register` | Không có trong phạm vi hiện tại | Tắt/chưa triển khai | Chưa cấp tài khoản công khai; chỉ mở sau khi nhóm duyệt đối tượng đăng ký, schema, xác minh email và rate limit |
 | `GET /api/v1/auth/profile/{slug}/` | Người đã đăng nhập | Đọc hồ sơ của chính tài khoản theo slug | Slug phải khớp tài khoản trong phiên; trả vai trò và thông tin được phép hiển thị, không trả bí mật xác thực |
 | `POST /api/v1/auth/logout/` | Người đã đăng nhập | Hủy phiên | Route đã có trong source; thu hồi phiên phía server và xóa cookie phiên |
@@ -191,13 +189,13 @@ Các method/path trong bảng gồm cả route đã triển khai và route đề
 
 `POST /api/v1/auth/register` hiện là route tắt: nếu `RegisterPage` còn hiển thị, trang chỉ giải thích điều kiện/liên hệ, không gửi tạo tài khoản. Admin Big tạo tài khoản nội bộ. Nếu nhóm duyệt portal học viên, đăng ký/kích hoạt phải được đặc tả và cập nhật schema trước khi bật endpoint; tuyệt đối không tự mở public signup.
 
-### Đăng nhập và liên kết tài khoản Google/Facebook — chưa triển khai
+### Đăng nhập và liên kết tài khoản Google/Facebook — đã có code, cần cấu hình môi trường
 
-Đăng nhập bằng mật khẩu cho tài khoản nội bộ đã có route `/api/v1/auth/login/`. OAuth Google/Facebook là phương thức bổ sung được đề xuất, chưa có endpoint trong source hiện tại; các route OAuth trong bảng chỉ là thiết kế, không được frontend gọi cho tới khi code, CSDL và OAuth applications được cấu hình, kiểm thử.
+Đăng nhập bằng mật khẩu và các route OAuth Google/Facebook có trong source. OAuth chỉ dành cho học viên đã liên kết danh tính trước đó; không thay thế đăng nhập nội bộ, không tự đăng ký và không tự liên kết theo email. Tính sẵn sàng ở môi trường triển khai còn phụ thuộc OAuth applications, biến môi trường và kiểm chứng cấu hình.
 
 **Luồng đăng nhập:**
 
-1. Người dùng bấm nhà cung cấp tương ứng; trình duyệt mở `GET /api/v1/auth/oauth/google/start?intent=login` hoặc `.../facebook/start?intent=login`. Backend chỉ nhận provider từ allowlist, tạo state ngẫu nhiên dùng một lần (và nonce cho Google), gắn với trình duyệt bằng cookie bảo mật tạm thời rồi chuyển hướng sang provider. `redirect_uri` được cấu hình cố định ở API, không lấy từ query/body.
+1. Học viên đã liên kết bấm nhà cung cấp tương ứng; trình duyệt mở `GET /api/v1/auth/oauth/google/start/` hoặc `.../facebook/start/`. Backend chỉ nhận provider từ allowlist, tạo state ngẫu nhiên dùng một lần (và nonce cho Google), gắn với trình duyệt bằng cookie bảo mật tạm thời rồi chuyển hướng sang provider. `redirect_uri` được cấu hình cố định ở API, không lấy từ query/body.
 2. Google/Facebook trả authorization code về callback đã đăng ký của API. Backend đối chiếu state/cookie, đổi code trực tiếp với provider qua HTTPS rồi xác minh; không chuyển provider token sang frontend và không ghi code/token vào log.
 3. Google ID token phải được xác minh chữ ký bằng JWKS chính thức và kiểm tra `iss`, `aud`, `exp`, `iat`, `nonce`; định danh bền vững là `sub`, không phải email. Facebook access token phải được introspect server-to-server (app ID đúng, token hợp lệ, đúng subject và chưa hết hạn); sau đó lấy Facebook app-scoped user ID. Chỉ yêu cầu quyền dữ liệu tối thiểu.
 4. API tìm provider subject trong `TaiKhoan.google_subject` hoặc `TaiKhoan.facebook_subject` tại từng CSDL site riêng, sau đó xác nhận các bản sao `TaiKhoan` nhất quán, tài khoản đang hoạt động và vai trò/phạm vi còn hợp lệ. Đây là `GLOBAL`; nếu site cần thiết mất kết nối hoặc các bản sao mâu thuẫn, từ chối cấp phiên và trả lỗi tạm thời, không âm thầm chọn một bản.
