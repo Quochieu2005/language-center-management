@@ -466,6 +466,18 @@ Mỗi site ghi `ThongBao` và audit `Logs` trong transaction cục bộ. Bắt b
 
 **Nghiệm thu:** người không phải Admin nhận 403; Admin Small chỉ tạo ở site của mình; Admin Big phát tới toàn bộ site hoạt động; nội dung sai/đường dẫn ngoài admin bị từ chối; gửi lại cùng key không tạo trùng, đổi body với key cũ nhận 409; khi một site lỗi, response liệt kê site thiếu và retry cùng request hoàn tất mà không nhân đôi các site đã ghi.
 
+### FS-NOTIF-01 — Admin tạo thông báo quản trị
+
+**Người dùng:** Admin Big và Admin Small. **Bảng hiện có:** `ThongBao`, `Logs` trên các CSDL site; không thêm database hoặc bảng mới.
+
+1. Admin Big có thể tạo thông báo cho Admin Big, Admin Small hoặc cả hai. Coordinator ghi cùng nội dung tới từng site đang hoạt động theo chính sách `REPLICATED-WRITE`; Admin Big không ghi vào một CSDL tổng hợp.
+2. Admin Small chỉ tạo thông báo tại cơ sở được gán (`LOCAL`), cho Admin Small hoặc cả hai nhóm admin. Không được gửi thông báo riêng cho Admin Big hay chọn site khác.
+3. Thông báo có tiêu đề, nội dung, nhóm, mức độ, nhóm nhận và đường dẫn nội bộ tùy chọn. Không chấp nhận đường dẫn ngoài khu vực `/admin/`.
+4. Mỗi yêu cầu ghi cần `Idempotency-Key`. Gửi lại cùng key và cùng nội dung không tạo bản ghi trùng; dùng lại key với nội dung khác bị từ chối. Nếu chỉ một số site nhận được, API trả danh sách site thiếu; Admin Big có thể gửi lại cùng nội dung/key để hoàn tất.
+5. Mỗi site ghi `ThongBao` và nhật ký `Logs` trong transaction cục bộ. Các site không cùng một transaction ACID; khi thiếu site không báo hoàn tất toàn phần.
+
+**Nghiệm thu:** Admin Small không thể ghi ngoài site hoặc nhắm Admin Big; Admin Big ghi được tới site hoạt động; site lỗi được báo rõ; retry không nhân đôi thông báo; không thêm bảng/database.
+
 ## 7. Quy tắc trạng thái nghiệp vụ
 
 Tên trạng thái cuối cùng phải khớp check constraint trong schema. Bảng dưới tóm tắt hành vi dự kiến, không thay thế enum/ràng buộc chính thức.
