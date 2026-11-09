@@ -26,6 +26,7 @@ from core.teachers.views import TeacherCollectionView, TeacherDetailView, Teache
 from core.notifications.views import (
     AdminNotificationListView,
 )
+from core.audit.views import AdminAuditLogListView
 from core.students.views import (
     StudentAccountProvisionView,
     StudentAdminCollectionView,
@@ -153,4 +154,5 @@ urlpatterns = [
     path("students/profile/<str:slug>/payments/<str:attempt_id>/", StudentSePayPaymentStatusView.as_view(), name="student-payment-status"),
     path("students/profile/<str:slug>/grades/", StudentGradesView.as_view(), name="student-grades"),
     path("admin/notifications/", AdminNotificationListView.as_view(), name="admin-notification-list"),
+    path("reports/audit-logs/", AdminAuditLogListView.as_view(), name="admin-audit-log-list"),
 ]

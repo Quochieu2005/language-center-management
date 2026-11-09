@@ -454,7 +454,17 @@ Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng ph�
 
 Không ghi password/hash, token, cookie, header xác thực, secret Cloudinary/SMTP/OAuth/SQL, PAN/CVV hay payload thanh toán thô. Không trả nội dung nội bộ trong lỗi API.
 
-**Nghiệm thu:** log nghiệp vụ có thể truy vết theo request ID nhưng không chứa secret; nhân sự cơ sở không đọc log của site khác; Admin Big thấy được trạng thái thiếu site khi truy vấn toàn cục.
+**Nghiệm thu:** log nghiệp vụ có thể truy vết theo mã log/tài khoản và bộ lọc ngày Việt Nam nhưng không chứa secret; Admin Big đọc toàn cục hoặc một site, Admin Small chỉ đọc site được gán; site lỗi phải được báo là dữ liệu chưa đầy đủ. API chỉ trả mã log, thời điểm, site, tài khoản, loại, thao tác, bảng, mã bản ghi, kết quả và site đích; không trả IP, hash định danh/IP, token, JSON dữ liệu trước/sau, ghi chú tự do hay nội dung lỗi nội bộ.
+
+### FS-NOTIF-01 — Tạo thông báo quản trị
+
+**Người dùng:** Admin Big và Admin Small. **Kiểu:** Admin Big dùng `REPLICATED-WRITE` ở tầng API tới các site đang hoạt động; Admin Small dùng `LOCAL` tại site được gán. **Bảng:** `ThongBao` và `Logs` tại từng site được ghi.
+
+Người tạo nhập nhóm thông báo, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn quản trị tùy chọn. API kiểm tra role từ phiên, giới hạn độ dài/giá trị, chỉ chấp nhận đường dẫn nội bộ `/admin/...`, và chỉ cho Admin Small nhắm `admin_all` hoặc `admin_small`. Admin Big gửi cùng thông báo tới các site hoạt động; Admin Small không được chỉ định site khác. Schema hiện có chỉ hỗ trợ nhóm nhận Admin Big, Admin Small hoặc cả hai, không dùng chức năng này để gửi cho học viên, giáo viên hay nhân viên.
+
+Mỗi site ghi `ThongBao` và audit `Logs` trong transaction cục bộ. Bắt buộc `Idempotency-Key`; retry phải dùng lại cùng key và body. Nếu thiếu site, API trả trạng thái chưa hoàn tất cùng danh sách site thiếu để có thể tiếp tục; không tuyên bố ACID xuyên site và không báo thành công toàn phần. Không tạo CSDL/bảng mới, không lưu trạng thái đã đọc.
+
+**Nghiệm thu:** người không phải Admin nhận 403; Admin Small chỉ tạo ở site của mình; Admin Big phát tới toàn bộ site hoạt động; nội dung sai/đường dẫn ngoài admin bị từ chối; gửi lại cùng key không tạo trùng, đổi body với key cũ nhận 409; khi một site lỗi, response liệt kê site thiếu và retry cùng request hoàn tất mà không nhân đôi các site đã ghi.
 
 ## 7. Quy tắc trạng thái nghiệp vụ
 

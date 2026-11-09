@@ -97,7 +97,7 @@ export default function ClassesPage() {
     <Card title={`Lớp học${site ? ` · ${site}` : ""}`} extra={<Space wrap>{canManage && <><Button onClick={() => setModal("room")}>Thêm phòng</Button><Button onClick={() => setModal("move")}>Chuyển lớp</Button></>}{canEnroll && <Button onClick={() => setModal("enroll")}>Đăng ký học</Button>}{canManage && <Button type="primary" onClick={() => setModal("class")} disabled={!site}>Mở lớp</Button>}</Space>}>
       <Table rowKey="class_id" loading={loading} columns={columns} dataSource={classes} scroll={{ x: 1000 }} />
     </Card>
-    <Modal title="Tạo lớp và lịch" open={modal === "class"} onCancel={() => setModal(null)} footer={null} width={700} destroyOnClose><Form form={classForm} layout="vertical" onFinish={createClass}>
+    <Modal title="Tạo lớp và lịch" open={modal === "class"} onCancel={() => setModal(null)} footer={null} width={700} destroyOnHidden><Form form={classForm} layout="vertical" onFinish={createClass}>
       <Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item>
       <Form.Item name="course_id" label="Mã khóa học có sẵn tại site" rules={[{ required: true }]}><Input maxLength={30} /></Form.Item>
       <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select options={teachers.filter((x) => x.status === "dang_day").map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>

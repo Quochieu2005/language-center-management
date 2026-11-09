@@ -13,6 +13,7 @@ from core.sites.connections import UnknownSiteError, get_site_database_alias
 from core.media.folders import build_asset_folder
 from core.auth.authentication import AuthCookieAuthentication
 from core.auth.account_status import AccountStatusResult
+from core.auth.oauth_views import OAuthStartView
 from core.auth.services import (
     AdminSmallDeactivationResult,
     AdminSmallProvisioningResult,
@@ -65,6 +66,20 @@ class HealthCheckTests(SimpleTestCase):
 
     def test_default_database_cannot_store_application_data(self):
         self.assertEqual(settings.DATABASES["default"]["ENGINE"], "django.db.backends.dummy")
+
+
+class OAuthRequestInitializationTests(SimpleTestCase):
+    def test_login_start_is_public_and_link_start_keeps_cookie_authentication(self):
+        factory = APIRequestFactory()
+
+        get_view = OAuthStartView()
+        get_request = get_view.initialize_request(factory.get("/api/v1/auth/oauth/google/start/"))
+        self.assertFalse(get_request.authenticators)
+
+        post_view = OAuthStartView()
+        post_request = post_view.initialize_request(factory.post("/api/v1/auth/oauth/google/start/"))
+        self.assertEqual(len(post_request.authenticators), 1)
+        self.assertIsInstance(post_request.authenticators[0], AuthCookieAuthentication)
 
 
 class CloudinaryAssetFolderTests(SimpleTestCase):
