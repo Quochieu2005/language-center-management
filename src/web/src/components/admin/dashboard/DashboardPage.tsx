@@ -58,7 +58,10 @@ function SpaceLinks() {
     { label: "Học phí", href: "/admin/tuition", roles: ["admin_big", "admin_small", "ke_toan"] },
     { label: "Chuyển cơ sở", href: "/admin/transfers", roles: ["admin_big", "admin_small"] },
     { label: "Giáo viên", href: "/admin/teachers", roles: ["admin_big", "admin_small"] },
-    { label: "Tài khoản", href: "/admin/accounts", roles: ["admin_big", "admin_small"] },
+    { label: "Nhân viên", href: "/admin/employees", roles: ["admin_big", "admin_small"] },
+    { label: "Admin Small", href: "/admin/accounts", roles: ["admin_big"] },
+    { label: "Thông báo", href: "/admin/notifications", roles: ["admin_big", "admin_small"] },
+    { label: "Nhật ký Admin", href: "/admin/audit", roles: ["admin_big", "admin_small"] },
     { label: "Báo cáo", href: "/admin/reports", roles: ["admin_big", "admin_small"] },
   ];
   return <Row gutter={[12, 12]}>{links.filter((item) => item.roles.includes(user?.role || "")).map(({ label, href }) => <Col key={href}><Link href={href}>{label}</Link></Col>)}</Row>;

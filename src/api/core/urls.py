@@ -26,6 +26,7 @@ from core.teachers.views import TeacherCollectionView, TeacherDetailView, Teache
 from core.notifications.views import (
     AdminNotificationListView,
 )
+from core.audit.views import AdminAuditLogListView
 from core.students.views import (
     StudentAccountProvisionView,
     StudentAdminCollectionView,
@@ -45,6 +46,7 @@ from core.classes.views import (
     EnrollmentCollectionView,
     EnrollmentClassAssignView,
     RoomCollectionView,
+    RoomDetailView,
 )
 from core.classes.public_views import PublicCourseClassListView, PublicEnrollmentCreateView
 from core.academics.attendance_views import (
@@ -122,6 +124,7 @@ urlpatterns = [
     path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),
     path("admin/classes/", ClassCollectionView.as_view(), name="class-list-create"),
     path("admin/rooms/", RoomCollectionView.as_view(), name="room-list-create"),
+    path("admin/rooms/<str:room_id>/", RoomDetailView.as_view(), name="room-delete"),
     path("admin/classes/<str:class_id>/", ClassDetailView.as_view(), name="class-detail"),
     path("admin/classes/<str:class_id>/students/", ClassRosterView.as_view(), name="class-students"),
     path("admin/classes/<str:class_id>/sessions/", ClassSessionsView.as_view(), name="class-sessions"),
@@ -151,4 +154,5 @@ urlpatterns = [
     path("students/profile/<str:slug>/payments/<str:attempt_id>/", StudentSePayPaymentStatusView.as_view(), name="student-payment-status"),
     path("students/profile/<str:slug>/grades/", StudentGradesView.as_view(), name="student-grades"),
     path("admin/notifications/", AdminNotificationListView.as_view(), name="admin-notification-list"),
+    path("reports/audit-logs/", AdminAuditLogListView.as_view(), name="admin-audit-log-list"),
 ]

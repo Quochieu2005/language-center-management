@@ -97,10 +97,10 @@ class OAuthStartView(APIView):
         self.throttle_scope = "oauth_start"
         return super().get_throttles()
 
-    def get_authenticators(self):
-        if self.request.method == "GET":
-            return []
-        return super().get_authenticators()
+    def initialize_request(self, request, *args, **kwargs):
+        if request.method == "GET":
+            self.authentication_classes = []
+        return super().initialize_request(request, *args, **kwargs)
 
     @extend_schema(
         operation_id="auth_student_oauth_login_start",

@@ -27,6 +27,7 @@ from core.classes.serializers import (
     EnrollmentCreateSerializer,
     RoomCreateResponseSerializer,
     RoomCreateSerializer,
+    RoomDeleteResponseSerializer,
     RoomListQuerySerializer,
     RoomListResponseSerializer,
 )
@@ -40,6 +41,7 @@ from core.classes.services import (
     assign_enrollment_to_class,
     create_class,
     create_room,
+    delete_room,
     get_class,
     list_class_students,
     list_class_sessions,
@@ -163,6 +165,50 @@ class RoomCollectionView(_ClassApiView):
         except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
             return _error_response(exc)
         return Response(result, status=status.HTTP_201_CREATED)
+
+
+class RoomDetailView(_ClassApiView):
+    throttle_scope = "class_management"
+
+    @extend_schema(
+        operation_id="room_delete",
+        tags=["Phòng học"],
+        summary="Xóa phòng học chưa được sử dụng",
+        description=(
+            "Admin Big phải chọn site_code; Admin Small chỉ thao tác tại site trong phiên. Xóa LOCAL "
+            "trong một CSDL site và ghi Logs cùng transaction. Từ chối nếu PhongHoc đang được LopHoc "
+            "hoặc BuoiHoc tham chiếu để giữ lịch sử và toàn vẹn khóa ngoại."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={
+            200: RoomDeleteResponseSerializer,
+            400: OpenApiResponse(description="Mã phòng hoặc site không hợp lệ; Admin Big phải chọn site."),
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được xóa phòng."),
+            404: OpenApiResponse(description="Không tìm thấy phòng tại site."),
+            409: OpenApiResponse(description="Phòng đang được lớp hoặc buổi học sử dụng."),
+            503: OpenApiResponse(description="CSDL site không sẵn sàng."),
+        },
+    )
+    def delete(self, request, room_id: str):
+        invalid_id = _validate_record_id(room_id)
+        if invalid_id:
+            return invalid_id
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+        )
+        if error:
+            return error
+        try:
+            result = delete_room(
+                site_code=site_code, room_id=room_id,
+                actor_id=request.user.account_id, remote_ip=_remote_ip(request),
+            )
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
 
 
 class EnrollmentCollectionView(_ClassApiView):

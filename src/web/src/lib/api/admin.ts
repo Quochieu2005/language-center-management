@@ -26,19 +26,6 @@ export type Employee = {
   full_name: string; phone: string | null; account_status: "active" | "inactive";
   employee_status: "dang_lam" | "nghi_viec";
 };
-export type Student = {
-  student_id: string; slug: string; site_code: string; full_name: string;
-  phone: string | null; email: string | null; status: string; account_issued: boolean;
-};
-export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
-export type AdminAvatarUploadIntent = {
-  intent_token: string;
-  upload_url: string;
-  cloud_name: string;
-  api_key: string;
-  fields: Record<string, string>;
-  max_file_bytes: number;
-};
 export type AdminNotification = {
   slug: string;
   site_code: string;
@@ -66,11 +53,51 @@ export type CreateAdminNotification = {
   message: string;
   target_path: string | null;
 };
+export type AdminNotificationCreateResult = {
+  site_code: string;
+  slug: string;
+  created: boolean;
+};
 export type AdminNotificationCreateResponse = {
   complete: boolean;
   site_codes: string[];
   missing_sites: string[];
-  results: { site_code: string; slug: string; created: boolean }[];
+  results: AdminNotificationCreateResult[];
+};
+export type AdminAuditLog = {
+  log_id: string;
+  log_type: "login" | "password_reset" | "system" | "sync";
+  occurred_at: string;
+  site_code: string;
+  account_id: string | null;
+  action: string | null;
+  affected_table: string | null;
+  record_id: string | null;
+  result: "thanh_cong" | "that_bai" | null;
+  destination_site: string | null;
+};
+export type AdminAuditLogList = {
+  scope: "LOCAL" | "GLOBAL";
+  complete: boolean;
+  missing_sites: string[];
+  site_codes: string[];
+  count: number;
+  limit: number;
+  offset: number;
+  results: AdminAuditLog[];
+};
+export type Student = {
+  student_id: string; slug: string; site_code: string; full_name: string;
+  phone: string | null; email: string | null; status: string; account_issued: boolean;
+};
+export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
+export type AdminAvatarUploadIntent = {
+  intent_token: string;
+  upload_url: string;
+  cloud_name: string;
+  api_key: string;
+  fields: Record<string, string>;
+  max_file_bytes: number;
 };
 
 export const adminApi = {
@@ -128,4 +155,14 @@ export const adminApi = {
       headers: { "Idempotency-Key": idempotencyKey },
       body: jsonBody(body),
     }),
+  auditLogs: (options: { site_code?: string; account_id?: string; log_type?: string; from_date?: string; to_date?: string; limit?: number; offset?: number } = {}) =>
+    apiRequest<AdminAuditLogList>(`/reports/audit-logs/${query({
+      ma_co_so: options.site_code,
+      ma_tai_khoan: options.account_id,
+      loai_log: options.log_type,
+      tu_ngay: options.from_date,
+      den_ngay: options.to_date,
+      limit: options.limit,
+      offset: options.offset,
+    })}`),
 };
