@@ -85,6 +85,13 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
           roles: ["admin_big"],
         },
         {
+          label: "Khóa học",
+          href: "/admin/courses",
+          icon: <BookOutlined />,
+          badge: null,
+          roles: ["admin_big"],
+        },
+        {
           label: "Giảng viên & Roster",
           href: "/admin/teachers",
           icon: <UsergroupAddOutlined />,
