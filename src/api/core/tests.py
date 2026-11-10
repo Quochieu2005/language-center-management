@@ -440,7 +440,7 @@ class TemporaryPasswordAccessTests(SimpleTestCase):
         )
         self.session = AuthenticatedSession(token_digest="a" * 64, session_id="session", expires_at=None)
 
-    def test_temporary_password_blocks_business_endpoints(self):
+    def test_temporary_password_allows_business_endpoints(self):
         request = APIRequestFactory().get("/api/v1/admin/admin-smalls/")
         request.COOKIES[settings.AUTH_COOKIE_NAME] = "a" * 64
         request.resolver_match = resolve("/api/v1/admin/admin-smalls/")
@@ -448,10 +448,9 @@ class TemporaryPasswordAccessTests(SimpleTestCase):
         with patch(
             "core.auth.authentication.load_user_session", return_value=(self.user, self.session)
         ):
-            with self.assertRaises(AuthenticationFailed) as caught:
-                AuthCookieAuthentication().authenticate(request)
+            authenticated = AuthCookieAuthentication().authenticate(request)
 
-        self.assertEqual(caught.exception.get_codes(), "password_change_required")
+        self.assertEqual(authenticated, (self.user, self.session))
 
     def test_temporary_password_allows_account_profile_check(self):
         request = APIRequestFactory().get("/api/v1/auth/profile/admin-small-q7-manager-q7/")

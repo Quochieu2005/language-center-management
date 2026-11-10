@@ -52,8 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublicPath(pathname)) router.replace("/login");
-    if (user && ["/login", "/forgot-password"].includes(pathname)) router.replace(user.must_change_password ? "/password/change" : homeForRole(user.role));
-    if (user?.must_change_password && pathname !== "/password/change") router.replace("/password/change");
+    if (user && ["/login", "/forgot-password"].includes(pathname)) router.replace(homeForRole(user.role));
   }, [loading, pathname, router, user]);
 
   useEffect(() => {

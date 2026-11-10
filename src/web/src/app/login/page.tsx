@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Button, Form, Input, Space, Typography } from "antd";
+import { Alert, App, Button, Form, Input, Space, Typography } from "antd";
 import { FacebookFilled, GoogleOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [socialBusy, setSocialBusy] = useState("");
   const [error, setError] = useState("");
+  const { message } = App.useApp();
   const { signIn } = useSession();
   const router = useRouter();
   useEffect(() => {
@@ -28,7 +29,8 @@ export default function LoginPage() {
         return authApi.session();
       }).then(({ user }) => {
         signIn(user);
-        router.replace(user.must_change_password ? "/password/change" : homeForRole(user.role));
+        if (user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
+        router.replace(homeForRole(user.role));
       }).catch(() => setError("Không xác minh được phiên Google/Facebook. Hãy đăng nhập lại bằng tài khoản được cấp."))
         .finally(() => setSocialBusy(""));
       return;
@@ -43,7 +45,7 @@ export default function LoginPage() {
       session_expired: "Phiên đã hết hạn. Hãy đăng nhập lại rồi thử liên kết.",
     };
     queueMicrotask(() => setError(messages[result] || "Đăng nhập ngoài không thành công."));
-  }, [router, signIn]);
+  }, [message, router, signIn]);
 
   const beginSocialLogin = (provider: "google" | "facebook") => {
     setSocialBusy(provider);
@@ -54,7 +56,8 @@ export default function LoginPage() {
     try {
       const result = await authApi.login(values.identifier, values.password);
       signIn(result.user);
-      router.replace(result.user.must_change_password ? "/password/change" : homeForRole(result.user.role));
+      if (result.user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
+      router.replace(homeForRole(result.user.role));
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Không kết nối được API. Kiểm tra máy chủ và địa chỉ API.");
     } finally { setBusy(false); }

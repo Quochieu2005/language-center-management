@@ -300,7 +300,7 @@ function formatProfileValue(key: string, value: unknown): string {
   if (key === "site_code" && value == null) return "Toàn hệ thống";
   if (value == null || value === "") return "Chưa cập nhật";
   if (typeof value === "boolean") {
-    if (key === "must_change_password") return value ? "Bắt buộc đổi ở lần đăng nhập tới" : "Không bắt buộc";
+    if (key === "must_change_password") return value ? "Được trung tâm cấp — nên đổi để bảo mật" : "Đã đổi hoặc không yêu cầu";
     return value ? "Có" : "Không";
   }
   const text = String(value);

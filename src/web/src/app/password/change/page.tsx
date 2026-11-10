@@ -69,7 +69,7 @@ function ChangePasswordForm() {
           </div>
 
           {user?.must_change_password && (
-            <Alert type="warning" title="Bạn cần đổi mật khẩu tạm thời để tiếp tục." />
+            <Alert type="info" title="Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể tiếp tục sử dụng và đổi mật khẩu khi thuận tiện." />
           )}
           {error && <Alert type="error" title={error} />}
 
