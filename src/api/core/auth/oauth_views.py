@@ -130,12 +130,10 @@ class OAuthStartView(APIView):
         operation_id="auth_student_oauth_link_start",
         tags=["Xác thực"],
         summary="Bắt đầu liên kết Google hoặc Facebook với tài khoản học viên hiện tại",
-        description=(
-            "Chỉ học viên đã đăng nhập và đã đổi mật khẩu cấp lần đầu được liên kết. "
-            "Liên kết được ghi tới các bản TaiKhoan tại mọi site đang hoạt động."
-        ),
+        description="Học viên đã đăng nhập có thể liên kết tài khoản. Liên kết được ghi tới các bản TaiKhoan tại mọi site đang hoạt động.",
         parameters=[OpenApiParameter("provider", str, OpenApiParameter.PATH)],
-        responses={200: OpenApiResponse(description="URL ủy quyền và cookie state HttpOnly."), 403: OpenApiResponse(description="Không đúng vai trò hoặc phải đổi mật khẩu trước.")},
+        request=None,
+        responses={200: OpenApiResponse(description="URL ủy quyền và cookie state HttpOnly."), 403: OpenApiResponse(description="Không đúng vai trò.")},
     )
     def post(self, request, provider: str):
         if provider not in PROVIDER_COLUMNS:
@@ -143,9 +141,8 @@ class OAuthStartView(APIView):
         if (
             not getattr(request.user, "is_authenticated", False)
             or request.user.role != "hoc_vien"
-            or request.user.must_change_password
         ):
-            return Response({"detail": "Chỉ học viên đã đổi mật khẩu cấp lần đầu mới được liên kết."}, status=403)
+            return Response({"detail": "Chỉ học viên đã đăng nhập mới được liên kết."}, status=403)
         try:
             authorization_url, flow = create_oauth_flow(provider, "link", request.user.account_id)
         except OAuthNotConfigured:
@@ -208,7 +205,6 @@ class OAuthCallbackView(APIView):
                 if (
                     oauth_user is None
                     or oauth_user.role != "hoc_vien"
-                    or oauth_user.must_change_password
                     or oauth_user.account_id != flow.get("account_id")
                 ):
                     return _return_response("session_expired", "link", provider)

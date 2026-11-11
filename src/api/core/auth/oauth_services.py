@@ -297,7 +297,7 @@ def login_with_oauth_provider(provider: str, subject: str, remote_ip: str):
                 sites = active_site_codes()
                 account = _replicated_provider_account(provider, subject, sites)
                 user = _resolve_principal(account[:10], sites) if account else None
-                if user is None or user.role != "hoc_vien" or user.must_change_password:
+                if user is None or user.role != "hoc_vien":
                     _record_attempt(cursor, ip_digest, identity_digest, "that_bai")
                     return None
                 cursor.execute(
@@ -337,7 +337,7 @@ def _read_account_for_link(site: str, account_id: str, column: str, subject: str
 
 
 def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, remote_ip: str) -> None:
-    if provider not in PROVIDER_COLUMNS or user.role != "hoc_vien" or user.must_change_password:
+    if provider not in PROVIDER_COLUMNS or user.role != "hoc_vien":
         raise OAuthAccountConflict
     column = PROVIDER_COLUMNS[provider]
     sites = active_site_codes()
@@ -360,7 +360,7 @@ def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, re
                 other_identity = target_rows[0][11]
                 if any(row[:10] != base or row[11] != other_identity for row in target_rows[1:]):
                     raise AuthInfrastructureUnavailable
-                if any(row[5] != "hoc_vien" or bool(row[9]) for row in target_rows):
+                if any(row[5] != "hoc_vien" for row in target_rows):
                     raise OAuthAccountConflict
                 principal = _resolve_principal(base, sites)
                 if (
@@ -404,7 +404,7 @@ def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, re
 
 
 def get_oauth_connections(user: AuthenticatedUser, slug: str) -> dict[str, bool]:
-    if user.role != "hoc_vien" or user.must_change_password or slug != user.slug:
+    if user.role != "hoc_vien" or slug != user.slug:
         raise OAuthAccountConflict
     sites = active_site_codes()
     replicas = []
