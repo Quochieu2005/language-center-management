@@ -24,9 +24,36 @@ class AdminAvatarFinalizeRequestSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
+class AdminSmallAvatarUploadIntentRequestSerializer(serializers.Serializer):
+    setup_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
+
+    def to_internal_value(self, data):
+        if hasattr(data, "keys") and set(data.keys()) != {"setup_token"}:
+            raise serializers.ValidationError({"detail": "Chỉ nhận setup_token."})
+        return super().to_internal_value(data)
+
+
+class AdminSmallAvatarFinalizeRequestSerializer(serializers.Serializer):
+    setup_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
+    intent_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
+    public_id = serializers.RegexField(
+        regex=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        max_length=36,
+        trim_whitespace=False,
+    )
+
+    def to_internal_value(self, data):
+        if hasattr(data, "keys") and set(data.keys()) != {"setup_token", "intent_token", "public_id"}:
+            raise serializers.ValidationError({"detail": "Chỉ nhận setup_token, intent_token và public_id."})
+        return super().to_internal_value(data)
+
+
 class AdminAvatarResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
-    role = serializers.ChoiceField(choices=("admin_big", "admin_small"))
+    role = serializers.ChoiceField(choices=(
+        "admin_big", "admin_small", "le_tan", "tu_van", "ke_toan",
+        "xep_lop", "giao_vien", "hoc_vien",
+    ))
     avatar_secure_url = serializers.URLField()
     complete = serializers.BooleanField()
     site_codes = serializers.ListField(child=serializers.CharField())

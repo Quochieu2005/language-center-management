@@ -381,7 +381,7 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_dang_ky` | FK → `DangKy` | |
 | `trang_thai` | | `co_mat` · `tre` · `vang_co_phep` · `vang_khong_phep` |
 | `ghi_chu` | | |
-| `ma_tai_khoan_ghi` | FK → `TaiKhoan` | Người ghi |
+| `ma_tai_khoan_ghi` | Mã tài khoản lịch sử, không FK | Người ghi; giữ được dấu vết khi tài khoản bị xóa |
 | | UQ (`ma_buoi`, `ma_dang_ky`) | |
 
 ### 6.6. Log và bảo mật (cục bộ)
@@ -412,9 +412,9 @@ Admin Small chỉ ghi tại site được gán. Admin Big gửi cùng sự kiệ
 | `trang_thai` | | `cho_duyet` · `dang_xu_ly` · `tu_choi` · `hoan_tat` · `that_bai` |
 | `buoc_cuoi` | | `cho_duyet` · `da_tiep_nhan` · `da_tao_ho_so_dich` · `da_cap_nhat_nguon` · `hoan_tat` · `tu_choi` |
 | `khoa_chong_lap` | UQ nếu khác *null* | Khóa idempotency của API; gửi lại cùng yêu cầu không tạo đề nghị thứ hai |
-| `ma_tai_khoan_de_nghi` | FK → `TaiKhoan` | Admin Small đã đăng nhập; API phải xác nhận tài khoản được gán đúng `co_so_nguon` |
+| `ma_tai_khoan_de_nghi` | Mã tài khoản lịch sử, không FK | Admin Small gửi đề nghị; API xác minh tài khoản và site tại thời điểm thao tác |
 | `ly_do_de_nghi` | | Lý do do Admin Small nhập; không chứa bí mật hoặc dữ liệu không cần thiết |
-| `ma_tai_khoan_quyet_dinh` | FK → `TaiKhoan`, *null* khi chờ duyệt | Admin Big đã duyệt hoặc từ chối |
+| `ma_tai_khoan_quyet_dinh` | Mã tài khoản lịch sử, *null* khi chờ duyệt, không FK | Admin Big đã duyệt hoặc từ chối |
 | `ngay_tao`, `ngay_quyet_dinh`, `cap_nhat_luc` | | Thời điểm gửi đề nghị, quyết định và cập nhật trạng thái |
 | `ly_do_tu_choi` | *null* trừ khi `tu_choi` | Admin Big phải ghi lý do khi từ chối |
 | `khoa_chong_trung_chuyen` | Cột tính toán; UQ | Khi đang mở, khóa là `HV:<ma_hoc_vien>`; khi đã kết thúc, khóa là `CC:<ma_chuyen>`. Unique index ngăn hai đề nghị/giao dịch mở cho cùng học viên mà không cần index lọc trên cột tính toán |
@@ -438,7 +438,7 @@ Khi duyệt, API định tuyến về CSDL nguồn và kiểm tra lại trạng 
 | `site_ghi` | FK → `CoSo` cục bộ | CSDL site đã ghi sự kiện |
 | `su_kien` | | `de_nghi` · `duyet` · `tu_choi` · `tao_ho_so_dich` · `xac_nhan_ho_so_dich` · `cap_nhat_ho_so_nguon` · `hoan_tat` · `that_bai` · `phuc_hoi` |
 | `thoi_diem` | | Thời điểm ghi sự kiện |
-| `ma_tai_khoan_thuc_hien` | FK → `TaiKhoan`, *null* | Tài khoản thao tác nếu xác định được |
+| `ma_tai_khoan_thuc_hien` | Mã tài khoản lịch sử, *null*, không FK | Tài khoản thao tác nếu xác định được |
 | `chi_tiet` | *null* | Chi tiết không nhạy cảm, không ghi mật khẩu/token/credential |
 
 Sự kiện được thêm tại site nơi hành động xảy ra. `de_nghi`, `duyet` và `tu_choi` được ghi ở nguồn; `tao_ho_so_dich` ghi cùng transaction cục bộ với hồ sơ tại đích; sau khi xác nhận commit đích, nguồn ghi `xac_nhan_ho_so_dich`; sự kiện cập nhật nguồn ghi tại nguồn. Bảng này không được UPDATE/DELETE; trạng thái hiện tại chỉ nằm trong `GiaoDichChuyenCoSo`.
@@ -475,6 +475,8 @@ Sự kiện được thêm tại site nơi hành động xảy ra. `de_nghi`, `d
 | Hệ thống | `chuyen_co_so` `sua_danh_muc` |
 
 `db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng xóa dữ liệu học viên đã bật cờ phiên theo quy trình.
+
+**Xóa vĩnh viễn Admin Small:** Admin Big có thể xóa vật lý dòng `Admin`, các bản sao `TaiKhoan`, phiên, token/giao dịch đặt lại mật khẩu còn gắn tài khoản và ảnh Cloudinary. Chạy `db/32_allow_admin_small_hard_delete.sql` riêng tại từng site trước khi bật thao tác này. Migration bỏ FK tới `TaiKhoan` ở các cột người thao tác của `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `DiemDanh` và bảng log cũ để giữ nguyên mã người thao tác trong lịch sử; không xóa các dòng lịch sử. FK `YeuCauThanhToan_TaiKhoan` vẫn được giữ; nếu còn yêu cầu thanh toán tham chiếu tài khoản thì API từ chối xóa. Hồ sơ `HocVien`/`GiaoVien`/`NhanVien` hoặc giao dịch chuyển cơ sở đang mở cũng khiến thao tác bị từ chối. Mỗi site commit độc lập, có dấu retry trong `Logs`; đây là `REPLICATED-WRITE`, không phải ACID xuyên CSDL.
 
 Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_tac_dong='MonHoc'`, `ma_ban_ghi`, `site_dich`, `ket_qua='thanh_cong'`, JSON trước/sau và tài khoản Admin Big. `ma_log` xác định theo khóa idempotency và site. Dòng ACK và cập nhật `MonHoc` nằm trong cùng transaction cục bộ, nên một site không thể có ACK thành công nếu update ở site đó rollback. `Logs` là nơi ghi ACK của từng bản sao, không phải database trung tâm.
 

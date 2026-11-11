@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections
 
 from core.auth.account_state import account_status_label
+from core.auth.admin_small_email import credential_email_status
 from core.auth.service_common import AuthInfrastructureUnavailable, active_site_codes
 from core.sites.connections import UnknownSiteError, get_site_database_alias
 
@@ -42,9 +43,23 @@ def list_admin_small_accounts(
                     """
                     SELECT n.ma_admin, n.ma_co_so, n.ho_ten, n.sdt,
                            t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email,
-                           t.trang_thai, n.trang_thai
+                           t.trang_thai, n.trang_thai, email_state.hanh_dong
                     FROM dbo.Admin AS n
                     INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
+                    OUTER APPLY
+                    (
+                        SELECT TOP (1) l.hanh_dong
+                        FROM dbo.Logs AS l
+                        WHERE l.loai_log = 'system' AND l.ma_co_so = n.ma_co_so
+                          AND l.ma_tai_khoan = t.ma_tai_khoan
+                          AND l.bang_tac_dong = 'TaiKhoan' AND l.ma_ban_ghi = t.ma_tai_khoan
+                          AND l.hanh_dong IN (
+                              'admin_small_email_ready', 'admin_small_email_sending',
+                              'admin_small_email_sent', 'admin_small_email_failed',
+                              'admin_small_email_unknown', 'admin_small_email_changed'
+                          )
+                        ORDER BY l.thoi_diem_utc DESC, l.ma_log DESC
+                    ) AS email_state
                     WHERE n.ma_co_so = %s AND n.loai_admin = 'admin_small'
                       AND t.vai_tro = 'nhan_vien' AND t.ma_co_so = n.ma_co_so
                     ORDER BY n.ho_ten, n.ma_admin
@@ -71,6 +86,7 @@ def list_admin_small_accounts(
                     "email": str(row[7]),
                     "account_status": account_status,
                     "profile_status": "dang_lam" if bool(row[9]) else "nghi_viec",
+                    "credential_email_status": credential_email_status(str(row[10]) if row[10] else None),
                 }
             )
             results.sort(key=lambda item: (item["full_name"].casefold(), item["site_code"], item["admin_id"]))

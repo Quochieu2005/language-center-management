@@ -79,6 +79,10 @@ class AdminSmallCreateSerializer(serializers.Serializer):
     username = serializers.RegexField(
         regex=r"^[A-Za-z0-9._-]{3,100}$", max_length=100, required=False
     )
+    slug = serializers.RegexField(
+        regex=r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$", max_length=120, required=False
+    )
+    avatar_requested = serializers.BooleanField(required=False, default=False)
 
     def validate_full_name(self, value):
         value = value.strip()
@@ -97,6 +101,9 @@ class AdminSmallCreateSerializer(serializers.Serializer):
         if not value or any(ord(character) < 32 for character in value):
             raise serializers.ValidationError("Tên đăng nhập không hợp lệ.")
         return value
+
+    def validate_slug(self, value):
+        return value.strip().lower()
 
 
 class AdminSmallSelfProfileUpdateSerializer(serializers.Serializer):
@@ -210,7 +217,7 @@ class AdminSmallDeleteResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
     site_code = serializers.CharField()
     role = serializers.ChoiceField(choices=["admin_small"])
-    status = serializers.ChoiceField(choices=["inactive"])
+    deleted = serializers.BooleanField()
     detail = serializers.CharField()
 
 
@@ -246,6 +253,9 @@ class AdminSmallListItemSerializer(serializers.Serializer):
     email = serializers.EmailField()
     account_status = serializers.ChoiceField(choices=("active", "inactive"))
     profile_status = serializers.ChoiceField(choices=("dang_lam", "nghi_viec"))
+    credential_email_status = serializers.ChoiceField(
+        choices=("ready", "processing", "sent", "failed", "unknown", "changed")
+    )
 
 
 class AdminSmallListResponseSerializer(serializers.Serializer):
@@ -272,7 +282,14 @@ class AdminSmallCreateResponseSerializer(serializers.Serializer):
     account_status = serializers.ChoiceField(choices=("active",))
     role = serializers.ChoiceField(choices=["admin_small"])
     must_change_password = serializers.BooleanField()
-    email_sent = serializers.BooleanField()
+    credential_email_status = serializers.ChoiceField(choices=("ready", "unknown"))
+    avatar_setup_token = serializers.CharField(allow_null=True, required=False)
+
+
+class AdminSmallCredentialEmailResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    email = serializers.EmailField()
+    status = serializers.ChoiceField(choices=("sent",))
 
 
 class GenericPasswordResetResponseSerializer(serializers.Serializer):
@@ -297,6 +314,7 @@ class AuthUserSerializer(serializers.Serializer):
     site_code = serializers.CharField(allow_null=True)
     profile_id = serializers.CharField(allow_null=True)
     must_change_password = serializers.BooleanField()
+    avatar_secure_url = serializers.URLField(allow_null=True, required=False)
 
 
 class AuthLoginResponseSerializer(serializers.Serializer):

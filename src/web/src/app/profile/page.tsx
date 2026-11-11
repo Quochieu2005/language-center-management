@@ -22,7 +22,7 @@ const PROFILE_FIELDS: Record<string, ProfileField[]> = {
     { key: "role", label: "Vai trò" },
     { key: "site_code", label: "Cơ sở" },
     { key: "slug", label: "Slug hồ sơ" },
-    { key: "must_change_password", label: "Đổi mật khẩu lần đăng nhập tới" },
+    { key: "must_change_password", label: "Mật khẩu được cấp" },
   ],
   admin_big: [
     { key: "account_id", label: "Mã tài khoản" },
@@ -32,7 +32,7 @@ const PROFILE_FIELDS: Record<string, ProfileField[]> = {
     { key: "slug", label: "Slug hồ sơ" },
     { key: "site_code", label: "Phạm vi cơ sở" },
     { key: "account_status", label: "Trạng thái tài khoản" },
-    { key: "must_change_password", label: "Đổi mật khẩu lần đăng nhập tới" },
+    { key: "must_change_password", label: "Mật khẩu được cấp" },
   ],
   admin_small: [
     { key: "profile_id", label: "Mã hồ sơ Admin" },
@@ -46,7 +46,7 @@ const PROFILE_FIELDS: Record<string, ProfileField[]> = {
     { key: "site_code", label: "Cơ sở phụ trách" },
     { key: "profile_status", label: "Trạng thái hồ sơ" },
     { key: "account_status", label: "Trạng thái tài khoản" },
-    { key: "must_change_password", label: "Đổi mật khẩu lần đăng nhập tới" },
+    { key: "must_change_password", label: "Mật khẩu được cấp" },
   ],
   giao_vien: [
     { key: "teacher_id", label: "Mã giáo viên" },
@@ -109,8 +109,17 @@ function ProfilePage() {
         let result: ProfileRecord;
         if (user.role === "admin_big") result = await adminApi.adminBigProfile(user.slug);
         else if (user.role === "admin_small") result = await adminApi.adminSmallProfile(user.slug);
-        else if (user.role === "giao_vien") result = await adminApi.teacherProfile(user.slug);
-        else if (user.role === "hoc_vien") result = await academicsApi.studentProfile(user.slug);
+        else if (user.role === "giao_vien") {
+          const [teacher, account] = await Promise.all([
+            adminApi.teacherProfile(user.slug), authApi.profile(user.slug),
+          ]);
+          result = { ...teacher, avatar_secure_url: account.user.avatar_secure_url };
+        } else if (user.role === "hoc_vien") {
+          const [student, account] = await Promise.all([
+            academicsApi.studentProfile(user.slug), authApi.profile(user.slug),
+          ]);
+          result = { ...student, avatar_secure_url: account.user.avatar_secure_url };
+        }
         else result = (await authApi.profile(user.slug)).user as unknown as ProfileRecord;
         if (cancelled) return;
         setProfile(result);
@@ -155,7 +164,7 @@ function ProfilePage() {
   };
 
   const fields = (user && PROFILE_FIELDS[user.role]) || PROFILE_FIELDS.account;
-  const canUploadAvatar = user?.role === "admin_big" || user?.role === "admin_small";
+  const canUploadAvatar = Boolean(user);
   const avatarUrl = typeof profile.avatar_secure_url === "string" ? profile.avatar_secure_url : undefined;
   const profileItems = fields.map(({ key, label }) => ({
     key,
@@ -168,7 +177,7 @@ function ProfilePage() {
     setAvatarLoading(true);
     setAvatarError("");
     try {
-      const result = await adminApi.completeAdminAvatarUpload(user.slug, {
+      const result = await authApi.completeAvatarUpload(user.slug, {
         intent_token: intentToken,
         public_id: publicId,
       });
@@ -201,7 +210,7 @@ function ProfilePage() {
     setAvatarLoading(true);
     setAvatarError("");
     try {
-      const intent = await adminApi.createAdminAvatarUploadIntent(user.slug);
+      const intent = await authApi.createAvatarUploadIntent(user.slug);
       const body = new FormData();
       body.append("file", file);
       body.append("api_key", intent.api_key);

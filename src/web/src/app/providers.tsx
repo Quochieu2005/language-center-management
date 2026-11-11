@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfigProvider } from "antd";
+import { App as AntdApp, ConfigProvider } from "antd";
 import viVN from "antd/locale/vi_VN";
 import type { ReactNode } from "react";
 import { SessionProvider } from "@/lib/auth/session";
@@ -24,7 +24,9 @@ export default function AppProviders({ children }: AppProvidersProps) {
         },
       }}
     >
-      <SessionProvider>{children}</SessionProvider>
+      <AntdApp>
+        <SessionProvider>{children}</SessionProvider>
+      </AntdApp>
     </ConfigProvider>
   );
 }

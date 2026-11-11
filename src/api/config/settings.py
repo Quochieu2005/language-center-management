@@ -162,6 +162,7 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "600/min",
         "admin_account_create": "10/hour",
+        "admin_credential_email": "5/hour",
         "admin_account_read": "120/min",
         "admin_small_self_profile": "30/hour",
         "admin_big_self_profile": "20/hour",

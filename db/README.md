@@ -26,6 +26,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `27_move_oauth_identity_to_account.sql` | Thêm `google_subject` và `facebook_subject` vào `TaiKhoan`, chuyển liên kết đang hoạt động từ bảng cũ nếu có, lưu dấu vết thu hồi vào `Logs`, rồi bỏ bảng OAuth cũ. Chạy riêng tại từng site sau khi `Logs` đã được cài. |
 | `26_consolidate_logs_and_remove_notification_reads.sql` | Gộp nhật ký cũ vào `dbo.Logs` và bỏ các bảng log nguồn; chạy riêng từng site trước khi dùng API cần `Logs`. `Logs` tồn tại riêng trong từng CSDL site, không phải DB trung tâm. |
 | `30_enforce_site_fragment_boundaries.sql` | Kiểm tra site/database và dữ liệu hiện tại, sau đó thêm 16 `CHECK` constraints để chặn ghi nhầm mảnh; chạy riêng từng site, không tạo bảng/database. |
+| `32_allow_admin_small_hard_delete.sql` | Cho phép API xóa vật lý Admin Small mà vẫn giữ mã người thao tác trong lịch sử; chạy riêng trên từng site sau khi sao lưu, trước khi bật nút xóa. Không xóa bảng hoặc dữ liệu nghiệp vụ. |
 
 ## Chạy bằng SSMS
 
@@ -33,11 +34,10 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 2. Mở `01_create_schema.sql`. Trong SSMS bật **Query → SQLCMD Mode**. Dòng `:setvar DatabaseName "QLTTNN_Q1"` là database đích; chọn một trong ba tên `QLTTNN_Q1`, `QLTTNN_Q7`, `QLTTNN_TD`, chạy script, rồi đổi tên và chạy lại cho hai database còn lại.
 3. Lặp bước tương tự với `02_seed_shared_catalog.sql`. Danh mục dùng chung phải giống nhau ở cả ba site.
 4. Nếu cần dữ liệu để demo, bật SQLCMD Mode trong `03_seed_demo_site.sql`, đặt cả `DatabaseName` và `SiteCode` theo site đang seed, rồi chạy một lần tại mỗi site. Script chỉ tạo dữ liệu kiểm thử và không tạo tài khoản/mật khẩu.
-5. Chạy migration `26_consolidate_logs_and_remove_notification_reads.sql` riêng từng site; xác nhận `dbo.Logs` có mặt trước khi chạy migration phụ thuộc vào bảng này.
-6. Chạy các migration còn phù hợp theo thứ tự số trong tên file, đọc điều kiện của từng script và áp dụng riêng từng site. Không chạy migration trên database chưa sao lưu hoặc khi điều kiện trong script không khớp schema.
-7. Chạy `30_enforce_site_fragment_boundaries.sql` riêng cho Q1, Q7, TD sau khi xác nhận không có dòng sai site. Script rollback nếu phát hiện vi phạm.
-8. Lặp bước tương tự với `04_verify_database.sql` để kiểm tra từng database. Kết quả của ba lần chạy phải cho thấy cùng schema và danh mục; bảng nghiệp vụ có thể có dữ liệu khác nhau theo site.
-9. Chạy `05_database_roles.sql` trong từng database. DBA tạo SQL login/user theo cấu hình môi trường rồi thêm database user vào `qlttnn_api` hoặc `qlttnn_readonly`. Không đưa mật khẩu vào script hoặc repository.
+5. Chạy các migration phù hợp theo thứ tự số tăng dần, riêng từng site; đọc điều kiện và sao lưu trước khi đổi cấu trúc. Migration `26_consolidate_logs_and_remove_notification_reads.sql` phải chạy trước migration nào cần `dbo.Logs`; chạy `30_enforce_site_fragment_boundaries.sql` sau khi xác nhận dữ liệu không có dòng sai site. Script 30 rollback nếu phát hiện vi phạm.
+6. Nếu bật chức năng xóa vĩnh viễn Admin Small, sau các migration khác chạy `32_allow_admin_small_hard_delete.sql` riêng trên Q1, Q7, TD. Script chỉ gỡ FK của các cột người thao tác trong bảng lịch sử; giữ FK tài khoản của `YeuCauThanhToan` và không xóa dữ liệu.
+7. Lặp bước tương tự với `04_verify_database.sql` để kiểm tra từng database. Kết quả của ba lần chạy phải cho thấy cùng schema và danh mục; bảng nghiệp vụ có thể có dữ liệu khác nhau theo site.
+8. Chạy `05_database_roles.sql` trong từng database. DBA tạo SQL login/user theo cấu hình môi trường rồi thêm database user vào `qlttnn_api` hoặc `qlttnn_readonly`. Không đưa mật khẩu vào script hoặc repository.
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 

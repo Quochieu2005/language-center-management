@@ -153,7 +153,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Quản lý giáo viên | Danh sách giáo viên, xem hồ sơ/trạng thái, tạo tài khoản và hồ sơ ban đầu, xem/cập nhật phân công lớp/buổi | API mô tả GET danh sách/chi tiết, POST tạo cho Admin Big và PUT phân công cho Admin Big/Admin Small đúng site. Trạng thái chỉ để xem; chưa có endpoint sửa hồ sơ hoặc trạng thái giáo viên. Giáo viên chỉ xem lớp được phân công |
 | Tài khoản và phân quyền | Danh sách tài khoản nội bộ, trạng thái, chức vụ và phạm vi được cấp | Admin Big quản lý tài khoản toàn hệ thống; không cho người dùng tự chọn role, site hoặc phạm vi quyền; các thao tác ghi dữ liệu dùng chung tuân theo chính sách đồng bộ |
 
-Hai page **Quản lý Admin Small** và **Quản lý giáo viên** đã có endpoint thiết kế trong `specs/api.md`: Admin Big đọc/tạo Admin Small và khóa/mở tài khoản; đọc hồ sơ giáo viên, tạo giáo viên và phân công lớp/buổi. Admin Small đọc roster/chi tiết giáo viên tại site được giao và cập nhật phân công trong site đó. API hiện chưa có endpoint sửa hồ sơ hoặc trạng thái giáo viên, nên UI chỉ hiển thị các trường này, không đưa nút sửa. Tài khoản dùng chung đi theo `REPLICATED-WRITE`; hồ sơ và phân công thuộc site phải định tuyến tới CSDL site tương ứng. Không JOIN hoặc tạo khóa ngoại xuyên CSDL.
+Trong **Quản lý Admin Small**, Admin Big có thao tác riêng để kích hoạt/ngưng và nút `Xóa vĩnh viễn`. Xóa yêu cầu xác nhận không thể hoàn tác, xóa hồ sơ/tài khoản/phiên và ảnh khỏi các site; giữ Logs, điểm danh, lịch sử chuyển cơ sở và chứng từ. API từ chối nếu còn liên kết nghiệp vụ hoặc giao dịch chưa kết thúc. Admin Small không được xóa Admin Small khác. **Quản lý giáo viên** cho phép đọc hồ sơ, tạo giáo viên và phân công lớp/buổi theo quyền hiện có; không đưa nút sửa hồ sơ nếu API chưa hỗ trợ. Tài khoản dùng chung đi theo `REPLICATED-WRITE`; hồ sơ và phân công thuộc site phải định tuyến tới CSDL site tương ứng. Không JOIN hoặc tạo khóa ngoại xuyên CSDL.
 
 | Chức vụ | Trang/thao tác được thể hiện trên cùng frontend |
 |---|---|
@@ -379,7 +379,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
 | `/admin/employees` | Nhân viên | Admin Big/Admin Small xem và tạo nhân viên theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. |
-| `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem, tạo, đổi trạng thái hoặc vô hiệu hóa Admin Small. |
+| `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn Admin Small. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
 | `/blog`, `/contact` | Blog, Liên hệ | Mở trang công khai trong tab mới. Chưa có chức năng Admin tạo/sửa bài Blog hoặc xử lý yêu cầu liên hệ. |

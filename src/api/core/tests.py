@@ -4,18 +4,19 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.conf import settings
+from django.core import signing
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
-from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIClient, APIRequestFactory
 
 from core.sites.connections import UnknownSiteError, get_site_database_alias
 from core.media.folders import build_asset_folder
+from core.media.avatars import AvatarInvalidIntent, _AVATAR_RESOURCE, create_admin_small_avatar_upload_intent
 from core.auth.authentication import AuthCookieAuthentication
 from core.auth.account_status import AccountStatusResult
 from core.auth.oauth_views import OAuthStartView
 from core.auth.services import (
-    AdminSmallDeactivationResult,
+    AdminSmallDeletionResult,
     AdminSmallProvisioningResult,
     AuthenticatedSession,
     AuthenticatedUser,
@@ -84,6 +85,24 @@ class OAuthRequestInitializationTests(SimpleTestCase):
 
 class CloudinaryAssetFolderTests(SimpleTestCase):
     @override_settings(CLOUDINARY_ROOT_FOLDER="language-center-management")
+    def test_admin_big_and_small_share_admin_folder(self):
+        self.assertEqual(_AVATAR_RESOURCE["admin_big"], _AVATAR_RESOURCE["admin_small"])
+        self.assertEqual(
+            build_asset_folder(
+                _AVATAR_RESOURCE["admin_big"],
+                record_code="admin-big-quochieu-2026-11-10",
+                asset_id="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            ),
+            "language-center-management/admin/admin-big-quochieu-2026-11-10/anh/"
+            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        )
+
+    def test_student_teacher_and_employee_have_separate_categories(self):
+        self.assertEqual(_AVATAR_RESOURCE["hoc_vien"], "student")
+        self.assertEqual(_AVATAR_RESOURCE["giao_vien"], "teacher")
+        self.assertEqual(_AVATAR_RESOURCE["tu_van"], "employee")
+
+    @override_settings(CLOUDINARY_ROOT_FOLDER="language-center-management")
     def test_student_image_gets_its_own_site_and_record_folder(self):
         folder = build_asset_folder(
             "student",
@@ -121,6 +140,17 @@ class CloudinaryAssetFolderTests(SimpleTestCase):
                 asset_id="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
             )
 
+    def test_admin_small_avatar_setup_token_is_bound_to_the_creating_admin(self):
+        admin_big = SimpleNamespace(role="admin_big", account_id="Q1-TK-000001")
+        token = signing.dumps(
+            {"actor_id": "Q7-TK-OTHER", "target_slug": "admin-small-q7-manager"},
+            salt="core.media.admin-small-avatar-setup.v1",
+        )
+        with patch("core.media.avatars._active_sites") as active_sites:
+            with self.assertRaises(AvatarInvalidIntent):
+                create_admin_small_avatar_upload_intent(admin_big, "admin-small-q7-manager", token)
+        active_sites.assert_not_called()
+
     @override_settings(CLOUDINARY_ROOT_FOLDER="language-center-management")
     def test_untrusted_path_segments_and_unknown_resources_are_rejected(self):
         with self.assertRaises(ValueError):
@@ -145,6 +175,8 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
             "full_name": "Nguyễn Văn Quản Lý",
             "email": "manager.q7@example.com",
             "site_code": "Q7",
+            "slug": "admin-small-q7-quan-ly",
+            "avatar_requested": True,
         }
 
     def test_only_admin_big_can_create_admin_small(self):
@@ -172,21 +204,48 @@ class AdminSmallProvisioningApiTests(SimpleTestCase):
             username="manager.q7",
             email="manager.q7@example.com",
             site_code="Q7",
-            slug="admin-small-q7-manager-q7",
+            slug="admin-small-q7-quan-ly",
         )
 
-        with patch("core.auth.views.create_admin_small", return_value=(result, True)) as create_account:
+        with (
+            patch("core.auth.views.create_admin_small", return_value=result) as create_account,
+            patch("core.auth.views.create_admin_small_avatar_setup_token", return_value="setup-token"),
+        ):
             response = self.client.post("/api/v1/admin/admin-smalls/", self.payload, format="json")
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["role"], "admin_small")
         self.assertTrue(response.json()["must_change_password"])
-        self.assertTrue(response.json()["email_sent"])
+        self.assertEqual(response.json()["credential_email_status"], "ready")
+        self.assertNotIn("email_sent", response.json())
         self.assertEqual(response.json()["slug"], result.slug)
+        self.assertEqual(response.json()["avatar_setup_token"], "setup-token")
         self.assertEqual(response.json()["account_status"], "active")
         self.assertNotIn("password", response.json())
         self.assertNotIn("1234567890", response.content.decode())
+        self.assertEqual(create_account.call_args.kwargs["slug"], self.payload["slug"])
         create_account.assert_called_once()
+
+    def test_admin_small_avatar_setup_routes_are_documented(self):
+        schema_response = self.client.get(reverse("schema"), {"format": "json"})
+        schema = json.loads(schema_response.content)
+        self.assertIn("/api/v1/admin/admin-smalls/{slug}/avatar/upload-intents/", schema["paths"])
+        self.assertIn("/api/v1/admin/admin-smalls/{slug}/avatar/complete/", schema["paths"])
+
+    def test_only_admin_big_can_request_initial_admin_small_avatar(self):
+        self.client.force_authenticate(
+            user=SimpleNamespace(
+                is_authenticated=True, role="admin_small", account_id="Q1-TK-000001", pk="Q1-TK-000001"
+            )
+        )
+        with patch("core.media.views.create_admin_small_avatar_upload_intent") as create_intent:
+            response = self.client.post(
+                "/api/v1/admin/admin-smalls/admin-small-q7-quan-ly/avatar/upload-intents/",
+                {"setup_token": "not-used"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 403)
+        create_intent.assert_not_called()
 
 
 class AdminSmallManagementApiTests(SimpleTestCase):
@@ -209,7 +268,7 @@ class AdminSmallManagementApiTests(SimpleTestCase):
             pk="Q1-TK-000001",
         )
 
-    def test_only_admin_big_can_deactivate_admin_small(self):
+    def test_only_admin_big_can_delete_admin_small(self):
         self.client.force_authenticate(user=self.small)
 
         with patch("core.auth.views.delete_admin_small") as delete_account:
@@ -220,17 +279,16 @@ class AdminSmallManagementApiTests(SimpleTestCase):
         self.assertEqual(self_response.status_code, 403)
         delete_account.assert_not_called()
 
-    def test_admin_big_deactivates_without_hard_deleting(self):
+    def test_admin_big_hard_deletes_admin_small(self):
         self.client.force_authenticate(user=self.big)
-        result = AdminSmallDeactivationResult(account_id="Q7-TK-000124", site_code="Q7")
+        result = AdminSmallDeletionResult(account_id="Q7-TK-000124", site_code="Q7")
 
         with patch("core.auth.views.delete_admin_small", return_value=result) as delete_account:
             response = self.client.delete("/api/v1/admin/admin-smalls/Q7-TK-000124/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "inactive")
+        self.assertTrue(response.json()["deleted"])
         self.assertEqual(response.json()["role"], "admin_small")
-        self.assertNotIn("deleted", response.json())
         delete_account.assert_called_once_with("Q7-TK-000124", "Q1-TK-000001", "127.0.0.1")
 
     def test_only_admin_big_can_list_admin_smalls_and_get_slug_for_status_action(self):

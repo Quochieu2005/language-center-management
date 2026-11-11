@@ -10,6 +10,7 @@ from core.auth.views import (
     AdminForgotPasswordView,
     AdminResetPasswordView,
     AdminSmallCreateView,
+    AdminSmallCredentialEmailView,
     AdminSmallDeleteView,
     AdminSmallStatusView,
     AdminSmallSelfProfileView,
@@ -80,7 +81,12 @@ from core.catalog.views import (
     PublicCourseListView,
     SharedSubjectDetailView,
 )
-from core.media.views import AdminAvatarCompleteView, AdminAvatarUploadIntentView
+from core.media.views import (
+    AdminAvatarCompleteView,
+    AdminAvatarUploadIntentView,
+    AdminSmallAvatarCompleteView,
+    AdminSmallAvatarUploadIntentView,
+)
 
 
 app_name = "core"
@@ -101,12 +107,15 @@ urlpatterns = [
     path("auth/activity/", AuthActivityView.as_view(), name="auth-activity"),
     path("auth/logout/", AuthLogoutView.as_view(), name="auth-logout"),
     path("admin/admin-smalls/", AdminSmallCreateView.as_view(), name="admin-small-create"),
+    path("admin/admin-smalls/<str:account_id>/credential-email/", AdminSmallCredentialEmailView.as_view(), name="admin-small-credential-email"),
     path("admin/admin-smalls/profile/<str:slug>/", AdminSmallSelfProfileView.as_view(), name="admin-small-profile"),
     path("admin/admin-smalls/<str:slug>/status/", AdminSmallStatusView.as_view(), name="admin-small-status"),
     path("admin/admin-smalls/<str:account_id>/", AdminSmallDeleteView.as_view(), name="admin-small-delete"),
     path("admin/admin-bigs/profile/<str:slug>/", AdminBigSelfProfileView.as_view(), name="admin-big-profile"),
-    path("admin/profile/<str:slug>/avatar/upload-intents/", AdminAvatarUploadIntentView.as_view(), name="admin-avatar-upload-intent"),
-    path("admin/profile/<str:slug>/avatar/complete/", AdminAvatarCompleteView.as_view(), name="admin-avatar-complete"),
+    path("auth/profile/<str:slug>/avatar/upload-intents/", AdminAvatarUploadIntentView.as_view(), name="auth-profile-avatar-upload-intent"),
+    path("auth/profile/<str:slug>/avatar/complete/", AdminAvatarCompleteView.as_view(), name="auth-profile-avatar-complete"),
+    path("admin/admin-smalls/<str:slug>/avatar/upload-intents/", AdminSmallAvatarUploadIntentView.as_view(), name="admin-small-avatar-upload-intent"),
+    path("admin/admin-smalls/<str:slug>/avatar/complete/", AdminSmallAvatarCompleteView.as_view(), name="admin-small-avatar-complete"),
     path("teachers/profile/<str:slug>/", TeacherProfileView.as_view(), name="teacher-profile"),
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),

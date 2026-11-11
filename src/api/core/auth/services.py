@@ -13,10 +13,13 @@ from core.auth.service_common import (
     AdminSmallProfileNotFound,
     AdminSmallTargetNotFound,
     AdminSmallDeleteConflict,
+    AdminSmallCredentialEmailConflict,
+    AdminSmallCredentialEmailDeliveryFailed,
+    AdminSmallCredentialEmailUncertain,
     AuthenticatedUser,
     AuthenticatedSession,
     AdminSmallProvisioningResult,
-    AdminSmallDeactivationResult,
+    AdminSmallDeletionResult,
     auth_session_alias,
     _digest,
     session_token_digest,
@@ -55,6 +58,8 @@ from core.auth.admin_small_lifecycle import (
     delete_admin_small,
     create_admin_small,
 )
+
+from core.auth.admin_small_email import send_admin_small_credentials
 
 from core.auth.session_services import (
     change_authenticated_password,

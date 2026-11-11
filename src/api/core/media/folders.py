@@ -9,13 +9,14 @@ from django.conf import settings
 _RESOURCE_LAYOUTS = {
     "student": ("hoc-vien", "site"),
     "teacher": ("giao-vien", "site"),
-    "account": ("tai-khoan", "shared"),
+    "employee": ("nhan-vien", "site"),
+    "account": ("admin", "shared"),
     "course": ("khoa-hoc", "shared"),
     "branch": ("co-so", "shared"),
     "brand": ("thuong-hieu", "shared"),
 }
 _SITE_CODE = re.compile(r"[A-Z0-9_-]{2,12}\Z")
-_RECORD_CODE = re.compile(r"[A-Z0-9][A-Z0-9_-]{0,63}\Z")
+_RECORD_CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 _FOLDER_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}\Z")
 
 
@@ -60,7 +61,7 @@ def build_asset_folder(
     else:
         if site_code is not None:
             raise ValueError("Ảnh dùng chung không được gắn vào một site riêng.")
-        scope_segments = ["dung-chung", record_code]
+        scope_segments = [record_code] if resource_type == "account" else ["dung-chung", record_code]
 
     try:
         parsed_asset_id = uuid.UUID(asset_id)

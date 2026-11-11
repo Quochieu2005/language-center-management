@@ -1,4 +1,5 @@
 import { apiRequest, jsonBody, query } from "./client";
+import type { AvatarUploadIntent } from "./auth";
 
 export type PageResult<T> = { count: number; limit: number; offset: number; results: T[]; site_code?: string };
 export type SiteCounts = {
@@ -13,6 +14,7 @@ export type AdminSmall = {
   admin_id: string; site_code: string; full_name: string; phone: string | null;
   account_id: string; slug: string; username: string; email: string;
   account_status: "active" | "inactive"; profile_status: "dang_lam" | "nghi_viec";
+  credential_email_status: "ready" | "processing" | "sent" | "failed" | "unknown" | "changed";
 };
 export type Teacher = {
   teacher_id: string; account_id: string | null; slug: string | null; site_code: string;
@@ -91,14 +93,7 @@ export type Student = {
   phone: string | null; email: string | null; status: string; account_issued: boolean;
 };
 export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
-export type AdminAvatarUploadIntent = {
-  intent_token: string;
-  upload_url: string;
-  cloud_name: string;
-  api_key: string;
-  fields: Record<string, string>;
-  max_file_bytes: number;
-};
+export type AdminAvatarUploadIntent = AvatarUploadIntent;
 
 export const adminApi = {
   studentCounts: (site_code?: string) => apiRequest<SiteCounts>(`/admin/reports/students-by-site/${query({ site_code })}`),
@@ -106,23 +101,29 @@ export const adminApi = {
     apiRequest<PageResult<AdminSmall> & { complete: boolean; missing_sites: string[]; site_codes: string[] }>(
       `/admin/admin-smalls/${query({ site_code, limit, offset })}`,
     ),
-  createAdminSmall: (body: { full_name: string; email: string; site_code: string; username?: string }) =>
-    apiRequest<{ account_id: string; admin_id: string; username: string; email: string; site_code: string; slug: string; account_status: "active"; role: "admin_small"; must_change_password: boolean }>("/admin/admin-smalls/", { method: "POST", body: jsonBody(body) }),
+  createAdminSmall: (body: { full_name: string; email: string; site_code: string; username?: string; slug?: string; avatar_requested?: boolean }) =>
+    apiRequest<{ account_id: string; admin_id: string; username: string; email: string; site_code: string; slug: string; account_status: "active"; role: "admin_small"; must_change_password: boolean; credential_email_status: "ready" | "unknown"; avatar_setup_token: string | null }>("/admin/admin-smalls/", { method: "POST", body: jsonBody(body) }),
+  sendAdminSmallCredentials: (accountId: string) =>
+    apiRequest<{ detail: string; email: string; status: "sent" }>(`/admin/admin-smalls/${encodeURIComponent(accountId)}/credential-email/`, { method: "POST" }),
   adminSmallProfile: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/admin-smalls/profile/${encodeURIComponent(slug)}/`),
   updateAdminSmallProfile: (slug: string, body: { full_name?: string; phone?: string | null }) =>
     apiRequest<Record<string, unknown>>(`/admin/admin-smalls/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   updateAdminSmallStatus: (slug: string, status: "active" | "inactive") =>
     apiRequest<Record<string, unknown>>(`/admin/admin-smalls/${encodeURIComponent(slug)}/status/`, { method: "PATCH", body: jsonBody({ status }) }),
-  deactivateAdminSmall: (accountId: string) =>
-    apiRequest<Record<string, unknown>>(`/admin/admin-smalls/${encodeURIComponent(accountId)}/`, { method: "DELETE" }),
+  deleteAdminSmall: (accountId: string) =>
+    apiRequest<{ account_id: string; site_code: string; role: "admin_small"; deleted: boolean; detail: string }>(
+      `/admin/admin-smalls/${encodeURIComponent(accountId)}/`, { method: "DELETE" },
+    ),
   adminBigProfile: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/admin-bigs/profile/${encodeURIComponent(slug)}/`),
   updateAdminBigProfile: (slug: string, body: { current_password: string; username?: string; email?: string; slug?: string }) =>
     apiRequest<Record<string, unknown>>(`/admin/admin-bigs/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
-  createAdminAvatarUploadIntent: (slug: string) =>
-    apiRequest<AdminAvatarUploadIntent>(`/admin/profile/${encodeURIComponent(slug)}/avatar/upload-intents/`, { method: "POST", body: "{}" }),
-  completeAdminAvatarUpload: (slug: string, body: { intent_token: string; public_id: string }) =>
-    apiRequest<{ account_id: string; role: "admin_big" | "admin_small"; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
-      `/admin/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
+  createAdminSmallAvatarUploadIntent: (slug: string, setupToken: string) =>
+    apiRequest<AdminAvatarUploadIntent>(`/admin/admin-smalls/${encodeURIComponent(slug)}/avatar/upload-intents/`, {
+      method: "POST", body: jsonBody({ setup_token: setupToken }),
+    }),
+  completeAdminSmallAvatarUpload: (slug: string, body: { setup_token: string; intent_token: string; public_id: string }) =>
+    apiRequest<{ account_id: string; role: "admin_small"; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
+      `/admin/admin-smalls/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
   teachers: (site_code: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Teacher>>(`/admin/teachers/${query({ site_code, ...options })}`),
