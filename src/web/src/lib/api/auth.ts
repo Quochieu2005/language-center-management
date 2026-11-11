@@ -10,9 +10,18 @@ export type SessionUser = {
   site_code: string | null;
   profile_id: string | null;
   must_change_password: boolean;
+  avatar_secure_url?: string | null;
 };
 export type LoginResponse = { user: SessionUser; idle_timeout_seconds: number };
 export type ProfileResponse = { user: SessionUser; expires_at: string };
+export type AvatarUploadIntent = {
+  intent_token: string;
+  upload_url: string;
+  cloud_name: string;
+  api_key: string;
+  fields: Record<string, string>;
+  max_file_bytes: number;
+};
 export type OAuthProvider = "google" | "facebook";
 
 export const authApi = {
@@ -20,6 +29,12 @@ export const authApi = {
   login: (identifier: string, password: string) =>
     apiRequest<LoginResponse>("/auth/login/", { method: "POST", body: jsonBody({ identifier, password }) }),
   profile: (slug: string) => apiRequest<ProfileResponse>(`/auth/profile/${encodeURIComponent(slug)}/`),
+  createAvatarUploadIntent: (slug: string) =>
+    apiRequest<AvatarUploadIntent>(`/auth/profile/${encodeURIComponent(slug)}/avatar/upload-intents/`, { method: "POST", body: "{}" }),
+  completeAvatarUpload: (slug: string, body: { intent_token: string; public_id: string }) =>
+    apiRequest<{ account_id: string; role: Role; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
+      `/auth/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
+    ),
   session: () => apiRequest<{ user: SessionUser }>("/auth/session/"),
   oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
   startOAuthLink: (provider: OAuthProvider) =>

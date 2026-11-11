@@ -111,6 +111,7 @@ class OAuthStartView(APIView):
             "Admin và học viên chưa liên kết không được tự tạo hoặc tự ghép tài khoản."
         ),
         parameters=[OpenApiParameter("provider", str, OpenApiParameter.PATH)],
+        request=None,
         responses={302: OpenApiResponse(description="Chuyển hướng tới nhà cung cấp OAuth.")},
     )
     def get(self, request, provider: str):

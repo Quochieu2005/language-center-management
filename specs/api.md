@@ -227,6 +227,8 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `GET /api/v1/admin/admins-small` | Admin Big | `GLOBAL` hoặc đọc bản sao tài khoản kèm tra cứu hồ sơ từng site | Gộp Admin Small theo site; phản hồi một phần nếu site thiếu |
 | `GET /api/v1/admin/admins-small/{ma_tai_khoan}` | Admin Big | `GLOBAL` định vị rồi `LOCAL` đọc hồ sơ | Chi tiết tài khoản và cơ sở được phân công; báo rõ site thiếu |
 | `POST /api/v1/admin/admins-small` | Admin Big | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Tạo tài khoản `nhan_vien`, phân công `ma_co_so`, tạo `NhanVien.chuc_vu = quan_ly_co_so`; phải có trạng thái phục hồi nếu hai chặng lệch |
+| `DELETE /api/v1/admin/admin-smalls/{account_id}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Xóa vật lý hồ sơ `Admin`, các bản sao `TaiKhoan`, phiên/token đặt lại mật khẩu và ảnh Cloudinary; giữ `Logs`, điểm danh, lịch sử chuyển cơ sở và chứng từ. Từ chối trước khi ghi nếu còn hồ sơ nghiệp vụ, yêu cầu thanh toán hoặc giao dịch chuyển cơ sở đang mở. Có dấu tiến trình/retry; không bảo đảm ACID xuyên CSDL |
+| `PATCH /api/v1/admin/admin-smalls/{slug}/status/` | Admin Big | `REPLICATED-WRITE` | Chỉ đổi trạng thái `active`/`inactive`; không xóa hồ sơ hoặc dữ liệu. Đây là thao tác riêng với DELETE |
 | `GET /api/v1/admin/accounts` | Admin Big | `GLOBAL`/bản sao tài khoản | Danh sách tài khoản nội bộ, trạng thái và phạm vi; không trả hash mật khẩu |
 | `GET /api/v1/admin/accounts/{ma_tai_khoan}` | Admin Big | Đọc bản sao tài khoản và tra cứu hồ sơ site cần thiết | Chi tiết tài khoản/phạm vi được phép; không trả hash hoặc secret |
 | `PATCH /api/v1/admin/accounts/{ma_tai_khoan}/status` | Admin Big | `REPLICATED-WRITE` | Khóa/mở tài khoản qua dịch vụ đồng bộ chung; không cho tự khóa tài khoản Admin Big cuối cùng nếu nhóm đặt quy tắc đó |
@@ -624,7 +626,7 @@ Replication runtime tối thiểu hiện được triển khai cho cập nhật 
 | Validation | Gửi thiếu trường, sai kiểu, sai enum, ngày kết thúc trước ngày bắt đầu, ngày ngoài phạm vi và body quá lớn; API từ chối mà không ghi DB |
 | SQL injection | Thử payload SQL trên login, search, filter, sort và các endpoint ghi; không được mở rộng kết quả, vượt quyền hoặc thay đổi bảng |
 | CRUD thực tế | Với từng tài nguyên được phép: gọi create/read/update trên SQL Server test, đọc lại để xác nhận dữ liệu đã lưu đúng; thử sai quyền và sai site |
-| Xóa và lưu lịch sử | Chỉ xóa dữ liệu nháp chưa được tham chiếu nếu nghiệp vụ cho phép; hóa đơn/phiếu thu, điểm danh, giao dịch và nhật ký dùng hủy/đóng/điều chỉnh, không hard-delete |
+| Xóa và lưu lịch sử | Mặc định chỉ xóa dữ liệu nháp chưa được tham chiếu nếu nghiệp vụ cho phép; hóa đơn/phiếu thu, điểm danh, giao dịch và nhật ký không hard-delete. Ngoại lệ: Admin Big được hard-delete tài khoản Admin Small qua DELETE đã nêu, nhưng phải giữ Logs và dữ liệu lịch sử; không thay bằng inactive |
 | Chống spam | Kiểm tra rate limit từng form, `429`/`Retry-After`, CAPTCHA sau ngưỡng và response không tiết lộ tài khoản |
 | Ảnh | Kiểm tra signed upload Cloudinary, file MIME giả, file quá lớn, intent hết hạn, user khác dùng public ID, gỡ ảnh còn tham chiếu và không phát sinh file trong source |
 | Hiệu năng | Đo p50/p95 theo millisecond với dữ liệu có kích thước ghi rõ; kiểm tra LOCAL, GLOBAL, login và upload riêng |
@@ -633,7 +635,7 @@ Replication runtime tối thiểu hiện được triển khai cho cập nhật 
 
 Kịch bản phải chạy trên CSDL SQL Server test riêng theo site, không chỉ mock repository. Mỗi thao tác thành công phải được đọc lại từ đúng site để chứng minh dữ liệu đã commit; thao tác sai phải kiểm tra không để lại bản ghi dở dang. Với `REPLICATED-WRITE`, đọc đối chiếu bản sao từng site; với `GLOBAL`, kiểm tra dữ liệu được gộp ở API chứ không ghi vào một CSDL trung tâm.
 
-Không ép mọi bảng có nút xóa. `HocVien` giữ lịch sử chuyển; `PhieuThu`, `DiemDanh`, `LichSuChuyenCoSo` và `Logs` không hard-delete trong luồng nghiệp vụ thông thường. Nếu cần xóa tài khoản/tài nguyên chưa sử dụng, dùng trạng thái `vo_hieu`/`da_huy` hoặc endpoint delete có kiểm tra tham chiếu, quyền, nhật ký và phục hồi phù hợp. Test delete phải chứng minh không xóa nhầm dữ liệu dẫn xuất/lịch sử.
+Không ép mọi bảng có nút xóa. `HocVien` giữ lịch sử chuyển; `PhieuThu`, `DiemDanh`, `LichSuChuyenCoSo` và `Logs` không hard-delete trong luồng nghiệp vụ thông thường. Riêng Admin Small: Admin Big dùng endpoint DELETE để xóa vật lý, còn nút trạng thái chỉ kích hoạt/ngưng. Kiểm tra tham chiếu và giao dịch đang mở trước khi bắt đầu; giữ lại nhật ký/chứng từ, ghi dấu retry ở từng site và không tuyên bố ACID xuyên CSDL. Test delete phải chứng minh tài khoản đã biến mất nhưng dữ liệu lịch sử không mất.
 
 Với mọi route, tối thiểu kiểm tra: thành công; request sai; unauthenticated; role sai; site sai; bản ghi không tồn tại; bản ghi bị cập nhật/xóa song song; site SQL Server mất kết nối; retry cùng request; transaction rollback. Ghi lệnh/kịch bản và kết quả trong PR hoặc tài liệu test; nếu endpoint chưa được cài thì ghi `Chưa chạy — chưa có implementation`, không tự ghi là pass.
 

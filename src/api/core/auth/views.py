@@ -13,6 +13,12 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication, AuthenticationUnavailable
+from core.media.avatars import (
+    AvatarConflict,
+    AvatarUnavailable,
+    create_admin_small_avatar_setup_token,
+    get_admin_avatar_url,
+)
 from core.auth.admin_small_accounts import list_admin_small_accounts
 from core.auth.account_status import (
     AccountStatusConflict,
@@ -35,6 +41,7 @@ from core.auth.serializers import (
     AdminSmallListQuerySerializer,
     AdminSmallListResponseSerializer,
     AdminSmallCreateResponseSerializer,
+    AdminSmallCredentialEmailResponseSerializer,
     AdminSmallCreateSerializer,
     AdminSmallDeleteResponseSerializer,
     AdminSmallSelfProfileResponseSerializer,
@@ -54,6 +61,9 @@ from core.auth.services import (
     AuthInfrastructureUnavailable,
     AdminSmallAccountConflict,
     AdminSmallDeleteConflict,
+    AdminSmallCredentialEmailConflict,
+    AdminSmallCredentialEmailDeliveryFailed,
+    AdminSmallCredentialEmailUncertain,
     AdminSmallProfileNotFound,
     AdminSmallSiteUnavailable,
     AdminSmallTargetNotFound,
@@ -61,6 +71,7 @@ from core.auth.services import (
     PasswordResetRateLimitExceeded,
     change_authenticated_password,
     create_admin_small,
+    send_admin_small_credentials,
     delete_admin_small,
     extend_user_session,
     login_user,
@@ -253,9 +264,10 @@ class AdminSmallCreateView(APIView):
         summary="Admin Big xem Admin Small theo cơ sở",
         description=(
             "Chỉ Admin Big. Mặc định truy vấn Global Query trên tất cả site đang hoạt động; dữ liệu "
-            "NhanVien được đọc tại từng CSDL site rồi gộp ở API, không JOIN xuyên site. Nếu site bắt "
+            "Hồ sơ được đọc tại từng CSDL site rồi gộp ở API, không JOIN xuyên site. Nếu site bắt "
             "buộc lỗi thì API trả 503, không trả danh sách thiếu như thể đầy đủ. Danh sách gồm slug và "
-            "trạng thái để Admin Big có thể bật/tắt đúng tài khoản."
+            "trạng thái để Admin Big có thể bật/tắt đúng tài khoản. Trạng thái email được lấy từ Logs "
+            "ở site sở hữu hồ sơ; tài khoản cũ không có dấu vết gửi sẽ bị khóa gửi lại."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -294,8 +306,11 @@ class AdminSmallCreateView(APIView):
             "Chỉ Admin Big được gọi. API tạo tài khoản nhan_vien với hồ sơ NhanVien có "
             "chuc_vu=quan_ly_co_so tại cơ sở được chọn; vai trò hiệu lực là admin_small. "
             "TaiKhoan được nhân bản tới mọi site đang hoạt động; hồ sơ nhân viên chỉ nằm "
-            "ở site được giao. API gửi mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD qua SMTP, "
-            "bắt buộc đổi mật khẩu sau đăng nhập đầu tiên và không trả mật khẩu trong response. "
+            "ở site được giao. API chỉ tạo tài khoản; Admin Big chủ động bấm API gửi mật khẩu tạm "
+            "một lần. Tài khoản bắt buộc đổi mật khẩu sau đăng nhập đầu tiên và mật khẩu không "
+            "được trả trong response. "
+            "Có thể gửi slug tùy chọn. Nếu avatar_requested=true, response cấp setup token "
+            "ngắn hạn để Admin Big tải ảnh ban đầu lên Cloudinary; nếu không, ảnh được bỏ qua. "
             "Giới hạn 10 yêu cầu mỗi giờ cho một tài khoản Admin Big."
         ),
         request=AdminSmallCreateSerializer,
@@ -304,9 +319,9 @@ class AdminSmallCreateView(APIView):
             400: OpenApiResponse(description="Dữ liệu không hợp lệ hoặc site không hoạt động."),
             401: OpenApiResponse(description="Chưa đăng nhập."),
             403: OpenApiResponse(description="Chỉ Admin Big được tạo Admin Small."),
-            409: OpenApiResponse(description="Email hoặc tên đăng nhập đã được sử dụng."),
+            409: OpenApiResponse(description="Email, tên đăng nhập hoặc slug đã được sử dụng; hoặc yêu cầu tạo trước đó không khớp."),
             429: OpenApiResponse(description="Đã vượt giới hạn tạo tài khoản."),
-            503: OpenApiResponse(description="Site, SQL Server hoặc SMTP chưa sẵn sàng."),
+            503: OpenApiResponse(description="Site hoặc SQL Server chưa sẵn sàng."),
         },
     )
     def post(self, request):
@@ -318,17 +333,18 @@ class AdminSmallCreateView(APIView):
         serializer = AdminSmallCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            result, email_sent = create_admin_small(
+            result = create_admin_small(
                 email=serializer.validated_data["email"],
                 full_name=serializer.validated_data["full_name"],
                 site_code=serializer.validated_data["site_code"],
                 username=serializer.validated_data.get("username"),
+                slug=serializer.validated_data.get("slug"),
                 admin_big_id=request.user.account_id,
                 remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
             )
         except AdminSmallAccountConflict:
             return Response(
-                {"detail": "Email hoặc tên đăng nhập đã được sử dụng."},
+                {"detail": "Email, tên đăng nhập hoặc slug đã được sử dụng; kiểm tra dữ liệu trước khi thử lại."},
                 status=status.HTTP_409_CONFLICT,
             )
         except AdminSmallSiteUnavailable:
@@ -338,6 +354,11 @@ class AdminSmallCreateView(APIView):
             )
         except AuthInfrastructureUnavailable as exc:
             raise AuthenticationUnavailable from exc
+
+        avatar_setup_token = (
+            create_admin_small_avatar_setup_token(request.user, result)
+            if serializer.validated_data["avatar_requested"] else None
+        )
 
         return Response(
             {
@@ -350,9 +371,68 @@ class AdminSmallCreateView(APIView):
                 "role": "admin_small",
                 "account_status": "active",
                 "must_change_password": result.must_change_password,
-                "email_sent": email_sent,
+                "credential_email_status": result.credential_email_status,
+                "avatar_setup_token": avatar_setup_token,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class AdminSmallCredentialEmailView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_credential_email"
+
+    @extend_schema(
+        operation_id="admin_small_send_credentials_once",
+        tags=["Quản lý tài khoản"],
+        summary="Admin Big gửi mật khẩu tạm cho Admin Small một lần",
+        description=(
+            "Chỉ Admin Big được gọi. API chỉ cho gửi khi Logs ở CSDL của cơ sở ghi nhận tài khoản "
+            "đang chờ gửi; khóa ứng dụng SQL Server ngăn hai yêu cầu gửi đồng thời. Gửi thành công "
+            "thì mọi lần gọi sau bị từ chối. Nếu SMTP trả kết quả không rõ, hệ thống khóa gửi lại "
+            "để tránh gửi trùng; chỉ lỗi SMTP xác nhận không nhận thư mới cho phép thử lại."
+        ),
+        responses={
+            200: AdminSmallCredentialEmailResponseSerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Chỉ Admin Big được gửi mật khẩu."),
+            404: OpenApiResponse(description="Không tìm thấy Admin Small."),
+            409: OpenApiResponse(description="Email đã gửi, đang xử lý, không rõ kết quả hoặc tài khoản không còn dùng mật khẩu tạm."),
+            429: OpenApiResponse(description="Đã vượt giới hạn gửi email."),
+            502: OpenApiResponse(description="SMTP xác nhận chưa nhận email; có thể thử lại."),
+            503: OpenApiResponse(description="CSDL hoặc SMTP chưa sẵn sàng; không gửi lại nếu trạng thái chưa rõ."),
+        },
+    )
+    def post(self, request, account_id: str):
+        if request.user.role != "admin_big":
+            return Response({"detail": "Chỉ Admin Big được gửi mật khẩu Admin Small."}, status=403)
+        try:
+            result = send_admin_small_credentials(
+                account_id=account_id,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallTargetNotFound:
+            return Response({"detail": "Không tìm thấy Admin Small đang hoạt động."}, status=404)
+        except AdminSmallCredentialEmailConflict:
+            return Response(
+                {"detail": "Không thể gửi lại: email đã được gửi, đang xử lý, chưa xác định kết quả hoặc mật khẩu tạm đã đổi."},
+                status=409,
+            )
+        except AdminSmallCredentialEmailDeliveryFailed:
+            return Response({"detail": "SMTP xác nhận chưa nhận email. Có thể thử gửi lại."}, status=502)
+        except AdminSmallCredentialEmailUncertain:
+            return Response(
+                {"detail": "Chưa xác định email đã tới hay chưa; hệ thống đã khóa gửi lại để tránh gửi trùng."},
+                status=503,
+            )
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+        return Response(
+            {"detail": "Đã gửi mật khẩu tạm đến email Admin Small.", **result},
+            status=200,
         )
 
 
@@ -539,21 +619,22 @@ class AdminSmallDeleteView(APIView):
     throttle_scope = "admin_small_delete"
 
     @extend_schema(
-        operation_id="admin_small_deactivate",
+        operation_id="admin_small_delete",
         tags=["Quản lý tài khoản"],
-        summary="Admin Big vô hiệu hóa Admin Small",
+        summary="Admin Big xóa vĩnh viễn Admin Small",
         description=(
-            "Chỉ Admin Big được gọi. Đây là vô hiệu hóa: TaiKhoan được chuyển sang 0 (inactive) và tăng phien_ban "
-            "trên các site đã ghi nhận; hồ sơ NhanVien ở site của tài khoản chuyển sang nghi_viec. Phiên cũ bị thu hồi, "
-            "nhật ký và dữ liệu lịch sử được giữ. Coordinator lưu tiến trình và retry tiến về phía trước nếu site lỗi; "
-            "không tuyên bố giao dịch ACID nguyên tử xuyên CSDL. Admin Small không thể xóa ai, kể cả chính mình."
+            "Chỉ Admin Big được gọi. Xóa vĩnh viễn hồ sơ Admin và bản sao TaiKhoan cùng các phiên/token đặt lại mật khẩu "
+            "trên mọi CSDL site đã cấu hình; xóa ảnh đại diện Cloudinary nếu có. Nhật ký Logs và dữ liệu lịch sử giữ nguyên, "
+            "các mã tài khoản lịch sử không còn khóa ngoại tới TaiKhoan. Coordinator ghi dấu phục hồi riêng trong transaction "
+            "cục bộ từng site, xử lý site nguồn sau cùng để có thể retry; đây không phải ACID nguyên tử xuyên CSDL. "
+            "Admin Small không được xóa tài khoản."
         ),
         responses={
             200: AdminSmallDeleteResponseSerializer,
             401: OpenApiResponse(description="Chưa đăng nhập."),
-            403: OpenApiResponse(description="Chỉ Admin Big được vô hiệu hóa Admin Small."),
+            403: OpenApiResponse(description="Chỉ Admin Big được xóa Admin Small."),
             404: OpenApiResponse(description="Không tìm thấy tài khoản Admin Small."),
-            409: OpenApiResponse(description="Tài khoản có trạng thái không thể vô hiệu hóa."),
+            409: OpenApiResponse(description="Còn hồ sơ/dữ liệu nghiệp vụ liên quan, giao dịch chuyển cơ sở đang mở hoặc bản sao site không đồng nhất."),
             429: OpenApiResponse(description="Vượt giới hạn yêu cầu."),
             503: OpenApiResponse(description="Site/Coordinator chưa sẵn sàng; lần gọi sau sẽ tiếp tục phục hồi."),
         },
@@ -561,7 +642,7 @@ class AdminSmallDeleteView(APIView):
     def delete(self, request, account_id: str):
         if request.user.role != "admin_big":
             return Response(
-                {"detail": "Chỉ Admin Big được vô hiệu hóa Admin Small."},
+                {"detail": "Chỉ Admin Big được xóa Admin Small."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
@@ -574,7 +655,7 @@ class AdminSmallDeleteView(APIView):
             return Response({"detail": "Không tìm thấy tài khoản Admin Small."}, status=404)
         except AdminSmallDeleteConflict:
             return Response(
-                {"detail": "Tài khoản Admin Small đang ở trạng thái xung đột; cần kiểm tra hoặc tiếp tục phục hồi."},
+                {"detail": "Không thể xóa: tài khoản còn hồ sơ hoặc dữ liệu nghiệp vụ liên quan, giao dịch chuyển cơ sở đang mở, hoặc bản sao giữa các site không đồng nhất."},
                 status=status.HTTP_409_CONFLICT,
             )
         except AuthInfrastructureUnavailable as exc:
@@ -584,8 +665,8 @@ class AdminSmallDeleteView(APIView):
                 "account_id": result.account_id,
                 "site_code": result.site_code,
                 "role": "admin_small",
-                "status": result.status,
-                "detail": "Tài khoản đã được vô hiệu hóa; hồ sơ và lịch sử vẫn được lưu giữ.",
+                "deleted": result.deleted,
+                "detail": "Tài khoản, hồ sơ, phiên và ảnh đại diện đã được xóa; nhật ký lịch sử được giữ lại.",
             },
             status=status.HTTP_200_OK,
         )
@@ -773,9 +854,16 @@ class AuthProfileView(APIView):
         if slug != request.user.slug:
             return Response({"detail": "Không tìm thấy hồ sơ tài khoản."}, status=status.HTTP_404_NOT_FOUND)
         session = request.auth
+        user = _serialized_user(request.user)
+        try:
+            user["avatar_secure_url"] = get_admin_avatar_url(
+                request.user.account_id, request.user.role, request.user.site_code
+            )
+        except (AvatarConflict, AvatarUnavailable) as exc:
+            raise AuthenticationUnavailable from exc
         return Response(
             {
-                "user": _serialized_user(request.user),
+                "user": user,
                 "expires_at": _utc_datetime(session.expires_at),
             }
         )

@@ -411,8 +411,6 @@ BEGIN TRY
             REFERENCES dbo.HocVien(ma_hoc_vien, ma_co_so),
         CONSTRAINT FK_GiaoDichChuyenCoSo_CoSoNguon FOREIGN KEY (co_so_nguon) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_GiaoDichChuyenCoSo_CoSoDich FOREIGN KEY (co_so_dich) REFERENCES dbo.CoSo(ma_co_so),
-        CONSTRAINT FK_GiaoDichChuyenCoSo_TaiKhoanDeNghi FOREIGN KEY (ma_tai_khoan_de_nghi) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
-        CONSTRAINT FK_GiaoDichChuyenCoSo_TaiKhoanQuyetDinh FOREIGN KEY (ma_tai_khoan_quyet_dinh) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_GiaoDichChuyenCoSo_khac_site CHECK (co_so_nguon <> co_so_dich),
         CONSTRAINT CK_GiaoDichChuyenCoSo_trang_thai CHECK (trang_thai IN ('cho_duyet', 'dang_xu_ly', 'tu_choi', 'hoan_tat', 'that_bai')),
         CONSTRAINT CK_GiaoDichChuyenCoSo_buoc CHECK (buoc_cuoi IN ('cho_duyet', 'da_tiep_nhan', 'da_tao_ho_so_dich', 'da_cap_nhat_nguon', 'hoan_tat', 'tu_choi')),
@@ -442,7 +440,6 @@ BEGIN TRY
         CONSTRAINT FK_LichSuChuyenCoSo_CoSoNguon FOREIGN KEY (co_so_nguon) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_LichSuChuyenCoSo_CoSoDich FOREIGN KEY (co_so_dich) REFERENCES dbo.CoSo(ma_co_so),
         CONSTRAINT FK_LichSuChuyenCoSo_SiteGhi FOREIGN KEY (site_ghi) REFERENCES dbo.CoSo(ma_co_so),
-        CONSTRAINT FK_LichSuChuyenCoSo_TaiKhoan FOREIGN KEY (ma_tai_khoan_thuc_hien) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_LichSuChuyenCoSo_khac_site CHECK (co_so_nguon <> co_so_dich),
         CONSTRAINT CK_LichSuChuyenCoSo_su_kien CHECK (su_kien IN ('de_nghi', 'duyet', 'tu_choi', 'tao_ho_so_dich', 'xac_nhan_ho_so_dich', 'cap_nhat_ho_so_nguon', 'hoan_tat', 'that_bai', 'phuc_hoi'))
     );
@@ -580,7 +577,6 @@ BEGIN TRY
             REFERENCES dbo.BuoiHoc(ma_buoi, ma_co_so),
         CONSTRAINT FK_DiemDanh_DangKyCungCoSo FOREIGN KEY (ma_dang_ky, ma_co_so)
             REFERENCES dbo.DangKy(ma_dang_ky, ma_co_so),
-        CONSTRAINT FK_DiemDanh_TaiKhoan FOREIGN KEY (ma_tai_khoan_ghi) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_DiemDanh_trang_thai CHECK (trang_thai IN ('co_mat', 'tre', 'vang_co_phep', 'vang_khong_phep'))
     );
 
@@ -672,7 +668,6 @@ BEGIN TRY
         ghi_chu        NVARCHAR(1000) NULL,
         CONSTRAINT PK_NhatKyHeThong PRIMARY KEY (ma_nhat_ky),
         CONSTRAINT FK_NhatKyHeThong_CoSo FOREIGN KEY (ma_co_so) REFERENCES dbo.CoSo(ma_co_so),
-        CONSTRAINT FK_NhatKyHeThong_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES dbo.TaiKhoan(ma_tai_khoan),
         CONSTRAINT CK_NhatKyHeThong_ket_qua CHECK (ket_qua IN ('thanh_cong', 'that_bai'))
     );
 

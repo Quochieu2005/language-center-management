@@ -45,6 +45,15 @@ class AdminSmallTargetNotFound(Exception):
 class AdminSmallDeleteConflict(Exception):
     """The requested account is not in the expected replicated state."""
 
+class AdminSmallCredentialEmailConflict(Exception):
+    """Credentials are already sent, uncertain, changed, or not ready for delivery."""
+
+class AdminSmallCredentialEmailDeliveryFailed(Exception):
+    """The mail backend explicitly reported that it did not accept the message."""
+
+class AdminSmallCredentialEmailUncertain(Exception):
+    """Mail delivery outcome is unknown; retry is blocked to prevent a duplicate."""
+
 @dataclass(frozen=True)
 class AuthenticatedUser:
     account_id: str
@@ -79,12 +88,13 @@ class AdminSmallProvisioningResult:
     site_code: str
     must_change_password: bool = True
     slug: str = ""
+    credential_email_status: str = "ready"
 
 @dataclass(frozen=True)
-class AdminSmallDeactivationResult:
+class AdminSmallDeletionResult:
     account_id: str
     site_code: str
-    status: str = "inactive"
+    deleted: bool = True
 
 def auth_session_alias() -> str:
     site_code = getattr(settings, "AUTH_SESSION_SITE_CODE", "")
@@ -385,7 +395,7 @@ def _acquire_named_lock(cursor, resource: str) -> None:
         raise AuthInfrastructureUnavailable
 
 def _next_sequence_number(site_code: str, sequence_name: str) -> int:
-    allowed_sequences = {"Seq_TK", "Seq_NV", "Seq_GV", "Seq_DB", "Seq_NK"}
+    allowed_sequences = {"Seq_TK", "Seq_NV", "Seq_GV", "Seq_AD", "Seq_DB", "Seq_NK"}
     if sequence_name not in allowed_sequences:
         raise ValueError("Sequence không được phép.")
     try:

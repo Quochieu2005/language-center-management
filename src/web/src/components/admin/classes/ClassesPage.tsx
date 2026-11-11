@@ -91,7 +91,7 @@ export default function ClassesPage() {
     { title: "Sĩ số", render: (_: unknown, row: ClassRow) => <span>{row.registered_count}/{row.capacity} · còn {row.remaining_seats}</span> },
     { title: "Trạng thái", dataIndex: "status", render: (value: string) => <Tag>{value}</Tag> },
   ];
-  return <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+  return <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
     {!site && <Alert type="warning" showIcon title="Chưa có site được chọn hoặc phiên chưa trả phạm vi cơ sở." />}
     {error && <Alert type="error" showIcon title={error} />}
     <Card title={`Lớp học${site ? ` · ${site}` : ""}`} extra={<Space wrap>{canManage && <><Button onClick={() => setModal("room")}>Thêm phòng</Button><Button onClick={() => setModal("move")}>Chuyển lớp</Button></>}{canEnroll && <Button onClick={() => setModal("enroll")}>Đăng ký học</Button>}{canManage && <Button type="primary" onClick={() => setModal("class")} disabled={!site}>Mở lớp</Button>}</Space>}>

@@ -21,6 +21,6 @@ export default function SubjectsPage() {
     <Alert type="info" showIcon title="Backend hiện có PATCH theo slug nhưng chưa có API GET để tải danh sách môn học. Nhập slug chính xác từ dữ liệu đã có; API chịu trách nhiệm đồng bộ bản sao và trả trạng thái từng site." style={{ marginBottom: 20 }} />
     {error && <Alert type="warning" showIcon title={error} style={{ marginBottom: 16 }} />}
     <Form layout="vertical" onFinish={submit} style={{ maxWidth: 560 }}><Form.Item name="slug" label="Slug môn học" rules={[{ required: true, max: 160 }]}><Input maxLength={160} /></Form.Item><Form.Item name="ten_mon" label="Tên môn học mới" rules={[{ required: true, max: 120 }]}><Input maxLength={120} /></Form.Item><Form.Item name="mo_ta" label="Mô tả"><Input.TextArea maxLength={500} rows={4} /></Form.Item><Button type="primary" htmlType="submit" loading={busy}>Cập nhật và đồng bộ</Button></Form>
-    {result !== null && <Space direction="vertical" style={{ width: "100%", marginTop: 24 }}><Typography.Title level={5}>Phản hồi API</Typography.Title><pre style={{ whiteSpace: "pre-wrap", overflow: "auto" }}>{JSON.stringify(result, null, 2)}</pre></Space>}
+    {result !== null && <Space orientation="vertical" style={{ width: "100%", marginTop: 24 }}><Typography.Title level={5}>Phản hồi API</Typography.Title><pre style={{ whiteSpace: "pre-wrap", overflow: "auto" }}>{JSON.stringify(result, null, 2)}</pre></Space>}
   </Card>;
 }

@@ -246,6 +246,20 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 **Điều kiện mở chức năng:** schema hiện có TaiKhoan nhưng chưa có luồng tạo tài khoản/invitation ledger và trạng thái kích hoạt đủ dùng. Cập nhật schema/API trước khi triển khai.
 
+### FS-ACC-02 — Xóa vĩnh viễn Admin Small
+
+**Người dùng:** chỉ Admin Big. Nút `Kích hoạt/Ngưng` là thao tác đổi trạng thái riêng; nút `Xóa vĩnh viễn` không được thay bằng vô hiệu hóa.
+
+**Phân tán:** `REPLICATED-WRITE` theo từng transaction cục bộ tại các CSDL site đang cấu hình. Không có CSDL trung tâm và không cam kết ACID xuyên site.
+
+1. Admin Big xác nhận xóa không thể hoàn tác. API xác minh tài khoản là Admin Small, các bản sao `TaiKhoan` nhất quán và hồ sơ `Admin` nằm tại đúng site.
+2. Nếu tài khoản còn liên kết hồ sơ `HocVien`, `GiaoVien`, `NhanVien`, yêu cầu thanh toán hoặc giao dịch chuyển cơ sở đang chờ/xử lý, API từ chối trước khi xóa site nào.
+3. Khi đủ điều kiện, xóa vật lý hồ sơ `Admin`, các bản sao `TaiKhoan`, phiên đăng nhập, token/giao dịch đặt lại mật khẩu còn gắn tài khoản và ảnh Cloudinary. Không đổi tài khoản sang `inactive` để giả làm xóa.
+4. Giữ nguyên `Logs`, điểm danh, lịch sử chuyển cơ sở, phiếu thu và dữ liệu nghiệp vụ. Mã tài khoản người thao tác trong dữ liệu lịch sử là giá trị lưu vết, không phải khóa ngoại bắt buộc tới tài khoản đang tồn tại.
+5. Mỗi site được xử lý trong transaction riêng, có dấu tiến trình để retry an toàn sau khi site mất kết nối. UI chỉ báo xóa xong khi API xác nhận hoàn tất toàn bộ site bắt buộc.
+
+**Nghiệm thu:** chỉ Admin Big gọi được DELETE; sau thành công không còn tài khoản/hồ sơ/phiên ở các site và đăng nhập bằng tài khoản đó thất bại; thao tác kích hoạt/ngưng vẫn chỉ đổi trạng thái; `Logs` và lịch sử nghiệp vụ còn nguyên; lỗi một site trả lỗi có thể retry, không báo thành công toàn phần.
+
 ### FS-SITE-01 — Quản lý cơ sở và danh mục dùng chung
 
 **Người dùng:** Admin Big. **Phân tán:** đọc/ghi CoSo, MonHoc, KhoaHoc bằng Replicated-Write.
