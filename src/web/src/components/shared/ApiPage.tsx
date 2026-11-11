@@ -8,15 +8,16 @@ export function ApiErrorNotice({ error }: { error: unknown }) {
   return <Alert type="error" showIcon title="Không thể hoàn tất yêu cầu" description={detail} />;
 }
 
-export function ApiDataTable({ rows, loading, emptyText = "Chưa có dữ liệu", onRow }: {
+export function ApiDataTable({ rows, loading, emptyText = "Chưa có dữ liệu", onRow, rowKey }: {
   rows: ApiRow[]; loading?: boolean; emptyText?: string; onRow?: TableProps<ApiRow>["onRow"];
+  rowKey: (row: ApiRow) => string;
 }) {
   const keys = rows.length ? Object.keys(rows[0]).filter((key) => !["password", "password_hash"].includes(key)) : [];
   const columns = keys.map((key) => ({
     title: key.replaceAll("_", " "), dataIndex: key, key, ellipsis: true,
     render: (value: unknown) => <Typography.Text>{formatValue(value)}</Typography.Text>,
   }));
-  return <Table<ApiRow> rowKey={(row, index) => String(row.id ?? row.slug ?? row.account_id ?? row.student_id ?? row.class_id ?? row.enrollment_id ?? row.session_id ?? row.tuition_id ?? row.transfer_id ?? index)} size="middle" loading={loading} dataSource={rows} columns={columns} onRow={onRow} locale={{ emptyText: <Empty description={emptyText} /> }} scroll={{ x: "max-content" }} pagination={{ pageSize: 10, showSizeChanger: false }} />;
+  return <Table<ApiRow> rowKey={rowKey} size="middle" loading={loading} dataSource={rows} columns={columns} onRow={onRow} locale={{ emptyText: <Empty description={emptyText} /> }} scroll={{ x: "max-content" }} pagination={{ pageSize: 10, showSizeChanger: false }} />;
 }
 
 export function LoadingPanel({ text = "Đang tải dữ liệu từ API..." }: { text?: string }) {

@@ -17,8 +17,10 @@ from core.media.avatars import (
     AvatarUnavailable,
     complete_admin_avatar_upload,
     complete_admin_small_avatar_upload,
+    complete_teacher_avatar_upload,
     create_admin_avatar_upload_intent,
     create_admin_small_avatar_upload_intent,
+    create_teacher_avatar_upload_intent,
 )
 from core.media.serializers import (
     AdminAvatarFinalizeRequestSerializer,
@@ -26,6 +28,8 @@ from core.media.serializers import (
     AdminAvatarUploadIntentResponseSerializer,
     AdminSmallAvatarFinalizeRequestSerializer,
     AdminSmallAvatarUploadIntentRequestSerializer,
+    TeacherAvatarFinalizeRequestSerializer,
+    TeacherAvatarUploadIntentRequestSerializer,
 )
 
 
@@ -217,6 +221,105 @@ class AdminSmallAvatarCompleteView(APIView):
             return Response({"detail": str(exc)}, status=400)
         except AvatarTargetNotFound:
             return Response({"detail": "Không tìm thấy tài khoản Admin Small."}, status=404)
+        except AvatarConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
+        except AvatarUnavailable as exc:
+            return Response(
+                {"detail": str(exc), "complete": False, "missing_sites": list(exc.missing_sites)},
+                status=503,
+            )
+        return Response(result, status=200)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class TeacherAvatarUploadIntentView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "profile_avatar"
+
+    @extend_schema(
+        operation_id="teacher_initial_avatar_upload_intent",
+        tags=["Quản lý giáo viên"],
+        summary="Cấp quyền tải ảnh hồ sơ ban đầu cho giáo viên vừa được tạo",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
+        request=TeacherAvatarUploadIntentRequestSerializer,
+        responses={
+            200: AdminAvatarUploadIntentResponseSerializer,
+            400: OpenApiResponse(description="Quyền tải ảnh không hợp lệ hoặc đã hết hạn."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small được cấp ảnh trong phạm vi site."),
+            404: OpenApiResponse(description="Không tìm thấy giáo viên."),
+            409: OpenApiResponse(description="Tài khoản hoặc bản sao ảnh chưa đồng nhất."),
+            429: OpenApiResponse(description="Vượt giới hạn tải ảnh."),
+            503: OpenApiResponse(description="Cloudinary hoặc một site chưa sẵn sàng."),
+        },
+    )
+    def post(self, request, slug: str):
+        if request.user.role not in {"admin_big", "admin_small"}:
+            return Response({"detail": "Chỉ Admin Big hoặc Admin Small được cấp ảnh giáo viên."}, status=403)
+        serializer = TeacherAvatarUploadIntentRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            intent = create_teacher_avatar_upload_intent(
+                request.user, slug, serializer.validated_data["setup_token"]
+            )
+        except AvatarInvalidIntent as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except AvatarTargetNotFound:
+            return Response({"detail": "Không tìm thấy giáo viên."}, status=404)
+        except AvatarConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
+        except AvatarUnavailable as exc:
+            return Response(
+                {"detail": str(exc), "complete": False, "missing_sites": list(exc.missing_sites)},
+                status=503,
+            )
+        return Response(intent, status=200)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class TeacherAvatarCompleteView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "profile_avatar"
+
+    @extend_schema(
+        operation_id="teacher_initial_avatar_complete",
+        tags=["Quản lý giáo viên"],
+        summary="Xác minh và lưu ảnh hồ sơ giáo viên vào các bản sao TaiKhoan",
+        parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
+        request=TeacherAvatarFinalizeRequestSerializer,
+        responses={
+            200: AdminAvatarResponseSerializer,
+            400: OpenApiResponse(description="Ảnh hoặc quyền tải ảnh không hợp lệ."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small được cấp ảnh trong phạm vi site."),
+            404: OpenApiResponse(description="Không tìm thấy giáo viên."),
+            409: OpenApiResponse(description="Ảnh hoặc metadata giữa các site bị xung đột."),
+            429: OpenApiResponse(description="Vượt giới hạn hoàn tất tải ảnh."),
+            503: OpenApiResponse(description="Cloudinary hoặc một site chưa sẵn sàng; có thể gửi lại cùng yêu cầu."),
+        },
+    )
+    def post(self, request, slug: str):
+        if request.user.role not in {"admin_big", "admin_small"}:
+            return Response({"detail": "Chỉ Admin Big hoặc Admin Small được cấp ảnh giáo viên."}, status=403)
+        serializer = TeacherAvatarFinalizeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = complete_teacher_avatar_upload(
+                request.user,
+                slug,
+                serializer.validated_data["setup_token"],
+                serializer.validated_data["intent_token"],
+                serializer.validated_data["public_id"],
+                request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AvatarInvalidIntent as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except AvatarInvalidUpload as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except AvatarTargetNotFound:
+            return Response({"detail": "Không tìm thấy giáo viên."}, status=404)
         except AvatarConflict as exc:
             return Response({"detail": str(exc)}, status=409)
         except AvatarUnavailable as exc:

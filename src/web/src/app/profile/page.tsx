@@ -56,7 +56,6 @@ const PROFILE_FIELDS: Record<string, ProfileField[]> = {
     { key: "email", label: "Email" },
     { key: "username", label: "Tên đăng nhập" },
     { key: "slug", label: "Slug hồ sơ" },
-    { key: "specialty", label: "Chuyên môn" },
     { key: "site_code", label: "Cơ sở" },
     { key: "status", label: "Trạng thái giảng dạy" },
     { key: "account_status", label: "Trạng thái tài khoản" },
@@ -148,7 +147,7 @@ function ProfilePage() {
       } else if (user.role === "admin_small") {
         result = await adminApi.updateAdminSmallProfile(user.slug, { full_name: values.full_name, phone: values.phone || null });
       } else if (user.role === "giao_vien") {
-        result = await adminApi.updateTeacherProfile(user.slug, { full_name: values.full_name, phone: values.phone || null, specialty: values.specialty });
+        result = await adminApi.updateTeacherProfile(user.slug, { full_name: values.full_name, phone: values.phone || null });
       } else if (user.role === "hoc_vien") {
         result = await academicsApi.updateStudentProfile(user.slug, { phone: values.phone || null, address: values.address || null });
       } else {
@@ -289,7 +288,6 @@ function ProfilePage() {
             </> : user?.role === "giao_vien" ? <>
               <Form.Item name="full_name" label="Họ tên"><Input maxLength={150} /></Form.Item>
               <Form.Item name="phone" label="Điện thoại"><Input maxLength={20} /></Form.Item>
-              <Form.Item name="specialty" label="Chuyên môn"><Input maxLength={200} /></Form.Item>
             </> : user?.role === "hoc_vien" ? <>
               <Form.Item name="phone" label="Điện thoại"><Input maxLength={20} /></Form.Item>
               <Form.Item name="address" label="Địa chỉ"><Input maxLength={300} /></Form.Item>

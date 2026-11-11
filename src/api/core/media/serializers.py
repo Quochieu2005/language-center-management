@@ -48,6 +48,14 @@ class AdminSmallAvatarFinalizeRequestSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
+class TeacherAvatarUploadIntentRequestSerializer(AdminSmallAvatarUploadIntentRequestSerializer):
+    pass
+
+
+class TeacherAvatarFinalizeRequestSerializer(AdminSmallAvatarFinalizeRequestSerializer):
+    pass
+
+
 class AdminAvatarResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
     role = serializers.ChoiceField(choices=(
