@@ -19,7 +19,8 @@ export type AdminSmall = {
 export type Teacher = {
   teacher_id: string; account_id: string | null; slug: string | null; site_code: string;
   account_status: "active" | "inactive" | null; full_name: string; phone: string | null;
-  email: string | null; username: string | null; specialty: string;
+  email: string | null; username: string | null; specialty: string; avatar_secure_url: string | null;
+  credential_email_status: "ready" | "processing" | "sent" | "failed" | "unknown" | "changed";
   status: "dang_day" | "tam_nghi" | "nghi_viec";
 };
 export type Employee = {
@@ -127,14 +128,27 @@ export const adminApi = {
     ),
   teachers: (site_code: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Teacher>>(`/admin/teachers/${query({ site_code, ...options })}`),
-  createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; specialty: string }) =>
-    apiRequest<Teacher>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
+  createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; slug?: string; phone?: string; avatar_requested?: boolean }) =>
+    apiRequest<Teacher & { must_change_password: boolean; avatar_setup_token: string | null }>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
+  sendTeacherCredentials: (slug: string, site_code: string) =>
+    apiRequest<{ status: "sent"; email: string; detail: string }>(
+      `/admin/teachers/${encodeURIComponent(slug)}/credential-email/${query({ site_code })}`,
+      { method: "POST", body: jsonBody({}) },
+    ),
+  createTeacherAvatarUploadIntent: (slug: string, setupToken: string) =>
+    apiRequest<AdminAvatarUploadIntent>(`/admin/teachers/${encodeURIComponent(slug)}/avatar/upload-intents/`, {
+      method: "POST", body: jsonBody({ setup_token: setupToken }),
+    }),
+  completeTeacherAvatarUpload: (slug: string, body: { setup_token: string; intent_token: string; public_id: string }) =>
+    apiRequest<{ account_id: string; role: "giao_vien"; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
+      `/admin/teachers/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
+    ),
   teacher: (slug: string, site_code: string) => apiRequest<Teacher>(`/admin/teachers/${encodeURIComponent(slug)}/${query({ site_code })}`),
   deleteTeacher: (slug: string, site_code: string) => apiRequest<Record<string, unknown>>(`/admin/teachers/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   setTeacherStatus: (slug: string, site_code: string, status: "active" | "inactive") =>
     apiRequest<Record<string, unknown>>(`/admin/teachers/${encodeURIComponent(slug)}/status/${query({ site_code })}`, { method: "PATCH", body: jsonBody({ status }) }),
   teacherProfile: (slug: string) => apiRequest<Teacher>(`/teachers/profile/${encodeURIComponent(slug)}/`),
-  updateTeacherProfile: (slug: string, body: { full_name?: string; phone?: string | null; specialty?: string }) =>
+  updateTeacherProfile: (slug: string, body: { full_name?: string; phone?: string | null }) =>
     apiRequest<Teacher>(`/teachers/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   employees: (site_code: string, options: { job_title?: string; status?: string; search?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Employee>>(`/admin/employees/${query({ site_code, ...options })}`),

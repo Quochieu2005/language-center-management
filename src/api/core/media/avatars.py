@@ -52,6 +52,7 @@ class AvatarTargetNotFound(Exception):
 
 _INTENT_SALT = "core.media.admin-avatar.v1"
 _ADMIN_SMALL_SETUP_SALT = "core.media.admin-small-avatar-setup.v1"
+_TEACHER_SETUP_SALT = "core.media.teacher-avatar-setup.v1"
 _INTENT_TTL_SECONDS = 3600
 _MAX_FILE_BYTES = 5 * 1024 * 1024
 _ALLOWED_FORMATS = "jpg,jpeg,png,webp"
@@ -189,6 +190,98 @@ def _resolve_admin_small_setup_target(admin_big, slug: str, setup_token: str) ->
     )
 
 
+def create_teacher_avatar_setup_token(actor, teacher) -> str:
+    role = str(getattr(actor, "role", ""))
+    site = str(getattr(teacher, "site_code", "")).upper()
+    if role not in {"admin_big", "admin_small"} or not getattr(actor, "account_id", ""):
+        raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho giáo viên.")
+    if role == "admin_small" and str(getattr(actor, "site_code", "")).upper() != site:
+        raise AvatarConflict("Admin Small chỉ được cấp ảnh tại cơ sở của mình.")
+    return signing.dumps(
+        {
+            "actor_id": str(actor.account_id),
+            "actor_role": role,
+            "actor_site": str(getattr(actor, "site_code", "") or "").upper() or None,
+            "target_id": str(teacher.account_id),
+            "target_slug": str(teacher.slug),
+            "target_site": site,
+        },
+        salt=_TEACHER_SETUP_SALT,
+        compress=True,
+    )
+
+
+def _resolve_teacher_setup_target(actor, slug: str, setup_token: str) -> AuthenticatedUser:
+    role = str(getattr(actor, "role", ""))
+    actor_id = str(getattr(actor, "account_id", ""))
+    actor_site = str(getattr(actor, "site_code", "") or "").upper() or None
+    if role not in {"admin_big", "admin_small"} or not actor_id:
+        raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho giáo viên.")
+    try:
+        claims = signing.loads(setup_token, salt=_TEACHER_SETUP_SALT, max_age=_INTENT_TTL_SECONDS)
+    except signing.BadSignature as exc:
+        raise AvatarInvalidIntent("Quyền tải ảnh ban đầu đã hết hạn hoặc không hợp lệ.") from exc
+    if (
+        not isinstance(claims, dict)
+        or claims.get("actor_id") != actor_id
+        or claims.get("actor_role") != role
+        or claims.get("actor_site") != actor_site
+        or claims.get("target_slug") != slug
+    ):
+        raise AvatarInvalidIntent("Quyền tải ảnh ban đầu không thuộc yêu cầu này.")
+
+    sites = _active_sites()
+    replicas = []
+    for site in sites:
+        with connections[get_site_database_alias(site)].cursor() as cursor:
+            cursor.execute(
+                "SELECT TOP (2) ma_tai_khoan, slug, ten_dang_nhap, email, vai_tro, ma_co_so, "
+                "trang_thai, bat_buoc_doi_mat_khau FROM dbo.TaiKhoan WHERE slug = %s",
+                [slug],
+            )
+            rows = cursor.fetchall()
+        if len(rows) > 1:
+            raise AvatarConflict("Slug không định danh duy nhất một tài khoản.")
+        replicas.append(tuple(rows[0]) if rows else None)
+    if all(row is None for row in replicas):
+        raise AvatarTargetNotFound
+    if any(row is None for row in replicas) or any(row != replicas[0] for row in replicas[1:]):
+        raise AvatarConflict("Tài khoản giáo viên chưa đồng nhất giữa các cơ sở.")
+
+    row = replicas[0]
+    account_id = str(row[0])
+    site_code = str(row[5] or "").upper()
+    if (
+        claims.get("target_id") != account_id
+        or claims.get("target_site") != site_code
+        or str(row[1]) != slug
+        or str(row[4]).lower() != "giao_vien"
+        or not bool(row[6])
+        or site_code not in sites
+        or (role == "admin_small" and actor_site != site_code)
+    ):
+        raise AvatarTargetNotFound
+    with connections[get_site_database_alias(site_code)].cursor() as cursor:
+        cursor.execute(
+            "SELECT TOP (2) ma_giao_vien FROM dbo.GiaoVien WHERE ma_tai_khoan = %s "
+            "AND ma_co_so = %s AND trang_thai = 'dang_day'",
+            [account_id, site_code],
+        )
+        profiles = cursor.fetchall()
+    if len(profiles) != 1:
+        raise AvatarTargetNotFound
+    return AuthenticatedUser(
+        account_id=account_id,
+        email=str(row[3]),
+        username=str(row[2]),
+        slug=str(row[1]),
+        role="giao_vien",
+        site_code=site_code,
+        profile_id=str(profiles[0][0]),
+        must_change_password=bool(row[7]),
+    )
+
+
 def _read_account(site_code: str, account_id: str, role: str, account_site: str | None) -> dict:
     alias = get_site_database_alias(site_code)
     with connections[alias].cursor() as cursor:
@@ -309,7 +402,9 @@ def destroy_cloudinary_avatar_asset(public_id: str | None) -> None:
         raise AvatarUnavailable("Cloudinary chưa xác nhận xóa ảnh đại diện.")
 
 
-def _create_admin_avatar_upload_intent(actor, target=None, *, initial_admin_small: bool = False) -> dict:
+def _create_admin_avatar_upload_intent(
+    actor, target=None, *, initial_admin_small: bool = False, initial_teacher: bool = False
+) -> dict:
     target = target or actor
     actor_role = str(getattr(actor, "role", ""))
     actor_id = str(getattr(actor, "account_id", ""))
@@ -320,6 +415,11 @@ def _create_admin_avatar_upload_intent(actor, target=None, *, initial_admin_smal
     if initial_admin_small:
         if actor_role != "admin_big" or role != "admin_small":
             raise AvatarConflict("Chỉ Admin Big được cấp ảnh ban đầu cho Admin Small.")
+    elif initial_teacher:
+        if actor_role not in {"admin_big", "admin_small"} or role != "giao_vien":
+            raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho giáo viên.")
+        if actor_role == "admin_small" and str(getattr(actor, "site_code", "")).upper() != str(getattr(target, "site_code", "")).upper():
+            raise AvatarConflict("Admin Small chỉ được cấp ảnh tại cơ sở của mình.")
     elif actor_id != account_id or actor_role != role:
         raise AvatarConflict("Chỉ được tải ảnh cho tài khoản của chính mình.")
     account_site = str(getattr(target, "site_code", "") or "").strip().upper() or None
@@ -329,7 +429,7 @@ def _create_admin_avatar_upload_intent(actor, target=None, *, initial_admin_smal
     with _account_lock(account_id):
         sites = _active_sites()
         old_avatar = _replicated_avatar(account_id, role, account_site, sites)
-        if initial_admin_small and any(old_avatar.values()):
+        if (initial_admin_small or initial_teacher) and any(old_avatar.values()):
             raise AvatarConflict("Ảnh ban đầu đã được thiết lập cho tài khoản này.")
         image_id = str(uuid.uuid4())
         try:
@@ -387,6 +487,16 @@ def create_admin_small_avatar_upload_intent(admin_big, slug: str, setup_token: s
     try:
         target = _resolve_admin_small_setup_target(admin_big, slug, setup_token)
         return _create_admin_avatar_upload_intent(admin_big, target, initial_admin_small=True)
+    except (AvatarConflict, AvatarInvalidIntent, AvatarTargetNotFound, AvatarUnavailable):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AvatarUnavailable from exc
+
+
+def create_teacher_avatar_upload_intent(actor, slug: str, setup_token: str) -> dict:
+    try:
+        target = _resolve_teacher_setup_target(actor, slug, setup_token)
+        return _create_admin_avatar_upload_intent(actor, target, initial_teacher=True)
     except (AvatarConflict, AvatarInvalidIntent, AvatarTargetNotFound, AvatarUnavailable):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
@@ -553,6 +663,11 @@ def _complete_admin_avatar_upload(actor, target, token: str, public_id: str, rem
     if not (
         (actor_role == role and str(getattr(actor, "account_id", "")) == account_id)
         or (actor_role == "admin_big" and role == "admin_small")
+        or (
+            actor_role in {"admin_big", "admin_small"}
+            and role == "giao_vien"
+            and (actor_role != "admin_small" or str(getattr(actor, "site_code", "")).upper() == str(getattr(target, "site_code", "")).upper())
+        )
     ):
         raise AvatarConflict("Chỉ được đổi ảnh cho tài khoản của chính mình.")
     account_site = str(getattr(target, "site_code", "") or "").strip().upper() or None
@@ -601,6 +716,18 @@ def complete_admin_small_avatar_upload(
     try:
         target = _resolve_admin_small_setup_target(admin_big, slug, setup_token)
         return _complete_admin_avatar_upload(admin_big, target, token, public_id, remote_ip)
+    except (AvatarConflict, AvatarInvalidIntent, AvatarInvalidUpload, AvatarTargetNotFound, AvatarUnavailable):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AvatarUnavailable from exc
+
+
+def complete_teacher_avatar_upload(
+    actor, slug: str, setup_token: str, token: str, public_id: str, remote_ip: str
+) -> dict:
+    try:
+        target = _resolve_teacher_setup_target(actor, slug, setup_token)
+        return _complete_admin_avatar_upload(actor, target, token, public_id, remote_ip)
     except (AvatarConflict, AvatarInvalidIntent, AvatarInvalidUpload, AvatarTargetNotFound, AvatarUnavailable):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:

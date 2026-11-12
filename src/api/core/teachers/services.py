@@ -21,6 +21,9 @@ from core.auth.service_common import (
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
 from core.notifications.publisher import publish_notification
+from core.teachers.credential_email import credential_email_status
+
+_DB_REQUIRED_TEACHER_SPECIALTY = "Tiếng Anh"
 
 
 class TeacherInfrastructureUnavailable(Exception):
@@ -68,9 +71,10 @@ class TeacherProvisioningResult:
     email: str
     username: str
     slug: str
-    specialty: str
+    specialty: str = _DB_REQUIRED_TEACHER_SPECIALTY
     status: str = "dang_day"
-    must_change_password: bool = True
+    must_change_password: bool = False
+    credential_email_status: str = "ready"
 
 
 @dataclass(frozen=True)
@@ -192,7 +196,7 @@ def _append_audit(
 def _profile_values(payload: dict[str, Any]) -> tuple[Any, ...]:
     return (
         payload["teacher_id"], payload["site_code"], payload["account_id"],
-        payload["full_name"], payload["phone"], payload["email"], payload["specialty"],
+        payload["full_name"], payload["phone"], payload["email"], _DB_REQUIRED_TEACHER_SPECIALTY,
     )
 
 
@@ -233,9 +237,10 @@ def _ensure_teacher_account_replica(site_code: str, expected: tuple[Any, ...]) -
                         INSERT INTO dbo.TaiKhoan
                             (ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro,
                              ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban)
-                        VALUES (%s, %s, %s, %s, %s, 'giao_vien', %s, 1, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, 'giao_vien', %s, %s, %s, %s)
                         """,
-                        [account_id, slug, username, email, password_hash, account_site, version],
+                        [account_id, slug, username, email, password_hash, account_site,
+                         account_status, int(bool(forced)), version],
                     )
                 elif actual != normalized_expected:
                     raise TeacherConflict
@@ -313,7 +318,7 @@ def _ensure_teacher_profile(site_code: str, payload: dict[str, Any], remote_ip: 
 
 def _recover_teacher_provisioning(
     *, site_code: str, email: str, username: str, full_name: str,
-    phone: str | None, specialty: str, temporary_password: str,
+    phone: str | None, slug: str, temporary_password: str,
 ) -> tuple[tuple[Any, ...], str] | None:
     """Use the committed profile at its owning site as the retry checkpoint."""
     try:
@@ -338,22 +343,23 @@ def _recover_teacher_provisioning(
         if len(rows) != 1:
             raise TeacherConflict
         row = rows[0]
-        account_id, slug, stored_username, stored_email = map(str, row[:4])
+        account_id, stored_slug, stored_username, stored_email = map(str, row[:4])
         password_hash = str(row[4])
         account_site = str(row[6]).upper() if row[6] else None
         if (
             str(row[5]).lower() != "giao_vien" or account_site != site_code
-            or not account_status_bit(row[7]) or not bool(row[8])
+            or not account_status_bit(row[7]) or stored_slug != slug
             or stored_email.casefold() != email or stored_username.lower() != username
             or not check_password(temporary_password, password_hash)
             or row[10] is None or str(row[11]).upper() != site_code
             or str(row[12]) != account_id or str(row[13]) != full_name
-            or row[14] != phone or row[15] != email or str(row[16]) != specialty
+            or row[14] != phone or row[15] != email
+            or str(row[16]) != _DB_REQUIRED_TEACHER_SPECIALTY
             or str(row[17]).lower() != "dang_day"
         ):
             raise TeacherConflict
         account = (
-            account_id, slug, stored_username, stored_email, password_hash,
+            account_id, stored_slug, stored_username, stored_email, password_hash,
             "giao_vien", site_code, account_status_bit(row[7]), bool(row[8]), int(row[9]),
         )
         return account, str(row[10])
@@ -366,7 +372,7 @@ def _recover_teacher_provisioning(
 @_translate_infrastructure_errors
 def create_teacher(
     *, full_name: str, email: str, username: str | None, phone: str | None,
-    specialty: str, site_code: str, actor_id: str, remote_ip: str,
+    site_code: str, actor_id: str, remote_ip: str, slug: str | None = None,
 ) -> TeacherProvisioningResult:
     temporary_password = str(getattr(settings, "TEACHER_INITIAL_PASSWORD", "")).strip()
     if not temporary_password:
@@ -376,14 +382,14 @@ def create_teacher(
     normalized_username = (username or make_slug(normalized_email.partition("@")[0], max_length=100)).strip().lower()
     normalized_name = full_name.strip()
     normalized_phone = phone.strip() if phone else None
-    normalized_specialty = specialty.strip()
-    if not normalized_email or not normalized_name or not normalized_specialty or not remote_ip:
+    normalized_slug = make_slug(normalized_name, slug, max_length=120)
+    if not normalized_email or not normalized_name or not remote_ip:
         raise ValueError("Thiếu thông tin giáo viên.")
     sites = active_site_codes()
     _ensure_site(target_site, sites)
     recovered = _recover_teacher_provisioning(
         site_code=target_site, email=normalized_email, username=normalized_username,
-        full_name=normalized_name, phone=normalized_phone, specialty=normalized_specialty,
+        full_name=normalized_name, phone=normalized_phone, slug=normalized_slug,
         temporary_password=temporary_password,
     )
     if recovered is not None:
@@ -396,11 +402,20 @@ def create_teacher(
             raise TeacherConflict
         account_id = _next_teacher_account_id(target_site, sites)
         teacher_id = _next_teacher_profile_id(target_site)
-        slug = make_slug(f"giao-vien-{target_site}-{normalized_username}", max_length=120)
+        for code in sites:
+            with get_site_connection(code).cursor() as cursor:
+                cursor.execute(
+                    "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TaiKhoan WHERE slug = %s) "
+                    "THEN 1 ELSE 0 END",
+                    [normalized_slug],
+                )
+                if int(cursor.fetchone()[0]):
+                    raise TeacherConflict
+        slug = normalized_slug
         password_hash = make_password(temporary_password)
         account = (
             account_id, slug, normalized_username, normalized_email, password_hash,
-            "giao_vien", target_site, 1, True, 1,
+            "giao_vien", target_site, 1, False, 1,
         )
     payload = {
         "teacher_id": teacher_id,
@@ -409,7 +424,6 @@ def create_teacher(
         "full_name": normalized_name,
         "phone": normalized_phone,
         "email": normalized_email,
-        "specialty": normalized_specialty,
         "actor_id": actor_id,
     }
     target_alias = get_site_database_alias(target_site)
@@ -434,16 +448,30 @@ def create_teacher(
         email=normalized_email,
         username=normalized_username,
         slug=slug,
-        specialty=normalized_specialty,
+        specialty=_DB_REQUIRED_TEACHER_SPECIALTY,
+        must_change_password=bool(account[8]),
     )
 
 
 _TEACHER_SELECT = """
     SELECT g.ma_giao_vien, g.ma_tai_khoan, g.ma_co_so, g.ho_ten, g.sdt,
-           COALESCE(g.email, t.email), t.ten_dang_nhap, t.slug,
-           g.chuyen_mon, g.trang_thai, t.trang_thai
+           COALESCE(g.email, t.email), t.ten_dang_nhap, t.slug, g.chuyen_mon,
+           g.trang_thai, t.trang_thai, t.avatar_secure_url, credential_email.hanh_dong
     FROM dbo.GiaoVien AS g
     LEFT JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = g.ma_tai_khoan
+    OUTER APPLY (
+        SELECT TOP (1) l.hanh_dong
+        FROM dbo.Logs AS l
+        WHERE l.loai_log = 'system' AND l.ma_co_so = g.ma_co_so
+          AND l.ma_tai_khoan = g.ma_tai_khoan AND l.bang_tac_dong = 'TaiKhoan'
+          AND l.ma_ban_ghi = g.ma_tai_khoan
+          AND l.hanh_dong IN (
+              'teacher_credential_email_sending', 'teacher_credential_email_sent',
+              'teacher_credential_email_failed', 'teacher_credential_email_unknown',
+              'teacher_credential_email_changed'
+          )
+        ORDER BY l.thoi_diem_utc DESC, l.ma_log DESC
+    ) AS credential_email
     WHERE g.ma_co_so = %s
 """
 
@@ -461,6 +489,8 @@ def _teacher_dict(row) -> dict[str, Any]:
         "specialty": str(row[8]),
         "status": str(row[9]).lower(),
         "account_status": account_status_label(row[10]) if len(row) > 10 else None,
+        "avatar_secure_url": str(row[11]) if len(row) > 11 and row[11] is not None else None,
+        "credential_email_status": credential_email_status(str(row[12]) if len(row) > 12 and row[12] else None),
     }
 
 
@@ -547,7 +577,7 @@ def update_teacher(
     sites = active_site_codes()
     _ensure_site(site, sites)
     alias = get_site_database_alias(site)
-    columns = {"full_name": "ho_ten", "phone": "sdt", "specialty": "chuyen_mon"}
+    columns = {"full_name": "ho_ten", "phone": "sdt"}
     if set(updates) - set(columns) or not updates:
         raise ValueError("Trường cập nhật giáo viên không hợp lệ.")
     try:
@@ -555,8 +585,7 @@ def update_teacher(
             with connections[alias].cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT g.ma_giao_vien, g.ma_tai_khoan, g.ho_ten, g.sdt,
-                           g.chuyen_mon, g.trang_thai
+                    SELECT g.ma_giao_vien, g.ma_tai_khoan, g.ho_ten, g.sdt, g.trang_thai
                     FROM dbo.GiaoVien AS g WITH (UPDLOCK, ROWLOCK)
                     INNER JOIN dbo.TaiKhoan AS t WITH (UPDLOCK, ROWLOCK)
                         ON t.ma_tai_khoan = g.ma_tai_khoan
@@ -567,14 +596,13 @@ def update_teacher(
                 row = cursor.fetchone()
                 if row is None or not row[1]:
                     raise TeacherNotFound
-                if str(row[5]).lower() == "nghi_viec":
+                if str(row[4]).lower() == "nghi_viec":
                     raise TeacherConflict
                 teacher_id = str(row[0])
                 old = {
                     "full_name": str(row[2]),
                     "phone": str(row[3]) if row[3] is not None else None,
-                    "specialty": str(row[4]),
-                    "status": str(row[5]).lower(),
+                    "status": str(row[4]).lower(),
                 }
                 new = dict(old)
                 new.update(updates)

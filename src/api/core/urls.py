@@ -23,7 +23,13 @@ from core.auth.oauth_views import (
     StudentOAuthConnectionsView,
 )
 from core.views import health_check
-from core.teachers.views import TeacherCollectionView, TeacherDetailView, TeacherProfileView, TeacherStatusView
+from core.teachers.views import (
+    TeacherCollectionView,
+    TeacherCredentialEmailView,
+    TeacherDetailView,
+    TeacherProfileView,
+    TeacherStatusView,
+)
 from core.notifications.views import (
     AdminNotificationListView,
 )
@@ -86,6 +92,8 @@ from core.media.views import (
     AdminAvatarUploadIntentView,
     AdminSmallAvatarCompleteView,
     AdminSmallAvatarUploadIntentView,
+    TeacherAvatarCompleteView,
+    TeacherAvatarUploadIntentView,
 )
 
 
@@ -116,8 +124,11 @@ urlpatterns = [
     path("auth/profile/<str:slug>/avatar/complete/", AdminAvatarCompleteView.as_view(), name="auth-profile-avatar-complete"),
     path("admin/admin-smalls/<str:slug>/avatar/upload-intents/", AdminSmallAvatarUploadIntentView.as_view(), name="admin-small-avatar-upload-intent"),
     path("admin/admin-smalls/<str:slug>/avatar/complete/", AdminSmallAvatarCompleteView.as_view(), name="admin-small-avatar-complete"),
+    path("admin/teachers/<str:slug>/avatar/upload-intents/", TeacherAvatarUploadIntentView.as_view(), name="teacher-avatar-upload-intent"),
+    path("admin/teachers/<str:slug>/avatar/complete/", TeacherAvatarCompleteView.as_view(), name="teacher-avatar-complete"),
     path("teachers/profile/<str:slug>/", TeacherProfileView.as_view(), name="teacher-profile"),
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
+    path("admin/teachers/<str:slug>/credential-email/", TeacherCredentialEmailView.as_view(), name="teacher-credential-email"),
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),
     path("admin/teachers/<str:slug>/", TeacherDetailView.as_view(), name="teacher-detail"),
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),

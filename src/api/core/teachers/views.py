@@ -15,9 +15,11 @@ from core.auth.account_status import (
 )
 from core.auth.serializers import AccountStatusResponseSerializer, AccountStatusUpdateSerializer
 from core.auth.service_common import AuthInfrastructureUnavailable
+from core.media.avatars import create_teacher_avatar_setup_token
 from core.teachers.serializers import (
     TeacherCreateResponseSerializer,
     TeacherCreateSerializer,
+    TeacherCredentialEmailResponseSerializer,
     TeacherDeleteResponseSerializer,
     TeacherListQuerySerializer,
     TeacherListResponseSerializer,
@@ -35,6 +37,13 @@ from core.teachers.services import (
     get_teacher,
     list_teachers,
     update_teacher,
+)
+from core.teachers.credential_email import (
+    TeacherCredentialEmailConflict,
+    TeacherCredentialEmailDeliveryFailed,
+    TeacherCredentialEmailNotFound,
+    TeacherCredentialEmailUncertain,
+    send_teacher_credentials,
 )
 
 
@@ -147,8 +156,9 @@ class TeacherCollectionView(APIView):
         description=(
             "Admin Big truyền site_code; Admin Small chỉ tạo tại site được xác thực. Hồ sơ GiaoVien "
             "nằm riêng ở site đó; TaiKhoan được ghi tại các site đang hoạt động và đồng bộ qua Logs (loai_log='sync'). "
-            "Mật khẩu cấp ban đầu lấy từ cấu hình backend, được băm bằng BCrypt, buộc "
-            "đổi sau đăng nhập đầu và không trả trong response."
+            "Mật khẩu cấp ban đầu lấy từ cấu hình backend, được băm và không trả trong response. "
+            "Không bắt buộc đổi ở lần đăng nhập đầu. Gửi thông tin đăng nhập qua endpoint riêng "
+            "theo thao tác chủ động của quản trị viên; chỉ gửi một lần. Ảnh hồ sơ tải lên Cloudinary."
         ),
         request=TeacherCreateSerializer,
         responses={
@@ -184,13 +194,17 @@ class TeacherCollectionView(APIView):
                 email=data["email"],
                 username=data.get("username"),
                 phone=data.get("phone"),
-                specialty=data["specialty"],
+                slug=data["slug"],
                 site_code=site_code,
                 actor_id=request.user.account_id,
                 remote_ip=_remote_ip(request),
             )
         except (TeacherInfrastructureUnavailable, TeacherSiteUnavailable, TeacherConflict) as exc:
             return _service_error(exc)
+        avatar_setup_token = (
+            create_teacher_avatar_setup_token(request.user, result)
+            if data.get("avatar_requested") else None
+        )
         return Response(
             {
                 "teacher_id": result.teacher_id,
@@ -203,11 +217,78 @@ class TeacherCollectionView(APIView):
                 "username": result.username,
                 "slug": result.slug,
                 "specialty": result.specialty,
+                "avatar_secure_url": None,
                 "status": result.status,
                 "must_change_password": result.must_change_password,
+                "credential_email_status": result.credential_email_status,
+                "avatar_setup_token": avatar_setup_token,
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class TeacherCredentialEmailView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_credential_email"
+
+    @extend_schema(
+        operation_id="teacher_credentials_send_email",
+        tags=["Quản lý giáo viên"],
+        summary="Gửi thông tin tài khoản giáo viên qua email một lần",
+        description=(
+            "Chỉ Admin Big/Admin Small trong phạm vi site. Chỉ gửi khi trạng thái còn sẵn sàng "
+            "hoặc lần gửi trước thất bại rõ ràng; trạng thái đã gửi hoặc không xác định không thể gửi lại. "
+            "Mật khẩu không xuất hiện trong request/response; kết quả email không chắc chắn cần xử lý thủ công."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY, required=True)],
+        responses={
+            200: TeacherCredentialEmailResponseSerializer,
+            400: OpenApiResponse(description="Thiếu hoặc sai site_code."),
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Không đủ quyền hoặc vượt phạm vi site."),
+            404: OpenApiResponse(description="Không tìm thấy giáo viên."),
+            409: OpenApiResponse(description="Đã gửi, đang gửi, kết quả gửi chưa rõ hoặc mật khẩu cấp đã thay đổi."),
+            429: OpenApiResponse(description="Vượt giới hạn gửi email."),
+            502: OpenApiResponse(description="Máy chủ email xác nhận không nhận thư."),
+            503: OpenApiResponse(description="Cơ sở dữ liệu hoặc cấu hình email chưa sẵn sàng."),
+        },
+    )
+    def post(self, request, slug: str):
+        query = TeacherSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        site_code, error = _site_scope(request.user, query.validated_data.get("site_code"))
+        if error:
+            return error
+        try:
+            result = send_teacher_credentials(
+                slug=slug, site_code=site_code, remote_ip=_remote_ip(request)
+            )
+        except TeacherCredentialEmailNotFound:
+            return Response({"detail": "Không tìm thấy giáo viên trong cơ sở được chọn."}, status=404)
+        except TeacherCredentialEmailConflict:
+            return Response(
+                {"detail": "Không thể gửi lại: thông tin đã gửi, đang xử lý, chưa rõ kết quả hoặc mật khẩu đã thay đổi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except TeacherCredentialEmailDeliveryFailed:
+            return Response(
+                {"detail": "Máy chủ email xác nhận chưa nhận thư; có thể thử gửi lại."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except TeacherCredentialEmailUncertain:
+            return Response(
+                {"detail": "Chưa xác định được kết quả gửi email; hệ thống đã khóa gửi lại để tránh gửi trùng."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except AuthInfrastructureUnavailable:
+            return Response(
+                {"detail": "Cơ sở dữ liệu hoặc cấu hình email chưa sẵn sàng."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({**result, "detail": "Đã gửi thông tin tài khoản đến email giáo viên."})
 
 
 @method_decorator(csrf_protect, name="dispatch")
@@ -401,7 +482,7 @@ class TeacherProfileView(APIView):
         tags=["Hồ sơ giáo viên"],
         summary="Giáo viên tự cập nhật hồ sơ theo slug",
         description=(
-            "Chỉ sửa họ tên, số điện thoại và chuyên môn của tài khoản đang đăng nhập. Email, username, "
+            "Chỉ sửa họ tên và số điện thoại của tài khoản đang đăng nhập. Email, username, "
             "slug, vai trò, cơ sở và trạng thái tài khoản không thể sửa qua endpoint này."
         ),
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],

@@ -37,7 +37,6 @@ class TeacherManagementApiTests(SimpleTestCase):
             "email": "teacher.q7@example.com",
             "username": "teacher.q7",
             "phone": "0901234567",
-            "specialty": "Tiếng Anh giao tiếp",
         }
         self.created = TeacherProvisioningResult(
             teacher_id="Q7-GV-000001",
@@ -48,7 +47,6 @@ class TeacherManagementApiTests(SimpleTestCase):
             email="teacher.q7@example.com",
             username="teacher.q7",
             slug="giao-vien-q7-teacher-q7",
-            specialty="Tiếng Anh giao tiếp",
         )
 
     def test_openapi_lists_teacher_crud_routes(self):
@@ -64,6 +62,7 @@ class TeacherManagementApiTests(SimpleTestCase):
         self.assertIn("patch", paths["/api/v1/admin/teachers/{slug}/status/"])
         self.assertIn("get", paths["/api/v1/teachers/profile/{slug}/"])
         self.assertIn("patch", paths["/api/v1/teachers/profile/{slug}/"])
+        self.assertIn("post", paths["/api/v1/admin/teachers/{slug}/credential-email/"])
 
     def test_admin_big_creates_teacher_at_the_selected_site_without_returning_password(self):
         self.client.force_authenticate(user=self.admin_big)
@@ -75,7 +74,8 @@ class TeacherManagementApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["site_code"], "Q7")
         self.assertEqual(response.json()["slug"], self.created.slug)
-        self.assertTrue(response.json()["must_change_password"])
+        self.assertFalse(response.json()["must_change_password"])
+        self.assertEqual(response.json()["specialty"], "Tiếng Anh")
         self.assertNotIn("password", response.json())
         self.assertNotIn("1234567890", response.content.decode())
         create.assert_called_once_with(
@@ -83,7 +83,7 @@ class TeacherManagementApiTests(SimpleTestCase):
             email="teacher.q7@example.com",
             username="teacher.q7",
             phone="0901234567",
-            specialty="Tiếng Anh giao tiếp",
+            slug="nguyen-an",
             site_code="Q7",
             actor_id="Q1-TK-000001",
             remote_ip="127.0.0.1",
@@ -225,7 +225,7 @@ class TeacherManagementApiTests(SimpleTestCase):
             "teacher_id": "Q7-GV-000001", "account_id": self.teacher.account_id,
             "site_code": "Q7", "slug": self.teacher.slug, "account_status": "active",
             "full_name": "Tên mới", "phone": None, "email": "teacher@example.com",
-            "username": "teacher.q7", "specialty": "Tiếng Anh", "status": "dang_day",
+            "username": "teacher.q7", "avatar_secure_url": None, "status": "dang_day",
         }
         with (
             patch("core.teachers.views.get_teacher", return_value=profile) as get_service,
