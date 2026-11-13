@@ -106,18 +106,22 @@ def _weekday_number(value: date) -> int:
     return (value.weekday() + 1) % 7 + 1
 
 
-def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int) -> list[date]:
-    if expected_count < 1 or expected_count > 500:
+def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int | None) -> list[date]:
+    if expected_count is not None and not 1 <= expected_count <= 500:
         raise ClassInvalid("Số buổi của khóa học phải nằm trong khoảng 1 đến 500.")
     if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 2 or day > 6 for day in weekdays):
         raise ClassInvalid("Lịch học chỉ được chọn các ngày từ Thứ 2 đến Thứ 6, không chọn trùng.")
     dates: list[date] = []
     current = start
-    while current <= end and len(dates) < expected_count:
+    while current <= end and (expected_count is None or len(dates) < expected_count):
         if _weekday_number(current) in weekdays:
             dates.append(current)
+            if len(dates) > 500:
+                raise ClassInvalid("Lịch lớp không được vượt quá 500 buổi.")
         current += timedelta(days=1)
-    if len(dates) != expected_count:
+    if not dates:
+        raise ClassInvalid("Khoảng ngày không có buổi học nào khớp với các thứ đã chọn.")
+    if expected_count is not None and len(dates) != expected_count:
         raise ClassInvalid("Khoảng ngày đã chọn không đủ buổi theo lịch và số buổi của khóa học.")
     return dates
 
@@ -276,8 +280,8 @@ def create_class(*, site_code: str, actor_id: str, remote_ip: str, data: dict[st
             course = cursor.fetchone()
             if course is None:
                 raise ClassInvalid("Khóa học không tồn tại ở cơ sở đã chọn.")
-            expected_sessions = int(course[0])
-            if expected_sessions > 500:
+            expected_sessions = None if course[0] is None else int(course[0])
+            if expected_sessions is not None and expected_sessions > 500:
                 raise ClassInvalid("Số buổi khóa học vượt giới hạn tạo lịch tự động của API.")
             generated_dates = _session_dates(
                 data["start_date"], data["end_date"], data["weekdays"], expected_sessions

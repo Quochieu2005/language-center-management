@@ -5,6 +5,7 @@ import os
 import re
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -217,6 +218,7 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOWED_ORIGINS = env_csv("CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS = env_csv("CSRF_TRUSTED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 
 # Email delivery for account activation and password recovery. Keep credentials
 # in src/api/.env or a deployment secret store; never expose them to the web app.

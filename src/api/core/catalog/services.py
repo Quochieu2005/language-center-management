@@ -14,6 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
 
 from core.academics.common import AcademicInfrastructureUnavailable, acquire_record_lock, active_site_state
+from core.slug_utils import make_slug
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
 
@@ -65,14 +66,6 @@ def _subject(row) -> dict:
 def _read_site(site_code: str, slug: str, event_id: str) -> tuple[dict | None, dict | None]:
     with get_site_connection(site_code).cursor() as cursor:
         cursor.execute(
-            "SELECT ma_mon, slug, ten_mon, mo_ta, phien_ban "
-            "FROM dbo.MonHoc WHERE slug = %s",
-            [slug],
-        )
-        rows = cursor.fetchall()
-        if len(rows) > 1:
-            raise SharedCatalogConflict("Slug môn học không duy nhất trong một site.")
-        cursor.execute(
             "SELECT bang_tac_dong, ma_ban_ghi, hanh_dong, site_dich, ket_qua, "
             "du_lieu_cu, du_lieu_moi FROM dbo.Logs "
             "WHERE loai_log = 'sync' AND ma_log = %s",
@@ -81,12 +74,24 @@ def _read_site(site_code: str, slug: str, event_id: str) -> tuple[dict | None, d
         event_rows = cursor.fetchall()
         if len(event_rows) > 1:
             raise SharedCatalogConflict("Có nhiều ACK cho cùng một mã thao tác.")
+        record_id = str(event_rows[0][1]) if event_rows else None
+        cursor.execute(
+            "SELECT ma_mon, slug, ten_mon, mo_ta, phien_ban "
+            f"FROM dbo.MonHoc WHERE {'ma_mon = %s' if record_id else 'slug = %s'}",
+            [record_id or slug],
+        )
+        rows = cursor.fetchall()
+        if len(rows) > 1:
+            raise SharedCatalogConflict("Môn học không duy nhất trong một site.")
     subject = _subject(rows[0]) if rows else None
     event = None
     if event_rows:
         raw = event_rows[0]
-        if tuple(str(value) for value in raw[:5]) != (
-            "MonHoc", str(subject["ma_mon"] if subject else raw[1]), "sua", site_code, "thanh_cong"
+        if (
+            tuple(str(value) for value in (raw[0], raw[2], raw[3], raw[4]))
+            != ("MonHoc", "sua", site_code, "thanh_cong")
+            or subject is None
+            or subject["ma_mon"] != record_id
         ):
             raise SharedCatalogConflict("ACK trong Logs không khớp môn học/site.")
         try:
@@ -122,10 +127,15 @@ def _validate_event(event: dict, *, slug: str, request_hash: str) -> tuple[dict,
         or set(before) != expected_fields
         or set(after) != expected_fields
         or before.get("slug") != slug
-        or after.get("slug") != slug
         or not versions_are_next
     ):
         raise SharedCatalogConflict("Idempotency-Key đã được dùng với nội dung khác hoặc ACK không hợp lệ.")
+    try:
+        expected_slug = make_slug(after["ten_mon"], max_length=120)
+    except (KeyError, ValueError) as exc:
+        raise SharedCatalogConflict("Slug trong ACK không hợp lệ.") from exc
+    if after.get("slug") != expected_slug:
+        raise SharedCatalogConflict("Slug trong ACK không khớp tên môn học.")
     return before, after
 
 
@@ -146,12 +156,20 @@ def _apply_site(
                 raise SharedCatalogConflict("Một bản sao đã thay đổi; cần đối soát trước khi tiếp tục.")
 
             cursor.execute(
-                "UPDATE dbo.MonHoc SET ten_mon = %s, mo_ta = %s, "
+                "SELECT ma_mon FROM dbo.MonHoc WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE slug = %s AND ma_mon <> %s",
+                [subject_after["slug"], subject_before["ma_mon"]],
+            )
+            if cursor.fetchall():
+                raise SharedCatalogConflict("Slug môn học đã được dùng tại một site.")
+
+            cursor.execute(
+                "UPDATE dbo.MonHoc SET slug = %s, ten_mon = %s, mo_ta = %s, "
                 "phien_ban = phien_ban + 1, cap_nhat_luc = SYSUTCDATETIME() "
                 "WHERE ma_mon = %s AND slug = %s AND phien_ban = %s "
                 "AND ten_mon = %s AND ((mo_ta = %s) OR (mo_ta IS NULL AND %s IS NULL))",
                 [
-                    subject_after["ten_mon"], subject_after["mo_ta"],
+                    subject_after["slug"], subject_after["ten_mon"], subject_after["mo_ta"],
                     subject_before["ma_mon"], subject_before["slug"],
                     subject_before["phien_ban"], subject_before["ten_mon"],
                     subject_before["mo_ta"], subject_before["mo_ta"],
@@ -240,8 +258,13 @@ def update_shared_subject(
                 if any(value != subject_values[0] for value in subject_values[1:]):
                     raise SharedCatalogConflict("Các bản sao môn học đang khác nhau; cần đối soát trước khi sửa.")
                 subject_before = subject_values[0]
+                try:
+                    new_slug = make_slug(patch.get("ten_mon", subject_before["ten_mon"]), max_length=120)
+                except ValueError as exc:
+                    raise SharedCatalogConflict("Không tạo được slug từ tên môn học.") from exc
                 subject_after = {
                     **subject_before,
+                    "slug": new_slug,
                     "ten_mon": patch.get("ten_mon", subject_before["ten_mon"]),
                     "mo_ta": patch.get("mo_ta", subject_before["mo_ta"]),
                     "phien_ban": subject_before["phien_ban"] + 1,

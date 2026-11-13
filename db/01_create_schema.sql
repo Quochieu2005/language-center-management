@@ -59,14 +59,22 @@ BEGIN TRY
         ma_mon         VARCHAR(30)    NOT NULL,
         ten_khoa_hoc   NVARCHAR(120)  NOT NULL,
         trinh_do       NVARCHAR(30)   NOT NULL,
-        so_buoi        SMALLINT       NOT NULL,
+        so_buoi        SMALLINT       NULL,
+        thoi_luong_so  DECIMAL(7, 2)  NULL,
+        thoi_luong_don_vi VARCHAR(10) NULL,
         hoc_phi_chuan  DECIMAL(18, 0) NOT NULL,
         phien_ban      BIGINT         NOT NULL CONSTRAINT DF_KhoaHoc_phien_ban DEFAULT (1),
         cap_nhat_luc   DATETIME2(0)   NOT NULL CONSTRAINT DF_KhoaHoc_cap_nhat_luc DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_KhoaHoc PRIMARY KEY (ma_khoa_hoc),
         CONSTRAINT UQ_KhoaHoc_slug UNIQUE (slug),
         CONSTRAINT FK_KhoaHoc_MonHoc FOREIGN KEY (ma_mon) REFERENCES dbo.MonHoc(ma_mon),
-        CONSTRAINT CK_KhoaHoc_so_buoi CHECK (so_buoi > 0),
+        CONSTRAINT CK_KhoaHoc_so_buoi CHECK (so_buoi IS NULL OR so_buoi > 0),
+        CONSTRAINT CK_KhoaHoc_thoi_luong CHECK (
+            (thoi_luong_so IS NULL AND thoi_luong_don_vi IS NULL)
+            OR (thoi_luong_so IS NOT NULL AND thoi_luong_so > 0
+                AND thoi_luong_don_vi IS NOT NULL AND thoi_luong_don_vi IN ('thang', 'ngay')
+                AND (thoi_luong_don_vi <> 'ngay' OR thoi_luong_so = FLOOR(thoi_luong_so)))
+        ),
         CONSTRAINT CK_KhoaHoc_hoc_phi CHECK (hoc_phi_chuan >= 0),
         CONSTRAINT CK_KhoaHoc_phien_ban CHECK (phien_ban > 0)
     );

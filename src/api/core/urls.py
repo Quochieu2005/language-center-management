@@ -85,6 +85,7 @@ from core.catalog.views import (
     SharedCourseCollectionView,
     SharedCourseDetailView,
     PublicCourseListView,
+    SharedSubjectCollectionView,
     SharedSubjectDetailView,
 )
 from core.media.views import (
@@ -133,6 +134,7 @@ urlpatterns = [
     path("admin/teachers/<str:slug>/", TeacherDetailView.as_view(), name="teacher-detail"),
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),
     path("admin/employees/<str:slug>/", EmployeeDetailView.as_view(), name="employee-detail"),
+    path("admin/shared/subjects/", SharedSubjectCollectionView.as_view(), name="shared-subject-list"),
     path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),
     path("admin/courses/", SharedCourseCollectionView.as_view(), name="admin-course-create"),
     path("admin/courses/<str:slug>/", SharedCourseDetailView.as_view(), name="admin-course-detail"),

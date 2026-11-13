@@ -313,7 +313,7 @@ class ClassCollectionView(_ClassApiView):
         tags=["Xếp lớp"],
         summary="Mở lớp, phân công giáo viên/phòng và tạo lịch buổi học",
         description=(
-            "Tạo LopHoc cùng các BuoiHoc theo số buổi của KhoaHoc trong một transaction cục bộ. "
+            "Tạo LopHoc cùng BuoiHoc trong một transaction cục bộ. Nếu khóa học chưa chốt số buổi, số buổi được xác định từ khoảng ngày và các thứ đã chọn. "
             "Kiểm tra khóa học, giáo viên đang dạy, phòng hoạt động/sức chứa, ngày giờ và xung đột "
             "giáo viên/phòng. Admin Big gửi site_code; Admin Small/lễ tân dùng site phiên đăng nhập."
         ),

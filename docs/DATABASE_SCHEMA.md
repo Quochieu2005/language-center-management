@@ -203,7 +203,9 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | `ma_mon` | FK → `MonHoc` | |
 | `ten_khoa_hoc` | | |
 | `trinh_do` | | A1..C2 / N5..N1 / ... |
-| `so_buoi` | | Số buổi của khóa |
+| `so_buoi` | | Tổng số buổi theo chương trình khóa học; lưu riêng, không suy ra từ số tháng |
+| `thoi_luong_so` | `DECIMAL(7,2)`, nullable | Số tháng (cho phép tối đa 2 chữ số thập phân, ví dụ 3,5) hoặc số ngày nguyên |
+| `thoi_luong_don_vi` | `VARCHAR(10)`, nullable | `thang` hoặc `ngay`; nếu là ngày thì số lượng phải nguyên |
 | `hoc_phi_chuan` | | Số tiền |
 
 ### 6.2. Tài khoản và phương thức đăng nhập (nhân bản, dùng chung các vai trò)

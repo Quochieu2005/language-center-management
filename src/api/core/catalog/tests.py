@@ -12,10 +12,10 @@ from core.catalog.serializers import SharedCourseCreateSerializer, SharedSubject
 from core.catalog.views import SharedCourseCollectionView, SharedCourseDetailView, SharedSubjectDetailView
 
 
-def _subject(version=4, *, name="English", description="General English"):
+def _subject(version=4, *, name="English", description="General English", slug="english"):
     return {
         "ma_mon": "MH-ENG",
-        "slug": "english",
+        "slug": slug,
         "ten_mon": name,
         "mo_ta": description,
         "phien_ban": version,
@@ -61,7 +61,7 @@ class SharedCatalogReplicationTests(SimpleTestCase):
     @patch.object(services, "_read_site")
     def test_retry_resumes_only_sites_without_ack(self, read_site, apply_site):
         before = _subject()
-        after = _subject(5, name="English A1")
+        after = _subject(5, name="English A1", slug="english-a1")
         request_hash = services._fingerprint({"ten_mon": "English A1"})
         states = {
             "Q1": (after.copy(), _event(before, after, request_hash)),
@@ -178,6 +178,8 @@ class PublicCourseCatalogTests(SimpleTestCase):
         "name": "Tiếng Anh A1",
         "level": "A1",
         "session_count": 24,
+        "thoi_luong_so": 3,
+        "thoi_luong_don_vi": "thang",
         "standard_fee": 4200000,
         "version": 1,
     }
@@ -225,9 +227,11 @@ class PublicCourseCatalogTests(SimpleTestCase):
 
 class SharedCourseReplicationTests(SimpleTestCase):
     def setUp(self):
+        fake_cursor = SimpleNamespace(execute=lambda *_args, **_kwargs: None, fetchall=lambda: [])
         self.patchers = [
             patch.object(course_services, "active_site_state", return_value=(("Q1", "Q7", "TD"), ())),
             patch.object(course_services, "get_site_database_alias", side_effect=lambda site: f"site_{site.lower()}"),
+            patch.object(course_services, "get_site_connection", return_value=SimpleNamespace(cursor=lambda: nullcontext(fake_cursor))),
             patch.object(course_services, "connections", {"site_q1": SimpleNamespace(cursor=lambda: nullcontext())}),
             patch.object(course_services, "acquire_record_lock"),
             patch.object(course_services.transaction, "atomic", side_effect=lambda using: nullcontext()),
@@ -241,6 +245,7 @@ class SharedCourseReplicationTests(SimpleTestCase):
         return {
             "ma_khoa_hoc": "KH-EN-A1", "slug": "tieng-anh-a1", "ma_mon": "MH-ENG",
             "ten_khoa_hoc": name, "trinh_do": "A1", "so_buoi": 24,
+            "thoi_luong_so": 3, "thoi_luong_don_vi": "thang",
             "hoc_phi_chuan": 4200000, "phien_ban": version,
         }
 
@@ -372,7 +377,8 @@ class SharedCourseReplicationTests(SimpleTestCase):
                 if "FROM dbo.KhoaHoc WITH" in sql:
                     self.rows = [tuple(before[field] for field in (
                         "ma_khoa_hoc", "slug", "ma_mon", "ten_khoa_hoc", "trinh_do",
-                        "so_buoi", "hoc_phi_chuan", "phien_ban",
+                        "so_buoi", "thoi_luong_so", "thoi_luong_don_vi",
+                        "hoc_phi_chuan", "phien_ban",
                     ))] if self.site_state["present"] else []
                 elif "FROM dbo.LopHoc" in sql:
                     self.rows = [("Q7-LH-1",)] if self.site_state["referenced"] else []
@@ -437,7 +443,8 @@ class SharedCourseReplicationTests(SimpleTestCase):
     def test_create_serializer_derives_slug_and_rejects_unknown_fields(self):
         payload = {
             "ma_khoa_hoc": "KH-EN-A1", "ma_mon": "MH-ENG", "ten_khoa_hoc": "Tiếng Anh A1",
-            "trinh_do": "A1", "so_buoi": 24, "hoc_phi_chuan": 4200000,
+            "trinh_do": "A1", "so_buoi": 24, "thoi_luong_so": 3,
+            "thoi_luong_don_vi": "thang", "hoc_phi_chuan": 4200000,
         }
         serializer = SharedCourseCreateSerializer(data=payload)
 
