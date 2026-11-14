@@ -147,7 +147,7 @@ class SharedSubjectDeleteResponseSerializer(serializers.Serializer):
 
 
 class SharedCourseCreateSerializer(serializers.Serializer):
-    ma_khoa_hoc = serializers.RegexField(r"^KH-[A-Z0-9]+(?:-[A-Z0-9]+)*$", max_length=30)
+    ma_khoa_hoc = serializers.RegexField(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$", max_length=30)
     ma_mon = serializers.CharField(max_length=30, trim_whitespace=True)
     ten_khoa_hoc = serializers.CharField(max_length=120, trim_whitespace=True)
     trinh_do = serializers.CharField(max_length=30, trim_whitespace=True)
@@ -192,7 +192,7 @@ class SharedCourseCreateSerializer(serializers.Serializer):
 
 class SharedCoursePatchSerializer(serializers.Serializer):
     ma_khoa_hoc = serializers.RegexField(
-        r"^KH-[A-Z0-9]+(?:-[A-Z0-9]+)*$", max_length=30, required=False
+        r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$", max_length=30, required=False
     )
     ma_mon = serializers.CharField(max_length=30, required=False, trim_whitespace=True)
     ten_khoa_hoc = serializers.CharField(max_length=120, required=False, trim_whitespace=True)

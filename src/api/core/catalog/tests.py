@@ -8,7 +8,11 @@ from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from core.catalog import course_services, public_courses, services
-from core.catalog.serializers import SharedCourseCreateSerializer, SharedSubjectPatchSerializer
+from core.catalog.serializers import (
+    SharedCourseCreateSerializer,
+    SharedCoursePatchSerializer,
+    SharedSubjectPatchSerializer,
+)
 from core.catalog.views import SharedCourseCollectionView, SharedCourseDetailView, SharedSubjectDetailView
 
 
@@ -455,6 +459,26 @@ class SharedCourseReplicationTests(SimpleTestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertIn("is_active", serializer.errors)
+
+    def test_course_code_accepts_custom_prefixes_on_create_and_update(self):
+        payload = {
+            "ma_khoa_hoc": "KH-EN-A1", "ma_mon": "MH-ENG", "ten_khoa_hoc": "Tiếng Anh A1",
+            "trinh_do": "A1", "so_buoi": 24, "thoi_luong_so": 3,
+            "thoi_luong_don_vi": "thang", "hoc_phi_chuan": 4200000,
+        }
+        for course_code in ("FG", "KH-EN-A1", "KHCT-TOEIC-450-550", "KHZ-TOEIC-450-550CX", "HK-TOEIC-450-550", "ABC1-TOEIC-450-550"):
+            with self.subTest(course_code=course_code):
+                create_serializer = SharedCourseCreateSerializer(data={**payload, "ma_khoa_hoc": course_code})
+                self.assertTrue(create_serializer.is_valid(), create_serializer.errors)
+                update_serializer = SharedCoursePatchSerializer(data={"ma_khoa_hoc": course_code})
+                self.assertTrue(update_serializer.is_valid(), update_serializer.errors)
+
+        for invalid_code in ("1HK-TOEIC-450", "HK--TOEIC-450", "HK-TOEIC-", "-FG", "FG-"):
+            with self.subTest(invalid_code=invalid_code):
+                create_serializer = SharedCourseCreateSerializer(data={**payload, "ma_khoa_hoc": invalid_code})
+                self.assertFalse(create_serializer.is_valid())
+                update_serializer = SharedCoursePatchSerializer(data={"ma_khoa_hoc": invalid_code})
+                self.assertFalse(update_serializer.is_valid())
 
     def test_only_admin_big_can_create_shared_courses(self):
         request = APIRequestFactory().post(

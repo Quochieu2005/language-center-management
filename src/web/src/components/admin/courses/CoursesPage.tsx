@@ -158,7 +158,7 @@ export default function CoursesPage() {
     <Card title={`Quản lý khóa học${catalog ? ` · ${catalog.count}` : ""}`} extra={<Button type="primary" onClick={create} disabled={!canWrite}>Tạo khóa học</Button>}>
       <Table rowKey="course_id" loading={loading} columns={columns} dataSource={catalog?.results || []} scroll={{ x: 1050 }} locale={{ emptyText: <Empty description={error ? "Không tải được dữ liệu từ các cơ sở" : "Chưa có khóa học"} /> }} />
     </Card>
-    <Modal title={editing ? `Sửa khóa học · ${editing.course_id}` : "Tạo khóa học dùng chung"} open={modal} afterOpenChange={(open) => { if (open) formScrollRef.current?.scrollTo({ top: 0 }); }} onCancel={() => { setModal(false); setSubjectPickerOpen(false); }} footer={null} width="min(920px, calc(100vw - 32px))" styles={{ body: { padding: 0, overflow: "hidden" } }} destroyOnHidden>
+    <Modal title={editing ? `Sửa khóa học · ${editing.course_id}` : "Tạo khóa học dùng chung"} open={modal} afterOpenChange={(open) => { if (open) { formScrollRef.current?.scrollTo({ top: 0 }); if (editing) void form.validateFields(["ma_khoa_hoc"]).catch(() => undefined); } }} onCancel={() => { setModal(false); setSubjectPickerOpen(false); }} footer={null} width="min(920px, calc(100vw - 32px))" styles={{ body: { padding: 0, overflow: "hidden" } }} destroyOnHidden>
       <div ref={formScrollRef} style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto", overflowX: "hidden", padding: 24 }}>
       <Form form={form} layout="vertical" onFinish={submit}>
         <div className={styles.formGrid}>
@@ -173,13 +173,13 @@ export default function CoursesPage() {
               { required: true, message: "Nhập mã khóa học." },
               {
                 validator: (_, value: string | undefined) =>
-                  !value || /^KH-[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(value.trim().toUpperCase())
+                  !value || /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/.test(value.trim().toUpperCase())
                     ? Promise.resolve()
-                    : Promise.reject(new Error("Mã phải bắt đầu bằng KH-. Ví dụ: KH-TOEIC-450-550.")),
+                    : Promise.reject(new Error("Mã phải bắt đầu bằng chữ cái, chỉ dùng chữ/số và dấu gạch nối. Ví dụ: FG hoặc HK-TOEIC-450-550.")),
               },
             ]}
           >
-            <Input maxLength={30} placeholder="KH-TOEIC-450-550" />
+            <Input maxLength={30} placeholder="FG hoặc HK-TOEIC-450-550" />
           </Form.Item>
         </div>
         <Alert type="info" showIcon title="Mã môn phải là môn học đã tồn tại và có cùng dữ liệu trên tất cả site đang hoạt động." style={{ marginBottom: 16 }} />
