@@ -265,7 +265,7 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 **Người dùng:** Admin Big. **Phân tán:** đọc/ghi CoSo, MonHoc, KhoaHoc bằng Replicated-Write.
 
 1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái.
-2. API kiểm tra mã ổn định, quan hệ môn-khóa, miền dữ liệu và không cho đóng site đang có nghiệp vụ mở mà chưa xử lý.
+2. API kiểm tra mã ổn định, quan hệ môn-khóa, miền dữ liệu và không cho đóng site đang có nghiệp vụ mở mà chưa xử lý. Mã khóa học tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số; có thể có các đoạn bổ sung ngăn bằng dấu gạch nối đơn. Giao diện chuẩn hóa mã thành chữ in hoa; cùng mã phải được giữ nhất quán trên mọi site.
 3. API danh mục môn học có đọc toàn cục và tạo/cập nhật/xóa đồng bộ qua các site đang hoạt động; API khóa học có tạo/cập nhật/xóa `KhoaHoc` theo cùng mô hình, kiểm tra môn học tồn tại giống nhau trên mọi site trước khi ghi. Mỗi site ghi ACK vào `Logs` trong transaction cục bộ. Runtime replication cho thay đổi `CoSo` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu. Cơ chế tại tầng API chưa thay cho bằng chứng kiểm chứng dữ liệu thực tế ở nhiều site.
 4. Thời lượng khóa học lưu số tháng với tối đa hai chữ số thập phân (ví dụ `3,5 tháng`); nếu chọn ngày thì số lượng phải là số nguyên. API, ràng buộc SQL và các bản sao `KhoaHoc` phải áp dụng cùng quy tắc.
 5. `so_buoi` là tổng số buổi theo chương trình đào tạo và được nhập riêng với thời lượng tháng/ngày. Không tự tính số buổi từ số tháng nếu chưa có tần suất học mỗi tuần.

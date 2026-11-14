@@ -17,7 +17,7 @@ Yêu cầu chung là **2–4 site**, có phân mảnh, replication, transaction 
 
 Khóa chính của **bản ghi nghiệp vụ/cục bộ được tạo tại một site** có dạng **`<SITE>-<LOẠI>-<SỐ THỨ TỰ 6 CHỮ SỐ>`**, ví dụ `Q1-HV-000001`. Mã site trong khóa là nơi tạo bản ghi và không đổi khi học viên chuyển cơ sở.
 
-Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi site: `CoSo.ma_co_so` dùng `Q1`, `Q7`, `TD`; `MonHoc.ma_mon` và `KhoaHoc.ma_khoa_hoc` dùng mã danh mục như `MH-ENG`, `KH-IELTS-65`. Không tạo lại mã danh mục theo từng site. `TaiKhoan` vẫn dùng mã có tiền tố site tạo tài khoản và được nhân bản cùng mã đó.
+Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi site: `CoSo.ma_co_so` dùng `Q1`, `Q7`, `TD`; `MonHoc.ma_mon` dùng mã như `MH-ENG`; `KhoaHoc.ma_khoa_hoc` tối đa 30 ký tự, bắt đầu bằng chữ in hoa và gồm chữ in hoa/chữ số, có thể chia thành các đoạn bằng dấu gạch nối đơn (ví dụ `FG`, `HK-TOEIC-450-550`, `ABC1-TOEIC-450-550`). Giao diện chuẩn hóa mã nhập thành chữ in hoa. Không tạo lại mã danh mục theo từng site. `TaiKhoan` vẫn dùng mã có tiền tố site tạo tài khoản và được nhân bản cùng mã đó.
 
 | Phần | Ví dụ | Ý nghĩa |
 |------|-------|---------|

@@ -17,7 +17,7 @@ function toSlug(value: string) {
 }
 
 export default function AccountsPage({ view }: AccountsPageProps) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { user } = useSession();
   const { siteCodes, selectedSite } = useSiteScope();
   const [admins, setAdmins] = useState<AdminSmall[]>([]);
@@ -237,10 +237,10 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
     {
       title: "Thao tác",
-      render: (_: unknown, row: Employee) => <Popconfirm title="Vô hiệu hóa tài khoản nhân viên này?" onConfirm={async () => {
+      render: (_: unknown, row: Employee) => <Button danger size="small" onClick={() => modal.confirm({ title: "Vô hiệu hóa tài khoản nhân viên này?", okText: "Xóa", cancelText: "Hủy", okButtonProps: { danger: true }, onOk: async () => {
         try { await adminApi.deleteEmployee(row.slug, row.site_code); message.success("Đã vô hiệu hóa tài khoản."); void load(); }
         catch (reason) { message.error(reason instanceof Error ? reason.message : "Không vô hiệu hóa được tài khoản."); }
-      }}><Button danger size="small">Xóa</Button></Popconfirm>,
+      } })}>Xóa</Button>,
     },
   ];
 
