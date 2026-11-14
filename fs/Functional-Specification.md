@@ -266,9 +266,11 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái.
 2. API kiểm tra mã ổn định, quan hệ môn-khóa, miền dữ liệu và không cho đóng site đang có nghiệp vụ mở mà chưa xử lý.
-3. Với cập nhật môn học, API đã có `PATCH /api/v1/admin/shared/subjects/{slug}/`: ghi từng bản `MonHoc` và ACK `Logs` ở từng CSDL site trong transaction cục bộ. Runtime replication cho thay đổi `CoSo`/`KhoaHoc` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu.
-4. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
-5. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
+3. API danh mục môn học có đọc toàn cục và tạo/cập nhật/xóa đồng bộ qua các site đang hoạt động; API khóa học có tạo/cập nhật/xóa `KhoaHoc` theo cùng mô hình, kiểm tra môn học tồn tại giống nhau trên mọi site trước khi ghi. Mỗi site ghi ACK vào `Logs` trong transaction cục bộ. Runtime replication cho thay đổi `CoSo` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu. Cơ chế tại tầng API chưa thay cho bằng chứng kiểm chứng dữ liệu thực tế ở nhiều site.
+4. Thời lượng khóa học lưu số tháng với tối đa hai chữ số thập phân (ví dụ `3,5 tháng`); nếu chọn ngày thì số lượng phải là số nguyên. API, ràng buộc SQL và các bản sao `KhoaHoc` phải áp dụng cùng quy tắc.
+5. `so_buoi` là tổng số buổi theo chương trình đào tạo và được nhập riêng với thời lượng tháng/ngày. Không tự tính số buổi từ số tháng nếu chưa có tần suất học mỗi tuần.
+6. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
+7. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
 
 **Nghiệm thu:** thiếu cấu hình hoặc lỗi một site được hiển thị cụ thể; không có trạng thái thành công toàn phần giả; các site sau đồng bộ có cùng mã và phiên bản. Đối với `MonHoc`, retry cùng `Idempotency-Key` và body tiếp tục site chưa ACK; cùng key khác body bị từ chối. Phải chạy TC-REP-01/TC-SYNC-01 trước khi kết luận đạt toàn phần.
 
@@ -581,10 +583,10 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 | OPEN-08 | Metadata Cloudinary, quyền upload/xóa và ràng buộc site sở hữu ảnh | DATABASE_SCHEMA.md, API upload |
 | OPEN-09 | Có đưa tài khoản/portal học viên vào phạm vi không; nếu có phải thiết kế vai trò và liên kết HocVien | README, schema, API, UI, FS |
 | OPEN-10 | Ngưỡng thời gian truy vấn p50/p95 và thiết bị/mạng đo cho mục tiêu hiệu năng | specs/api.md, specs/ui-ux.md |
-| OPEN-11 | Mở rộng replication runtime từ `MonHoc` sang `CoSo`/`KhoaHoc` và gom các luồng ghi `TaiKhoan` vào service chung; hiện chưa bật SQL Server Publication | README mục 9, schema, tài liệu đồng bộ, YC-03/YC-07 |
+| OPEN-11 | Bổ sung replication runtime cho `CoSo` và gom các luồng ghi `TaiKhoan` vào service chung; `MonHoc` và `KhoaHoc` đã có luồng API nhưng còn phải chạy kiểm chứng nhiều site. Chưa bật SQL Server Publication | README mục 9, schema, tài liệu đồng bộ, YC-03/YC-07 |
 | OPEN-12 | Giao thức distributed transaction và mức bảo đảm đáp ứng tiêu chí giảng viên; nếu cần DBMS quản lý phải triển khai/kiểm thử bổ sung | README mục 9, tài liệu giao dịch, YC-04 |
 | OPEN-13 | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện để bảo vệ chỗ cuối, bộ kiểm thử hai phiên | FS-ENR-01, specs/api.md, source, YC-05 |
-| OPEN-14 | Đã xử lý cho `MonHoc`: `Logs` append-only lưu ACK từng site trong cùng transaction cục bộ với update, định danh theo idempotency key/site và chứa version trước/sau; chưa áp dụng chung cho mọi bảng danh mục/tài khoản | `Logs`, service danh mục dùng chung, README mục 9, specs/api.md, TC-REP-01/TC-SYNC-01 |
+| OPEN-14 | `MonHoc` và `KhoaHoc` ghi ACK append-only vào `Logs` trong cùng transaction cục bộ, định danh theo idempotency key/site và lưu dữ liệu trước/sau; cơ chế chưa được áp dụng chung cho mọi bảng danh mục/tài khoản và vẫn cần kiểm chứng replication thực tế | `Logs`, service danh mục dùng chung, README mục 9, specs/api.md, TC-REP-01/TC-SYNC-01 |
 
 Không tự coi các mục OPEN là đã chốt. Khi nhóm thống nhất, cập nhật các tài liệu liên quan trong cùng thay đổi và bổ sung tiêu chí nghiệm thu cụ thể.
 

@@ -10,6 +10,15 @@ import styles from "./PublicCourseCatalog.module.scss";
 const money = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 });
 const EMPTY_COURSES: PublicCourse[] = [];
 
+const durationFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
+
+function courseDuration(course: PublicCourse) {
+  if (course.thoi_luong_so == null || !course.thoi_luong_don_vi) return "Chưa cập nhật";
+  const amount = Number(course.thoi_luong_so);
+  if (!Number.isFinite(amount)) return "Chưa cập nhật";
+  return `${durationFormatter.format(amount)} ${course.thoi_luong_don_vi === "thang" ? "tháng" : "ngày"}`;
+}
+
 function BranchList({ course }: { course: PublicCourse }) {
   if (!course.branches.length) return <span>Chưa có lớp mở được API xác nhận</span>;
   return <ul>{course.branches.map((branch) => <li key={branch.site_code}>{branch.site_name} · {branch.open_class_count} lớp đang mở</li>)}</ul>;
@@ -43,7 +52,7 @@ export default function PublicCourseCatalog({ courseSlug, preview = false }: { c
         <p className={styles.eyebrow}>{selectedCourse.subject_name} · {selectedCourse.level}</p>
         <h2>{selectedCourse.name}</h2>
         <p>Thông tin khóa học do danh mục công khai cung cấp.</p>
-        <dl><div><dt>Thời lượng</dt><dd>{selectedCourse.session_count} buổi</dd></div><div><dt>Học phí chuẩn</dt><dd>{money.format(selectedCourse.standard_fee)}</dd></div></dl>
+        <dl><div><dt>Số buổi học</dt><dd>{selectedCourse.session_count == null ? "Chưa chốt" : `${selectedCourse.session_count} buổi`}</dd></div><div><dt>Thời gian hoàn thành</dt><dd>{courseDuration(selectedCourse)}</dd></div><div><dt>Học phí chuẩn</dt><dd>{money.format(selectedCourse.standard_fee)}</dd></div></dl>
         <div className={styles.branchList}><strong>Cơ sở và lớp đang mở</strong><BranchList course={selectedCourse} /></div>
         {catalog && !catalog.complete && <Coverage catalog={catalog} />}
         <button className={styles.enroll} type="button" disabled={!selectedCourse.branches.length} onClick={() => setEnrollmentCourse(selectedCourse)}>Đăng ký lớp</button>
@@ -58,7 +67,7 @@ export default function PublicCourseCatalog({ courseSlug, preview = false }: { c
     {catalog && !catalog.complete && <Coverage catalog={catalog} />}
     {loading ? <p className={styles.state} role="status">Đang tải danh sách khóa học…</p> : error ? <State message={error} retry={() => { setLoading(true); setRetry((value) => value + 1); }} /> : courses.length === 0 ? <p className={styles.state} role="status">Chưa có khóa học được công khai.</p> : <>
       <div className={styles.filters} aria-label="Lọc khóa học theo môn"><button type="button" aria-pressed={subject === "all"} onClick={() => setSubject("all")}>Tất cả</button>{subjects.map(([id, name]) => <button type="button" key={id} aria-pressed={subject === id} onClick={() => setSubject(id)}>{name}</button>)}</div>
-      <div className={styles.grid}>{visibleCourses.map((course) => <article className={styles.course} key={course.course_id}><div className={styles.courseTop}><span>{course.subject_name} · {course.level}</span><strong>{money.format(course.standard_fee)}</strong></div><h3><Link href={`/courses/${course.slug}`}>{course.name}</Link></h3><p>{course.session_count} buổi học · {course.branches.reduce((total, branch) => total + branch.open_class_count, 0)} lớp đang mở</p><BranchList course={course} /><button className={styles.enroll} type="button" disabled={!course.branches.length} onClick={() => setEnrollmentCourse(course)}>Đăng ký lớp</button><Link className={styles.more} href={`/courses/${course.slug}`}>Xem chi tiết <span aria-hidden="true">↗</span></Link></article>)}</div>
+      <div className={styles.grid}>{visibleCourses.map((course) => <article className={styles.course} key={course.course_id}><div className={styles.courseTop}><span>{course.subject_name} · {course.level}</span><strong>{money.format(course.standard_fee)}</strong></div><h3><Link href={`/courses/${course.slug}`}>{course.name}</Link></h3><p>{course.session_count == null ? "Số buổi chưa chốt" : `${course.session_count} buổi học`} · {courseDuration(course)} · {course.branches.reduce((total, branch) => total + branch.open_class_count, 0)} lớp đang mở</p><BranchList course={course} /><button className={styles.enroll} type="button" disabled={!course.branches.length} onClick={() => setEnrollmentCourse(course)}>Đăng ký lớp</button><Link className={styles.more} href={`/courses/${course.slug}`}>Xem chi tiết <span aria-hidden="true">↗</span></Link></article>)}</div>
       {preview && courses.length > 3 && <Link className={styles.allCourses} href="/courses">Xem toàn bộ khóa học <span aria-hidden="true">→</span></Link>}
     </>}
     <PublicCourseEnrollmentDialog key={enrollmentCourse?.slug ?? "closed"} course={enrollmentCourse} onClose={() => setEnrollmentCourse(null)} />

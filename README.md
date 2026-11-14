@@ -237,7 +237,7 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Cùng schema và bản sao theo site. Runtime replication hiện có luồng tài khoản và API cập nhật `MonHoc`; `CoSo`/`KhoaHoc` chưa có luồng ghi runtime đầy đủ |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Cùng schema và bản sao theo site. API hiện có luồng ghi runtime cho tài khoản, cập nhật `MonHoc`, và tạo/sửa/xóa `KhoaHoc`; luồng khóa học kiểm tra môn đã có trên mọi site và ghi ACK `Logs` theo từng transaction cục bộ. Cơ chế code chưa thay cho bằng chứng chạy kiểm chứng đồng bộ thực tế |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện/log ghi tại site phát sinh; không nhân bản |
@@ -256,7 +256,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 |---|---|---|---|
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung qua Coordinator vào các CSDL site riêng | `PATCH /api/v1/admin/shared/subjects/{slug}/` cập nhật `MonHoc`; một số luồng tài khoản cũng có replication | Trả kết quả chưa hoàn tất nếu thiếu ACK; retry dùng lại `Idempotency-Key` và body |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung qua Coordinator vào các CSDL site riêng | `PATCH /api/v1/admin/shared/subjects/{slug}/` cập nhật `MonHoc`; tạo/sửa/xóa `KhoaHoc`; một số luồng tài khoản cũng có replication | Trả kết quả chưa hoàn tất nếu thiếu ACK; retry dùng lại `Idempotency-Key` và body |
 | `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
@@ -271,9 +271,9 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`: Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, khóa thao tác cùng môn, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
 
-Phạm vi tối thiểu YC-03 đã có đường truyền thay đổi cho `MonHoc`. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: API ghi `CoSo`/`KhoaHoc` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Trước khi mở rộng chức năng ghi các bảng đó, cần gom chính sách đồng bộ vào một service chung và không bật song song SQL Server Publication trên cùng bảng.
+Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
 
 ### 4.4. Các quy tắc không được phá vỡ
 

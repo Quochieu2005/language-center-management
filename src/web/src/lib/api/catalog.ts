@@ -8,7 +8,9 @@ export type PublicCourse = {
   subject_name: string;
   name: string;
   level: string;
-  session_count: number;
+  session_count: number | null;
+  thoi_luong_so: number | string | null;
+  thoi_luong_don_vi: "thang" | "ngay" | null;
   standard_fee: number;
   version: number;
   branches: { site_code: string; site_name: string; open_class_count: number }[];
@@ -22,6 +24,36 @@ export type PublicCourseList = {
   inconsistent_sites: string[];
   count: number;
   results: PublicCourse[];
+};
+
+export type SharedSubject = {
+  ma_mon: string;
+  slug: string;
+  ten_mon: string;
+  mo_ta: string | null;
+  phien_ban: number;
+};
+
+export type SharedSubjectList = {
+  scope: "GLOBAL";
+  complete: boolean;
+  site_codes: string[];
+  missing_sites: string[];
+  inconsistent_sites: string[];
+  count: number;
+  results: SharedSubject[];
+};
+
+export type SharedSubjectCreateInput = {
+  ma_mon: string; ten_mon: string; mo_ta?: string | null;
+};
+export type SharedSubjectPatchInput = { ten_mon?: string; mo_ta?: string | null };
+export type SharedSubjectWriteResult = SharedSubject & {
+  complete: boolean; sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
+};
+export type SharedSubjectDeleteResult = {
+  ma_mon: string; slug: string; deleted: boolean; complete: boolean;
+  sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
 };
 
 export type PublicCourseClass = {
@@ -52,13 +84,15 @@ export type PublicEnrollmentResult = {
 };
 
 export type SharedCourseCreateInput = {
-  ma_khoa_hoc: string; slug?: string; ma_mon: string; ten_khoa_hoc: string;
-  trinh_do: string; so_buoi: number; hoc_phi_chuan: number;
+  ma_khoa_hoc: string; ma_mon: string; ten_khoa_hoc: string;
+  trinh_do: string; so_buoi: number | null; thoi_luong_so: number;
+  thoi_luong_don_vi: "thang" | "ngay"; hoc_phi_chuan: number;
 };
-export type SharedCoursePatchInput = Omit<SharedCourseCreateInput, "ma_khoa_hoc" | "slug">;
+export type SharedCoursePatchInput = Partial<SharedCourseCreateInput>;
 export type SharedCourseWriteResult = {
   ma_khoa_hoc: string; slug: string; ma_mon: string; ten_khoa_hoc: string;
-  trinh_do: string; so_buoi: number; hoc_phi_chuan: number; phien_ban: number;
+  trinh_do: string; so_buoi: number | null; thoi_luong_so: number | string | null;
+  thoi_luong_don_vi: "thang" | "ngay" | null; hoc_phi_chuan: number; phien_ban: number;
   complete: boolean; sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
 };
 export type SharedCourseDeleteResult = {
@@ -68,6 +102,13 @@ export type SharedCourseDeleteResult = {
 
 export const catalogApi = {
   publicCourses: () => apiRequest<PublicCourseList>("/courses/"),
+  sharedSubjects: () => apiRequest<SharedSubjectList>("/admin/shared/subjects/"),
+  createSubject: (body: SharedSubjectCreateInput, idempotencyKey: string) =>
+    apiRequest<SharedSubjectWriteResult>("/admin/shared/subjects/", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
+  updateSubject: (slug: string, body: SharedSubjectPatchInput, idempotencyKey: string) =>
+    apiRequest<SharedSubjectWriteResult>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "PATCH", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
+  deleteSubject: (slug: string, idempotencyKey: string) =>
+    apiRequest<SharedSubjectDeleteResult>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "DELETE", headers: { "Idempotency-Key": idempotencyKey } }),
   createCourse: (body: SharedCourseCreateInput, idempotencyKey: string) =>
     apiRequest<SharedCourseWriteResult>("/admin/courses/", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
   updateCourse: (slug: string, body: SharedCoursePatchInput, idempotencyKey: string) =>
