@@ -20,7 +20,7 @@ const teacherSlug = (value: string) => value.toLowerCase().replace(/đ/g, "d").n
   .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 export default function TeachersPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { user } = useSession();
   const { siteCodes, selectedSite, setSelectedSite } = useSiteScope();
   const [rows, setRows] = useState<Teacher[]>([]);
@@ -217,7 +217,7 @@ export default function TeachersPage() {
     } },
     { title: "Thao tác", render: (_: unknown, row) => <Space>
       <Button size="small" disabled={!row.slug || !row.account_status} onClick={async () => { const nextStatus = row.account_status === "active" ? "inactive" : "active"; try { await adminApi.setTeacherStatus(row.slug!, row.site_code, nextStatus); message.success(nextStatus === "active" ? "Đã kích hoạt tài khoản giáo viên." : "Đã ngưng tài khoản giáo viên."); void load(); } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không đổi được trạng thái."); } }}>{row.account_status === "active" ? "Ngưng" : "Kích hoạt"}</Button>
-      <Popconfirm title="Vô hiệu hóa tài khoản và xử lý hồ sơ giáo viên?" onConfirm={async () => { if (!row.slug) return; try { await adminApi.deleteTeacher(row.slug, row.site_code); message.success("Đã xử lý yêu cầu xóa theo API."); void load(); } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không xóa được."); } }}><Button danger size="small" disabled={!row.slug}>Xóa</Button></Popconfirm>
+      <Button danger size="small" disabled={!row.slug} onClick={() => modal.confirm({ title: "Vô hiệu hóa tài khoản và xử lý hồ sơ giáo viên?", okText: "Xóa", cancelText: "Hủy", okButtonProps: { danger: true }, onOk: async () => { if (!row.slug) return; try { await adminApi.deleteTeacher(row.slug, row.site_code); message.success("Đã xử lý yêu cầu xóa theo API."); void load(); } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không xóa được."); } } })}>Xóa</Button>
     </Space> },
   ];
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Input, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { Alert, App, Button, Card, Input, Select, Space, Table, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { adminApi, type Student } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";
@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/api/client";
 import { useSiteScope } from "@/lib/auth/site-scope";
 
 export default function StudentsPage({ initialSearch }: { initialSearch: string }) {
+  const { message, modal } = App.useApp();
   const { user } = useSession();
   const { siteCodes, selectedSite, setSelectedSite, loadingSites } = useSiteScope();
   const [rows, setRows] = useState<Student[]>([]);
@@ -44,7 +45,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
     { title: "Họ tên", dataIndex: "full_name" }, { title: "Cơ sở", dataIndex: "site_code" }, { title: "Email", dataIndex: "email" },
     { title: "Điện thoại", dataIndex: "phone" }, { title: "Tình trạng", dataIndex: "status", render: (value: string) => <Tag>{value}</Tag> },
     { title: "Tài khoản", dataIndex: "account_issued", render: (issued: boolean, row: Student) => issued ? <Tag color="green">Đã cấp</Tag> : user?.role === "admin_big" || user?.role === "admin_small" ? <Button size="small" onClick={async () => { try { await adminApi.issueStudentAccount(row.slug); message.success("Đã xử lý cấp tài khoản theo API."); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Không cấp được tài khoản."); } }}>Cấp tài khoản</Button> : <Tag>Chưa cấp</Tag> },
-    ...(user?.role === "admin_big" || user?.role === "admin_small" ? [{ title: "Thao tác", render: (_: unknown, row: Student) => <Popconfirm title="Xóa vĩnh viễn học viên và dữ liệu liên quan?" description="Thao tác này không thể hoàn tác." okText="Xóa vĩnh viễn" okButtonProps={{ danger: true }} onConfirm={async () => { try { await adminApi.deleteStudent(row.slug, row.site_code); message.success("Đã xóa hồ sơ theo API."); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Không xóa được học viên."); } }}><Button danger size="small">Xóa</Button></Popconfirm> }] : []),
+    ...(user?.role === "admin_big" || user?.role === "admin_small" ? [{ title: "Thao tác", render: (_: unknown, row: Student) => <Button danger size="small" onClick={() => modal.confirm({ title: "Xóa vĩnh viễn học viên và dữ liệu liên quan?", content: "Thao tác này không thể hoàn tác.", okText: "Xóa vĩnh viễn", cancelText: "Hủy", okButtonProps: { danger: true }, onOk: async () => { try { await adminApi.deleteStudent(row.slug, row.site_code); message.success("Đã xóa hồ sơ theo API."); void load(); } catch (e) { message.error(e instanceof Error ? e.message : "Không xóa được học viên."); } } })}>Xóa</Button> }] : []),
   ];
   return <Card title="Hồ sơ học viên" extra={<Space wrap><Input allowClear value={searchDraft} onChange={(e) => setSearchDraft(e.target.value)} onPressEnter={() => setSearch(searchDraft)} placeholder="Tìm tên, email, mã..." prefix={<SearchOutlined />} style={{ width: 240 }} /><Button onClick={() => setSearch(searchDraft)}>Tìm kiếm</Button></Space>}>
     <Space style={{ marginBottom: 16 }} wrap>
