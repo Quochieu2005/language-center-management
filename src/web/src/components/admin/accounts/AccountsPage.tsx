@@ -312,7 +312,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
         }} /></Form.Item>}
         {isEmployeeView && <Form.Item name="phone" label="Số điện thoại"><Input maxLength={20} /></Form.Item>}
         {isAdminBig && <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true }]}><Select options={siteCodes.map((value) => ({ value, label: value }))} /></Form.Item>}
-        {isEmployeeView && <Form.Item name="job_title" label="Chức vụ" extra="Lễ tân hỗ trợ tiếp nhận, đăng ký/lớp và kế hoạch học phí; Tư vấn & xếp lớp tra cứu học viên; Kế toán ghi phiếu thu." rules={[{ required: true }]}><Select options={[
+        {isEmployeeView && <Form.Item name="job_title" label="Chức vụ" extra="Lễ tân tiếp nhận và thao tác đăng ký/lớp; Tư vấn & xếp lớp tra cứu học viên; Kế toán ghi phiếu thu." rules={[{ required: true }]}><Select options={[
           { value: "le_tan", label: "Lễ tân" },
           { value: "tu_van", label: "Tư vấn & xếp lớp" },
           { value: "ke_toan", label: "Kế toán" },

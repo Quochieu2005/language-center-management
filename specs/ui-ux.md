@@ -159,7 +159,7 @@ Trong **Quản lý Admin Small**, Admin Big có thao tác riêng để kích ho�
 |---|---|
 | Admin Big | Khu vực quản trị toàn hệ thống: tạo/khóa và phân công Admin Small; khởi tạo tài khoản, phân công hồ sơ giáo viên; quản lý cơ sở/danh mục; thống kê toàn cục; duyệt/từ chối đề nghị chuyển cơ sở |
 | Admin Small | Khu vực quản trị site được giao: quản lý roster giáo viên và phân công tại site theo quyền API; nghiệp vụ cơ sở; tạo đề nghị chuyển học viên và theo dõi đề nghị; không tự tạo Admin Big, không duyệt đề nghị và không truy cập site khác |
-| Lễ tân | Tiếp nhận tại quầy; thao tác đăng ký/lớp và kế hoạch học phí trong một site; không tra cứu danh sách học viên hoặc ghi phiếu thu |
+| Lễ tân | Tiếp nhận tại quầy, thao tác đăng ký/lớp trong một site; API có quyền kế hoạch học phí nhưng giao diện chưa có menu Học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
 | Tư vấn & xếp lớp | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp trong một site được giao |
 | Kế toán | Học phí, phiếu thu/hoàn và công nợ trong một site được giao |
 | Giáo viên | Các lớp/buổi được phân công; điểm danh và nhập/sửa điểm theo quyền |
@@ -389,7 +389,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
 | `/admin` và `/admin/dashboard` | Tổng quan | Admin Big có biểu đồ học viên đang học theo các site và cảnh báo site thiếu dữ liệu (`GLOBAL`); Admin Small có chỉ số học viên tại site và biểu đồ lớp theo trạng thái (`LOCAL`). Hai vai trò dùng dữ liệu/API khác nhau; nhân viên khác chỉ có lối tắt nghiệp vụ. |
-| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem, tạo, sửa hồ sơ và cho nhân viên nghỉ việc theo chức vụ Lễ tân, Tư vấn & xếp lớp hoặc Kế toán; API tự giới hạn site và quyền. Form tạo cho chọn ảnh đại diện JPG/PNG/WebP tối đa 5 MB, xem trước và tải thẳng lên Cloudinary; metadata ảnh được nhân bản trong `TaiKhoan`. Khi sửa chỉ đổi họ tên, số điện thoại, chức vụ; email/tên đăng nhập là danh tính tài khoản, cơ sở là vị trí mảnh nên không sửa trên form hồ sơ. “Xóa” là nghỉ việc và giữ lịch sử/chứng từ. Lễ tân hỗ trợ tiếp nhận tại quầy; trong source hiện có quyền thao tác lớp/đăng ký và kế hoạch đóng học phí, còn quyền tra cứu danh sách học viên thuộc chức vụ Tư vấn & xếp lớp. |
+| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem, tạo, sửa hồ sơ và cho nhân viên nghỉ việc theo chức vụ Lễ tân, Tư vấn & xếp lớp hoặc Kế toán; API tự giới hạn site và quyền. Form tạo cho chọn ảnh đại diện JPG/PNG/WebP tối đa 5 MB, xem trước và tải thẳng lên Cloudinary; metadata ảnh được nhân bản trong `TaiKhoan`. Khi sửa chỉ đổi họ tên, số điện thoại, chức vụ; email/tên đăng nhập là danh tính tài khoản, cơ sở là vị trí mảnh nên không sửa trên form hồ sơ. “Xóa” là nghỉ việc và giữ lịch sử/chứng từ. Lễ tân hỗ trợ tiếp nhận và thao tác lớp/đăng ký; backend có quyền API kế hoạch học phí nhưng giao diện chưa mở menu này. Quyền tra cứu danh sách học viên thuộc Tư vấn & xếp lớp; ghi phiếu thu thuộc Kế toán. |
 | `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn Admin Small. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
@@ -413,7 +413,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 
 #### Admin Small, lễ tân, tư vấn & xếp lớp và kế toán — các trang tại cơ sở
 
-Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy và thao tác đúng quyền tại site được gán; lễ tân, tư vấn & xếp lớp và kế toán dùng chung frontend nhưng chỉ thấy thao tác API cho phép. Tư vấn & xếp lớp được tra cứu danh sách học viên; Lễ tân thao tác đăng ký/lớp và kế hoạch học phí nhưng không có danh sách học viên hay quyền ghi phiếu thu.
+Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy và thao tác đúng quyền tại site được gán; lễ tân, tư vấn & xếp lớp và kế toán dùng chung frontend nhưng chỉ thấy thao tác API cho phép. Tư vấn & xếp lớp được tra cứu danh sách học viên; Lễ tân thao tác đăng ký/lớp, backend có quyền API lập kế hoạch học phí nhưng giao diện chưa mở màn Học phí cho vai trò này. Lễ tân không có danh sách học viên hoặc quyền ghi phiếu thu.
 
 | Route minh họa | Page | Nội dung chính |
 |---|---|---|
