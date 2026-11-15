@@ -27,7 +27,7 @@ from core.auth.service_common import (
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
 from core.notifications.publisher import publish_notification
-from core.auth.admin_small_email import EMAIL_READY, record_admin_small_email_event
+from core.auth.admin_small_email import EMAIL_READY, record_credential_email_event
 
 
 def _require_admin_small_temporary_password() -> str:
@@ -220,7 +220,7 @@ def _create_admin_profile(
                         [site_code, account_id, account_id, EMAIL_READY],
                     )
                     if cursor.fetchone() is None:
-                        record_admin_small_email_event(
+                        record_credential_email_event(
                             cursor, site_code=site_code, account_id=account_id,
                             action=EMAIL_READY, result="thanh_cong", remote_ip=remote_ip,
                         )

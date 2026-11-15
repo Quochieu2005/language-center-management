@@ -4,20 +4,25 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import uuid
 from dataclasses import dataclass
 from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
-from django.core.mail import send_mail
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
 
 from core.auth.account_state import account_status_bit
 from core.academics.common import append_audit, acquire_record_lock, require_active_site
 from core.auth.admin_small_lifecycle import _replicate_account
+from core.auth.admin_small_email import (
+    EMPLOYEE_EMAIL_READY,
+    EMPLOYEE_EMAIL_UNKNOWN,
+    _EMPLOYEE_EMAIL_ACTIONS,
+    credential_email_status,
+    record_credential_email_event,
+)
 from core.auth.service_common import (
     AdminSmallAccountConflict,
     AuthInfrastructureUnavailable,
@@ -28,7 +33,6 @@ from core.auth.service_common import (
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
 
-logger = logging.getLogger("core.employees")
 _JOB_TITLES = {"le_tan", "tu_van", "ke_toan"}
 
 
@@ -73,7 +77,7 @@ class EmployeeProvisioningResult:
     job_title: str
     full_name: str
     phone: str | None
-    email_sent: bool
+    credential_email_status: str
     must_change_password: bool = True
 
 
@@ -88,13 +92,7 @@ class EmployeeDeletionResult:
 
 def _require_provisioning_configuration() -> str:
     password = str(getattr(settings, "ADMIN_SMALL_TEMP_PASSWORD", "")).strip()
-    smtp_ready = (
-        str(getattr(settings, "EMAIL_BACKEND", "")).endswith("smtp.EmailBackend")
-        and getattr(settings, "EMAIL_HOST_USER", "")
-        and getattr(settings, "EMAIL_HOST_PASSWORD", "")
-        and getattr(settings, "DEFAULT_FROM_EMAIL", "")
-    )
-    if not password or len(password) > 128 or not smtp_ready:
+    if not password or len(password) > 128:
         raise EmployeeInfrastructureUnavailable
     return password
 
@@ -161,7 +159,8 @@ def _unique_account_slug(site_code: str, username: str, sites: tuple[str, ...]) 
 def _create_profile(
     *, site_code: str, employee_id: str, account_id: str, full_name: str,
     phone: str | None, email: str, job_title: str, actor_id: str, remote_ip: str,
-) -> None:
+    initial_credential_status: str,
+) -> str:
     alias = get_site_database_alias(site_code)
     with transaction.atomic(using=alias):
         with connections[alias].cursor() as cursor:
@@ -202,6 +201,29 @@ def _create_profile(
                 remote_ip=remote_ip,
                 after={"job_title": job_title, "site_code": site_code, "account_id": account_id},
             )
+            placeholders = ", ".join(["%s"] * len(_EMPLOYEE_EMAIL_ACTIONS))
+            cursor.execute(
+                f"""
+                SELECT TOP (1) hanh_dong
+                FROM dbo.Logs
+                WHERE loai_log = 'system' AND ma_co_so = %s AND ma_tai_khoan = %s
+                  AND bang_tac_dong = 'TaiKhoan' AND ma_ban_ghi = %s
+                  AND hanh_dong IN ({placeholders})
+                ORDER BY thoi_diem_utc DESC, ma_log DESC
+                """,
+                [site_code, account_id, account_id, *_EMPLOYEE_EMAIL_ACTIONS],
+            )
+            latest_email_action = cursor.fetchone()
+            latest_email_action = str(latest_email_action[0]) if latest_email_action else None
+            if latest_email_action is None:
+                latest_email_action = (
+                    EMPLOYEE_EMAIL_READY if initial_credential_status == "ready" else EMPLOYEE_EMAIL_UNKNOWN
+                )
+                record_credential_email_event(
+                    cursor, site_code=site_code, account_id=account_id,
+                    action=latest_email_action, remote_ip=remote_ip,
+                )
+            return credential_email_status(latest_email_action)
 
 
 def _recover_employee_provisioning(
@@ -258,26 +280,6 @@ def _recover_employee_provisioning(
         raise EmployeeInfrastructureUnavailable from exc
 
 
-def _send_credentials(email: str, full_name: str, password: str) -> bool:
-    try:
-        return send_mail(
-            subject="Tài khoản nhân viên Trung tâm Ngoại ngữ",
-            message=(
-                f"Chào {full_name},\n\nTài khoản nhân viên của bạn đã được tạo.\n"
-                f"Email đăng nhập: {email}\n"
-                f"Mật khẩu tạm thời: {password}\n\n"
-                "Hãy đăng nhập bằng email này.\n"
-                "Hãy đổi mật khẩu ngay lần đăng nhập đầu tiên và không chia sẻ mật khẩu."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        ) == 1
-    except Exception as exc:
-        logger.warning("Employee credential email failed; error_type=%s", type(exc).__name__)
-        return False
-
-
 @_translate_errors
 def create_employee(
     *, site_code: str, full_name: str, email: str, username: str | None,
@@ -318,14 +320,16 @@ def create_employee(
             password_hash, site, True, 1,
         )
     target_alias = get_site_database_alias(site)
+    credential_status = "unknown"
     try:
         # Persist the site-local employee and its login account in one commit first.
         with transaction.atomic(using=target_alias):
             _replicate_account(site, account, "them")
-            _create_profile(
+            credential_status = _create_profile(
                 site_code=site, employee_id=employee_id, account_id=account_id,
                 full_name=normalized_name, phone=normalized_phone, email=normalized_email,
                 job_title=job_title, actor_id=actor_id, remote_ip=remote_ip,
+                initial_credential_status="ready" if recovered is None else "unknown",
             )
         for active_site in sites:
             if active_site != site:
@@ -334,12 +338,11 @@ def create_employee(
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise EmployeeInfrastructureUnavailable from exc
-    email_sent = _send_credentials(normalized_email, normalized_name, temporary_password)
     return EmployeeProvisioningResult(
         employee_id=employee_id, account_id=account_id, slug=account_slug,
         username=normalized_username, email=normalized_email, site_code=site,
         job_title=job_title, full_name=normalized_name, phone=normalized_phone,
-        email_sent=email_sent,
+        credential_email_status=credential_status,
     )
 
 
@@ -376,13 +379,23 @@ def list_employees(
         cursor.execute(
             """
             SELECT n.ma_nhan_vien, n.ma_tai_khoan, t.slug, n.ho_ten, n.sdt, n.email,
-                   n.chuc_vu, n.trang_thai, t.trang_thai, t.ten_dang_nhap, t.avatar_secure_url
+                   n.chuc_vu, n.trang_thai, t.trang_thai, t.ten_dang_nhap, t.avatar_secure_url,
+                   credential_email.hanh_dong
             FROM dbo.NhanVien AS n
             LEFT JOIN dbo.TaiKhoan AS t
               ON t.ma_tai_khoan = n.ma_tai_khoan AND t.ma_co_so = n.ma_co_so
+            OUTER APPLY (
+                SELECT TOP (1) l.hanh_dong
+                FROM dbo.Logs AS l
+                WHERE l.loai_log = 'system' AND l.ma_co_so = n.ma_co_so
+                  AND l.ma_tai_khoan = n.ma_tai_khoan
+                  AND l.bang_tac_dong = 'TaiKhoan' AND l.ma_ban_ghi = n.ma_tai_khoan
+                  AND l.hanh_dong IN (%s, %s, %s, %s, %s, %s)
+                ORDER BY l.thoi_diem_utc DESC, l.ma_log DESC
+            ) AS credential_email
             WHERE """ + where + " ORDER BY n.ho_ten, n.ma_nhan_vien "
             "OFFSET %s ROWS FETCH NEXT %s ROWS ONLY",
-            [*params, offset, limit],
+            [*_EMPLOYEE_EMAIL_ACTIONS, *params, offset, limit],
         )
         rows = cursor.fetchall()
     return {
@@ -397,6 +410,7 @@ def list_employees(
                 "account_status": "active" if row[8] in (True, 1, "1") else "inactive" if row[8] is not None else None,
                 "username": str(row[9]) if row[9] else None,
                 "avatar_secure_url": str(row[10]) if row[10] else None,
+                "credential_email_status": credential_email_status(str(row[11]) if row[11] else None),
             }
             for row in rows
         ],

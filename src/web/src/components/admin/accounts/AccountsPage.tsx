@@ -125,6 +125,13 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           avatar_requested: Boolean(avatarFile),
         });
         createdEmployeeSite = createdEmployee.site_code;
+        const credentialNotice = createdEmployee.credential_email_status === "ready"
+          ? "Bấm Gửi mật khẩu trong danh sách để gửi email một lần."
+          : createdEmployee.credential_email_status === "sent"
+            ? "Mật khẩu đã được gửi trước đó."
+            : createdEmployee.credential_email_status === "failed"
+              ? "Có thể bấm Thử lại trong danh sách."
+              : "Trạng thái email chưa rõ nên hệ thống khóa gửi lại để tránh gửi trùng.";
         let avatarUploaded = false;
         let avatarUploadError = "";
         if (avatarFile) {
@@ -149,9 +156,9 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           }
         }
         if (avatarUploadError) {
-          message.warning(`Đã tạo nhân viên nhưng ảnh chưa được lưu: ${avatarUploadError}. Nhân viên có thể tải ảnh sau khi đăng nhập.`);
+          message.warning(`Đã tạo nhân viên nhưng ảnh chưa được lưu: ${avatarUploadError}. ${credentialNotice}`);
         } else {
-          message.success(avatarUploaded ? "Đã tạo nhân viên và tải ảnh đại diện lên." : "Đã tạo tài khoản nhân viên.");
+          message.success(`${avatarUploaded ? "Đã tạo nhân viên và tải ảnh đại diện lên." : "Đã tạo nhân viên."} ${credentialNotice}`);
         }
       } else if (!isEmployeeView && values.site_code) {
         const createdAccount = await adminApi.createAdminSmall({
@@ -283,18 +290,54 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     { title: "Số điện thoại", dataIndex: "phone", render: (value: string | null) => value || "—" },
     { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Chức vụ", dataIndex: "job_title", render: (value: Employee["job_title"]) => employeeRoleLabels[value] },
+    {
+      title: "Mật khẩu qua email",
+      dataIndex: "credential_email_status",
+      render: (value: Employee["credential_email_status"], row: Employee) => {
+        const emailStatus = value || "unknown";
+        if (emailStatus === "ready" || emailStatus === "failed") {
+          return <Popconfirm
+            title={emailStatus === "failed" ? "Thử gửi lại mật khẩu?" : "Gửi mật khẩu tạm một lần?"}
+            description={`Email sẽ được gửi đến ${row.email}. Sau khi gửi thành công, không thể gửi lại.`}
+            onConfirm={async () => {
+              setSendingCredentialId(row.account_id);
+              try {
+                await adminApi.sendEmployeeCredentials(row.account_id, row.site_code);
+                message.success(`Đã gửi mật khẩu đến ${row.email}. Không thể gửi lại.`);
+                await load();
+              } catch (reason) {
+                message.error(reason instanceof Error ? reason.message : "Không gửi được email.");
+                void load();
+              } finally { setSendingCredentialId(""); }
+            }}
+          >
+            <Button size="small" type="primary" loading={sendingCredentialId === row.account_id}
+              disabled={row.account_status !== "active" || row.employee_status !== "dang_lam"}>
+              {emailStatus === "failed" ? "Thử lại" : "Gửi mật khẩu"}
+            </Button>
+          </Popconfirm>;
+        }
+        const labels: Record<Exclude<NonNullable<Employee["credential_email_status"]>, "ready" | "failed">, [string, string]> = {
+          sent: ["Đã gửi", "green"],
+          processing: ["Đang xử lý", "processing"],
+          unknown: ["Không rõ · đã khóa gửi lại", "default"],
+          changed: ["Mật khẩu đã đổi", "default"],
+        };
+        const [label, color] = labels[emailStatus];
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
     {
       title: "Thao tác",
       render: (_: unknown, row: Employee) => <Space>
-        <Button size="small" disabled={row.employee_status !== "dang_lam"} onClick={async () => {
-          const nextStatus = row.account_status === "active" ? "inactive" : "active";
+        {row.account_status === "active" && row.employee_status === "dang_lam" && <Button size="small" onClick={async () => {
           try {
-            await adminApi.setEmployeeStatus(row.slug, row.site_code, nextStatus);
-            message.success(nextStatus === "active" ? "Đã chuyển tài khoản sang active." : "Đã chuyển tài khoản sang inactive.");
+            await adminApi.setEmployeeStatus(row.slug, row.site_code);
+            message.success("Đã ngưng tài khoản nhân viên.");
             void load();
           } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không cập nhật được trạng thái tài khoản."); }
-        }}>{row.account_status === "active" ? "Vô hiệu hóa" : "Kích hoạt"}</Button>
+        }}>Ngưng</Button>}
         <Popconfirm
           title="Xóa vĩnh viễn tài khoản nhân viên này?"
           description="Tài khoản đăng nhập, phiên và ảnh đại diện sẽ bị xóa. Hồ sơ có phiếu thu sẽ được giữ để bảo toàn chứng từ."

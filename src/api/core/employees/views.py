@@ -16,8 +16,14 @@ from core.auth.account_status import (
     change_account_status,
 )
 from core.auth.authentication import AuthCookieAuthentication
-from core.auth.serializers import AccountStatusUpdateSerializer
-from core.auth.service_common import AuthInfrastructureUnavailable
+from core.auth.admin_small_email import send_employee_credentials
+from core.auth.service_common import (
+    AdminSmallCredentialEmailConflict,
+    AdminSmallCredentialEmailDeliveryFailed,
+    AdminSmallCredentialEmailUncertain,
+    AdminSmallTargetNotFound,
+    AuthInfrastructureUnavailable,
+)
 from core.media.avatars import create_employee_avatar_setup_token
 from core.employees.serializers import (
     EmployeeCreateSerializer,
@@ -25,6 +31,8 @@ from core.employees.serializers import (
     EmployeeListQuerySerializer,
     EmployeeResponseSerializer,
     EmployeeSiteQuerySerializer,
+    EmployeeCredentialEmailResponseSerializer,
+    EmployeeStatusUpdateSerializer,
     EmployeeUpdateSerializer,
 )
 from core.employees.services import (
@@ -101,8 +109,9 @@ class EmployeeCollectionView(APIView):
         description=(
             "LOCAL cho hồ sơ dbo.NhanVien tại site đã chọn; bản ghi TaiKhoan nhan_vien được nhân bản "
             "đến các site hoạt động theo chính sách tài khoản hiện có. Admin Big chọn site; Admin Small "
-            "chỉ tạo ở site của mình. Mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD được gửi qua SMTP, "
-            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Nếu avatar_requested=true, API trả "
+            "chỉ tạo ở site của mình. Mật khẩu tạm lấy từ ADMIN_SMALL_TEMP_PASSWORD, lưu dạng hash và "
+            "bắt buộc đổi ở lần đăng nhập đầu; tạo nhân viên không gửi email. API ghi trạng thái chờ gửi "
+            "vào Logs; Admin Big/Admin Small phải bấm gửi qua endpoint credential-email. Nếu avatar_requested=true, API trả "
             "setup_token ngắn hạn để tải ảnh lên Cloudinary; bytes ảnh không đi qua Django/SQL Server."
         ),
         request=EmployeeCreateSerializer,
@@ -141,9 +150,73 @@ class EmployeeCollectionView(APIView):
                 "avatar_secure_url": None,
                 "avatar_setup_token": avatar_setup_token,
                 "must_change_password": result.must_change_password,
-                "email_sent": result.email_sent,
+                "credential_email_status": result.credential_email_status,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class EmployeeCredentialEmailView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_credential_email"
+
+    @extend_schema(
+        operation_id="employee_send_credentials_once",
+        tags=["Quản lý nhân viên"],
+        summary="Admin Big/Admin Small gửi mật khẩu tạm cho nhân viên một lần",
+        description=(
+            "Chỉ gửi khi Logs tại site ghi nhận trạng thái chờ gửi hoặc lần gửi trước được SMTP xác nhận thất bại. "
+            "Gửi thành công, đổi mật khẩu, hoặc kết quả SMTP chưa rõ sẽ khóa gửi lại. Khóa SQL Server ngăn gửi đồng thời. "
+            "Admin Big phải chọn site; Admin Small chỉ dùng site trong phiên."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={
+            200: EmployeeCredentialEmailResponseSerializer,
+            400: OpenApiResponse(description="Thiếu hoặc sai site."),
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Không đủ quyền hoặc Admin Small chọn site khác."),
+            404: OpenApiResponse(description="Không tìm thấy nhân viên đang hoạt động."),
+            409: OpenApiResponse(description="Email đã gửi, đang xử lý, kết quả chưa rõ hoặc mật khẩu tạm đã đổi."),
+            429: OpenApiResponse(description="Đã vượt giới hạn gửi email."),
+            502: OpenApiResponse(description="SMTP xác nhận chưa nhận email; có thể thử lại."),
+            503: OpenApiResponse(description="CSDL hoặc SMTP chưa sẵn sàng; trạng thái chưa rõ sẽ khóa gửi lại."),
+        },
+    )
+    def post(self, request, account_id: str):
+        query = EmployeeSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        try:
+            site = site_scope(
+                request.user, query.validated_data.get("site_code"),
+                roles={"admin_big", "admin_small"},
+            )
+            result = send_employee_credentials(
+                account_id=account_id,
+                site_code=site,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallTargetNotFound:
+            return Response({"detail": "Không tìm thấy nhân viên đang hoạt động tại cơ sở được chọn."}, status=404)
+        except AdminSmallCredentialEmailConflict:
+            return Response(
+                {"detail": "Không thể gửi lại: email đã được gửi, đang xử lý, chưa xác định kết quả hoặc mật khẩu tạm đã đổi."},
+                status=409,
+            )
+        except AdminSmallCredentialEmailDeliveryFailed:
+            return Response({"detail": "SMTP xác nhận chưa nhận email. Có thể thử gửi lại."}, status=502)
+        except AdminSmallCredentialEmailUncertain:
+            return Response(
+                {"detail": "Chưa xác định email đã tới hay chưa; hệ thống đã khóa gửi lại để tránh gửi trùng."},
+                status=503,
+            )
+        except (AcademicError, AuthInfrastructureUnavailable, KeyError) as exc:
+            return _site_error(exc)
+        return Response(
+            {"detail": "Đã gửi mật khẩu tạm đến email nhân viên.", **result},
+            status=status.HTTP_200_OK,
         )
 
 
@@ -297,11 +370,11 @@ class EmployeeStatusView(APIView):
     @extend_schema(
         operation_id="employee_account_status_update",
         tags=["Quản lý nhân viên"],
-        summary="Admin Big/Admin Small bật hoặc tắt tài khoản nhân viên",
+        summary="Admin Big/Admin Small ngưng tài khoản nhân viên",
         description=(
-            "Đổi trạng thái đăng nhập active/inactive riêng với DELETE. TaiKhoan được đồng bộ tới mọi "
-            "site đang hoạt động; khi inactive, phiên hiện có bị thu hồi. Không thay đổi "
-            "NhanVien.trang_thai (tình trạng làm việc). Admin Big phải chọn site; Admin Small chỉ dùng site của mình."
+            "Chỉ hỗ trợ active → inactive; không có thao tác kích hoạt lại. TaiKhoan được đồng bộ tới mọi "
+            "site đang hoạt động và các phiên hiện có bị thu hồi. Không thay đổi NhanVien.trang_thai "
+            "(tình trạng làm việc). Admin Big phải chọn site; Admin Small chỉ dùng site của mình."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         request=AccountStatusUpdateSerializer,
@@ -318,7 +391,7 @@ class EmployeeStatusView(APIView):
     def patch(self, request, slug: str):
         query = EmployeeSiteQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        serializer = AccountStatusUpdateSerializer(data=request.data)
+        serializer = EmployeeStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             site = site_scope(
