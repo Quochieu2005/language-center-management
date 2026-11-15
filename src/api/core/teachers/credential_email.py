@@ -151,7 +151,8 @@ def send_teacher_credentials(*, slug: str, site_code: str, remote_ip: str) -> di
             message=(
                 "Tài khoản giáo viên của bạn đã được cấp.\n"
                 f"Email đăng nhập: {email}\nMật khẩu: {password}\n\n"
-                "Bạn có thể đổi mật khẩu sau khi đăng nhập. Không chia sẻ thông tin này với người khác."
+                "Hãy đăng nhập bằng email này. Bạn có thể đổi mật khẩu sau khi đăng nhập. "
+                "Không chia sẻ thông tin này với người khác."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[str(email)],

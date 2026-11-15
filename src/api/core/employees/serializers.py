@@ -100,6 +100,11 @@ class EmployeeSiteQuerySerializer(StrictInputSerializer):
         return value.strip().upper()
 
 
+class EmployeeStatusUpdateSerializer(StrictInputSerializer):
+    status = serializers.ChoiceField(choices=("inactive",))
+    allowed_fields = {"status"}
+
+
 class EmployeeListResponseSerializer(serializers.Serializer):
     site_code = serializers.CharField()
     count = serializers.IntegerField()
@@ -125,5 +130,13 @@ class EmployeeResponseSerializer(serializers.Serializer):
 
 class EmployeeCreateResponseSerializer(EmployeeResponseSerializer):
     must_change_password = serializers.BooleanField()
-    email_sent = serializers.BooleanField()
+    credential_email_status = serializers.ChoiceField(
+        choices=("ready", "processing", "sent", "failed", "unknown", "changed"),
+    )
     avatar_setup_token = serializers.CharField(allow_null=True)
+
+
+class EmployeeCredentialEmailResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    email = serializers.EmailField()
+    status = serializers.ChoiceField(choices=("sent",))

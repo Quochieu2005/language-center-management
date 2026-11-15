@@ -10,7 +10,20 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.academics.common import AcademicError, AcademicForbidden, AcademicInvalid, site_scope
+from core.auth.account_status import (
+    AccountStatusConflict,
+    AccountStatusTargetNotFound,
+    change_account_status,
+)
 from core.auth.authentication import AuthCookieAuthentication
+from core.auth.admin_small_email import send_employee_credentials
+from core.auth.service_common import (
+    AdminSmallCredentialEmailConflict,
+    AdminSmallCredentialEmailDeliveryFailed,
+    AdminSmallCredentialEmailUncertain,
+    AdminSmallTargetNotFound,
+    AuthInfrastructureUnavailable,
+)
 from core.media.avatars import create_employee_avatar_setup_token
 from core.employees.serializers import (
     EmployeeCreateSerializer,
@@ -18,6 +31,8 @@ from core.employees.serializers import (
     EmployeeListQuerySerializer,
     EmployeeResponseSerializer,
     EmployeeSiteQuerySerializer,
+    EmployeeCredentialEmailResponseSerializer,
+    EmployeeStatusUpdateSerializer,
     EmployeeUpdateSerializer,
 )
 from core.employees.services import (
@@ -25,7 +40,7 @@ from core.employees.services import (
     EmployeeInfrastructureUnavailable,
     EmployeeNotFound,
     create_employee,
-    deactivate_employee,
+    delete_employee,
     get_employee,
     list_employees,
     update_employee,
@@ -51,6 +66,10 @@ class EmployeeCollectionView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "employee_management"
+
+    def get_throttles(self):
+        self.throttle_scope = "employee_read" if self.request.method == "GET" else "employee_management"
+        return super().get_throttles()
 
     @extend_schema(
         operation_id="employee_list",
@@ -90,8 +109,9 @@ class EmployeeCollectionView(APIView):
         description=(
             "LOCAL cho hồ sơ dbo.NhanVien tại site đã chọn; bản ghi TaiKhoan nhan_vien được nhân bản "
             "đến các site hoạt động theo chính sách tài khoản hiện có. Admin Big chọn site; Admin Small "
-            "chỉ tạo ở site của mình. Mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD được gửi qua SMTP, "
-            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Nếu avatar_requested=true, API trả "
+            "chỉ tạo ở site của mình. Mật khẩu tạm lấy từ ADMIN_SMALL_TEMP_PASSWORD, lưu dạng hash và "
+            "bắt buộc đổi ở lần đăng nhập đầu; tạo nhân viên không gửi email. API ghi trạng thái chờ gửi "
+            "vào Logs; Admin Big/Admin Small phải bấm gửi qua endpoint credential-email. Nếu avatar_requested=true, API trả "
             "setup_token ngắn hạn để tải ảnh lên Cloudinary; bytes ảnh không đi qua Django/SQL Server."
         ),
         request=EmployeeCreateSerializer,
@@ -130,9 +150,73 @@ class EmployeeCollectionView(APIView):
                 "avatar_secure_url": None,
                 "avatar_setup_token": avatar_setup_token,
                 "must_change_password": result.must_change_password,
-                "email_sent": result.email_sent,
+                "credential_email_status": result.credential_email_status,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class EmployeeCredentialEmailView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "admin_credential_email"
+
+    @extend_schema(
+        operation_id="employee_send_credentials_once",
+        tags=["Quản lý nhân viên"],
+        summary="Admin Big/Admin Small gửi mật khẩu tạm cho nhân viên một lần",
+        description=(
+            "Chỉ gửi khi Logs tại site ghi nhận trạng thái chờ gửi hoặc lần gửi trước được SMTP xác nhận thất bại. "
+            "Gửi thành công, đổi mật khẩu, hoặc kết quả SMTP chưa rõ sẽ khóa gửi lại. Khóa SQL Server ngăn gửi đồng thời. "
+            "Admin Big phải chọn site; Admin Small chỉ dùng site trong phiên."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={
+            200: EmployeeCredentialEmailResponseSerializer,
+            400: OpenApiResponse(description="Thiếu hoặc sai site."),
+            401: OpenApiResponse(description="Chưa đăng nhập."),
+            403: OpenApiResponse(description="Không đủ quyền hoặc Admin Small chọn site khác."),
+            404: OpenApiResponse(description="Không tìm thấy nhân viên đang hoạt động."),
+            409: OpenApiResponse(description="Email đã gửi, đang xử lý, kết quả chưa rõ hoặc mật khẩu tạm đã đổi."),
+            429: OpenApiResponse(description="Đã vượt giới hạn gửi email."),
+            502: OpenApiResponse(description="SMTP xác nhận chưa nhận email; có thể thử lại."),
+            503: OpenApiResponse(description="CSDL hoặc SMTP chưa sẵn sàng; trạng thái chưa rõ sẽ khóa gửi lại."),
+        },
+    )
+    def post(self, request, account_id: str):
+        query = EmployeeSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        try:
+            site = site_scope(
+                request.user, query.validated_data.get("site_code"),
+                roles={"admin_big", "admin_small"},
+            )
+            result = send_employee_credentials(
+                account_id=account_id,
+                site_code=site,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except AdminSmallTargetNotFound:
+            return Response({"detail": "Không tìm thấy nhân viên đang hoạt động tại cơ sở được chọn."}, status=404)
+        except AdminSmallCredentialEmailConflict:
+            return Response(
+                {"detail": "Không thể gửi lại: email đã được gửi, đang xử lý, chưa xác định kết quả hoặc mật khẩu tạm đã đổi."},
+                status=409,
+            )
+        except AdminSmallCredentialEmailDeliveryFailed:
+            return Response({"detail": "SMTP xác nhận chưa nhận email. Có thể thử gửi lại."}, status=502)
+        except AdminSmallCredentialEmailUncertain:
+            return Response(
+                {"detail": "Chưa xác định email đã tới hay chưa; hệ thống đã khóa gửi lại để tránh gửi trùng."},
+                status=503,
+            )
+        except (AcademicError, AuthInfrastructureUnavailable, KeyError) as exc:
+            return _site_error(exc)
+        return Response(
+            {"detail": "Đã gửi mật khẩu tạm đến email nhân viên.", **result},
+            status=status.HTTP_200_OK,
         )
 
 
@@ -142,6 +226,10 @@ class EmployeeDetailView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "employee_management"
+
+    def get_throttles(self):
+        self.throttle_scope = "employee_read" if self.request.method == "GET" else "employee_management"
+        return super().get_throttles()
 
     @extend_schema(
         operation_id="employee_detail_by_slug",
@@ -213,23 +301,24 @@ class EmployeeDetailView(APIView):
     @extend_schema(
         operation_id="employee_delete_by_slug",
         tags=["Quản lý nhân viên"],
-        summary="Xóa nhân viên theo slug",
+        summary="Xóa vĩnh viễn tài khoản nhân viên theo slug",
         description=(
             "Chỉ Admin Big hoặc Admin Small được gọi. Admin Big phải chỉ định site_code; Admin Small "
-            "chỉ thao tác tại site trong phiên. DELETE khóa TaiKhoan trên mọi bản sao, thu hồi phiên "
-            "đăng nhập và chuyển NhanVien.trang_thai sang nghi_viec tại site sở hữu. Hồ sơ, PhieuThu "
-            "và Logs được giữ để bảo toàn chứng từ và lịch sử. Nếu một bản sao lỗi, gọi lại cùng slug "
-            "để tiếp tục đồng bộ; không tuyên bố thành công khi chưa hoàn tất mọi site. Kiểu: "
-            "REPLICATED-WRITE cho TaiKhoan và LOCAL cho NhanVien/PhienDangNhap/Logs."
+            "chỉ thao tác tại site trong phiên. DELETE xóa vật lý TaiKhoan, phiên/token và ảnh đại diện "
+            "ở các bản sao; không đổi trạng thái sang inactive. Nếu NhanVien được PhieuThu tham chiếu, "
+            "giữ hồ sơ tại site, gỡ liên kết tài khoản và đánh dấu nghỉ việc; nếu không, xóa hồ sơ. "
+            "Giữ Logs/chứng từ. Có thể gọi lại cùng slug sau lỗi để tiếp tục; không tuyên bố hoàn tất "
+            "trước khi đồng bộ đủ các site được cấu hình. Kiểu: REPLICATED-WRITE cho TaiKhoan và "
+            "LOCAL cho NhanVien/PhienDangNhap/TokenDatLaiMatKhau/Logs."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         responses={
-            200: OpenApiResponse(description="Tài khoản đã bị khóa, hồ sơ được chuyển sang nghỉ việc."),
+            200: OpenApiResponse(description="Tài khoản đăng nhập đã bị xóa vĩnh viễn."),
             400: OpenApiResponse(description="Site không hợp lệ hoặc Admin Big chưa chọn site."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
             403: OpenApiResponse(description="Không đủ quyền hoặc Admin Small chọn site khác."),
             404: OpenApiResponse(description="Không tìm thấy nhân viên tại site được chọn."),
-            409: OpenApiResponse(description="Trạng thái nhân viên/tài khoản xung đột."),
+            409: OpenApiResponse(description="Còn dữ liệu nghiệp vụ cần giữ hoặc bản sao tài khoản xung đột."),
             503: OpenApiResponse(description="Site hoặc bản sao tài khoản chưa sẵn sàng; gọi lại để tiếp tục."),
         },
     )
@@ -241,7 +330,7 @@ class EmployeeDetailView(APIView):
                 request.user, query.validated_data.get("site_code"),
                 roles={"admin_big", "admin_small"},
             )
-            result = deactivate_employee(
+            result = delete_employee(
                 slug=slug, site_code=site, actor_id=request.user.account_id,
                 remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
             )
@@ -249,7 +338,7 @@ class EmployeeDetailView(APIView):
             return Response({"detail": "Không tìm thấy nhân viên trong cơ sở được chọn."}, status=404)
         except EmployeeConflict:
             return Response(
-                {"detail": "Trạng thái nhân viên hoặc tài khoản đang xung đột; hãy tải lại dữ liệu."},
+                {"detail": "Không thể xóa: tài khoản còn dữ liệu nghiệp vụ cần giữ hoặc bản sao đang xung đột."},
                 status=409,
             )
         except (AcademicError, EmployeeInfrastructureUnavailable, KeyError) as exc:
@@ -260,9 +349,73 @@ class EmployeeDetailView(APIView):
                 "account_id": result.account_id,
                 "slug": result.slug,
                 "site_code": result.site_code,
-                "status": result.status,
-                "employee_status": result.employee_status,
-                "detail": "Tài khoản đã bị khóa; hồ sơ, phiếu thu và nhật ký được giữ lại.",
+                "deleted": True,
+                "profile_retained": result.profile_retained,
+                "detail": (
+                    "Tài khoản đã bị xóa vĩnh viễn; hồ sơ được giữ để bảo toàn phiếu thu."
+                    if result.profile_retained else "Tài khoản và hồ sơ nhân viên đã bị xóa vĩnh viễn."
+                ),
             },
             status=status.HTTP_200_OK,
         )
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class EmployeeStatusView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "employee_management"
+
+    @extend_schema(
+        operation_id="employee_account_status_update",
+        tags=["Quản lý nhân viên"],
+        summary="Admin Big/Admin Small ngưng tài khoản nhân viên",
+        description=(
+            "Chỉ hỗ trợ active → inactive; không có thao tác kích hoạt lại. TaiKhoan được đồng bộ tới mọi "
+            "site đang hoạt động và các phiên hiện có bị thu hồi. Không thay đổi NhanVien.trang_thai "
+            "(tình trạng làm việc). Admin Big phải chọn site; Admin Small chỉ dùng site của mình."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        request=EmployeeStatusUpdateSerializer,
+        responses={
+            200: OpenApiResponse(description="Trạng thái tài khoản đã được cập nhật."),
+            400: OpenApiResponse(description="Site hoặc trạng thái không hợp lệ."),
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Không đủ quyền hoặc vượt phạm vi site."),
+            404: OpenApiResponse(description="Không tìm thấy nhân viên tại site được chọn."),
+            409: OpenApiResponse(description="Nhân viên đã nghỉ việc hoặc dữ liệu đang xung đột."),
+            503: OpenApiResponse(description="Đồng bộ site chưa hoàn tất; có thể gọi lại."),
+        },
+    )
+    def patch(self, request, slug: str):
+        query = EmployeeSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        serializer = EmployeeStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            site = site_scope(
+                request.user, query.validated_data.get("site_code"),
+                roles={"admin_big", "admin_small"},
+            )
+            result = change_account_status(
+                slug=slug,
+                expected_role="employee",
+                desired_status=serializer.validated_data["status"],
+                actor_id=request.user.account_id,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+                site_code=site,
+            )
+        except AccountStatusTargetNotFound:
+            return Response({"detail": "Không tìm thấy nhân viên trong cơ sở được chọn."}, status=404)
+        except AccountStatusConflict:
+            return Response({"detail": "Nhân viên đã nghỉ việc hoặc trạng thái đang được thay đổi."}, status=409)
+        except (AcademicError, AuthInfrastructureUnavailable, KeyError) as exc:
+            return _site_error(exc)
+        return Response({
+            "account_id": result.account_id,
+            "slug": result.slug,
+            "role": result.role,
+            "site_code": result.site_code,
+            "status": result.status,
+        })

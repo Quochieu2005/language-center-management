@@ -47,7 +47,7 @@ Prefix thực tế là `/api/v1/`; bảng dưới tóm tắt các path nghiệp 
 | Xác thực | `/auth/csrf/`, `/auth/login/`, `/auth/session/`, `/auth/activity/`, `/auth/logout/`, `/auth/profile/{slug}/`, `/auth/password/change/`, `/auth/password/forgot/`, `/auth/password/reset/` |
 | OAuth | `/auth/oauth/{provider}/start/`, `/auth/oauth/{provider}/callback/`, `/auth/oauth/connections/{slug}/` |
 | Admin Small/Big | `/admin/admin-smalls/`, `/admin/admin-smalls/{account_id}/credential-email/`, `/admin/admin-smalls/{slug}/status/`, `/admin/admin-smalls/{account_id}/`, `/admin/admin-smalls/profile/{slug}/`, `/admin/admin-bigs/profile/{slug}/` |
-| Giáo viên/nhân viên | `/admin/teachers/`, `/admin/teachers/{slug}/`, `/admin/teachers/{slug}/status/`, `/admin/teachers/{slug}/credential-email/`, `/teachers/profile/{slug}/`, `/admin/employees/`, `/admin/employees/{slug}/` |
+| Giáo viên/nhân viên | `/admin/teachers/`, `/admin/teachers/{slug}/`, `/admin/teachers/{slug}/status/`, `/admin/teachers/{slug}/credential-email/`, `/teachers/profile/{slug}/`, `/admin/employees/`, `/admin/employees/{slug}/`, `/admin/employees/{slug}/status/`, `/admin/employees/{account_id}/credential-email/` |
 | Avatar | `/auth/profile/{slug}/avatar/upload-intents/`, `/auth/profile/{slug}/avatar/complete/`, `/admin/admin-smalls/{slug}/avatar/upload-intents/`, `/admin/admin-smalls/{slug}/avatar/complete/`, `/admin/teachers/{slug}/avatar/upload-intents/`, `/admin/teachers/{slug}/avatar/complete/`, `/admin/employees/{slug}/avatar/upload-intents/`, `/admin/employees/{slug}/avatar/complete/` |
 | Danh mục | `/admin/shared/subjects/`, `/admin/shared/subjects/{slug}/`, `/admin/courses/`, `/admin/courses/{slug}/`, `/courses/`, `/courses/{course_slug}/classes/` |
 | Tuyển sinh, học viên | `/public/enrollments/`, `/admin/students/`, `/admin/students/{slug}/`, `/admin/students/{slug}/account/`, `/students/profile/{slug}/` và các route con `enrollments/`, `schedule/`, `tuition/`, `grades/` |
@@ -134,7 +134,7 @@ Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một l
 
 Django gửi thư từ backend qua SMTP; thông tin kết nối chỉ nằm trong biến môi trường/secret store (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` hoặc `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`). Với Gmail, cấu hình mặc định là `smtp.gmail.com:587` + STARTTLS, dùng địa chỉ Gmail và Google App Password. App Password chỉ dành cho SMTP, không phải OAuth Client Secret. Không ghi thông tin này vào source, Git, log, Swagger response hoặc frontend. Chỉ báo gửi thành công sau khi SMTP chấp nhận thư; lỗi gửi thư phải có trạng thái retry an toàn và không log nội dung bí mật.
 
-Source hiện tạo tài khoản Admin Small/giáo viên bằng mật khẩu khởi tạo từ cấu hình backend, lưu hash và gửi thông tin cấp tài khoản qua email; chưa có token kích hoạt riêng. Email thật phụ thuộc SMTP và phải kiểm tra kết quả gửi. Không ghi mật khẩu/secret vào log, Git hay response.
+Source hiện tạo tài khoản Admin Small/giáo viên bằng mật khẩu khởi tạo từ cấu hình backend, lưu hash và gửi email cấp tài khoản; email là thông tin đăng nhập chính, username không bắt buộc. Chưa có token kích hoạt riêng. Email thật phụ thuộc SMTP và phải kiểm tra kết quả gửi. Không ghi mật khẩu/secret vào log, Git hay response.
 
 Source hiện reset mật khẩu quản trị bằng OTP 6 số, lưu hash, giới hạn số lần sai và hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây). OTP dùng một lần; ledger phục hồi giữ trạng thái cập nhật mật khẩu trên các bản sao. Response yêu cầu reset không tiết lộ tài khoản tồn tại hay không. Luồng SMTP vẫn cần kiểm thử ở môi trường nhóm.
 
@@ -198,7 +198,7 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 | `GET /api/v1/blog/categories/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu các bản Blog ở từng site | Đọc `DanhMucBlog`/`BaiVietBlog`; trả danh mục hoạt động, `post_count`, `complete`, `missing_sites`, `inconsistent_sites`; `503` nếu không đọc được site nào |
 | `GET /api/v1/blog/{slug}/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu bài theo slug ở từng site | Chỉ trả bài đã xuất bản nếu các bản khớp; `404` nếu không có, `409` nếu lệch, `503` nếu thiếu site |
 | `GET /api/v1/courses/{course_slug}/classes/` | Khách chưa đăng nhập | Route hiện có; truy vấn theo phạm vi API | Đọc lớp công khai của khóa học; đối chiếu status/missing site theo response hiện tại trước khi dùng như hợp đồng |
-| `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
+| `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận email hoặc tên đăng nhập cùng mật khẩu; tìm danh tính trên các bản `TaiKhoan` site hoạt động, trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
 | `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập hoặc đã xác thực để liên kết | Route hiện có; `provider` chỉ `google` hoặc `facebook` | Tạo state dùng một lần; callback chỉ đăng nhập tài khoản học viên đã liên kết, không tự tạo hoặc ghép theo email |
 | `GET /api/v1/auth/oauth/{provider}/callback/` | Callback Google/Facebook | Route hiện có | Đổi authorization code ở server, xác minh provider subject; phụ thuộc OAuth configuration thật |
 | `GET /api/v1/auth/oauth/connections/{slug}/` | Học viên đã đăng nhập | Đọc trạng thái liên kết tài khoản theo phiên | Chỉ trả trạng thái liên kết của chính học viên đã xác thực |
@@ -329,19 +329,25 @@ Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan
 
 | Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
 |---|---|---|---|
-| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang, gồm `avatar_secure_url`; Big phải chọn site, Small chỉ thấy site gắn phiên |
-| `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien`, `TaiKhoan` và trạng thái email gần nhất từ `Logs` cục bộ; mỗi dòng gồm email, username, phone, `site_code`, `avatar_secure_url` và `credential_email_status`. Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Không gửi email khi tạo; ghi trạng thái chờ gửi vào `Logs` tại site và trả `credential_email_status`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
+| `POST /api/v1/admin/employees/{account_id}/credential-email/?site_code=...` | Admin Big; Admin Small đúng site | `GLOBAL` đọc bản sao + `LOCAL` + SMTP | Xác minh các bản sao `TaiKhoan` và hồ sơ `NhanVien` tại site; chỉ Admin Big/Admin Small bấm gửi mới gọi SMTP. Ghi `employee_credential_email_*` vào `Logs` của site; chỉ `ready`/`failed` được gửi, còn `sent`/`processing`/`unknown`/`changed` khóa gửi lại |
 | `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn, gồm `avatar_secure_url`; không dò hoặc JOIN qua site khác |
 | `PATCH /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Chỉ cập nhật `NhanVien.ho_ten`, `sdt`, `chuc_vu`; ghi `Logs` cùng transaction cục bộ |
-| `DELETE /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Xóa mềm: vô hiệu hóa các bản `TaiKhoan`, thu hồi `PhienDangNhap`, đổi `NhanVien.trang_thai` thành `nghi_viec`; giữ hồ sơ và chứng từ/lịch sử |
+| `PATCH /api/v1/admin/employees/{slug}/status/?site_code=...` | Admin Big; Admin Small đúng site | `REPLICATED-WRITE` | Body `{ "status": "inactive" }`; chỉ chuyển `active` → `inactive` trên các site hoạt động và thu hồi `PhienDangNhap`; không hỗ trợ kích hoạt lại, không đổi trạng thái công việc `NhanVien` |
+| `DELETE /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Xóa vật lý các bản `TaiKhoan`, phiên/token và ảnh; xóa hồ sơ `NhanVien` nếu không có phiếu thu, nếu có thì gỡ FK tài khoản và giữ hồ sơ `nghi_viec`; giữ `Logs`/`PhieuThu`, có marker retry từng site |
 | `POST /api/v1/admin/employees/{slug}/avatar/upload-intents/` | Admin Big; Admin Small đúng site, token cấp lúc tạo | `GLOBAL` đọc bản sao + `LOCAL` đọc hồ sơ | Xác minh tài khoản/hồ sơ nhân viên, trạng thái ảnh và site hoạt động; ký intent ngắn hạn để client tải trực tiếp lên Cloudinary |
 | `POST /api/v1/admin/employees/{slug}/avatar/complete/` | Admin Big; Admin Small đúng site, token cấp lúc tạo | `REPLICATED-WRITE` | Xác minh asset Cloudinary rồi cập nhật `TaiKhoan.avatar_public_id`/`avatar_secure_url` cùng audit tại từng site hoạt động; lỗi site trả incomplete/503, không báo hoàn tất giả |
 
 PATCH nhận ít nhất một trong `full_name`, `phone`, `job_title`; body có trường lạ nhận `400`. `phone: null` hoặc `phone: ""` xóa số điện thoại. Chỉ hồ sơ đang làm việc có tài khoản hoạt động được sửa; email/tên đăng nhập là danh tính tài khoản nhân bản, còn `site_code` xác định mảnh nên các trường này không được sửa bằng endpoint hồ sơ. GET/PATCH/DELETE dùng query `site_code` cho Admin Big; Admin Small có thể bỏ query hoặc truyền đúng site của mình.
 
+API GET danh sách/chi tiết nhân viên dùng scope đọc `employee_read` (120 request/phút), tách khỏi scope ghi `employee_management` (10 request/giờ) của POST/PATCH/DELETE. Gửi mật khẩu dùng scope `admin_credential_email`, có giới hạn riêng như các email cấp tài khoản khác. Việc tải danh sách sau khi tạo không tiêu hao hạn mức ghi.
+
+Email cấp tài khoản nhân viên hiển thị email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động. Login API vẫn chấp nhận username như định danh thay thế.
+
 `tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này trước khi triển khai phiên bản mới. Chức vụ `le_tan` là nhân viên tiếp nhận tại quầy; trong source hiện tại được thao tác lớp/đăng ký và kế hoạch đóng học phí, còn tra cứu danh sách học viên thuộc `tu_van`.
 
-Create trả `201`; GET/PATCH trả `200`; lỗi validation/quyền/không tìm thấy/xung đột lần lượt có thể trả `400`/`403`/`404`/`409`. Ảnh không bắt buộc, chỉ nhận JPG/JPEG/PNG/WebP tối đa 5 MB; API xác minh setup token, upload intent và asset, client gửi bytes trực tiếp Cloudinary, không qua Django. Nếu upload ảnh thất bại thì tài khoản đã tạo vẫn tồn tại và giao diện phải báo ảnh chưa lưu. DELETE là nghỉ việc, không xóa vật lý; nếu một site chưa đồng bộ hoặc thu hồi phiên được thì trả `503`, không báo thành công toàn phần, và có thể gọi lại cùng slug để tiếp tục. Các database commit độc lập nên `REPLICATED-WRITE` không đồng nghĩa ACID xuyên site. Tài khoản/phiên/nhật ký được xử lý theo service hiện có; chưa có bằng chứng lỗi và phục hồi nhiều site thật.
+Create trả `201`; GET/PATCH/DELETE và gửi email thành công trả `200`; lỗi validation/quyền/không tìm thấy/xung đột lần lượt có thể trả `400`/`403`/`404`/`409`. Ảnh không bắt buộc, chỉ nhận JPG/JPEG/PNG/WebP tối đa 5 MB; API xác minh setup token, upload intent và asset, client gửi bytes trực tiếp Cloudinary, không qua Django. Nếu upload ảnh thất bại thì tài khoản đã tạo vẫn tồn tại và giao diện phải báo ảnh chưa lưu. POST tạo không gửi email; người quản lý bấm gửi riêng. SMTP báo không nhận thì trả `502` và cho thử lại; kết quả chưa rõ trả `503` và khóa gửi lại để tránh gửi trùng. PATCH `/status/` chỉ cho phép `active` → `inactive`, thu hồi phiên và tách biệt với DELETE. DELETE xóa vật lý tài khoản, phiên/token, trạng thái đọc thông báo và ảnh; hồ sơ NhanVien chỉ giữ lại khi PhieuThu tham chiếu, đồng thời gỡ liên kết tài khoản và đánh dấu nghỉ việc. Giữ Logs/chứng từ. Nếu site chưa đồng bộ hoặc dọn ảnh được thì trả `503`, không báo thành công toàn phần, và có thể gọi lại cùng slug để tiếp tục. Các database commit độc lập nên `REPLICATED-WRITE` không đồng nghĩa ACID xuyên site; chưa có bằng chứng lỗi và phục hồi nhiều site thật.
 
 ## Endpoint cho giáo viên
 
@@ -456,12 +462,12 @@ Các trường dưới đây là phần nghiệp vụ tối thiểu để đặc
 
 ```json
 {
-  "ten_dang_nhap": "nhanvien.q1",
-  "mat_khau": "<không ghi vào log>"
+  "identifier": "nhanvien.q1",
+  "password": "<không ghi vào log>"
 }
 ```
 
-API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
+`identifier` có thể là email hoặc tên đăng nhập. API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
 
 Khuyến nghị phiên trình duyệt dùng cookie `HttpOnly`, `Secure`, `SameSite` và cơ chế CSRF phù hợp; không lưu access token/mật khẩu trong `localStorage`. Nếu nhóm chọn cơ chế bearer token khác, phải đặc tả thời hạn, thu hồi, refresh và nơi lưu trước khi code.
 
@@ -502,7 +508,7 @@ Các thao tác này do Admin Big thực hiện. Ví dụ request tạo Admin Sma
 
 API tự đặt `TaiKhoan.vai_tro = nhan_vien`, gắn site và tạo hồ sơ `Admin.loai_admin = admin_small` tại Q7; không tạo hồ sơ `NhanVien` cho Admin Small. Không cho client gửi `vai_tro` hoặc `loai_admin`. Với giáo viên, API đặt `vai_tro = giao_vien`, tạo `TaiKhoan` dùng chung và hồ sơ `GiaoVien` tại site được chọn.
 
-Source có endpoint tạo Admin Small và giáo viên; API khởi tạo mật khẩu theo cấu hình, lưu hash, bắt buộc đổi mật khẩu ở lần đăng nhập đầu, rồi gửi email thông tin tài khoản qua endpoint credential-email riêng. Chưa có token kích hoạt tài khoản kiểu invitation. Gửi email thật vẫn phụ thuộc SMTP và cần xác minh tại môi trường chạy.
+Source có endpoint tạo Admin Small, giáo viên và nhân viên; API khởi tạo mật khẩu theo cấu hình, lưu hash, bắt buộc đổi mật khẩu ở lần đăng nhập đầu. Tạo tài khoản không tự gửi email; Admin gửi qua endpoint credential-email riêng khi chủ động chọn thao tác đó. Chưa có token kích hoạt tài khoản kiểu invitation. Gửi email thật vẫn phụ thuộc SMTP và cần xác minh tại môi trường chạy.
 
 Đây là nhiều bước ghi (`REPLICATED-WRITE` cho `TaiKhoan`, `LOCAL` cho hồ sơ). Response cần có trạng thái xử lý theo từng chặng; chỉ trả thành công hoàn toàn khi tài khoản có hồ sơ/phạm vi dùng được. Nếu đồng bộ tài khoản thành công nhưng tạo hồ sơ site thất bại, vô hiệu hóa hoặc đưa tài khoản về trạng thái chờ xử lý có thể phục hồi; không để tài khoản hoạt động không có site/phạm vi. Kiểm tra trùng `ten_dang_nhap`/`email` trên các bản sao trước khi ghi.
 
@@ -699,7 +705,7 @@ Replication runtime hiện có cho `MonHoc`, `KhoaHoc` và CMS `DanhMucBlog`/`Ba
 | Validation | Gửi thiếu trường, sai kiểu, sai enum, ngày kết thúc trước ngày bắt đầu, ngày ngoài phạm vi và body quá lớn; API từ chối mà không ghi DB |
 | SQL injection | Thử payload SQL trên login, search, filter, sort và các endpoint ghi; không được mở rộng kết quả, vượt quyền hoặc thay đổi bảng |
 | CRUD thực tế | Với từng tài nguyên được phép: gọi create/read/update trên SQL Server test, đọc lại để xác nhận dữ liệu đã lưu đúng; thử sai quyền và sai site |
-| Xóa và lưu lịch sử | Mặc định chỉ xóa dữ liệu nháp chưa được tham chiếu nếu nghiệp vụ cho phép; hóa đơn/phiếu thu, điểm danh, giao dịch và nhật ký không hard-delete. Ngoại lệ: Admin Big được hard-delete tài khoản Admin Small qua DELETE đã nêu, nhưng phải giữ Logs và dữ liệu lịch sử; không thay bằng inactive |
+| Xóa và lưu lịch sử | Mặc định chỉ xóa dữ liệu nháp chưa được tham chiếu nếu nghiệp vụ cho phép; hóa đơn/phiếu thu, điểm danh, giao dịch và nhật ký không hard-delete. Ngoại lệ: tài khoản Admin Small hoặc nhân viên được hard-delete theo endpoint đã nêu; giữ Logs/chứng từ và giữ hồ sơ nhân viên nếu PhieuThu đang tham chiếu; không thay thao tác xóa bằng inactive |
 | Chống spam | Kiểm tra rate limit từng form, `429`/`Retry-After`, CAPTCHA sau ngưỡng và response không tiết lộ tài khoản |
 | Ảnh | Kiểm tra signed upload Cloudinary, file MIME giả, file quá lớn, intent hết hạn, user khác dùng public ID, gỡ ảnh còn tham chiếu và không phát sinh file trong source |
 | Hiệu năng | Đo p50/p95 theo millisecond với dữ liệu có kích thước ghi rõ; kiểm tra LOCAL, GLOBAL, login và upload riêng |
@@ -708,7 +714,7 @@ Replication runtime hiện có cho `MonHoc`, `KhoaHoc` và CMS `DanhMucBlog`/`Ba
 
 Kịch bản phải chạy trên CSDL SQL Server test riêng theo site, không chỉ mock repository. Mỗi thao tác thành công phải được đọc lại từ đúng site để chứng minh dữ liệu đã commit; thao tác sai phải kiểm tra không để lại bản ghi dở dang. Với `REPLICATED-WRITE`, đọc đối chiếu bản sao từng site; với `GLOBAL`, kiểm tra dữ liệu được gộp ở API chứ không ghi vào một CSDL trung tâm.
 
-Không ép mọi bảng có nút xóa. `HocVien` giữ lịch sử chuyển; `PhieuThu`, `DiemDanh`, `LichSuChuyenCoSo` và `Logs` không hard-delete trong luồng nghiệp vụ thông thường. Riêng Admin Small: Admin Big dùng endpoint DELETE để xóa vật lý, còn nút trạng thái chỉ kích hoạt/ngưng. Kiểm tra tham chiếu và giao dịch đang mở trước khi bắt đầu; giữ lại nhật ký/chứng từ, ghi dấu retry ở từng site và không tuyên bố ACID xuyên CSDL. Test delete phải chứng minh tài khoản đã biến mất nhưng dữ liệu lịch sử không mất.
+Không ép mọi bảng có nút xóa. `HocVien` giữ lịch sử chuyển; `PhieuThu`, `DiemDanh`, `LichSuChuyenCoSo` và `Logs` không hard-delete trong luồng nghiệp vụ thông thường. Tài khoản nhân viên/Admin Small: thao tác ngưng đăng nhập là riêng với DELETE; DELETE xóa vật lý tài khoản, phiên và dữ liệu bảo mật phụ, đồng thời giữ Logs/chứng từ. Với nhân viên đã lập phiếu thu, giữ hồ sơ rời tài khoản để bảo toàn khóa ngoại. Kiểm tra tham chiếu và giao dịch đang mở trước khi bắt đầu; ghi dấu retry ở từng site và không tuyên bố ACID xuyên CSDL. Kịch bản delete phải chứng minh tài khoản đã biến mất nhưng dữ liệu lịch sử không mất.
 
 Với mọi route, tối thiểu kiểm tra: thành công; request sai; unauthenticated; role sai; site sai; bản ghi không tồn tại; bản ghi bị cập nhật/xóa song song; site SQL Server mất kết nối; retry cùng request; transaction rollback. Ghi lệnh/kịch bản và kết quả trong PR hoặc tài liệu test; nếu endpoint chưa được cài thì ghi `Chưa chạy — chưa có implementation`, không tự ghi là pass.
 

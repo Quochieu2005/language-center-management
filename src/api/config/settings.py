@@ -172,6 +172,7 @@ REST_FRAMEWORK = {
         "teacher_create": "10/hour",
         "teacher_management": "120/min",
         "employee_management": "10/hour",
+        "employee_read": "120/min",
         "student_account_create": "10/hour",
         "student_management": "120/min",
         "student_portal": "120/min",

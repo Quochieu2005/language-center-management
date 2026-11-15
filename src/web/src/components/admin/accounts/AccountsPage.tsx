@@ -23,15 +23,16 @@ function toSlug(value: string) {
 }
 
 export default function AccountsPage({ view }: AccountsPageProps) {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const { user } = useSession();
-  const { siteCodes, selectedSite } = useSiteScope();
+  const { siteCodes, selectedSite, setSelectedSite } = useSiteScope();
   const [admins, setAdmins] = useState<AdminSmall[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingAdminSmall, setDeletingAdminSmall] = useState<AdminSmall | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCredentialId, setSendingCredentialId] = useState("");
@@ -55,6 +56,12 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     setAvatarFile(null);
     setAvatarPreview("");
     if (avatarInput.current) avatarInput.current.value = "";
+  };
+
+  const openCreateForm = () => {
+    resetCreateForm();
+    form.setFieldsValue({ site_code: site || siteCodes[0] });
+    setCreating(true);
   };
 
   const chooseAvatar = (file?: File) => {
@@ -105,6 +112,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   }, [load]);
 
   const submit = async (values: { full_name: string; email: string; username?: string; slug?: string; phone?: string; site_code?: string; job_title?: Employee["job_title"] }) => {
+    let createdEmployeeSite: string | undefined;
     setSubmitting(true);
     try {
       if (isEmployeeView && values.job_title) {
@@ -117,6 +125,14 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           job_title: values.job_title,
           avatar_requested: Boolean(avatarFile),
         });
+        createdEmployeeSite = createdEmployee.site_code;
+        const credentialNotice = createdEmployee.credential_email_status === "ready"
+          ? "Bấm Gửi mật khẩu trong danh sách để gửi email một lần."
+          : createdEmployee.credential_email_status === "sent"
+            ? "Mật khẩu đã được gửi trước đó."
+            : createdEmployee.credential_email_status === "failed"
+              ? "Có thể bấm Thử lại trong danh sách."
+              : "Trạng thái email chưa rõ nên hệ thống khóa gửi lại để tránh gửi trùng.";
         let avatarUploaded = false;
         let avatarUploadError = "";
         if (avatarFile) {
@@ -141,9 +157,9 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           }
         }
         if (avatarUploadError) {
-          message.warning(`Đã tạo nhân viên nhưng ảnh chưa được lưu: ${avatarUploadError}. Nhân viên có thể tải ảnh sau khi đăng nhập.`);
+          message.warning(`Đã tạo nhân viên nhưng ảnh chưa được lưu: ${avatarUploadError}. ${credentialNotice}`);
         } else {
-          message.success(avatarUploaded ? "Đã tạo nhân viên và tải ảnh đại diện lên." : "Đã tạo tài khoản nhân viên.");
+          message.success(`${avatarUploaded ? "Đã tạo nhân viên và tải ảnh đại diện lên." : "Đã tạo nhân viên."} ${credentialNotice}`);
         }
       } else if (!isEmployeeView && values.site_code) {
         const createdAccount = await adminApi.createAdminSmall({
@@ -184,7 +200,11 @@ export default function AccountsPage({ view }: AccountsPageProps) {
       }
       resetCreateForm();
       setCreating(false);
-      void load();
+      if (isEmployeeView && isAdminBig && createdEmployeeSite && createdEmployeeSite !== site) {
+        setSelectedSite(createdEmployeeSite);
+      } else {
+        void load();
+      }
     } catch (reason) {
       message.error(reason instanceof ApiError ? reason.message : "Không tạo được tài khoản.");
     } finally {
@@ -202,6 +222,23 @@ export default function AccountsPage({ view }: AccountsPageProps) {
       void load();
     } catch (reason) {
       message.error(reason instanceof Error ? reason.message : "Không xóa được Admin Small; hãy thử lại.");
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const confirmDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    setDeleteSubmitting(true);
+    try {
+      const result = await adminApi.deleteEmployee(deletingEmployee.slug, deletingEmployee.site_code);
+      message.success(result.profile_retained
+        ? "Đã xóa tài khoản; hồ sơ được giữ lại để bảo toàn phiếu thu."
+        : "Đã xóa vĩnh viễn tài khoản và hồ sơ nhân viên.");
+      setDeletingEmployee(null);
+      void load();
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Không xóa được tài khoản; có thể thử lại.");
     } finally {
       setDeleteSubmitting(false);
     }
@@ -267,25 +304,70 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     { title: "Ảnh", dataIndex: "avatar_secure_url", width: 72, render: (value: string | null, row) => <Avatar src={value || undefined} icon={<UserOutlined />} alt={`Ảnh đại diện ${row.full_name}`} /> },
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
+    { title: "Tên đăng nhập", dataIndex: "username" },
+    { title: "Số điện thoại", dataIndex: "phone", render: (value: string | null) => value || "—" },
     { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Chức vụ", dataIndex: "job_title", render: (value: Employee["job_title"]) => employeeRoleLabels[value] },
+    {
+      title: "Mật khẩu qua email",
+      dataIndex: "credential_email_status",
+      render: (value: Employee["credential_email_status"], row: Employee) => {
+        const emailStatus = value || "unknown";
+        if (emailStatus === "ready" || emailStatus === "failed") {
+          return <Popconfirm
+            title={emailStatus === "failed" ? "Thử gửi lại mật khẩu?" : "Gửi mật khẩu tạm một lần?"}
+            description={`Email sẽ được gửi đến ${row.email}. Sau khi gửi thành công, không thể gửi lại.`}
+            onConfirm={async () => {
+              setSendingCredentialId(row.account_id);
+              try {
+                await adminApi.sendEmployeeCredentials(row.account_id, row.site_code);
+                message.success(`Đã gửi mật khẩu đến ${row.email}. Không thể gửi lại.`);
+                await load();
+              } catch (reason) {
+                message.error(reason instanceof Error ? reason.message : "Không gửi được email.");
+                void load();
+              } finally { setSendingCredentialId(""); }
+            }}
+          >
+            <Button size="small" type="primary" loading={sendingCredentialId === row.account_id}
+              disabled={row.account_status !== "active" || row.employee_status !== "dang_lam"}>
+              {emailStatus === "failed" ? "Thử lại" : "Gửi mật khẩu"}
+            </Button>
+          </Popconfirm>;
+        }
+        const labels: Record<Exclude<NonNullable<Employee["credential_email_status"]>, "ready" | "failed">, [string, string]> = {
+          sent: ["Đã gửi", "green"],
+          processing: ["Đang xử lý", "processing"],
+          unknown: ["Không rõ · đã khóa gửi lại", "default"],
+          changed: ["Mật khẩu đã đổi", "default"],
+        };
+        const [label, color] = labels[emailStatus];
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
     {
       title: "Thao tác",
-      render: (_: unknown, row: Employee) => <Button danger size="small" onClick={() => modal.confirm({ title: "Vô hiệu hóa tài khoản nhân viên này?", okText: "Xóa", cancelText: "Hủy", okButtonProps: { danger: true }, onOk: async () => {
-        try { await adminApi.deleteEmployee(row.slug, row.site_code); message.success("Đã vô hiệu hóa tài khoản."); void load(); }
-        catch (reason) { message.error(reason instanceof Error ? reason.message : "Không vô hiệu hóa được tài khoản."); }
-      } })}>Xóa</Button>,
+      render: (_: unknown, row: Employee) => <Space>
+        {row.account_status === "active" && row.employee_status === "dang_lam" && <Button size="small" onClick={async () => {
+          try {
+            await adminApi.setEmployeeStatus(row.slug, row.site_code);
+            message.success("Đã ngưng tài khoản nhân viên.");
+            void load();
+          } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không cập nhật được trạng thái tài khoản."); }
+        }}>Ngưng</Button>}
+        <Button danger size="small" onClick={() => setDeletingEmployee(row)}>Xóa vĩnh viễn</Button>
+      </Space>,
     },
   ];
 
   return <Card
     title={isEmployeeView ? "Quản lý nhân viên" : "Quản trị Admin Small"}
-    extra={<Button type="primary" onClick={() => setCreating(true)}>{isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"}</Button>}
+    extra={<Button type="primary" onClick={openCreateForm}>{isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"}</Button>}
   >
     {error && <Alert type="warning" showIcon title={error} style={{ marginBottom: 16 }} />}
     {isEmployeeView
-      ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 760 }} />
+      ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 1000 }} />
       : <Table<AdminSmall> rowKey="account_id" loading={loading} columns={adminColumns} dataSource={admins} scroll={{ x: 760 }} />}
     <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} width="min(760px, calc(100vw - 32px))" onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} destroyOnHidden closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting} styles={{ body: { maxHeight: "calc(100dvh - 140px)", overflowY: "auto" } }}>
       <Form form={form} layout="vertical" onFinish={submit}>
@@ -312,7 +394,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
             <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>
+            <Form.Item name="username" label="Tên đăng nhập phụ (không bắt buộc)" extra="Email cũng dùng để đăng nhập."><Input maxLength={100} /></Form.Item>
           </Col>
           <Col xs={24} md={12}>
             {isEmployeeView
@@ -361,6 +443,31 @@ export default function AccountsPage({ view }: AccountsPageProps) {
         </Typography.Text>
         <Typography.Text type="secondary">
           Nhật ký và lịch sử liên quan vẫn được giữ. Hệ thống sẽ từ chối nếu tài khoản còn dữ liệu nghiệp vụ cần bảo toàn.
+        </Typography.Text>
+      </Space>
+    </Modal>
+    <Modal
+      title="Xóa vĩnh viễn tài khoản nhân viên?"
+      open={deletingEmployee !== null}
+      centered
+      width={500}
+      okText="Xóa vĩnh viễn"
+      cancelText="Hủy"
+      okButtonProps={{ danger: true }}
+      confirmLoading={deleteSubmitting}
+      closable={!deleteSubmitting}
+      mask={{ closable: !deleteSubmitting }}
+      keyboard={!deleteSubmitting}
+      onCancel={() => { if (!deleteSubmitting) setDeletingEmployee(null); }}
+      onOk={confirmDeleteEmployee}
+    >
+      <Space orientation="vertical" size={8}>
+        <Typography.Text>
+          Xóa tài khoản đăng nhập của <strong>{deletingEmployee?.full_name}</strong> tại cơ sở <strong>{deletingEmployee?.site_code}</strong>?
+          Thao tác này không thể hoàn tác.
+        </Typography.Text>
+        <Typography.Text type="secondary">
+          Phiên đăng nhập, token đặt lại mật khẩu và ảnh đại diện sẽ bị xóa. Hồ sơ có phiếu thu sẽ được giữ rời tài khoản để bảo toàn chứng từ.
         </Typography.Text>
       </Space>
     </Modal>
