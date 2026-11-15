@@ -168,17 +168,21 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 **Nghiệm thu:** trang công khai không yêu cầu đăng nhập; API không trả hồ sơ học viên, thông tin tài khoản hoặc dữ liệu nội bộ.
 
-### FS-BLOG-01 — Danh mục và chi tiết Blog công khai
+### FS-BLOG-01 — Danh mục, bài viết công khai và quản trị Blog
 
-**Người dùng:** khách, người dùng chưa đăng nhập. **Phân tán:** `GLOBAL` đọc các bản `DanhMucBlog` và `BaiVietBlog` riêng tại từng site, tổng hợp/đối chiếu ở API.
+**Người dùng:** khách chưa đăng nhập (đọc công khai), Admin Big (quản trị CMS). **Phân tán:** public `GLOBAL`; CMS `REPLICATED-WRITE` tới các bản `DanhMucBlog`/`BaiVietBlog` riêng tại từng site.
 
 1. `GET /api/v1/blog/categories/` trả danh mục đang hoạt động cùng số bài đã xuất bản; chỉ tính bài đã xuất bản, không ẩn và không có ngày xuất bản trong tương lai.
 2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung văn bản, thời gian đọc, ngày xuất bản và danh mục.
 3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô.
 4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
 5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
+6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái và tạo, sửa, xóa qua các route `/api/v1/admin/blog/...`; quyền lấy từ phiên đã xác thực ở server. Admin Small không được ghi dữ liệu Blog dùng chung.
+7. Ghi Blog là `REPLICATED-WRITE`: Coordinator dùng danh sách site hoạt động từ dữ liệu và cấu hình, ghi mỗi bản sao trong transaction cục bộ, lưu ACK vào `Logs`, yêu cầu `Idempotency-Key` và retry bằng cùng key. Không cam kết ACID nguyên tử xuyên database.
+8. Nếu site thiếu trước khi ghi, trả lỗi dịch vụ; nếu một site lỗi sau khi các site khác đã commit, trả trạng thái chưa hoàn tất cùng `missing_sites`. Bản sao lệch hoặc key dùng lại với payload khác trả xung đột; không báo hoàn tất.
+9. Không xóa danh mục đang có bài viết tham chiếu. Xóa bài viết lưu ảnh chụp trước thao tác vào nhật ký đồng bộ; bài viết chỉ xuất hiện công khai khi đã xuất bản, danh mục hoạt động và đến thời điểm xuất bản.
 
-**Nghiệm thu:** danh sách và chi tiết lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện, slug được truy vấn có tham số, và lỗi site/lệch bản sao được hiển thị đúng trạng thái. API đọc Blog không bao gồm tạo/sửa/xóa CMS.
+**Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; Admin Big quản lý được cả danh mục và bài viết; quyền, validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
 
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 

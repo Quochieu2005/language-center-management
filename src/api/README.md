@@ -102,7 +102,7 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 
 Các nghiệp vụ bắt buộc của đề tài đã có route/service tương ứng trong source: đăng ký khóa học, xếp lớp, chuyển cơ sở, thu học phí tại quầy, quản lý điểm và thống kê học viên theo cơ sở. Chuyển cơ sở điều phối nhiều transaction cục bộ với phục hồi tiến về phía trước sau khi đích commit; không phải ACID nguyên tử xuyên database. Cơ chế khóa/transaction đăng ký bảo vệ chỗ cuối ở một site; phải chạy hai phiên SQL Server để chứng minh TC-CON-01.
 
-Blog có hai route đọc công khai: `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`. Service đọc `DanhMucBlog`/`BaiVietBlog` ở mọi site hoạt động; không có route ghi CMS. Chạy migration 36 trên từng DB trước khi gọi API; response Blog có cờ thiếu/lệch site theo hợp đồng trong `specs/api.md`.
+Blog có hai route đọc công khai: `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`. CMS Admin Big có route đọc danh sách/chi tiết và tạo/sửa/xóa danh mục, bài viết dưới `/api/v1/admin/blog/`. Writer dùng `REPLICATED-WRITE`: từng database site có transaction cục bộ và ACK trong `Logs`; request ghi cần `Idempotency-Key`, site lỗi sau khi đã commit một phần trả incomplete để retry cùng key. Chạy migration 36 trên từng DB trước khi gọi API; chi tiết hợp đồng, quyền và giới hạn commit ở `specs/api.md`.
 
 Học viên/portal và thanh toán SePay có code cùng schema nhưng **không được hiểu là đã được nhóm duyệt vào phạm vi môn học**. SePay mặc định tắt bằng `SEPAY_ENABLED=false`; không coi tích hợp là chạy thật khi chưa cấu hình merchant/webhook và kiểm chứng trên môi trường được cấp phép.
 

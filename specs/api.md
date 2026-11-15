@@ -212,14 +212,35 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 
 API không có endpoint đăng ký tài khoản công khai; source có `POST /api/v1/public/enrollments/` để gửi đăng ký khóa học, không phải tạo tài khoản. Admin Big tạo tài khoản nội bộ. Portal học viên có code/schema nhưng chưa được duyệt vào phạm vi đồ án; không bật public signup.
 
-### Blog công khai — route đọc đã có trong source
+### Blog — đọc công khai và CMS Admin Big đã có trong source
 
 Hai route chỉ đọc và cho phép khách chưa đăng nhập:
 
 - `GET /api/v1/blog/categories/` trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`. Mỗi danh mục có `slug`, `name`, `description`, `post_count`. `post_count` chỉ tính bài `da_xuat_ban` đã tới thời điểm xuất bản.
 - `GET /api/v1/blog/{slug}/` trả `{scope, complete, site_codes, result}`. `result` có `slug`, `title`, `excerpt`, `content` dạng văn bản thường, `reading_time_minutes`, `published_at` và `category: {slug, name}`.
 
-API đọc `DanhMucBlog` và `BaiVietBlog` từ từng CSDL site đang hoạt động qua Site Router. Migration 36 tạo cùng dữ liệu mẫu ở từng database; API so sánh kết quả trước khi trả chi tiết. Đây là khởi tạo bản sao, không phải writer replication runtime và không phải bằng chứng YC-03/TC-REP-01. Danh sách có thể trả `200` cùng `complete=false` và site thiếu/lệch; chi tiết trả `404` nếu không có slug, `409` nếu bản sao khác nhau, `503` nếu không đọc đủ site. Nội dung phải được frontend render như text đã escape. Chưa có API Admin tạo/sửa/xóa Blog.
+Admin Big dùng các route sau; phiên và vai trò phải được xác thực ở server, không nhận site hoặc role từ client:
+
+| Route | Hành vi |
+|---|---|
+| `GET /api/v1/admin/blog/categories/` | Đọc mọi danh mục và trạng thái, kèm số bài đang tham chiếu; trả trạng thái đối chiếu site. |
+| `POST /api/v1/admin/blog/categories/` | Tạo danh mục `{slug, name, description?, status?}`. |
+| `GET /api/v1/admin/blog/categories/{slug}/` | Đọc một danh mục mọi trạng thái. |
+| `PATCH /api/v1/admin/blog/categories/{slug}/` | Sửa một phần `slug`, `name`, `description`, `status`. |
+| `DELETE /api/v1/admin/blog/categories/{slug}/` | Xóa danh mục chỉ khi không có bài viết tham chiếu. |
+| `GET /api/v1/admin/blog/articles/` | Đọc metadata bài viết mọi trạng thái (không tải toàn bộ `content` cho danh sách); dùng route chi tiết để lấy nội dung. |
+| `POST /api/v1/admin/blog/articles/` | Tạo `{slug, category_slug, title, excerpt, content, reading_time_minutes, status?, published_at?}`. `content` là văn bản thường; `published_at` nhận thời điểm ISO có offset và lưu UTC tới giây. |
+| `GET /api/v1/admin/blog/articles/{slug}/` | Đọc một bài ở mọi trạng thái. |
+| `PATCH /api/v1/admin/blog/articles/{slug}/` | Sửa một phần các trường của bài viết, gồm `category_slug` và thời điểm ISO có offset `published_at` (lưu UTC tới giây). |
+| `DELETE /api/v1/admin/blog/articles/{slug}/` | Xóa bài viết và ghi ảnh chụp trước thao tác vào ACK đồng bộ tại từng site. |
+
+Mọi request ghi yêu cầu `Idempotency-Key` hợp lệ. Tất cả thao tác CMS thuộc `REPLICATED-WRITE`, chỉ Admin Big được dùng; Coordinator lấy các site hoạt động từ dữ liệu/cấu hình, dùng transaction cục bộ trên từng database và ghi ACK `Logs` cùng dữ liệu. Không có DB trung tâm hoặc khóa ngoại/JOIN xuyên site và không tuyên bố ACID nguyên tử xuyên database. Retry phải dùng lại cùng key, cùng route/path và cùng payload; key đã dùng cho nội dung khác trả `409`. Site thiếu trước khi bắt đầu ghi trả `503`; lỗi site sau khi một phần đã commit trả `202`, `complete=false`, `missing_sites` để retry. Bản sao Blog khác nhau trả `409`; slug sai/trùng và danh mục bài viết không tồn tại/đang ngừng được từ chối. Danh mục đang được bài viết dùng không thể xóa.
+
+Site tham gia là mọi cơ sở `hoat_dong` có cấu hình Site Router. Ghi đọc/đối chiếu `DanhMucBlog` hoặc `BaiVietBlog` tại từng site; mỗi transaction cục bộ ghi thêm `Logs` (`loai_log='sync'`) để giữ ACK/idempotency và trạng thái trước/sau. Với bài viết, `category_slug` được giải ra khóa danh mục nội bộ riêng tại từng database; không đồng bộ giá trị `IDENTITY` giữa site.
+
+Hai route GET collection trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`; GET detail trả `{scope, complete, site_codes, result}`. Collection danh mục có `post_count` mọi trạng thái; collection bài viết trả metadata, không tải `content` toàn bộ. Nếu thiếu site, collection vẫn trả danh sách canonical kèm `complete=false`; detail cần xác nhận đủ site và trả `503` khi thiếu.
+
+Các route đọc công khai và CMS đọc từng CSDL site riêng qua Site Router. Migration 36 tạo dữ liệu mẫu ban đầu, không phải writer replication. Public list có thể trả `200` cùng `complete=false` và site thiếu/lệch; public detail trả `404` nếu không có slug, `409` nếu bản sao khác nhau, `503` nếu không đọc đủ site. Nội dung phải được frontend render như text đã escape. Có API CMS không đồng nghĩa đã chạy TC-REP-01/TC-SYNC-01; cần kiểm chứng thay đổi thật, lỗi site, retry và đối soát trên SQL Server thật.
 
 ### Đăng nhập và liên kết tài khoản Google/Facebook — đã có code, cần cấu hình môi trường
 
@@ -629,7 +650,7 @@ Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm
 - `GLOBAL` không trả thành công toàn phần khi site bị lỗi: giữ kết quả từng site, đặt `complete: false`, liệt kê `missing_sites`; các thao tác yêu cầu đủ site như `REPLICATED-WRITE` phải báo thất bại/chờ đối soát theo chính sách, không giả thành công.
 - Ghi `Logs` append-only cùng transaction cục bộ cho các thao tác có audit. Log chỉ chứa định danh và dữ liệu nghiệp vụ tối thiểu; không ghi mật khẩu, hash mật khẩu, token, cookie, header xác thực hay thông tin kết nối.
 
-Replication runtime hiện có cho cập nhật `MonHoc` và tạo/sửa/xóa `KhoaHoc`: mỗi site ghi dữ liệu và ACK append-only vào `Logs` trong cùng transaction cục bộ. ACK có mã thao tác theo `Idempotency-Key` và site; retry cùng key/body tiếp tục site chưa ACK, còn key/body khác hoặc bản sao lệch trả xung đột để đối soát. Không thêm bảng và không dùng `Logs` như một outbox tổng quát cho các luồng khác. `CoSo` chưa có fan-out runtime đầy đủ; một số luồng tài khoản vẫn có cơ chế riêng, chưa được gom thành một service chung. Đây là mô tả code hiện có, không thay thế kịch bản chạy kiểm chứng đồng bộ trên các site.
+Replication runtime hiện có cho `MonHoc`, `KhoaHoc` và CMS `DanhMucBlog`/`BaiVietBlog`: mỗi writer ghi dữ liệu và ACK append-only vào `Logs` trong transaction cục bộ tại site. ACK có mã thao tác theo `Idempotency-Key` và site; retry cùng key/body tiếp tục site chưa ACK, còn key/body khác hoặc bản sao lệch trả xung đột để đối soát. Các writer là luồng theo miền nghiệp vụ, không dùng `Logs` như outbox tổng quát. `CoSo` chưa có fan-out runtime đầy đủ; một số luồng tài khoản vẫn có cơ chế riêng, chưa được gom thành một service chung. Đây là mô tả code hiện có, không thay thế kịch bản chạy kiểm chứng đồng bộ trên các site.
 
 ## Kiểm thử hợp đồng API cần có
 

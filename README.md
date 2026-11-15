@@ -237,7 +237,7 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`), `DanhMucBlog`, `BaiVietBlog` | Cùng schema và bản sao theo site. API hiện có luồng ghi runtime cho tài khoản, cập nhật `MonHoc`, và tạo/sửa/xóa `KhoaHoc`; Blog được seed ban đầu và chỉ có API đọc/đối chiếu, chưa có writer CMS. Seed không thay cho bằng chứng replication runtime |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`), `DanhMucBlog`, `BaiVietBlog` | Cùng schema và bản sao theo site. API có luồng ghi runtime cho tài khoản, `MonHoc`, `KhoaHoc` và CMS Blog; Blog dùng Coordinator ghi từng site, ACK trong `Logs`, retry idempotent. Seed không thay cho bằng chứng replication runtime |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện/log ghi tại site phát sinh; không nhân bản |
@@ -272,6 +272,8 @@ flowchart LR
 ```
 
 API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+
+CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
 Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
 
@@ -608,14 +610,16 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 
 ---
 
-### 5.15. Đọc danh mục và bài Blog công khai
+### 5.15. Đọc và quản trị Blog
 
 **Loại:** `GLOBAL` · **Ai làm:** khách chưa đăng nhập.
 
 - `GET /api/v1/blog/categories/` đọc danh mục và số bài đã xuất bản.
 - `GET /api/v1/blog/{slug}/` đọc chi tiết bài theo slug; chỉ trả bài đã xuất bản, danh mục đang hoạt động và đã đến thời điểm xuất bản.
 - API hỏi riêng từng CSDL site qua Site Router, đối chiếu các bản sao `DanhMucBlog`/`BaiVietBlog` rồi trả kết quả ở tầng ứng dụng. Không tạo DB trung tâm hoặc JOIN xuyên site. Danh sách báo `complete`, `missing_sites`, `inconsistent_sites`; chi tiết trả 404 khi không có slug, 409 khi bản sao khác nhau, 503 khi không đọc đủ site.
-- Migration `36_add_blog_tables.sql` tạo hai bảng và nạp ba bài mẫu tĩnh hiện có vào từng database. Đây là dữ liệu khởi tạo, không phải replication runtime. Chưa có API Admin tạo/sửa/xóa bài; giao diện `/blog` hiện vẫn dùng nội dung tĩnh cho tới khi được nối API.
+- Admin Big dùng `/api/v1/admin/blog/categories/` và `/api/v1/admin/blog/articles/` để đọc, tạo, sửa, xóa danh mục/bài viết; API yêu cầu phiên Admin Big và `Idempotency-Key`. Danh mục đang được bài viết dùng không thể xóa.
+- CMS ghi theo `REPLICATED-WRITE` tới từng site đang hoạt động, mỗi site dùng transaction cục bộ và lưu ACK trong `Logs`. Nếu lỗi sau khi một phần đã commit, API trả `202` với site thiếu; retry phải dùng cùng key/payload. Không có cam kết ACID nguyên tử xuyên database; bản sao lệch trả conflict để đối soát.
+- Migration `36_add_blog_tables.sql` tạo hai bảng và nạp ba bài mẫu ban đầu vào từng database. Seed là khởi tạo, không phải bằng chứng kiểm chứng replication. Giao diện `/blog` vẫn dùng nội dung tĩnh và chưa có màn hình CMS nối các API mới.
 
 Blog là chức năng hỗ trợ, không thay thế sáu nghiệp vụ bắt buộc của đề tài. Xem [hợp đồng API](specs/api.md), [schema](docs/DATABASE_SCHEMA.md) và [ma trận trạng thái](docs/Trang-Thai-Trien-Khai.md).
 

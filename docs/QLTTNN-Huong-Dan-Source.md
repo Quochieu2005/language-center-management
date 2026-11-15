@@ -231,7 +231,7 @@ src/
         ├── auth/                   Đăng nhập, session, tài khoản và reset OTP
         ├── sites/                  Site Router và kết nối SQL Server
         ├── catalog/                Môn/khóa học, đọc và ghi bản sao
-        ├── blog/                   API đọc danh mục và bài công khai theo slug qua Global Query
+        ├── blog/                   API Blog công khai qua Global Query và CMS Admin Big đồng bộ bản sao
         ├── classes/                Lớp, phòng, đăng ký và xếp lớp
         ├── academics/              Lịch, điểm danh, điểm, học phí, chuyển và báo cáo
         ├── students/               Hồ sơ, portal và điều phối xóa học viên

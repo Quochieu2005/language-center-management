@@ -52,7 +52,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `33_add_course_duration_fields.sql` | Thêm thời lượng tháng/ngày cho `KhoaHoc`; chạy trước 34 và 35 khi cần nâng schema cũ. |
 | `34_allow_fractional_course_months.sql` | Đổi thời lượng sang `DECIMAL(7,2)` để hỗ trợ tháng lẻ; chạy sau 33. |
 | `35_allow_optional_course_session_count.sql` | Cho phép `KhoaHoc.so_buoi` để trống đến khi lịch được xếp; chạy sau 33–34. |
-| `36_add_blog_tables.sql` | Tạo `DanhMucBlog`/`BaiVietBlog` và nạp ba bài mẫu ban đầu; chạy riêng trên từng database site để bật hai API Blog công khai. |
+| `36_add_blog_tables.sql` | Tạo `DanhMucBlog`/`BaiVietBlog` và nạp ba bài mẫu ban đầu; chạy riêng trên từng database site trước khi dùng API Blog công khai hoặc CMS Admin Big. |
 
 ## Chạy bằng SSMS
 
@@ -73,7 +73,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 - Mỗi cơ sở có một database riêng. Khóa ngoại chỉ trỏ tới bảng trong database đó; không có khóa ngoại hoặc JOIN giữa database của các cơ sở.
 - Khi demo trên một máy, có thể đặt cả ba database trên một SQL Server instance nhưng vẫn dùng tên database/kết nối riêng. `00_create_databases.sql` dành cho cách cài này. Nếu triển khai mỗi site trên một SQL Server khác nhau, chỉ tạo database của site tương ứng trên máy đó rồi chạy schema/seed/role riêng qua kết nối của site đó; không tạo cả ba database lặp lại trên từng máy.
 - `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` là dữ liệu nhân bản theo schema. Google/Facebook subject nằm trong dòng `TaiKhoan`; chỉ liên kết sau khi người dùng đã xác thực vào tài khoản nội bộ. Script seed không tạo tài khoản hoặc liên kết đăng nhập mẫu.
-- `DanhMucBlog`/`BaiVietBlog` có mặt tại từng site; migration 36 khởi tạo cùng ba bài mẫu. API đọc `GLOBAL` và đối chiếu dữ liệu nhưng chưa có writer CMS; migration seed không phải cơ chế replication runtime. Nếu một site bị thiếu hoặc lệch Blog, API phải báo incomplete/conflict thay vì coi như bản sao đúng.
+- `DanhMucBlog`/`BaiVietBlog` có mặt tại từng site; migration 36 khởi tạo cùng ba bài mẫu. API public đọc `GLOBAL`; CMS Admin Big ghi `REPLICATED-WRITE` theo transaction cục bộ từng site và lưu ACK trong `Logs`. Migration seed không phải cơ chế replication runtime. Nếu một site bị thiếu hoặc lệch Blog, API phải báo incomplete/conflict thay vì coi như bản sao đúng.
 - Script seed danh mục là thao tác nạp ban đầu, chưa phải đồng bộ runtime. Source có service `REPLICATED-WRITE` cho `MonHoc` và `KhoaHoc`; `CoSo` chưa có fan-out runtime đầy đủ. Không lấy seed, code hoặc unit test làm bằng chứng TC-REP-01/TC-SYNC-01; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
 - Các bảng nghiệp vụ và bảng con được lưu tại site tương ứng. Cột `ma_co_so` trên bảng con là khóa phân mảnh để database kiểm tra các quan hệ cùng site bằng khóa ngoại ghép.
 - `GiaoDichChuyenCoSo` chỉ có bản ghi trong database của site nguồn; Admin Small tạo đề nghị `cho_duyet` tại đó, Admin Big quyết định qua Coordinator, và Coordinator chỉ thực hiện khi đã duyệt. Source có route để Admin Big retry; worker/lịch retry chạy nền chưa được xác nhận. Bảng lưu người đề nghị, người quyết định và lý do; unique index giới hạn mỗi học viên còn tối đa một đề nghị/giao dịch mở. `LichSuChuyenCoSo` là nhật ký append-only tại nơi hành động xảy ra (nguồn hoặc đích); `ma_chuyen` chỉ dùng để đối chiếu giữa hai database, không tạo khóa ngoại xuyên site.

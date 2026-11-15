@@ -107,6 +107,65 @@ def _read_site_article(site_code: str, slug: str) -> dict | None:
     }
 
 
+def _read_site_admin_categories(site_code: str) -> tuple[dict, ...]:
+    alias = get_site_database_alias(site_code)
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT category.slug, category.ten_danh_muc, category.mo_ta,
+                   category.trang_thai, COUNT_BIG(post.ma_bai_viet_blog)
+            FROM dbo.DanhMucBlog AS category
+            LEFT JOIN dbo.BaiVietBlog AS post
+              ON post.ma_danh_muc_blog = category.ma_danh_muc_blog
+            GROUP BY category.slug, category.ten_danh_muc, category.mo_ta, category.trang_thai
+            ORDER BY category.slug
+            """
+        )
+        return tuple(
+            {
+                "slug": str(row[0]),
+                "name": str(row[1]),
+                "description": None if row[2] is None else str(row[2]),
+                "status": str(row[3]),
+                "post_count": int(row[4]),
+            }
+            for row in cursor.fetchall()
+        )
+
+
+def _read_site_admin_articles(site_code: str) -> tuple[dict, ...]:
+    alias = get_site_database_alias(site_code)
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT post.slug, category.slug, post.tieu_de, post.tom_tat,
+                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc
+            FROM dbo.BaiVietBlog AS post
+            INNER JOIN dbo.DanhMucBlog AS category
+              ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
+            ORDER BY post.slug
+            """
+        )
+        rows = cursor.fetchall()
+    articles = []
+    for row in rows:
+        published_at = row[6]
+        if published_at is not None and published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=datetime_timezone.utc)
+        articles.append(
+            {
+                "slug": str(row[0]),
+                "category_slug": str(row[1]),
+                "title": str(row[2]),
+                "excerpt": str(row[3]),
+                "reading_time_minutes": int(row[4]),
+                "status": str(row[5]),
+                "published_at": published_at,
+            }
+        )
+    return tuple(articles)
+
+
 def _read_snapshots(site_codes: tuple[str, ...], reader, initial_missing=()):
     snapshots = {}
     missing_sites = set(initial_missing)
@@ -203,3 +262,103 @@ def get_public_blog_article(slug: str) -> dict:
             inconsistent_sites=inconsistent_sites,
         )
     return {"scope": "GLOBAL", "complete": True, "site_codes": list(site_codes), "result": canonical}
+
+
+def _list_admin_blog(reader) -> dict:
+    # shortcut: return all Blog metadata; add pagination when editorial volume requires it.
+    site_codes, initial_missing = _site_state()
+    snapshots, missing_sites = _read_snapshots(site_codes, reader, initial_missing)
+    if not snapshots:
+        raise PublicBlogUnavailable(
+            "Không đọc được dữ liệu quản trị Blog ở site nào.",
+            site_codes=site_codes,
+            missing_sites=missing_sites or site_codes,
+        )
+    canonical_site = _canonical_site(snapshots)
+    canonical = snapshots[canonical_site]
+    inconsistent_sites = tuple(
+        sorted(site for site, values in snapshots.items() if values != canonical)
+    )
+    return {
+        "scope": "GLOBAL",
+        "complete": not missing_sites and not inconsistent_sites,
+        "site_codes": list(site_codes),
+        "missing_sites": list(missing_sites),
+        "inconsistent_sites": list(inconsistent_sites),
+        "count": len(canonical),
+        "results": list(canonical),
+    }
+
+
+def list_admin_blog_categories() -> dict:
+    return _list_admin_blog(_read_site_admin_categories)
+
+
+def list_admin_blog_articles() -> dict:
+    return _list_admin_blog(_read_site_admin_articles)
+
+
+def _get_admin_blog_record(reader, slug: str, label: str) -> dict:
+    normalized_slug = str(slug or "").strip().lower()
+    if not normalized_slug:
+        raise PublicBlogNotFound(f"Không tìm thấy {label}.")
+    site_codes, initial_missing = _site_state()
+    snapshots, missing_sites = _read_snapshots(site_codes, lambda site: reader(site, normalized_slug), initial_missing)
+    if missing_sites or len(snapshots) != len(site_codes):
+        raise PublicBlogUnavailable(
+            f"Không đọc đủ site để xác nhận {label}.",
+            site_codes=site_codes,
+            missing_sites=missing_sites or tuple(sorted(set(site_codes) - set(snapshots))),
+        )
+    found = {site: value for site, value in snapshots.items() if value is not None}
+    if not found:
+        raise PublicBlogNotFound(f"Không tìm thấy {label}.", site_codes=site_codes)
+    canonical_site = _canonical_site(found)
+    canonical = found[canonical_site]
+    inconsistent = tuple(sorted(site for site in site_codes if snapshots[site] != canonical))
+    if inconsistent:
+        raise PublicBlogConflict(
+            f"Các bản sao {label} không thống nhất giữa các site.",
+            site_codes=site_codes,
+            inconsistent_sites=inconsistent,
+        )
+    return {"scope": "GLOBAL", "complete": True, "site_codes": list(site_codes), "result": canonical}
+
+
+def _read_site_admin_category(site_code: str, slug: str) -> dict | None:
+    return next((row for row in _read_site_admin_categories(site_code) if row["slug"] == slug), None)
+
+
+def _read_site_admin_article(site_code: str, slug: str) -> dict | None:
+    alias = get_site_database_alias(site_code)
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT post.slug, category.slug, post.tieu_de, post.tom_tat, post.noi_dung,
+                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc
+            FROM dbo.BaiVietBlog AS post
+            INNER JOIN dbo.DanhMucBlog AS category
+              ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
+            WHERE post.slug = %s
+            """,
+            [slug],
+        )
+        row = cursor.fetchone()
+    if row is None:
+        return None
+    published_at = row[7]
+    if published_at is not None and published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=datetime_timezone.utc)
+    return {
+        "slug": str(row[0]), "category_slug": str(row[1]), "title": str(row[2]),
+        "excerpt": str(row[3]), "content": str(row[4]), "reading_time_minutes": int(row[5]),
+        "status": str(row[6]), "published_at": published_at,
+    }
+
+
+def get_admin_blog_category(slug: str) -> dict:
+    return _get_admin_blog_record(_read_site_admin_category, slug, "danh mục Blog")
+
+
+def get_admin_blog_article(slug: str) -> dict:
+    return _get_admin_blog_record(_read_site_admin_article, slug, "bài Blog")
