@@ -292,7 +292,7 @@ flowchart TD
 
 ### 3.4. Luồng đăng nhập, đăng ký và phân quyền giao diện
 
-1. Mọi vai trò mở cùng route `/login`; trang dùng tên đăng nhập/mật khẩu. Source có OAuth Google/Facebook cho tài khoản học viên đã liên kết; chỉ hiển thị nút khi cấu hình provider thật sẵn sàng. Frontend không hỏi người dùng muốn vào vai trò nào.
+1. Mọi vai trò mở cùng route `/login`; trường định danh nhận email hoặc tên đăng nhập cùng mật khẩu. Source có OAuth Google/Facebook cho tài khoản học viên đã liên kết; chỉ hiển thị nút khi cấu hình provider thật sẵn sàng. Frontend không hỏi người dùng muốn vào vai trò nào.
 2. Với OAuth, frontend điều hướng trình duyệt tới API start endpoint; backend quản lý state/nonce, callback, kiểm tra provider subject và liên kết tài khoản. Frontend không nhận hay lưu provider access token. Không tự tạo tài khoản hoặc tự liên kết qua email; kết nối provider thật còn phải được cấu hình và kiểm chứng.
 3. API xác thực trạng thái hoạt động và quyền; mật khẩu không được lưu ở trình duyệt hoặc ghi ra log. API là nơi quyết định vai trò, chức vụ, site và phạm vi lớp.
 4. Sau đăng nhập thành công, frontend gọi `GET /api/v1/auth/profile/{slug}/` với slug nhận từ phản hồi đăng nhập, đọc hồ sơ phiên do API trả về rồi mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; lễ tân, kế toán và giáo viên thấy menu theo nhiệm vụ.

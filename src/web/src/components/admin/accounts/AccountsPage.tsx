@@ -25,7 +25,7 @@ function toSlug(value: string) {
 export default function AccountsPage({ view }: AccountsPageProps) {
   const { message, modal } = App.useApp();
   const { user } = useSession();
-  const { siteCodes, selectedSite } = useSiteScope();
+  const { siteCodes, selectedSite, setSelectedSite } = useSiteScope();
   const [admins, setAdmins] = useState<AdminSmall[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +55,12 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     setAvatarFile(null);
     setAvatarPreview("");
     if (avatarInput.current) avatarInput.current.value = "";
+  };
+
+  const openCreateForm = () => {
+    resetCreateForm();
+    form.setFieldsValue({ site_code: site || siteCodes[0] });
+    setCreating(true);
   };
 
   const chooseAvatar = (file?: File) => {
@@ -105,6 +111,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   }, [load]);
 
   const submit = async (values: { full_name: string; email: string; username?: string; slug?: string; phone?: string; site_code?: string; job_title?: Employee["job_title"] }) => {
+    let createdEmployeeSite: string | undefined;
     setSubmitting(true);
     try {
       if (isEmployeeView && values.job_title) {
@@ -117,6 +124,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           job_title: values.job_title,
           avatar_requested: Boolean(avatarFile),
         });
+        createdEmployeeSite = createdEmployee.site_code;
         let avatarUploaded = false;
         let avatarUploadError = "";
         if (avatarFile) {
@@ -184,7 +192,11 @@ export default function AccountsPage({ view }: AccountsPageProps) {
       }
       resetCreateForm();
       setCreating(false);
-      void load();
+      if (isEmployeeView && isAdminBig && createdEmployeeSite && createdEmployeeSite !== site) {
+        setSelectedSite(createdEmployeeSite);
+      } else {
+        void load();
+      }
     } catch (reason) {
       message.error(reason instanceof ApiError ? reason.message : "Không tạo được tài khoản.");
     } finally {
@@ -210,6 +222,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   const adminColumns: ColumnsType<AdminSmall> = [
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
+    { title: "Tên đăng nhập", dataIndex: "username" },
     { title: "Cơ sở", dataIndex: "site_code" },
     {
       title: "Mật khẩu qua email",
@@ -281,7 +294,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
 
   return <Card
     title={isEmployeeView ? "Quản lý nhân viên" : "Quản trị Admin Small"}
-    extra={<Button type="primary" onClick={() => setCreating(true)}>{isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"}</Button>}
+    extra={<Button type="primary" onClick={openCreateForm}>{isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"}</Button>}
   >
     {error && <Alert type="warning" showIcon title={error} style={{ marginBottom: 16 }} />}
     {isEmployeeView

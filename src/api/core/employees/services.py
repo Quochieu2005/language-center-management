@@ -263,7 +263,9 @@ def _send_credentials(email: str, full_name: str, username: str, password: str) 
             subject="Tài khoản nhân viên Trung tâm Ngoại ngữ",
             message=(
                 f"Chào {full_name},\n\nTài khoản nhân viên của bạn đã được tạo.\n"
-                f"Tên đăng nhập: {username}\nMật khẩu tạm thời: {password}\n\n"
+                f"Email đăng nhập: {email}\nTên đăng nhập: {username}\n"
+                f"Mật khẩu tạm thời: {password}\n\n"
+                "Bạn có thể đăng nhập bằng email hoặc tên đăng nhập.\n"
                 "Hãy đổi mật khẩu ngay lần đăng nhập đầu tiên và không chia sẻ mật khẩu."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,

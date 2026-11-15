@@ -52,6 +52,10 @@ class EmployeeCollectionView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "employee_management"
 
+    def get_throttles(self):
+        self.throttle_scope = "employee_read" if self.request.method == "GET" else "employee_management"
+        return super().get_throttles()
+
     @extend_schema(
         operation_id="employee_list",
         tags=["Quản lý nhân viên"],
@@ -142,6 +146,10 @@ class EmployeeDetailView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "employee_management"
+
+    def get_throttles(self):
+        self.throttle_scope = "employee_read" if self.request.method == "GET" else "employee_management"
+        return super().get_throttles()
 
     @extend_schema(
         operation_id="employee_detail_by_slug",

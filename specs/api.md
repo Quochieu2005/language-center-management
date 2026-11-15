@@ -198,7 +198,7 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 | `GET /api/v1/blog/categories/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu các bản Blog ở từng site | Đọc `DanhMucBlog`/`BaiVietBlog`; trả danh mục hoạt động, `post_count`, `complete`, `missing_sites`, `inconsistent_sites`; `503` nếu không đọc được site nào |
 | `GET /api/v1/blog/{slug}/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu bài theo slug ở từng site | Chỉ trả bài đã xuất bản nếu các bản khớp; `404` nếu không có, `409` nếu lệch, `503` nếu thiếu site |
 | `GET /api/v1/courses/{course_slug}/classes/` | Khách chưa đăng nhập | Route hiện có; truy vấn theo phạm vi API | Đọc lớp công khai của khóa học; đối chiếu status/missing site theo response hiện tại trước khi dùng như hợp đồng |
-| `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
+| `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận email hoặc tên đăng nhập cùng mật khẩu; tìm danh tính trên các bản `TaiKhoan` site hoạt động, trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
 | `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập hoặc đã xác thực để liên kết | Route hiện có; `provider` chỉ `google` hoặc `facebook` | Tạo state dùng một lần; callback chỉ đăng nhập tài khoản học viên đã liên kết, không tự tạo hoặc ghép theo email |
 | `GET /api/v1/auth/oauth/{provider}/callback/` | Callback Google/Facebook | Route hiện có | Đổi authorization code ở server, xác minh provider subject; phụ thuộc OAuth configuration thật |
 | `GET /api/v1/auth/oauth/connections/{slug}/` | Học viên đã đăng nhập | Đọc trạng thái liên kết tài khoản theo phiên | Chỉ trả trạng thái liên kết của chính học viên đã xác thực |
@@ -329,7 +329,7 @@ Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan
 
 | Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
 |---|---|---|---|
-| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang, gồm `avatar_secure_url`; Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang, gồm email, username và `avatar_secure_url`; Big phải chọn site, Small chỉ thấy site gắn phiên |
 | `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
 | `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn, gồm `avatar_secure_url`; không dò hoặc JOIN qua site khác |
 | `PATCH /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Chỉ cập nhật `NhanVien.ho_ten`, `sdt`, `chuc_vu`; ghi `Logs` cùng transaction cục bộ |
@@ -338,6 +338,10 @@ Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan
 | `POST /api/v1/admin/employees/{slug}/avatar/complete/` | Admin Big; Admin Small đúng site, token cấp lúc tạo | `REPLICATED-WRITE` | Xác minh asset Cloudinary rồi cập nhật `TaiKhoan.avatar_public_id`/`avatar_secure_url` cùng audit tại từng site hoạt động; lỗi site trả incomplete/503, không báo hoàn tất giả |
 
 PATCH nhận ít nhất một trong `full_name`, `phone`, `job_title`; body có trường lạ nhận `400`. `phone: null` hoặc `phone: ""` xóa số điện thoại. Chỉ hồ sơ đang làm việc có tài khoản hoạt động được sửa; email/tên đăng nhập là danh tính tài khoản nhân bản, còn `site_code` xác định mảnh nên các trường này không được sửa bằng endpoint hồ sơ. GET/PATCH/DELETE dùng query `site_code` cho Admin Big; Admin Small có thể bỏ query hoặc truyền đúng site của mình.
+
+API GET danh sách/chi tiết nhân viên dùng scope đọc `employee_read` (120 request/phút), tách khỏi scope ghi `employee_management` (10 request/giờ) của POST/PATCH/DELETE. Việc tải danh sách sau khi tạo không tiêu hao hạn mức ghi.
+
+Email cấp tài khoản nhân viên hiển thị email và tên đăng nhập; người dùng có thể đăng nhập bằng một trong hai giá trị.
 
 `tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này trước khi triển khai phiên bản mới. Chức vụ `le_tan` là nhân viên tiếp nhận tại quầy; trong source hiện tại được thao tác lớp/đăng ký và kế hoạch đóng học phí, còn tra cứu danh sách học viên thuộc `tu_van`.
 
@@ -456,12 +460,12 @@ Các trường dưới đây là phần nghiệp vụ tối thiểu để đặc
 
 ```json
 {
-  "ten_dang_nhap": "nhanvien.q1",
-  "mat_khau": "<không ghi vào log>"
+  "identifier": "nhanvien.q1",
+  "password": "<không ghi vào log>"
 }
 ```
 
-API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
+`identifier` có thể là email hoặc tên đăng nhập. API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
 
 Khuyến nghị phiên trình duyệt dùng cookie `HttpOnly`, `Secure`, `SameSite` và cơ chế CSRF phù hợp; không lưu access token/mật khẩu trong `localStorage`. Nếu nhóm chọn cơ chế bearer token khác, phải đặc tả thời hạn, thu hồi, refresh và nơi lưu trước khi code.
 
