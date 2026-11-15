@@ -179,7 +179,7 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô.
 4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
 5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
-6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái và tạo, sửa, xóa qua các route `/api/v1/admin/blog/...`; quyền lấy từ phiên đã xác thực ở server. Admin Small không được ghi dữ liệu Blog dùng chung.
+6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái và tạo, sửa, xóa qua CMS `/admin/blog` cùng các route `/api/v1/admin/blog/...`; quyền lấy từ phiên đã xác thực ở server. Admin Small không được ghi dữ liệu Blog dùng chung.
 7. Ghi Blog là `REPLICATED-WRITE`: Coordinator dùng danh sách site hoạt động từ dữ liệu và cấu hình, ghi mỗi bản sao trong transaction cục bộ, lưu ACK vào `Logs`, yêu cầu `Idempotency-Key` và retry bằng cùng key. Không cam kết ACID nguyên tử xuyên database.
 8. Nếu site thiếu trước khi ghi, trả lỗi dịch vụ; nếu một site lỗi sau khi các site khác đã commit, trả trạng thái chưa hoàn tất cùng `missing_sites`. Bản sao lệch hoặc key dùng lại với payload khác trả xung đột; không báo hoàn tất.
 9. Không xóa danh mục đang có bài viết tham chiếu. Xóa bài viết lưu ảnh chụp trước thao tác vào nhật ký đồng bộ; bài viết chỉ xuất hiện công khai khi đã xuất bản, danh mục hoạt động và đến thời điểm xuất bản.

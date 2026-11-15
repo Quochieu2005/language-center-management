@@ -64,7 +64,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
       items: [
         { label: "Thông báo", href: "/admin/notifications", icon: <BellOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Nhật ký Admin", href: "/admin/audit", icon: <FileSearchOutlined />, roles: ["admin_big", "admin_small"] },
-        { label: "Blog", href: "/blog", icon: <ReadOutlined />, openInNewTab: true },
+        { label: "Blog", href: "/admin/blog", icon: <ReadOutlined />, roles: ["admin_big"] },
         { label: "Liên hệ", href: "/contact", icon: <PhoneOutlined />, openInNewTab: true },
       ],
     },
