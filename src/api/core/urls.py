@@ -80,7 +80,7 @@ from core.academics.sepay_views import (
     StudentSePayPaymentCreateView,
     StudentSePayPaymentStatusView,
 )
-from core.employees.views import EmployeeCollectionView, EmployeeDetailView
+from core.employees.views import EmployeeCollectionView, EmployeeDetailView, EmployeeStatusView
 from core.catalog.views import (
     SharedCourseCollectionView,
     SharedCourseDetailView,
@@ -145,6 +145,7 @@ urlpatterns = [
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),
     path("admin/teachers/<str:slug>/", TeacherDetailView.as_view(), name="teacher-detail"),
     path("admin/employees/", EmployeeCollectionView.as_view(), name="employee-list-create"),
+    path("admin/employees/<str:slug>/status/", EmployeeStatusView.as_view(), name="employee-status"),
     path("admin/employees/<str:slug>/", EmployeeDetailView.as_view(), name="employee-detail"),
     path("admin/shared/subjects/", SharedSubjectCollectionView.as_view(), name="shared-subject-list"),
     path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),

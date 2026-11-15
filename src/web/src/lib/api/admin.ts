@@ -166,8 +166,10 @@ export const adminApi = {
     apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`),
   updateEmployee: (slug: string, site_code: string, body: { full_name?: string; phone?: string | null; job_title?: Employee["job_title"] }) =>
     apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
+  setEmployeeStatus: (slug: string, site_code: string, status: "active" | "inactive") =>
+    apiRequest<Record<string, unknown>>(`/admin/employees/${encodeURIComponent(slug)}/status/${query({ site_code })}`, { method: "PATCH", body: jsonBody({ status }) }),
   deleteEmployee: (slug: string, site_code: string) =>
-    apiRequest<Record<string, unknown>>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
+    apiRequest<{ deleted: boolean; profile_retained: boolean; detail: string }>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   students: (options: { site_code?: string; status?: string; search?: string; account_issued?: boolean; limit?: number; offset?: number } = {}) =>
     apiRequest<ApiPage<Student>>(`/admin/students/${query(options)}`),
   issueStudentAccount: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/students/${encodeURIComponent(slug)}/account/`, { method: "POST", body: "{}" }),

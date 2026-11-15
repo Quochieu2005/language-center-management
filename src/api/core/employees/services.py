@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -76,13 +78,12 @@ class EmployeeProvisioningResult:
 
 
 @dataclass(frozen=True)
-class EmployeeDeactivationResult:
+class EmployeeDeletionResult:
     employee_id: str
     account_id: str
     slug: str
     site_code: str
-    status: str = "inactive"
-    employee_status: str = "nghi_viec"
+    profile_retained: bool
 
 
 def _require_provisioning_configuration() -> str:
@@ -349,7 +350,10 @@ def list_employees(
 ) -> dict:
     site = str(site_code).strip().upper()
     alias = require_active_site(site)
-    clauses = ["n.ma_co_so = %s", "n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')"]
+    clauses = [
+        "n.ma_co_so = %s", "n.ma_tai_khoan IS NOT NULL",
+        "n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')",
+    ]
     params: list[object] = [site]
     if job_title:
         clauses.append("n.chuc_vu = %s")
@@ -532,190 +536,300 @@ def update_employee(
     return _employee_response(site, tuple(result))
 
 
-def _read_employee_for_deactivation(site_code: str, slug: str):
-    alias = require_active_site(site_code)
-    with connections[alias].cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT TOP (2) n.ma_nhan_vien, n.ma_tai_khoan, n.trang_thai,
-                           t.slug, t.vai_tro, t.ma_co_so
-            FROM dbo.NhanVien AS n
-            INNER JOIN dbo.TaiKhoan AS t
-              ON t.ma_tai_khoan = n.ma_tai_khoan AND t.ma_co_so = n.ma_co_so
-            WHERE n.ma_co_so = %s AND t.slug = %s
-              AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
-            """,
-            [site_code, slug],
-        )
-        rows = cursor.fetchall()
+def _employee_delete_marker_id(site_code: str, slug: str) -> str:
+    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:32]
+    return f"employee-delete:{site_code}:{digest}"
+
+
+def _read_employee_delete_marker(cursor, site_code: str, slug: str):
+    cursor.execute(
+        """
+        SELECT ma_co_so, hanh_dong, bang_tac_dong, ma_ban_ghi, du_lieu_cu,
+               site_dich, ket_qua
+        FROM dbo.Logs WHERE ma_log = %s
+        """,
+        [_employee_delete_marker_id(site_code, slug)],
+    )
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    try:
+        payload = json.loads(str(row[4]))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise EmployeeConflict from exc
+    if (
+        str(row[0]).upper() != site_code or str(row[1]) != "xoa_nhan_vien"
+        or str(row[2]) != "TaiKhoan" or str(row[3]) != payload.get("account_id")
+        or str(row[5]).upper() != str(payload.get("target_site", "")).upper()
+        or str(row[6]) != "thanh_cong" or payload.get("slug") != slug
+        or not payload.get("employee_id")
+        or not isinstance(payload.get("profile_retained"), bool)
+    ):
+        raise EmployeeConflict
+    return payload
+
+
+def _employee_delete_identity(account: tuple) -> tuple:
+    return tuple(account[index] for index in (0, 1, 2, 3, 4, 5, 6))
+
+
+def _employee_account_by_slug(cursor, slug: str, *, lock: bool = False):
+    lock_hint = " WITH (UPDLOCK, HOLDLOCK)" if lock else ""
+    cursor.execute(
+        f"""
+        SELECT TOP (2) ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau,
+                       vai_tro, ma_co_so, trang_thai, phien_ban,
+                       bat_buoc_doi_mat_khau, avatar_public_id
+        FROM dbo.TaiKhoan{lock_hint} WHERE slug = %s
+        """,
+        [slug],
+    )
+    rows = cursor.fetchall()
     if len(rows) > 1:
         raise EmployeeConflict
     return tuple(rows[0]) if rows else None
 
 
-def _read_employee_account_copies(account_id: str, sites: tuple[str, ...]):
-    copies = []
-    for site in sites:
-        with get_site_connection(site).cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT TOP (2) ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau,
-                               vai_tro, ma_co_so, trang_thai, phien_ban,
-                               bat_buoc_doi_mat_khau
-                FROM dbo.TaiKhoan
-                WHERE ma_tai_khoan = %s
-                """,
-                [account_id],
-            )
-            rows = cursor.fetchall()
-        if len(rows) > 1:
-            raise EmployeeInfrastructureUnavailable
-        if not rows:
-            raise EmployeeInfrastructureUnavailable
-        copies.append(tuple(rows[0]))
-
-    # Status/version may differ after an interrupted replicated write; all identity
-    # and credential fields must still agree so the same request can safely resume.
-    identity = (*copies[0][:7], copies[0][9])
-    if any((*row[:7], row[9]) != identity for row in copies[1:]):
-        raise EmployeeInfrastructureUnavailable
-    if str(copies[0][5]).lower() != "nhan_vien":
-        raise EmployeeNotFound
-    return copies
-
-
-def _append_employee_replication_event(cursor, site_code: str, account_id: str) -> None:
+def _check_employee_delete_references(cursor, account_id: str) -> None:
+    for table in ("HocVien", "GiaoVien", "Admin"):
+        cursor.execute(f"SELECT COUNT_BIG(*) FROM dbo.{table} WHERE ma_tai_khoan = %s", [account_id])
+        if int(cursor.fetchone()[0]):
+            raise EmployeeConflict
     cursor.execute(
-        """
-        INSERT INTO dbo.Logs
-            (ma_log, loai_log, ma_co_so, bang_tac_dong, ma_ban_ghi,
-             hanh_dong, site_dich, ket_qua)
-        VALUES (%s, 'sync', %s, 'TaiKhoan', %s, 'sua', %s, 'thanh_cong')
-        """,
-        [
-            f"{site_code}-DB-{uuid.uuid4().hex[:10]}", site_code,
-            account_id, site_code,
-        ],
+        "IF OBJECT_ID(N'dbo.YeuCauThanhToan', N'U') IS NOT NULL "
+        "SELECT COUNT_BIG(*) FROM dbo.YeuCauThanhToan WHERE ma_tai_khoan = %s "
+        "ELSE SELECT CONVERT(bigint, 0)",
+        [account_id],
     )
-
-
-def _deactivate_account_copy(
-    *, site_code: str, account_id: str,
-    employee_id: str, profile_site: str, actor_id: str, remote_ip: str,
-) -> None:
-    alias = get_site_database_alias(site_code)
-    with transaction.atomic(using=alias):
-        with connections[alias].cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT trang_thai, phien_ban, vai_tro, ma_co_so
-                FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK)
-                WHERE ma_tai_khoan = %s
-                """,
-                [account_id],
-            )
-            current = cursor.fetchone()
-            if (
-                current is None or str(current[2]).lower() != "nhan_vien"
-                or str(current[3]).upper() != profile_site
-            ):
-                raise EmployeeConflict
-            status_bit = account_status_bit(current[0])
-            version = int(current[1])
-            if status_bit not in (0, 1) or version < 1:
-                raise EmployeeConflict
-            if status_bit == 1:
-                cursor.execute(
-                    """
-                    UPDATE dbo.TaiKhoan
-                    SET trang_thai = 0, phien_ban = phien_ban + 1,
-                        cap_nhat_luc = SYSUTCDATETIME()
-                    WHERE ma_tai_khoan = %s AND vai_tro = 'nhan_vien'
-                      AND ma_co_so = %s AND trang_thai = 1 AND phien_ban = %s
-                    """,
-                    [account_id, profile_site, version],
-                )
-                if cursor.rowcount != 1:
-                    raise EmployeeConflict
-                _append_employee_replication_event(cursor, site_code, account_id)
-
-            cursor.execute(
-                """
-                UPDATE dbo.PhienDangNhap
-                SET thu_hoi_luc_utc = COALESCE(thu_hoi_luc_utc, SYSUTCDATETIME())
-                WHERE ma_tai_khoan = %s AND thu_hoi_luc_utc IS NULL
-                """,
-                [account_id],
-            )
-
-            if site_code == profile_site:
-                cursor.execute(
-                    """
-                    SELECT trang_thai FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK)
-                    WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                      AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
-                    """,
-                    [employee_id, profile_site, account_id],
-                )
-                profile = cursor.fetchone()
-                if profile is None or str(profile[0]).lower() not in {"dang_lam", "nghi_viec"}:
-                    raise EmployeeConflict
-                old_status = str(profile[0]).lower()
-                if old_status == "dang_lam":
-                    cursor.execute(
-                        """
-                        UPDATE dbo.NhanVien SET trang_thai = 'nghi_viec'
-                        WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                          AND trang_thai = 'dang_lam'
-                        """,
-                        [employee_id, profile_site, account_id],
-                    )
-                    if cursor.rowcount != 1:
-                        raise EmployeeConflict
-                    append_audit(
-                        cursor, site_code=profile_site, actor_id=actor_id,
-                        action="xoa_nhan_vien", table_name="NhanVien",
-                        record_id=employee_id, remote_ip=remote_ip,
-                        before={"status": old_status}, after={"status": "nghi_viec"},
-                    )
+    if int(cursor.fetchone()[0]):
+        raise EmployeeConflict
+    cursor.execute(
+        "SELECT COUNT_BIG(*) FROM dbo.GiaoDichChuyenCoSo "
+        "WHERE (ma_tai_khoan_de_nghi = %s OR ma_tai_khoan_quyet_dinh = %s) "
+        "AND trang_thai IN ('cho_duyet', 'dang_xu_ly')",
+        [account_id, account_id],
+    )
+    if int(cursor.fetchone()[0]):
+        raise EmployeeConflict
 
 
 @_translate_errors
-def deactivate_employee(
+def delete_employee(
     *, slug: str, site_code: str, actor_id: str, remote_ip: str,
-) -> EmployeeDeactivationResult:
+) -> EmployeeDeletionResult:
     site = str(site_code).strip().upper()
     clean_slug = str(slug).strip()
     if not clean_slug or not actor_id or not remote_ip:
         raise EmployeeNotFound
-    sites = active_site_codes()
-    if site not in sites:
+    sites = tuple(sorted(getattr(settings, "SITE_DATABASE_ALIASES", {})))
+    active_sites = active_site_codes()
+    if not sites or site not in active_sites or not set(active_sites).issubset(sites):
         raise EmployeeInfrastructureUnavailable
 
-    profile = _read_employee_for_deactivation(site, clean_slug)
-    if profile is None:
-        raise EmployeeNotFound
-    employee_id, account_id = str(profile[0]), str(profile[1])
-    if str(profile[3]) != clean_slug or str(profile[4]).lower() != "nhan_vien":
-        raise EmployeeNotFound
-    profile_status = str(profile[2]).lower()
+    accounts, markers, site_markers, avatar_ids = [], [], {}, set()
+    for code in sites:
+        with get_site_connection(code).cursor() as cursor:
+            marker = _read_employee_delete_marker(cursor, code, clean_slug)
+            account = _employee_account_by_slug(cursor, clean_slug)
+        site_markers[code] = marker
+        if marker is not None:
+            if account is not None:
+                raise EmployeeConflict
+            markers.append(marker)
+            if marker.get("avatar_public_id"):
+                avatar_ids.add(str(marker["avatar_public_id"]))
+        elif account is not None:
+            accounts.append(account)
+            if account[10]:
+                avatar_ids.add(str(account[10]))
+        elif code in active_sites:
+            raise EmployeeInfrastructureUnavailable
 
-    copies = _read_employee_account_copies(account_id, sites)
-    account_site = str(copies[0][6]).upper() if copies[0][6] else ""
-    if account_site != site:
+    if not accounts and not markers:
         raise EmployeeNotFound
-    copy_statuses = [account_status_bit(row[7]) for row in copies]
-    if any(value not in (0, 1) for value in copy_statuses):
+    if any(_employee_delete_identity(row) != _employee_delete_identity(accounts[0]) for row in accounts[1:]):
+        raise EmployeeInfrastructureUnavailable
+    account_id = str(accounts[0][0]) if accounts else str(markers[0]["account_id"])
+    target_site = str(accounts[0][6]).upper() if accounts else str(markers[0]["target_site"]).upper()
+    employee_ids = {str(marker["employee_id"]) for marker in markers}
+    if accounts:
+        if (
+            str(accounts[0][1]) != clean_slug or str(accounts[0][5]).lower() != "nhan_vien"
+            or str(accounts[0][6]).upper() != target_site
+        ):
+            raise EmployeeNotFound
+        for row in accounts:
+            if (
+                str(row[0]) != account_id or str(row[6]).upper() != target_site
+                or account_status_bit(row[7]) not in (0, 1) or int(row[8]) < 1
+            ):
+                raise EmployeeInfrastructureUnavailable
+    if any(
+        str(marker["account_id"]) != account_id
+        or str(marker["target_site"]).upper() != target_site
+        or marker["slug"] != clean_slug
+        for marker in markers
+    ) or len(employee_ids) > 1:
         raise EmployeeConflict
-    if profile_status not in {"dang_lam", "nghi_viec"}:
+    if target_site != site or target_site not in sites:
+        raise EmployeeNotFound
+
+    target_marker = site_markers[target_site]
+    employee_id = str(target_marker["employee_id"]) if target_marker else next(iter(employee_ids), "")
+    profile_retained = bool(target_marker["profile_retained"]) if target_marker else False
+    if target_marker is None:
+        with get_site_connection(target_site).cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP (2) ma_nhan_vien, ma_co_so, ma_tai_khoan, chuc_vu, trang_thai
+                FROM dbo.NhanVien WHERE ma_tai_khoan = %s AND ma_co_so = %s
+                  AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
+                """,
+                [account_id, target_site],
+            )
+            profiles = cursor.fetchall()
+        if len(profiles) != 1 or str(profiles[0][1]).upper() != target_site:
+            raise EmployeeConflict
+        employee_id = str(profiles[0][0])
+        if employee_ids and employee_id not in employee_ids:
+            raise EmployeeConflict
+        if str(profiles[0][4]).lower() not in {"dang_lam", "nghi_viec"}:
+            raise EmployeeConflict
+        with get_site_connection(target_site).cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT_BIG(*) FROM dbo.PhieuThu WHERE ma_nhan_vien = %s AND ma_co_so = %s",
+                [employee_id, target_site],
+            )
+            profile_retained = int(cursor.fetchone()[0]) > 0
+    if not employee_id:
         raise EmployeeConflict
 
-    # Update remote copies first and the profile site last. A partial failure can
-    # be retried: the next request accepts already-inactive replicas and continues.
-    ordered_sites = tuple(code for code in sites if code != site) + (site,)
+    for code in sites:
+        with get_site_connection(code).cursor() as cursor:
+            _check_employee_delete_references(cursor, account_id)
+            if code != target_site:
+                cursor.execute(
+                    "SELECT COUNT_BIG(*) FROM dbo.NhanVien WHERE ma_tai_khoan = %s",
+                    [account_id],
+                )
+                if int(cursor.fetchone()[0]):
+                    raise EmployeeConflict
+            elif code in active_sites:
+                cursor.execute(
+                    "SELECT TOP (2) ma_nhan_vien, ma_tai_khoan, trang_thai "
+                    "FROM dbo.NhanVien WHERE ma_nhan_vien = %s AND ma_co_so = %s",
+                    [employee_id, target_site],
+                )
+                profile = cursor.fetchall()
+                if site_markers[target_site] is not None:
+                    if profile_retained and (
+                        len(profile) != 1 or profile[0][1] is not None
+                        or str(profile[0][2]).lower() != "nghi_viec"
+                    ):
+                        raise EmployeeConflict
+                    if not profile_retained and profile:
+                        raise EmployeeConflict
+                elif len(profile) != 1 or str(profile[0][1]) != account_id:
+                    raise EmployeeConflict
+
+    from core.media.avatars import AvatarUnavailable, destroy_cloudinary_avatar_asset
+
+    ordered_sites = tuple(code for code in sites if code != target_site) + (target_site,)
     for code in ordered_sites:
-        _deactivate_account_copy(
-            site_code=code, account_id=account_id, employee_id=employee_id,
-            profile_site=site, actor_id=actor_id, remote_ip=remote_ip,
-        )
-    return EmployeeDeactivationResult(employee_id, account_id, clean_slug, site)
+        alias = get_site_database_alias(code)
+        with transaction.atomic(using=alias):
+            with connections[alias].cursor() as cursor:
+                marker = _read_employee_delete_marker(cursor, code, clean_slug)
+                local_account = _employee_account_by_slug(cursor, clean_slug, lock=True)
+                if marker is not None:
+                    if local_account is not None:
+                        raise EmployeeConflict
+                    continue
+                if code in active_sites and local_account is None:
+                    raise EmployeeInfrastructureUnavailable
+                if local_account is not None:
+                    if accounts and _employee_delete_identity(local_account) != _employee_delete_identity(accounts[0]):
+                        raise EmployeeConflict
+                    if not accounts and str(local_account[0]) != account_id:
+                        raise EmployeeConflict
+                if local_account is not None and local_account[10]:
+                    avatar_ids.add(str(local_account[10]))
+                _check_employee_delete_references(cursor, account_id)
+                if code == target_site and local_account is not None:
+                    cursor.execute(
+                        "SELECT TOP (2) ma_nhan_vien FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK) "
+                        "WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s "
+                        "AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')",
+                        [employee_id, target_site, account_id],
+                    )
+                    profile = cursor.fetchall()
+                    if len(profile) != 1:
+                        raise EmployeeConflict
+                    cursor.execute(
+                        "SELECT COUNT_BIG(*) FROM dbo.PhieuThu WITH (UPDLOCK, HOLDLOCK) "
+                        "WHERE ma_nhan_vien = %s AND ma_co_so = %s",
+                        [employee_id, target_site],
+                    )
+                    has_receipts = int(cursor.fetchone()[0]) > 0
+                    if has_receipts != profile_retained:
+                        raise EmployeeConflict
+                    if profile_retained:
+                        cursor.execute(
+                            "UPDATE dbo.NhanVien SET ma_tai_khoan = NULL, trang_thai = 'nghi_viec' "
+                            "WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s",
+                            [employee_id, target_site, account_id],
+                        )
+                    else:
+                        cursor.execute(
+                            "DELETE FROM dbo.NhanVien WHERE ma_nhan_vien = %s "
+                            "AND ma_co_so = %s AND ma_tai_khoan = %s",
+                            [employee_id, target_site, account_id],
+                        )
+                    if cursor.rowcount != 1:
+                        raise EmployeeConflict
+                if local_account is not None:
+                    for table in (
+                        "PhienDangNhap", "TokenDatLaiMatKhau",
+                        "GiaoDichDatLaiMatKhau", "TrangThaiDocThongBao",
+                    ):
+                        cursor.execute(
+                            f"IF OBJECT_ID(N'dbo.{table}', N'U') IS NOT NULL "
+                            f"DELETE FROM dbo.{table} WHERE ma_tai_khoan = %s",
+                            [account_id],
+                        )
+                    cursor.execute(
+                        "DELETE FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s "
+                        "AND vai_tro = 'nhan_vien' AND ma_co_so = %s",
+                        [account_id, target_site],
+                    )
+                    if cursor.rowcount != 1:
+                        raise EmployeeConflict
+                payload = json.dumps(
+                    {
+                        "account_id": account_id, "employee_id": employee_id,
+                        "slug": clean_slug, "target_site": target_site,
+                        "profile_retained": profile_retained,
+                        "avatar_public_id": str(local_account[10]) if local_account and local_account[10] else None,
+                    },
+                    separators=(",", ":"),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO dbo.Logs
+                        (ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong,
+                         bang_tac_dong, ma_ban_ghi, du_lieu_cu, ip, ket_qua, site_dich)
+                    VALUES (%s, 'system', %s, %s, 'xoa_nhan_vien', 'TaiKhoan',
+                            %s, %s, %s, 'thanh_cong', %s)
+                    """,
+                    [
+                        _employee_delete_marker_id(code, clean_slug), code, actor_id,
+                        account_id, payload, remote_ip[:45], target_site,
+                    ],
+                )
+
+    try:
+        for avatar_id in avatar_ids:
+            destroy_cloudinary_avatar_asset(avatar_id)
+    except AvatarUnavailable as exc:
+        raise EmployeeInfrastructureUnavailable from exc
+    return EmployeeDeletionResult(employee_id, account_id, clean_slug, target_site, profile_retained)

@@ -1,4 +1,4 @@
-"""Direct active/inactive updates for replicated accounts without a job table."""
+"""Direct active/inactive updates for replicated Admin Small and employee accounts."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class AccountStatusTargetNotFound(Exception):
 
 
 class AccountStatusConflict(Exception):
-    """The account changed concurrently or its Admin profile is inconsistent."""
+    """The account changed concurrently or its local profile is inconsistent."""
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,25 @@ def _read_admin_small_profile(account_id: str, site_code: str) -> tuple[str, int
     if bit is None:
         raise AccountStatusConflict
     return str(rows[0][0]), bit
+
+
+def _read_employee_profile(account_id: str, site_code: str) -> tuple[str, str] | None:
+    with get_site_connection(site_code).cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP (2) ma_nhan_vien, trang_thai
+            FROM dbo.NhanVien
+            WHERE ma_tai_khoan = %s AND ma_co_so = %s
+              AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
+            """,
+            [account_id, site_code],
+        )
+        rows = cursor.fetchall()
+    if len(rows) > 1:
+        raise AccountStatusConflict
+    if not rows:
+        return None
+    return str(rows[0][0]), str(rows[0][1]).lower()
 
 
 def _read_account_by_slug(slug: str, sites: tuple[str, ...]):
@@ -195,7 +214,7 @@ def change_account_status(
     desired_status = str(desired_status).strip().lower()
     if not slug or desired_status not in {"active", "inactive"} or not actor_id or not remote_ip:
         raise AccountStatusTargetNotFound
-    if expected_role != "admin_small":
+    if expected_role not in {"admin_small", "employee"}:
         raise AccountStatusTargetNotFound
 
     applied: list[str] = []
@@ -211,15 +230,23 @@ def change_account_status(
         target_site = str(account[6]).upper()
         if target_site not in sites or (site_code and target_site != str(site_code).upper()):
             raise AccountStatusTargetNotFound
-        profile = _read_admin_small_profile(str(account[0]), target_site)
-        if profile is None:
-            raise AccountStatusTargetNotFound
+        profile = None
+        if expected_role == "admin_small":
+            profile = _read_admin_small_profile(str(account[0]), target_site)
+            if profile is None:
+                raise AccountStatusTargetNotFound
+        else:
+            employee = _read_employee_profile(str(account[0]), target_site)
+            if employee is None:
+                raise AccountStatusTargetNotFound
+            if employee[1] != "dang_lam":
+                raise AccountStatusConflict
 
         old_status = account_status_bit(account[7])
         old_version = int(account[8])
         if old_status not in (0, 1):
             raise AccountStatusConflict
-        if profile[1] != old_status:
+        if profile is not None and profile[1] != old_status:
             raise AccountStatusConflict
         new_status = 1 if desired_status == "active" else 0
         if old_status == new_status:
@@ -239,17 +266,18 @@ def change_account_status(
             )
             applied.append(code)
 
-        alias = get_site_database_alias(target_site)
-        with transaction.atomic(using=alias):
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    "UPDATE dbo.Admin SET trang_thai = %s "
-                    "WHERE ma_tai_khoan = %s AND ma_co_so = %s "
-                    "AND loai_admin = 'admin_small' AND trang_thai = %s",
-                    [new_status, account[0], target_site, old_status],
-                )
-                if cursor.rowcount != 1:
-                    raise AccountStatusConflict
+        if expected_role == "admin_small":
+            alias = get_site_database_alias(target_site)
+            with transaction.atomic(using=alias):
+                with connections[alias].cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE dbo.Admin SET trang_thai = %s "
+                        "WHERE ma_tai_khoan = %s AND ma_co_so = %s "
+                        "AND loai_admin = 'admin_small' AND trang_thai = %s",
+                        [new_status, account[0], target_site, old_status],
+                    )
+                    if cursor.rowcount != 1:
+                        raise AccountStatusConflict
         return AccountStatusResult(str(account[0]), slug, expected_role, target_site, desired_status)
     except (AccountStatusTargetNotFound, AccountStatusConflict, AuthInfrastructureUnavailable):
         if account is not None and applied:

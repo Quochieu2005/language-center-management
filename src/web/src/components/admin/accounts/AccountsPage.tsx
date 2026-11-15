@@ -23,7 +23,7 @@ function toSlug(value: string) {
 }
 
 export default function AccountsPage({ view }: AccountsPageProps) {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const { user } = useSession();
   const { siteCodes, selectedSite, setSelectedSite } = useSiteScope();
   const [admins, setAdmins] = useState<AdminSmall[]>([]);
@@ -286,10 +286,34 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
     {
       title: "Thao tác",
-      render: (_: unknown, row: Employee) => <Button danger size="small" onClick={() => modal.confirm({ title: "Vô hiệu hóa tài khoản nhân viên này?", okText: "Xóa", cancelText: "Hủy", okButtonProps: { danger: true }, onOk: async () => {
-        try { await adminApi.deleteEmployee(row.slug, row.site_code); message.success("Đã vô hiệu hóa tài khoản."); void load(); }
-        catch (reason) { message.error(reason instanceof Error ? reason.message : "Không vô hiệu hóa được tài khoản."); }
-      } })}>Xóa</Button>,
+      render: (_: unknown, row: Employee) => <Space>
+        <Button size="small" disabled={row.employee_status !== "dang_lam"} onClick={async () => {
+          const nextStatus = row.account_status === "active" ? "inactive" : "active";
+          try {
+            await adminApi.setEmployeeStatus(row.slug, row.site_code, nextStatus);
+            message.success(nextStatus === "active" ? "Đã chuyển tài khoản sang active." : "Đã chuyển tài khoản sang inactive.");
+            void load();
+          } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không cập nhật được trạng thái tài khoản."); }
+        }}>{row.account_status === "active" ? "Vô hiệu hóa" : "Kích hoạt"}</Button>
+        <Popconfirm
+          title="Xóa vĩnh viễn tài khoản nhân viên này?"
+          description="Tài khoản đăng nhập, phiên và ảnh đại diện sẽ bị xóa. Hồ sơ có phiếu thu sẽ được giữ để bảo toàn chứng từ."
+          okText="Xóa vĩnh viễn"
+          cancelText="Hủy"
+          okButtonProps={{ danger: true }}
+          onConfirm={async () => {
+            try {
+              const result = await adminApi.deleteEmployee(row.slug, row.site_code);
+              message.success(result.profile_retained
+                ? "Đã xóa tài khoản; hồ sơ được giữ lại để bảo toàn phiếu thu."
+                : "Đã xóa vĩnh viễn tài khoản và hồ sơ nhân viên.");
+              void load();
+            } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không xóa được tài khoản; có thể thử lại."); }
+          }}
+        >
+          <Button danger size="small">Xóa vĩnh viễn</Button>
+        </Popconfirm>
+      </Space>,
     },
   ];
 
