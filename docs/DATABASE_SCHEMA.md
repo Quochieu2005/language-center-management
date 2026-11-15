@@ -306,6 +306,8 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `chuc_vu` | | `le_tan` · `tu_van` · `ke_toan` · `xep_lop` |
 | `trang_thai` | | `dang_lam` · `nghi_viec` |
 
+Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Nghỉ việc cập nhật trạng thái, không xóa vật lý `NhanVien`, chứng từ hoặc log. Không thêm bảng/cột/migration cho API này.
+
 ### 6.4. Lớp học
 
 **`PhongHoc`** (phân mảnh)

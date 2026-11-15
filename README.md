@@ -498,13 +498,14 @@ Luồng hiện có áp dụng cho Admin Big/Admin Small: API trả phản hồi 
 
 API có route quên/đặt lại mật khẩu và luồng gửi thư, nhưng việc gửi thật phụ thuộc SMTP secrets cục bộ. Không ghi email/password SMTP hoặc secret vào README, Git, log hay chat; `.env.example` chỉ giữ placeholder.
 
-### 5.9. Tạo tài khoản nhân viên/giáo viên và phân công Admin Small
+### 5.9. Quản lý nhân viên và cấp tài khoản nội bộ
 
-**Loại:** tạo tài khoản `REPLICATED-WRITE`; tạo hồ sơ làm việc `LOCAL` tại site được giao · **Ai làm:** Admin Big.
+**Loại:** tạo tài khoản `REPLICATED-WRITE`; tạo/đọc/sửa hồ sơ nhân viên `LOCAL`; cho nghỉ việc gồm cập nhật hồ sơ `LOCAL` và khóa tài khoản/thu hồi phiên `REPLICATED-WRITE` · **Ai làm:** Admin Big và Admin Small theo phạm vi site.
 
 ```mermaid
 flowchart LR
     Admin_Big["Admin Big"] -->|gửi thao tác| GiaoDienWeb["GiaoDienWeb"]
+    Admin_Small["Admin Small"] -->|quản lý nhân viên trong site được gán| GiaoDienWeb
     GiaoDienWeb["GiaoDienWeb"] -->|gửi yêu cầu| API["API"]
     API["API"] -->|điều phối nghiệp vụ| DongBoTaiKhoan["Đồng bộ tài khoản"]
     DongBoTaiKhoan["Đồng bộ tài khoản"] -->|chọn mọi cơ sở đang hoạt động| SiteRouter["Bộ định tuyến cơ sở"]
@@ -513,7 +514,9 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big tạo tài khoản và hồ sơ đúng site qua API. Admin Small là tài khoản `nhan_vien` có hồ sơ `Admin.loai_admin = admin_small`; nhân viên thường có hồ sơ `NhanVien` với chức vụ cụ thể. Tài khoản được nhân bản theo service, hồ sơ công tác nằm tại site được giao. API dùng mật khẩu khởi tạo lấy từ cấu hình backend, lưu hash và gửi thông tin cấp theo trạng thái email có thể theo dõi/gửi lại an toàn theo nghiệp vụ. Giáo viên có route xem/cập nhật hồ sơ, trạng thái, cấp thông tin và avatar. Việc email thật và hoàn tất đồng bộ nhiều site cần được kiểm tra tại môi trường chạy.
+Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/cho nghỉ việc nhân viên trong site của mình. Nhân viên nghiệp vụ là `NhanVien` với chức vụ `le_tan`, `tu_van`, `ke_toan` hoặc `xep_lop`; không nhầm với hồ sơ Admin Small (`Admin.loai_admin=admin_small`).
+
+Tạo nhân viên ghi `NhanVien` ở site công tác và nhân bản `TaiKhoan`; API dùng mật khẩu khởi tạo trong cấu hình backend, chỉ lưu hash, không trả mật khẩu và buộc đổi ở lần đăng nhập đầu. Sửa chỉ cập nhật họ tên, điện thoại, chức vụ và audit trong transaction cục bộ; email/tên đăng nhập thuộc danh tính tài khoản nhân bản, còn site là vị trí phân mảnh nên không đổi tại đây. Xóa là nghỉ việc: khóa tài khoản và thu hồi phiên theo các site hoạt động, đánh dấu `NhanVien.trang_thai=nghi_viec` tại site sở hữu, giữ hồ sơ và chứng từ. Nếu thiếu site, không báo ghi hoàn tất; retry theo cùng hồ sơ. Các CSDL commit riêng, không phải ACID xuyên site. Chi tiết hợp đồng nằm trong [FS](fs/Functional-Specification.md), [API spec](specs/api.md) và [schema](docs/DATABASE_SCHEMA.md).
 
 ### 5.10. Mở lớp và sinh lịch học
 

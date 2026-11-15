@@ -2,57 +2,218 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Alert, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Empty, Row, Skeleton, Statistic, Tag, Typography } from "antd";
+import styles from "./DashboardPage.module.scss";
 import { academicsApi } from "@/lib/api/academics";
 import { adminApi, type SiteCounts } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session";
+import type { Role } from "@/lib/api/auth";
 
-type DashboardState = { health: string; report: SiteCounts | null; notices: Record<string, unknown>[]; errors: string[] };
+const classStatusOptions = [
+  { status: "sap_mo", label: "Sắp mở", color: "#d97706" },
+  { status: "dang_hoc", label: "Đang học", color: "#237b57" },
+  { status: "ket_thuc", label: "Kết thúc", color: "#3b82f6" },
+  { status: "huy", label: "Đã hủy", color: "#64748b" },
+] as const;
+
+type ClassStatusMetric = (typeof classStatusOptions)[number] & { count: number };
 
 export default function DashboardPage() {
-  const { user } = useSession();
-  const [data, setData] = useState<DashboardState | null>(null);
+  const { user, loading } = useSession();
+  if (loading) return <Skeleton active />;
+  if (user?.role === "admin_big") return <AdminBigDashboard />;
+  if (user?.role === "admin_small") return <AdminSmallDashboard siteCode={user.site_code} />;
+  return <StaffDashboard role={user?.role} />;
+}
+
+function AdminBigDashboard() {
+  const [report, setReport] = useState<SiteCounts | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+
   useEffect(() => {
-    let cancelled = false;
-    const role = user?.role;
-    const isAdmin = role === "admin_big" || role === "admin_small";
-    Promise.allSettled([academicsApi.health(), isAdmin ? adminApi.studentCounts() : Promise.resolve(null), isAdmin ? adminApi.notifications({ limit: 8 }) : Promise.resolve(null)]).then((results) => {
-      if (cancelled) return;
-      const errors: string[] = [];
-      let report: SiteCounts | null = null;
-      let notices: Record<string, unknown>[] = [];
-      const health = results[0].status === "fulfilled" ? String(results[0].value.status || "Đang chạy") : "Không kết nối";
-      if (results[0].status === "rejected") errors.push(errorText(results[0].reason));
-      if (results[1].status === "fulfilled") report = results[1].value;
-      else if (results[1].status === "rejected") {
-        if (results[1].reason instanceof ApiError && Array.isArray(results[1].reason.payload.results)) report = results[1].reason.payload as unknown as SiteCounts;
-        errors.push(errorText(results[1].reason));
-      }
-      if (results[2].status === "fulfilled" && results[2].value) notices = results[2].value.results;
-      else if (results[2].status === "rejected") errors.push(errorText(results[2].reason));
-      setData({ health, report, notices, errors });
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      adminApi.studentCounts().then((result) => {
+        if (active) setReport(result);
+      }).catch((reason: unknown) => {
+        if (!active) return;
+        const partial = partialSiteCounts(reason);
+        if (partial) setReport(partial);
+        setError(errorText(reason));
+      }).finally(() => {
+        if (active) setLoading(false);
+      });
     });
-    return () => { cancelled = true; };
-  }, [user]);
-  if (!data) return <Skeleton active />;
-  return <div style={{ display: "grid", gap: 20 }}>
-    <div><Typography.Title level={2}>Tổng quan</Typography.Title><Typography.Text type="secondary">Số liệu tải từ API theo phiên và quyền hiện tại.</Typography.Text></div>
-    {data.errors.length > 0 && <Alert type="warning" showIcon title="Một số dữ liệu chưa tải được" description={data.errors.join(" · ")} />}
-    {data.report && !data.report.complete && <Alert type="warning" showIcon title={`Global Query thiếu site: ${data.report.missing_sites.join(", ")}`} />}
-    <Row gutter={[16, 16]}>
-      <Col xs={24} md={12}><Card><Statistic title="Trạng thái API" value={data.health} styles={{ content: { color: data.health.toLowerCase().includes("ok") ? "#237b57" : undefined } }} /></Card></Col>
-      {data.report && <Col xs={24} md={12}><Card><Statistic title={data.report.complete ? "Học viên đang học" : "Học viên ở site đã phản hồi"} value={data.report.total_active_students} /></Card></Col>}
-    </Row>
-    {data.report && <Card title="Theo cơ sở"><Space orientation="vertical" style={{ width: "100%" }}>{data.report.results.map((item) => <div key={item.site_code} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><span>{item.site_code}</span><Tag>{item.active_students} học viên</Tag></div>)}</Space></Card>}
-    <Card title="Thông báo mới">{data.notices.length ? <Space orientation="vertical" style={{ width: "100%" }}>{data.notices.map((item, index) => <div key={String(item.slug ?? index)} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}><div><Typography.Text strong>{String(item.title || "Thông báo")}</Typography.Text><br /><Typography.Text type="secondary">{String(item.message || "")}</Typography.Text></div><Tag>{String(item.site_code || "")}</Tag></div>)}</Space> : <Empty description="API chưa trả thông báo nào." />}</Card>
-    <Card title="Đi tới nghiệp vụ"><SpaceLinks /></Card>
+    return () => { active = false; };
+  }, [reload]);
+
+  const title = report?.complete ? "Học viên đang học toàn hệ thống" : "Học viên tại site đã phản hồi";
+  return <div className={styles.dashboardContainer}>
+    <DashboardHeader
+      badge="ADMIN BIG"
+      title="Thống kê toàn trung tâm"
+      description="Tổng hợp số học viên đang học từ các CSDL site riêng."
+    />
+    {report && !report.complete && <Alert
+      type="warning"
+      showIcon
+      title="Số liệu chưa đầy đủ"
+      description={`Chưa đọc được các site: ${report.missing_sites.join(", ") || "chưa xác định"}. Tổng hiện tại chỉ gồm các site đã phản hồi.`}
+    />}
+    {error && <Alert type={report?.complete ? "warning" : "error"} showIcon title="Không tải được dữ liệu mới" description={error} />}
+    {loading && !report ? <Skeleton active /> : <>
+      {report && <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}><MetricCard title={title} value={report.total_active_students} /></Col>
+        <Col xs={24} md={8}><MetricCard title="Cơ sở đang hoạt động" value={report.site_codes.length} /></Col>
+        <Col xs={24} md={8}><MetricCard title="Cơ sở đã phản hồi" value={`${report.results.length}/${report.site_codes.length}`} /></Col>
+      </Row>}
+      <Card
+        className={styles.dashboardChartCard}
+        title="Học viên đang học theo cơ sở"
+        extra={<Button onClick={() => { setLoading(true); setError(""); setReload((value) => value + 1); }} loading={loading}>Tải lại</Button>}
+      >
+        {report?.results.length ? <SiteStudentChart results={report.results} /> : <Empty description={loading ? "Đang tải số liệu..." : "Chưa có số liệu cơ sở để hiển thị."} />}
+        {report && <Typography.Text type="secondary" className={styles.chartNote}>
+          Nguồn: `HocVien` tại từng site; chỉ tính hồ sơ `dang_hoc`. Mỗi CSDL được hỏi riêng, không gộp vào database trung tâm.
+        </Typography.Text>}
+      </Card>
+      <Card title="Đi tới nghiệp vụ"><SpaceLinks role="admin_big" /></Card>
+    </>}
   </div>;
 }
 
-function SpaceLinks() {
-  const { user } = useSession();
-  const links: { label: string; href: string; roles: string[] }[] = [
+function AdminSmallDashboard({ siteCode }: { siteCode: string | null }) {
+  const [report, setReport] = useState<SiteCounts | null>(null);
+  const [classes, setClasses] = useState<ClassStatusMetric[] | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (!siteCode) {
+      queueMicrotask(() => {
+        if (active) {
+          setErrors(["Tài khoản chưa được gán cơ sở."]);
+          setLoading(false);
+        }
+      });
+      return () => { active = false; };
+    }
+    queueMicrotask(() => {
+      if (!active) return;
+      setErrors([]);
+      Promise.allSettled([
+        adminApi.studentCounts(siteCode),
+        Promise.all(classStatusOptions.map(async (item) => {
+          const result = await academicsApi.classes(siteCode, { status: item.status, limit: 1, offset: 0 });
+          return { ...item, count: result.count };
+        })),
+      ]).then(([studentsResult, classesResult]) => {
+        if (!active) return;
+        const nextErrors: string[] = [];
+        if (studentsResult.status === "fulfilled") setReport(studentsResult.value);
+        else nextErrors.push(`Thống kê học viên: ${errorText(studentsResult.reason)}`);
+        if (classesResult.status === "fulfilled") setClasses(classesResult.value);
+        else nextErrors.push(`Thống kê lớp: ${errorText(classesResult.reason)}`);
+        setErrors(nextErrors);
+      }).finally(() => {
+        if (active) setLoading(false);
+      });
+    });
+    return () => { active = false; };
+  }, [siteCode, reload]);
+
+  const activeClasses = classes?.find((item) => item.status === "dang_hoc")?.count;
+  const upcomingClasses = classes?.find((item) => item.status === "sap_mo")?.count;
+  return <div className={styles.dashboardContainer}>
+    <DashboardHeader
+      badge={`ADMIN SMALL${siteCode ? ` · ${siteCode}` : ""}`}
+      title="Thống kê cơ sở"
+      description="Số liệu chỉ đọc từ cơ sở được gán cho tài khoản của bạn."
+    />
+    {errors.map((message) => <Alert key={message} type="warning" showIcon title={message} />)}
+    {loading && !report && !classes ? <Skeleton active /> : <>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}><MetricCard title="Học viên đang học tại cơ sở" value={report?.total_active_students ?? "—"} /></Col>
+        <Col xs={24} md={8}><MetricCard title="Lớp đang học" value={activeClasses ?? "—"} /></Col>
+        <Col xs={24} md={8}><MetricCard title="Lớp sắp mở" value={upcomingClasses ?? "—"} /></Col>
+      </Row>
+      <Card
+        className={styles.dashboardChartCard}
+        title={`Tình trạng lớp${siteCode ? ` · ${siteCode}` : ""}`}
+        extra={<Button onClick={() => { setLoading(true); setErrors([]); setReload((value) => value + 1); }} loading={loading}>Tải lại</Button>}
+      >
+        {classes ? <ClassStatusChart data={classes} /> : <Empty description={loading ? "Đang tải số liệu..." : "Chưa lấy được số liệu lớp."} />}
+        <Typography.Text type="secondary" className={styles.chartNote}>
+          Nguồn: số lớp theo trạng thái `sap_mo`, `dang_hoc`, `ket_thuc`, `huy` trong CSDL của cơ sở này.
+        </Typography.Text>
+      </Card>
+      {report?.complete === false && <Alert type="warning" showIcon title={`Dữ liệu site chưa đầy đủ: ${report.missing_sites.join(", ")}`} />}
+      <Card title="Đi tới nghiệp vụ"><SpaceLinks role="admin_small" /></Card>
+    </>}
+  </div>;
+}
+
+function DashboardHeader({ badge, title, description }: { badge: string; title: string; description: string }) {
+  return <header className={styles.dashboardHeader}>
+    <div>
+      <Typography.Title level={2}>{title}</Typography.Title>
+      <Typography.Text type="secondary">{description}</Typography.Text>
+    </div>
+    <Tag color="blue" className={styles.roleBadge}>{badge}</Tag>
+  </header>;
+}
+
+function MetricCard({ title, value }: { title: string; value: number | string }) {
+  return <Card className={styles.dashboardMetricCard}><Statistic title={title} value={value} /></Card>;
+}
+
+function SiteStudentChart({ results }: { results: SiteCounts["results"] }) {
+  const maximum = Math.max(1, ...results.map((item) => item.active_students));
+  return <div className={styles.siteChart} role="list" aria-label="Số học viên đang học theo cơ sở">
+    {results.map((item) => {
+      const percent = Math.round((item.active_students / maximum) * 100);
+      return <div className={styles.siteBarRow} key={item.site_code} role="listitem">
+        <div className={styles.siteBarLabel}><span>{item.site_code}</span><strong>{formatCount(item.active_students)}</strong></div>
+        <div className={styles.siteBarTrack} role="meter" aria-label={`${item.site_code}: ${formatCount(item.active_students)} học viên`} aria-valuemin={0} aria-valuemax={maximum} aria-valuenow={item.active_students}>
+          <span className={styles.siteBarFill} style={{ width: `${percent}%` }} />
+        </div>
+      </div>;
+    })}
+    <Typography.Text type="secondary" className={styles.chartNote}>Thanh biểu thị tương quan giữa các cơ sở đang hiển thị.</Typography.Text>
+  </div>;
+}
+
+function ClassStatusChart({ data }: { data: ClassStatusMetric[] }) {
+  const maximum = Math.max(1, ...data.map((item) => item.count));
+  return <div className={styles.classChart} role="list" aria-label="Số lớp theo trạng thái">
+    {data.map((item) => {
+      const percent = Math.round((item.count / maximum) * 100);
+      return <div className={styles.classBarItem} key={item.status} role="listitem">
+        <strong>{formatCount(item.count)}</strong>
+        <div className={styles.classBarTrack} role="meter" aria-label={`${item.label}: ${formatCount(item.count)} lớp`} aria-valuemin={0} aria-valuemax={maximum} aria-valuenow={item.count}>
+          <span className={styles.classBarFill} style={{ height: `${percent}%`, backgroundColor: item.color }} />
+        </div>
+        <span className={styles.classBarLabel}>{item.label}</span>
+      </div>;
+    })}
+  </div>;
+}
+
+function StaffDashboard({ role }: { role?: Role }) {
+  return <div className={styles.dashboardContainer}>
+    <DashboardHeader badge="WORKSPACE" title="Tổng quan nghiệp vụ" description="Chọn chức năng theo quyền được cấp." />
+    <Card title="Đi tới nghiệp vụ"><SpaceLinks role={role} /></Card>
+  </div>;
+}
+
+function SpaceLinks({ role }: { role?: Role }) {
+  const links: { label: string; href: string; roles: Role[] }[] = [
     { label: "Học viên", href: "/admin/students", roles: ["admin_big", "admin_small", "tu_van"] },
     { label: "Lớp và đăng ký", href: "/admin/classes", roles: ["admin_big", "admin_small", "le_tan", "xep_lop", "tu_van"] },
     { label: "Học phí", href: "/admin/tuition", roles: ["admin_big", "admin_small", "ke_toan"] },
@@ -64,7 +225,20 @@ function SpaceLinks() {
     { label: "Nhật ký Admin", href: "/admin/audit", roles: ["admin_big", "admin_small"] },
     { label: "Báo cáo", href: "/admin/reports", roles: ["admin_big", "admin_small"] },
   ];
-  return <Row gutter={[12, 12]}>{links.filter((item) => item.roles.includes(user?.role || "")).map(({ label, href }) => <Col key={href}><Link href={href}>{label}</Link></Col>)}</Row>;
+  return <nav className={styles.quickLinks} aria-label="Đi tới nghiệp vụ">
+    {links.filter((item) => role && item.roles.includes(role)).map(({ label, href }) => <Link className={styles.quickLink} href={href} key={href}>{label}</Link>)}
+  </nav>;
 }
 
-function errorText(error: unknown) { return error instanceof Error ? error.message : "API lỗi không xác định."; }
+function partialSiteCounts(error: unknown): SiteCounts | null {
+  if (!(error instanceof ApiError) || !Array.isArray(error.payload.results)) return null;
+  return error.payload as unknown as SiteCounts;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("vi-VN").format(value);
+}
+
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : "Không tải được số liệu.";
+}

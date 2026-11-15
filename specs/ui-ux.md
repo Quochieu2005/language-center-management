@@ -387,7 +387,8 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
-| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem và tạo nhân viên theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. |
+| `/admin` và `/admin/dashboard` | Tổng quan | Admin Big có biểu đồ học viên đang học theo các site và cảnh báo site thiếu dữ liệu (`GLOBAL`); Admin Small có chỉ số học viên tại site và biểu đồ lớp theo trạng thái (`LOCAL`). Hai vai trò dùng dữ liệu/API khác nhau; nhân viên khác chỉ có lối tắt nghiệp vụ. |
+| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem, tạo, sửa hồ sơ và cho nhân viên nghỉ việc theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. Khi sửa chỉ đổi họ tên, số điện thoại, chức vụ; email/tên đăng nhập là danh tính tài khoản, cơ sở là vị trí mảnh nên không sửa trên form hồ sơ. “Xóa” là nghỉ việc và giữ lịch sử/chứng từ. |
 | `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn Admin Small. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |

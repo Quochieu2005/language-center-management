@@ -154,6 +154,10 @@ export const adminApi = {
     apiRequest<PageResult<Employee>>(`/admin/employees/${query({ site_code, ...options })}`),
   createEmployee: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; job_title: Employee["job_title"] }) =>
     apiRequest<Employee>("/admin/employees/", { method: "POST", body: jsonBody(body) }),
+  employee: (slug: string, site_code: string) =>
+    apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`),
+  updateEmployee: (slug: string, site_code: string, body: { full_name?: string; phone?: string | null; job_title?: Employee["job_title"] }) =>
+    apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
   deleteEmployee: (slug: string, site_code: string) =>
     apiRequest<Record<string, unknown>>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   students: (options: { site_code?: string; status?: string; search?: string; account_issued?: boolean; limit?: number; offset?: number } = {}) =>

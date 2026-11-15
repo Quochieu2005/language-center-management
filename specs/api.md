@@ -274,7 +274,7 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 |---|---|---|---|
 | `GET /api/v1/admin/sites` | Admin Big | Đọc bản sao `CoSo`; tổng hợp trạng thái kết nối theo nhu cầu | `CoSo` ở bản sao tại site; không trả thông tin bí mật kết nối |
 | `GET /api/v1/admin/sites/{ma_co_so}` | Admin Big | Đọc bản sao `CoSo` và trạng thái site | Chi tiết cơ sở; không trả credential/chuỗi kết nối |
-| `GET /api/v1/admin/dashboard` | Admin Big | `GLOBAL` | Số liệu toàn hệ thống, việc chờ duyệt và tình trạng site; response báo site thiếu |
+| `GET /api/v1/admin/dashboard` | Admin Big | Đề xuất, chưa có route source | Dashboard web hiện tổng hợp dữ liệu từ `GET /api/v1/admin/reports/students-by-site/`; không gọi endpoint này |
 | `POST /api/v1/admin/sites` | Admin Big | Điều phối cấu hình + nạp dữ liệu dùng chung | Tạo metadata và khởi chạy quy trình provisioning; không cho trình duyệt truyền credential SQL Server |
 | `PATCH /api/v1/admin/sites/{ma_co_so}/status` | Admin Big | `REPLICATED-WRITE`/quy trình đóng site | Chỉ nhận trạng thái cho phép; trước khi đóng phải xử lý giao dịch chuyển và dữ liệu đang hoạt động theo README mục 5.14 |
 | `GET /api/v1/admin/admins-small` | Admin Big | `GLOBAL` hoặc đọc bản sao tài khoản kèm tra cứu hồ sơ từng site | Gộp Admin Small theo site; phản hồi một phần nếu site thiếu |
@@ -321,6 +321,22 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 Tạo thông báo nhận `category`, `severity`, `audience`, `title`, `message` và `target_path` nội bộ `/admin/...` (không bắt buộc). Chỉ Admin Big/Admin Small được tạo; Admin Small chỉ ghi tại site của mình và không thể nhắm riêng Admin Big. Admin Big gửi tới mọi site hoạt động. Nhóm nhận hợp lệ là `admin_all`, `admin_big`, `admin_small`; schema hiện tại không hỗ trợ phát trực tiếp cho học viên, giáo viên hoặc nhân viên. Các lần ghi dùng transaction và audit riêng tại từng CSDL site; nếu một site lỗi, API không báo hoàn tất toàn phần. Dùng cùng `Idempotency-Key` và cùng body để tiếp tục các site còn thiếu; dùng key cũ với nội dung khác trả `409`.
 
 `POST /admin/sites` không có nghĩa API tự tạo CSDL tùy ý bằng credential từ browser. Khâu tạo database, cấu hình kết nối bí mật, chạy migration và nạp bản sao phải thuộc provisioning phía server/nhóm triển khai; endpoint chỉ khởi chạy quy trình đã được bảo vệ.
+
+### Nhân viên nghiệp vụ — đã có route trong source
+
+Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan`, `xep_lop`); không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big phải chỉ định một `site_code` đang hoạt động cho mỗi request; Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body. Các endpoint này thao tác một site, không phải Global Query.
+
+| Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
+|---|---|---|---|
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang; Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code` |
+| `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn; không dò hoặc JOIN qua site khác |
+| `PATCH /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Chỉ cập nhật `NhanVien.ho_ten`, `sdt`, `chuc_vu`; ghi `Logs` cùng transaction cục bộ |
+| `DELETE /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Xóa mềm: vô hiệu hóa các bản `TaiKhoan`, thu hồi `PhienDangNhap`, đổi `NhanVien.trang_thai` thành `nghi_viec`; giữ hồ sơ và chứng từ/lịch sử |
+
+PATCH nhận ít nhất một trong `full_name`, `phone`, `job_title`; body có trường lạ nhận `400`. `phone: null` hoặc `phone: ""` xóa số điện thoại. Chỉ hồ sơ đang làm việc có tài khoản hoạt động được sửa; email/tên đăng nhập là danh tính tài khoản nhân bản, còn `site_code` xác định mảnh nên các trường này không được sửa bằng endpoint hồ sơ. GET/PATCH/DELETE dùng query `site_code` cho Admin Big; Admin Small có thể bỏ query hoặc truyền đúng site của mình.
+
+Create trả `201`; GET/PATCH trả `200`; lỗi validation/quyền/không tìm thấy/xung đột lần lượt có thể trả `400`/`403`/`404`/`409`. DELETE là nghỉ việc, không xóa vật lý; nếu một site chưa đồng bộ hoặc thu hồi phiên được thì trả `503`, không báo thành công toàn phần, và có thể gọi lại cùng slug để tiếp tục. Các database commit độc lập nên `REPLICATED-WRITE` không đồng nghĩa ACID xuyên site. Tài khoản/phiên/nhật ký được xử lý theo service hiện có; chưa có bằng chứng lỗi và phục hồi nhiều site thật.
 
 ## Endpoint cho giáo viên
 

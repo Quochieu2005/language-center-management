@@ -395,6 +395,137 @@ def list_employees(
     }
 
 
+def _employee_response(site_code: str, row) -> dict:
+    account_status = account_status_bit(row[10])
+    if account_status not in (0, 1):
+        raise EmployeeConflict
+    employee_status = str(row[6]).lower()
+    if employee_status not in {"dang_lam", "nghi_viec"}:
+        raise EmployeeConflict
+    return {
+        "employee_id": str(row[0]), "account_id": str(row[1]), "full_name": str(row[2]),
+        "phone": row[3], "email": str(row[4]), "job_title": str(row[5]).lower(),
+        "employee_status": employee_status, "slug": str(row[7]),
+        "account_status": "active" if account_status else "inactive",
+        "username": str(row[11]), "site_code": site_code,
+    }
+
+
+def _employee_by_slug(cursor, site_code: str, slug: str, *, lock: bool = False):
+    if lock:
+        cursor.execute(
+            """
+            SELECT TOP (2) ma_tai_khoan, slug, vai_tro, ma_co_so, trang_thai, ten_dang_nhap
+            FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK)
+            WHERE ma_co_so = %s AND slug = %s AND vai_tro = 'nhan_vien'
+            """,
+            [site_code, slug],
+        )
+        accounts = cursor.fetchall()
+        if len(accounts) > 1:
+            raise EmployeeConflict
+        if not accounts:
+            raise EmployeeNotFound
+        account = accounts[0]
+        cursor.execute(
+            """
+            SELECT TOP (2) ma_nhan_vien, ma_tai_khoan, ho_ten, sdt, email,
+                           chuc_vu, trang_thai
+            FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK)
+            WHERE ma_tai_khoan = %s AND ma_co_so = %s
+              AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+            """,
+            [account[0], site_code],
+        )
+        profiles = cursor.fetchall()
+        if len(profiles) > 1:
+            raise EmployeeConflict
+        if not profiles:
+            raise EmployeeNotFound
+        profile = profiles[0]
+        return (
+            profile[0], profile[1], profile[2], profile[3], profile[4], profile[5],
+            profile[6], account[1], account[2], account[3], account[4], account[5],
+        )
+
+    cursor.execute(
+        """
+        SELECT TOP (2) n.ma_nhan_vien, n.ma_tai_khoan, n.ho_ten, n.sdt, n.email,
+                       n.chuc_vu, n.trang_thai, t.slug, t.vai_tro, t.ma_co_so,
+                       t.trang_thai, t.ten_dang_nhap
+        FROM dbo.TaiKhoan AS t
+        INNER JOIN dbo.NhanVien AS n
+          ON n.ma_tai_khoan = t.ma_tai_khoan AND n.ma_co_so = t.ma_co_so
+        WHERE n.ma_co_so = %s AND t.slug = %s AND t.vai_tro = 'nhan_vien'
+          AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+        """,
+        [site_code, slug],
+    )
+    rows = cursor.fetchall()
+    if len(rows) > 1:
+        raise EmployeeConflict
+    if not rows:
+        raise EmployeeNotFound
+    row = rows[0]
+    if str(row[8]).lower() != "nhan_vien" or str(row[9]).upper() != site_code:
+        raise EmployeeConflict
+    return row
+
+
+@_translate_errors
+def get_employee(*, slug: str, site_code: str) -> dict:
+    site = str(site_code).strip().upper()
+    clean_slug = str(slug).strip()
+    if not clean_slug:
+        raise EmployeeNotFound
+    alias = require_active_site(site)
+    with connections[alias].cursor() as cursor:
+        row = _employee_by_slug(cursor, site, clean_slug)
+    return _employee_response(site, row)
+
+
+@_translate_errors
+def update_employee(
+    *, slug: str, site_code: str, fields: dict, actor_id: str, remote_ip: str,
+) -> dict:
+    columns = {"full_name": "ho_ten", "phone": "sdt", "job_title": "chuc_vu"}
+    if not fields or set(fields) - columns.keys() or not actor_id or not remote_ip:
+        raise ValueError("Thông tin cập nhật không hợp lệ.")
+    site = str(site_code).strip().upper()
+    clean_slug = str(slug).strip()
+    if not clean_slug:
+        raise EmployeeNotFound
+    alias = require_active_site(site)
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            row = _employee_by_slug(cursor, site, clean_slug, lock=True)
+            if str(row[6]).lower() != "dang_lam" or account_status_bit(row[10]) != 1:
+                raise EmployeeConflict
+            current = {"full_name": str(row[2]), "phone": row[3], "job_title": str(row[5]).lower()}
+            updated = {key: fields.get(key, value) for key, value in current.items()}
+            changed = {key: value for key, value in updated.items() if value != current[key]}
+            if changed:
+                assignments = ", ".join(f"{columns[key]} = %s" for key in changed)
+                cursor.execute(
+                    f"UPDATE dbo.NhanVien SET {assignments} "
+                    "WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s "
+                    "AND trang_thai = 'dang_lam'",
+                    [*changed.values(), row[0], site, row[1]],
+                )
+                if cursor.rowcount != 1:
+                    raise EmployeeConflict
+                append_audit(
+                    cursor, site_code=site, actor_id=actor_id,
+                    action="cap_nhat_nhan_vien", table_name="NhanVien",
+                    record_id=str(row[0]), remote_ip=remote_ip,
+                    before={key: current[key] for key in changed},
+                    after={key: changed[key] for key in changed},
+                )
+    result = list(row)
+    result[2], result[3], result[5] = updated["full_name"], updated["phone"], updated["job_title"]
+    return _employee_response(site, tuple(result))
+
+
 def _read_employee_for_deactivation(site_code: str, slug: str):
     alias = require_active_site(site_code)
     with connections[alias].cursor() as cursor:
