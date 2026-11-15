@@ -279,6 +279,8 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     { title: "Ảnh", dataIndex: "avatar_secure_url", width: 72, render: (value: string | null, row) => <Avatar src={value || undefined} icon={<UserOutlined />} alt={`Ảnh đại diện ${row.full_name}`} /> },
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
+    { title: "Tên đăng nhập", dataIndex: "username" },
+    { title: "Số điện thoại", dataIndex: "phone", render: (value: string | null) => value || "—" },
     { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Chức vụ", dataIndex: "job_title", render: (value: Employee["job_title"]) => employeeRoleLabels[value] },
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
@@ -297,7 +299,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   >
     {error && <Alert type="warning" showIcon title={error} style={{ marginBottom: 16 }} />}
     {isEmployeeView
-      ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 760 }} />
+      ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 1000 }} />
       : <Table<AdminSmall> rowKey="account_id" loading={loading} columns={adminColumns} dataSource={admins} scroll={{ x: 760 }} />}
     <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} width="min(760px, calc(100vw - 32px))" onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} destroyOnHidden closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting} styles={{ body: { maxHeight: "calc(100dvh - 140px)", overflowY: "auto" } }}>
       <Form form={form} layout="vertical" onFinish={submit}>

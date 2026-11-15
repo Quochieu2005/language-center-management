@@ -329,7 +329,7 @@ Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan
 
 | Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
 |---|---|---|---|
-| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang, gồm email, username và `avatar_secure_url`; Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê/phân trang; mỗi dòng gồm email, username, phone, `site_code` và `avatar_secure_url`. Big phải chọn site, Small chỉ thấy site gắn phiên |
 | `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
 | `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn, gồm `avatar_secure_url`; không dò hoặc JOIN qua site khác |
 | `PATCH /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Chỉ cập nhật `NhanVien.ho_ten`, `sdt`, `chuc_vu`; ghi `Logs` cùng transaction cục bộ |

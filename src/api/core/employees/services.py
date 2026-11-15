@@ -387,7 +387,8 @@ def list_employees(
             {
                 "employee_id": str(row[0]), "account_id": str(row[1]) if row[1] else None,
                 "slug": str(row[2]) if row[2] else None, "full_name": str(row[3]),
-                "phone": row[4], "email": row[5], "job_title": str(row[6]).lower(),
+                "phone": row[4], "email": row[5], "site_code": site,
+                "job_title": str(row[6]).lower(),
                 "employee_status": str(row[7]).lower(),
                 "account_status": "active" if row[8] in (True, 1, "1") else "inactive" if row[8] is not None else None,
                 "username": str(row[9]) if row[9] else None,
