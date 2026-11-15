@@ -377,7 +377,7 @@ class EmployeeStatusView(APIView):
             "(tình trạng làm việc). Admin Big phải chọn site; Admin Small chỉ dùng site của mình."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
-        request=AccountStatusUpdateSerializer,
+        request=EmployeeStatusUpdateSerializer,
         responses={
             200: OpenApiResponse(description="Trạng thái tài khoản đã được cập nhật."),
             400: OpenApiResponse(description="Site hoặc trạng thái không hợp lệ."),
