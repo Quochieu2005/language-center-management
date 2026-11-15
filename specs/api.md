@@ -1,7 +1,7 @@
 
 # Đặc tả API
 
-> Trạng thái: API Django hiện có health check, xác thực, quản trị và một số nghiệp vụ. File này chứa cả hợp đồng đã có trong source lẫn đề xuất chưa triển khai; phải đối chiếu `src/api/core/urls.py`, view/service tương ứng và kiểm thử trước khi kết luận từng route hoạt động. OpenAPI/Swagger được sinh từ code hiện tại, không phải bằng chứng về kiểm thử phân tán.
+> Trạng thái: API Django có xác thực, quản trị và các nghiệp vụ chính trong source. Tài liệu gồm quy tắc yêu cầu, thiết kế endpoint và một số route đã triển khai; route thực tế nằm trong `src/api/core/urls.py`. Đối chiếu [ma trận trạng thái triển khai](../docs/Trang-Thai-Trien-Khai.md); OpenAPI/Swagger hoặc code không phải bằng chứng nghiệm thu phân tán.
 
 File này mô tả giao diện gọi API thế nào và API phải xử lý quyền, site, dữ liệu cùng lỗi ra sao. Yêu cầu màn hình nằm ở [`ui-ux.md`](ui-ux.md); luồng nghiệp vụ chuẩn nằm trong [`README.md`](../README.md); định nghĩa bảng nằm trong [`docs/DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).
 
@@ -37,6 +37,27 @@ Môn học yêu cầu **2–4 site**, có phân mảnh, replication, transaction
 | YC-07 | Với `MonHoc`, ACK append-only trong `Logs` cùng transaction cục bộ cho phép retry cùng key/body và chỉ ghi site chưa ACK; outage/recovery qua mạng thật vẫn cần TC-SYNC-01 |
 
 [Hướng dẫn kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md) quy định điều kiện đầu vào và bằng chứng. Đồ án đã chọn replication tầng ứng dụng cho `MonHoc`; đây chưa phải replication cho mọi bảng dùng chung. Chuyển cơ sở hiện là Coordinator với các transaction cục bộ và phục hồi tiến về phía trước, không phải ACID nguyên tử xuyên DB. Swagger chỉ mô tả endpoint, không chứng minh các kịch bản đã chạy đúng trên SQL Server.
+
+## Route đang có trong source
+
+Prefix thực tế là `/api/v1/`; bảng dưới tóm tắt các path nghiệp vụ chính lấy từ `src/api/core/urls.py`, không thay thế danh sách đầy đủ method/path trong file đó. Đây là route có đăng ký trong Django, chưa khẳng định API/SQL Server đang chạy hoặc đã được kiểm chứng TC.
+
+| Luồng | Path pattern hiện có |
+|---|---|
+| Xác thực | `/auth/csrf/`, `/auth/login/`, `/auth/session/`, `/auth/activity/`, `/auth/logout/`, `/auth/profile/{slug}/`, `/auth/password/change/`, `/auth/password/forgot/`, `/auth/password/reset/` |
+| OAuth | `/auth/oauth/{provider}/start/`, `/auth/oauth/{provider}/callback/`, `/auth/oauth/connections/{slug}/` |
+| Admin Small/Big | `/admin/admin-smalls/`, `/admin/admin-smalls/{account_id}/credential-email/`, `/admin/admin-smalls/{slug}/status/`, `/admin/admin-smalls/{account_id}/`, `/admin/admin-smalls/profile/{slug}/`, `/admin/admin-bigs/profile/{slug}/` |
+| Giáo viên/nhân viên | `/admin/teachers/`, `/admin/teachers/{slug}/`, `/admin/teachers/{slug}/status/`, `/admin/teachers/{slug}/credential-email/`, `/teachers/profile/{slug}/`, `/admin/employees/`, `/admin/employees/{slug}/` |
+| Avatar | `/auth/profile/{slug}/avatar/upload-intents/`, `/auth/profile/{slug}/avatar/complete/`, `/admin/admin-smalls/{slug}/avatar/upload-intents/`, `/admin/admin-smalls/{slug}/avatar/complete/`, `/admin/teachers/{slug}/avatar/upload-intents/`, `/admin/teachers/{slug}/avatar/complete/` |
+| Danh mục | `/admin/shared/subjects/`, `/admin/shared/subjects/{slug}/`, `/admin/courses/`, `/admin/courses/{slug}/`, `/courses/`, `/courses/{course_slug}/classes/` |
+| Tuyển sinh, học viên | `/public/enrollments/`, `/admin/students/`, `/admin/students/{slug}/`, `/admin/students/{slug}/account/`, `/students/profile/{slug}/` và các route con `enrollments/`, `schedule/`, `tuition/`, `grades/` |
+| Lớp, đăng ký | `/admin/classes/`, `/admin/classes/{class_id}/`, `/admin/classes/{class_id}/students/`, `/admin/classes/{class_id}/sessions/`, `/admin/classes/{class_id}/teacher/`, `/admin/enrollments/`, `/admin/enrollments/{enrollment_id}/class/`, `/admin/rooms/`, `/admin/rooms/{room_id}/` |
+| Học phí, chuyển cơ sở | `/admin/tuition/`, `/admin/tuition/{tuition_id}/installments/`, `/admin/tuition/{tuition_id}/receipts/`, `/admin/tuition/{tuition_id}/receipts/{receipt_id}/invoice/`, `/admin/classes/{class_id}/tuition-reminders/`, `/admin/transfers/`, `/admin/transfers/{source_site}/{transfer_id}/decision/`, `/admin/transfers/{source_site}/{transfer_id}/retry/` |
+| Giáo viên | `/teacher/classes/`, `/teacher/classes/{class_id}/sessions/`, `/teacher/sessions/{session_id}/attendance/`, `/teacher/enrollments/{enrollment_id}/grades/`, `/teacher/enrollments/{enrollment_id}/grades/{grade_type}/`, `/teacher/enrollments/{enrollment_id}/grades/history/` |
+| Báo cáo và thông báo | `/admin/reports/students-by-site/`, `/admin/notifications/`, `/reports/audit-logs/` |
+| Thanh toán SePay | `/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/`, `/students/profile/{slug}/payments/{attempt_id}/`, `/webhooks/sepay/` |
+
+Các endpoint trong những bảng thiết kế tiếp theo chưa tự động là route đang chạy: path không nằm trong inventory trên, hoặc không được ghi rõ “route source”, phải được coi là hợp đồng đề xuất. Đặc biệt, inventory không có API quản lý `CoSo`, `/admin/sites`, `/admin/dashboard`, hoặc một endpoint đăng ký tài khoản công khai.
 
 ## Múi giờ và định dạng giờ
 
@@ -91,7 +112,7 @@ Lỗi validation trả `400` hoặc `422` cùng mã trường, ví dụ `{"error
 - Khi hết 3600 giây, API từ chối phiên bằng `401` với mã ổn định `SESSION_IDLE_TIMEOUT`, thu hồi trạng thái phiên, hết hạn cookie `HttpOnly` và không xử lý nghiệp vụ. `POST /auth/logout` dùng cùng cơ chế kết thúc phiên khi logout thủ công. Nếu không thể truy cập nơi lưu trạng thái phiên, API không được coi phiên là hợp lệ; trả lỗi dịch vụ phù hợp và không cho qua kiểm tra quyền.
 - Frontend đồng bộ hoạt động giữa các tab cùng phiên, hiển thị cảnh báo trước hạn (mặc định 5 phút) và nút “Tiếp tục phiên” chỉ khi API xác nhận phiên còn hạn. Đến hạn hoặc nhận `SESSION_IDLE_TIMEOUT`, frontend xóa trạng thái người dùng trong bộ nhớ, điều hướng về trang đăng nhập với thông báo phiên hết hạn và không giữ token trong storage.
 - Chính sách cần kiểm thử: chưa hết hạn tại 59:59; hết hạn tại 60:00; tương tác thật đặt lại hạn; polling/refresh nền không đặt lại; reload/tab ngủ không kéo dài phiên; hoạt động ở tab khác được đồng bộ; logout thủ công thu hồi ngay; các role có cùng chính sách.
-- **Phụ thuộc triển khai hiện tại:** chưa có endpoint đăng nhập/logout, model xác thực hay nơi lưu phiên trong API; `DATABASES['default']` cố ý là dummy. Trước khi bật auth, phải chốt nơi lưu trạng thái phiên có thể thu hồi phù hợp mô hình CSDL riêng từng site và cập nhật schema/migration nếu cần. Không tự tạo CSDL nghiệp vụ trung tâm hoặc lưu trạng thái phiên vào một site tùy ý.
+- **Source hiện tại:** có login/logout, `PhienDangNhap`, `SuKienDangNhap`, endpoint session/activity và idle timeout 3600 giây. Trạng thái phiên kỹ thuật lưu tại database của site cấu hình `AUTH_SESSION_SITE_CODE`; `DATABASES['default']` vẫn là dummy. Cần kiểm chứng frontend nhiều tab và phụ thuộc vận hành vào site lưu phiên.
 
 ### Rate limit và chống dò tài khoản
 
@@ -105,7 +126,7 @@ Các ngưỡng dưới đây là **giá trị khởi đầu đề xuất**, ph�
 | Quên mật khẩu | Tối đa 10 request/IP/giờ và 3 lần cho cùng email/giờ | Trả cùng response `202` dù email có tồn tại hay không; không gửi nhiều email reset |
 | Xác nhận reset mật khẩu | Giới hạn theo IP và token; token một lần, có hạn | Token sai/hết hạn/đã dùng không đổi dữ liệu; trả lỗi chung và ghi audit không chứa token |
 
-IP chỉ được lấy từ proxy đã tin cậy; không tin header IP tùy ý từ client. Rate limit phải phối hợp IP, tài khoản/email đã chuẩn hóa và thời gian; CAPTCHA không thay thế rate limit. Public registration hiện vẫn **tắt** vì học viên chưa có tài khoản trong schema. Nếu sau này bật, phải áp dụng các giới hạn này trước khi mở endpoint.
+IP chỉ được lấy từ proxy đã tin cậy; không tin header IP tùy ý từ client. Rate limit phải phối hợp IP, tài khoản/email đã chuẩn hóa và thời gian; CAPTCHA không thay thế rate limit. API đăng ký tài khoản công khai chưa được duyệt và không có route trong source. API ghi danh khóa học công khai (`POST /api/v1/public/enrollments/`) là nghiệp vụ khác; portal/tài khoản học viên có code nhưng chưa được duyệt phạm vi đồ án.
 
 Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một lần và lưu dạng hash; token gửi qua email không ghi log. Khác với mật khẩu người dùng, token ngẫu nhiên có thể lưu bằng SHA-256/HMAC hash phục vụ tra cứu an toàn; mật khẩu vẫn phải dùng bcrypt.
 
@@ -113,11 +134,11 @@ Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một l
 
 Django gửi thư từ backend qua SMTP; thông tin kết nối chỉ nằm trong biến môi trường/secret store (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` hoặc `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`). Với Gmail, cấu hình mặc định là `smtp.gmail.com:587` + STARTTLS, dùng địa chỉ Gmail và Google App Password. App Password chỉ dành cho SMTP, không phải OAuth Client Secret. Không ghi thông tin này vào source, Git, log, Swagger response hoặc frontend. Chỉ báo gửi thành công sau khi SMTP chấp nhận thư; lỗi gửi thư phải có trạng thái retry an toàn và không log nội dung bí mật.
 
-Khi Admin Big tạo Admin Small hoặc giáo viên, không gửi mật khẩu tạm qua email. Sau khi tài khoản và hồ sơ site được tạo an toàn, gửi email mời người nhận tự đặt mật khẩu bằng token kích hoạt ngẫu nhiên, một lần, có hạn; tài khoản chưa được đăng nhập cho tới khi kích hoạt. Schema hiện tại chưa có bảng token kích hoạt riêng/trạng thái `cho_kich_hoat`, nên phải cập nhật schema và luồng `REPLICATED-WRITE`/phục hồi trước khi bật tính năng mời. Không tái sử dụng token reset cho mục đích kích hoạt.
+Source hiện tạo tài khoản Admin Small/giáo viên bằng mật khẩu khởi tạo từ cấu hình backend, lưu hash và gửi thông tin cấp tài khoản qua email; chưa có token kích hoạt riêng. Email thật phụ thuộc SMTP và phải kiểm tra kết quả gửi. Không ghi mật khẩu/secret vào log, Git hay response.
 
-Quên mật khẩu gửi liên kết đặt lại chứa token có entropy cao; người dùng mở liên kết và tự nhập mật khẩu mới. Token hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 900 giây), chỉ dùng một lần, chỉ lưu hash tại site tiếp nhận và không xuất hiện trong nhật ký. Nếu site lưu tài khoản không sẵn sàng, không báo reset thành công và không cập nhật một phần các bản sao. Endpoint yêu cầu reset vẫn trả cùng thông báo chung `202` dù tài khoản/email tồn tại hay không; rate limit theo IP và email đã chuẩn hóa. Chọn liên kết ngẫu nhiên thay cho mã số ngắn trong phiên bản đầu để giảm khả năng dò mã; nếu sau này dùng OTP số, phải thêm bộ đếm thử/khóa ngắn hạn và lưu hash mã vào schema trước khi triển khai.
+Source hiện reset mật khẩu quản trị bằng OTP 6 số, lưu hash, giới hạn số lần sai và hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây). OTP dùng một lần; ledger phục hồi giữ trạng thái cập nhật mật khẩu trên các bản sao. Response yêu cầu reset không tiết lộ tài khoản tồn tại hay không. Luồng SMTP vẫn cần kiểm thử ở môi trường nhóm.
 
-Các timeout URL cấu hình ở backend gồm `PASSWORD_RESET_TIMEOUT` (900 giây) và `ACCOUNT_ACTIVATION_TIMEOUT` (86400 giây). `WEB_APP_BASE_URL` chỉ nhận origin đã được cấu hình; không lấy URL redirect tùy ý từ request. Source hiện có các service gửi email trong một số luồng tạo tài khoản và quên mật khẩu; giao thư thực tế vẫn phụ thuộc cấu hình SMTP ở môi trường chạy và phải kiểm tra kết quả SMTP riêng.
+`PASSWORD_RESET_TIMEOUT` mặc định là 120 giây. `WEB_APP_BASE_URL` chỉ nhận origin đã được cấu hình; không lấy URL redirect tùy ý từ request. Source có service gửi email trong một số luồng tạo tài khoản và quên mật khẩu; giao thư thực tế vẫn phụ thuộc SMTP ở môi trường chạy.
 
 ## Ảnh và Cloudinary
 
@@ -136,11 +157,11 @@ language-center-management/
 
 Tên người, email, số điện thoại và nội dung nhạy cảm không được dùng làm tên folder hoặc `public_id`; mã site/mã hồ sơ phải lấy từ bản ghi và quyền đã xác thực ở server. Mã ảnh là UUID ngẫu nhiên riêng cho từng asset. API dự kiến dùng `asset_folder` với Cloudinary Dynamic folders để phân loại trong Media Library mà không bắt buộc đưa đường dẫn folder vào `public_id`; không dùng thư mục để thay thế kiểm soát quyền truy cập. Ảnh cá nhân cần chính sách delivery hạn chế phù hợp. Xem [Cloudinary Folder Modes](https://cloudinary.com/documentation/folder_modes) và [Upload API Reference](https://cloudinary.com/documentation/image_upload_api_reference).
 
-Khai báo `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` và `CLOUDINARY_ROOT_FOLDER` trong `src/api/.env`, không commit các giá trị này. Nếu API secret từng bị chia sẻ, phải rotate trước khi cấu hình giá trị mới. `.env.example` chỉ chứa placeholders. Cấu hình hiện tại mới chuẩn bị biến môi trường và hàm dựng folder path; chưa có endpoint upload hay upload nào được xác nhận hoạt động. Trước khi bật upload phải bổ sung metadata ảnh tại CSDL site phù hợp trong `docs/DATABASE_SCHEMA.md` và triển khai/kiểm thử xác thực, quyền, ký upload và xác minh asset.
+Source hiện có upload intent và endpoint hoàn tất Cloudinary cho ảnh đại diện Admin, Admin Small và giáo viên; các biến môi trường chỉ có placeholders trong `.env.example`. Django kiểm tra quyền/asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url` theo các bản sao tài khoản. Chưa có API MediaAsset tổng quát hoặc bằng chứng upload thật trên Cloudinary; schema avatar đã có trong `docs/DATABASE_SCHEMA.md`.
 
 Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có thời hạn → frontend gửi bytes ảnh trực tiếp tới Cloudinary → frontend gửi `public_id` về API → API xác minh lại asset rồi gắn metadata vào bản ghi tại site đúng. Nếu upload Cloudinary thành công nhưng ghi metadata thất bại, không báo hoàn tất; ghi nhận asset mồ côi để dọn an toàn.
 
-| Method và path đề xuất | Người gọi | Hành vi |
+| Method và path thiết kế | Người gọi | Hành vi |
 |---|---|---|
 | `POST /api/v1/media/upload-intents` | Người dùng đã xác thực, có quyền sửa hồ sơ/tài nguyên tương ứng | API kiểm tra quyền/site, mục đích và loại ảnh; tạo chữ ký upload Cloudinary hết hạn ngắn, public ID do server sinh |
 | `POST /api/v1/media/assets` | Người dùng vừa upload bằng intent hợp lệ | API xác minh chữ ký, public ID, loại tài nguyên, kích thước và metadata từ Cloudinary; sau đó gắn asset vào bản ghi được phép |
@@ -148,7 +169,7 @@ Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có
 
 Yêu cầu upload: chỉ MIME ảnh trong allowlist; kiểm tra cả MIME thực và phần mở rộng; giới hạn dung lượng/chiều rộng/chiều cao theo cấu hình; đổi tên bằng public ID phía server; không nhận URL tùy ý rồi tải hộ (tránh SSRF). Có thể dùng Cloudinary transformation để tạo thumbnail/responsive format. Upload intent hết hạn, gắn với tài khoản, site, mục đích và bản ghi được phép; không cho tái sử dụng để ghi đè ảnh tùy ý. Trước khi xóa asset, xác minh không còn bản ghi tham chiếu tại các site cần thiết; nếu xóa metadata/asset bị lỗi giữa chừng, trả trạng thái phục hồi và không để URL hỏng được báo là đã xóa sạch.
 
-SQL Server lưu metadata như `public_id`, `secure_url`, định dạng, kích thước, alt text và liên kết bản ghi; không lưu bytes ảnh. Metadata phải theo đúng vị trí dữ liệu: ảnh của hồ sơ site ghi `LOCAL`; ảnh thuộc danh mục dùng chung đồng bộ theo `REPLICATED-WRITE`. Không tạo database trung tâm cho media. Schema hiện chưa mô tả bảng/cột metadata Cloudinary; phải bổ sung `MediaAsset` hoặc các cột quan hệ đã thống nhất trong `docs/DATABASE_SCHEMA.md` trước khi triển khai upload.
+SQL Server chỉ lưu metadata avatar hiện được triển khai (`avatar_public_id`, `avatar_secure_url`) trong `TaiKhoan`; các cột này đi cùng bản sao tài khoản và được ghi theo `REPLICATED-WRITE`. Bytes ảnh ở Cloudinary. Schema chưa có bảng metadata tổng quát cho ảnh khóa học/cơ sở; không tạo database media trung tâm.
 
 ## Danh tính, vai trò và phạm vi site
 
@@ -156,38 +177,38 @@ SQL Server lưu metadata như `public_id`, `secure_url`, định dạng, kích t
 
 | Người dùng | Biểu diễn theo schema hiện tại | Phạm vi API |
 |---|---|---|
-| Admin Big | `TaiKhoan.vai_tro = admin`, `ma_co_so = NULL` | Toàn hệ thống; thao tác nhiều site phải được gắn `GLOBAL`, `REPLICATED-WRITE` hoặc `DISTRIBUTED-TX` rõ ràng |
-| Admin Small | `TaiKhoan.vai_tro = nhan_vien`, `NhanVien.chuc_vu = quan_ly_co_so`, có `ma_co_so` | Một site được gán; không được chọn site khác trong query/body để mở rộng quyền |
+| Admin Big | `TaiKhoan.vai_tro = admin_big`, `ma_co_so = NULL` | Toàn hệ thống; thao tác nhiều site phải được gắn `GLOBAL`, `REPLICATED-WRITE` hoặc `DISTRIBUTED-TX` rõ ràng |
+| Admin Small | `TaiKhoan.vai_tro = nhan_vien`, hồ sơ `Admin.loai_admin = admin_small`, có site được gán | Một site được gán; không được chọn site khác trong query/body để mở rộng quyền |
 | Lễ tân | `nhan_vien` với chức vụ tương ứng | Hồ sơ học viên, đăng ký và xếp lớp trong site được gán |
 | Kế toán | `nhan_vien` với chức vụ tương ứng | Học phí và phiếu thu trong site được gán |
 | Giáo viên | `TaiKhoan.vai_tro = giao_vien`, hồ sơ `GiaoVien` tại site | Chỉ lớp/buổi được phân công; API kiểm tra phân công ở mỗi thao tác |
-| Học viên | **Chưa có tài khoản trong schema hiện tại** | Không có quyền hoặc endpoint hoạt động. API portal học viên ở mục “Phạm vi học viên đề xuất” chỉ được mở sau khi nhóm duyệt và cập nhật schema |
+| Học viên | Schema/API/UI có tài khoản và portal trong source; phạm vi đồ án chưa được duyệt | Không đưa vào phạm vi nghiệm thu trước khi nhóm thống nhất và cập nhật các tài liệu liên quan |
 
-`Admin Small` là chức vụ của nhân viên, không thêm giá trị `admin_small` vào `TaiKhoan.vai_tro`. Nếu một endpoint nhận bộ lọc `ma_co_so`, API chỉ chấp nhận site đúng quyền; với Admin Big, site đích vẫn phải tồn tại và đang hoạt động. Không dùng tiền tố mã học viên để xác định site hiện hành.
+`Admin Small` không dùng `TaiKhoan.vai_tro=admin_small`: role đăng nhập là `nhan_vien`, còn hồ sơ phân quyền là `Admin.loai_admin=admin_small`. `NhanVien.chuc_vu` mô tả nhân viên nghiệp vụ. Nếu endpoint nhận bộ lọc `ma_co_so`, API chỉ chấp nhận site đúng quyền; với Admin Big, site đích vẫn phải tồn tại và đang hoạt động. Không dùng tiền tố mã học viên để xác định site hiện hành.
 
 ## Endpoint dùng chung: Web công khai và xác thực
 
-Các method/path trong bảng cần được đối chiếu với source. Danh mục khóa học công khai và các route OAuth có code trong source; OAuth còn phụ thuộc cấu hình provider ở từng môi trường. Các route khác được ghi là đề xuất khi chưa có route tương ứng. Đăng ký công khai không mở trong phạm vi hiện tại.
+Các method/path được ghi là “đã có trong source” phải khớp `src/api/core/urls.py`; route chỉ là thiết kế được ghi rõ “đề xuất” thì chưa phải hợp đồng đang chạy. OAuth còn phụ thuộc cấu hình provider ở từng môi trường. Đăng ký tài khoản công khai không mở; đăng ký khóa học công khai là luồng riêng.
 
 | Method và path | Người gọi | Kiểu truy cập | Dữ liệu đọc/ghi và hành vi |
 |---|---|---|---|
-| `GET /api/v1/public/sites` | Khách chưa đăng nhập | Đọc bản sao dùng chung | Đọc `CoSo`; chỉ trả trường công khai của site đang hoạt động |
+| `GET /api/v1/public/sites` | Khách chưa đăng nhập | Đề xuất, chưa có route tương ứng trong source | Nếu nhóm cần API danh sách cơ sở công khai, phải bổ sung route theo schema; không giả định endpoint đang chạy |
 | `GET /api/v1/courses/` | Khách chưa đăng nhập | `GLOBAL` đọc từng CSDL site riêng | Đọc danh mục `KhoaHoc`/`MonHoc` và số lớp đang mở theo site; trả `scope`, `complete`, `site_codes`, `missing_sites`, `inconsistent_sites`, `count`, `results`; nếu thiếu site, kết quả đánh dấu chưa đầy đủ |
-| `GET /api/v1/public/classes?ma_co_so=...&ma_khoa_hoc=...` | Khách chưa đăng nhập | `LOCAL` nếu lọc một site; `GLOBAL` nếu xem nhiều site | Đọc `LopHoc`, lịch cần công khai; Global Query phải trả `meta.complete` và `missing_sites` |
-| `POST /api/v1/auth/login/` | Vai trò nội bộ hiện có | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả phiên và ngữ cảnh quyền, không trả hash mật khẩu hoặc chuỗi kết nối |
-| `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập; `provider` chỉ `google` hoặc `facebook` | Khởi tạo OAuth; provider subject được tra cứu `GLOBAL` sau callback | Tạo state dùng một lần rồi chuyển hướng; chỉ học viên đã liên kết subject được đăng nhập, không tự tạo hoặc tự ghép tài khoản |
-| `GET /api/v1/auth/oauth/{provider}/callback/` | Callback Google/Facebook | `GLOBAL` xác minh liên kết nhân bản và đọc `TaiKhoan` | Đổi authorization code ở server; xác minh provider subject; chỉ học viên có liên kết hợp lệ được cấp phiên |
-| `POST /api/v1/auth/oauth/{provider}/start/` | Học viên đã đăng nhập, đổi mật khẩu cấp lần đầu | Khởi tạo liên kết; callback ghi bằng `REPLICATED-WRITE` | Trả URL ủy quyền và đặt cookie state; danh tính tài khoản lấy từ phiên, không nhận mã tài khoản từ client |
+| `GET /api/v1/courses/{course_slug}/classes/` | Khách chưa đăng nhập | Route hiện có; truy vấn theo phạm vi API | Đọc lớp công khai của khóa học; đối chiếu status/missing site theo response hiện tại trước khi dùng như hợp đồng |
+| `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
+| `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập hoặc đã xác thực để liên kết | Route hiện có; `provider` chỉ `google` hoặc `facebook` | Tạo state dùng một lần; callback chỉ đăng nhập tài khoản học viên đã liên kết, không tự tạo hoặc ghép theo email |
+| `GET /api/v1/auth/oauth/{provider}/callback/` | Callback Google/Facebook | Route hiện có | Đổi authorization code ở server, xác minh provider subject; phụ thuộc OAuth configuration thật |
 | `GET /api/v1/auth/oauth/connections/{slug}/` | Học viên đã đăng nhập | Đọc trạng thái liên kết tài khoản theo phiên | Chỉ trả trạng thái liên kết của chính học viên đã xác thực |
-| `POST /api/v1/auth/register` | Không có trong phạm vi hiện tại | Tắt/chưa triển khai | Chưa cấp tài khoản công khai; chỉ mở sau khi nhóm duyệt đối tượng đăng ký, schema, xác minh email và rate limit |
+| — (không có account signup route) | Khách chưa đăng nhập | Chưa có route trong source và chưa được duyệt phạm vi | `POST /api/v1/public/enrollments/` là đăng ký khóa học công khai, không tạo tài khoản học viên |
 | `GET /api/v1/auth/profile/{slug}/` | Người đã đăng nhập | Đọc hồ sơ của chính tài khoản theo slug | Slug phải khớp tài khoản trong phiên; trả vai trò và thông tin được phép hiển thị, không trả bí mật xác thực |
 | `POST /api/v1/auth/logout/` | Người đã đăng nhập | Hủy phiên | Route đã có trong source; thu hồi phiên phía server và xóa cookie phiên |
+| `GET /api/v1/auth/session/`, `POST /api/v1/auth/activity/` | Người đã đăng nhập | Route hiện có | Đọc session và ghi nhận hoạt động người dùng thật theo chính sách idle timeout |
 | `POST /api/v1/auth/password/change/` | Người đã đăng nhập | `LOCAL` kiểm tra tài khoản; `REPLICATED-WRITE` cập nhật bản sao mật khẩu theo chính sách | Route đã có trong source; nhận mật khẩu hiện tại và mật khẩu mới; xác minh bằng bcrypt |
 | `POST /api/v1/auth/password/forgot/` | Người chưa đăng nhập | Tra cứu tài khoản; tạo OTP có hạn | Route đã có trong source; luôn trả thông báo không tiết lộ tài khoản/email có tồn tại hay không |
 | `POST /api/v1/auth/password/reset/` | Người có OTP đặt lại | `LOCAL` kiểm OTP; cập nhật mật khẩu theo chính sách | Route đã có trong source; mã có hạn và chỉ dùng một lần theo trạng thái lưu hiện có |
-| `POST /api/v1/auth/account-activations` | Người có liên kết mời hợp lệ | `LOCAL` kiểm token; `REPLICATED-WRITE` kích hoạt và đặt mật khẩu mới | Chỉ bật sau khi schema có trạng thái tài khoản chờ kích hoạt và token kích hoạt riêng; không dùng chung token reset |
+| `POST /api/v1/auth/account-activations` | Người có liên kết mời hợp lệ | Đề xuất; chưa có route/schema token kích hoạt trong source | Không dùng như endpoint đang hoạt động; quy trình source hiện cấp mật khẩu khởi tạo theo cấu hình và email thông tin tài khoản |
 
-`POST /api/v1/auth/register` hiện là route tắt: nếu `RegisterPage` còn hiển thị, trang chỉ giải thích điều kiện/liên hệ, không gửi tạo tài khoản. Admin Big tạo tài khoản nội bộ. Nếu nhóm duyệt portal học viên, đăng ký/kích hoạt phải được đặc tả và cập nhật schema trước khi bật endpoint; tuyệt đối không tự mở public signup.
+API không có endpoint đăng ký tài khoản công khai; source có `POST /api/v1/public/enrollments/` để gửi đăng ký khóa học, không phải tạo tài khoản. Admin Big tạo tài khoản nội bộ. Portal học viên có code/schema nhưng chưa được duyệt vào phạm vi đồ án; không bật public signup.
 
 ### Đăng nhập và liên kết tài khoản Google/Facebook — đã có code, cần cấu hình môi trường
 
@@ -226,16 +247,16 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `PATCH /api/v1/admin/sites/{ma_co_so}/status` | Admin Big | `REPLICATED-WRITE`/quy trình đóng site | Chỉ nhận trạng thái cho phép; trước khi đóng phải xử lý giao dịch chuyển và dữ liệu đang hoạt động theo README mục 5.14 |
 | `GET /api/v1/admin/admins-small` | Admin Big | `GLOBAL` hoặc đọc bản sao tài khoản kèm tra cứu hồ sơ từng site | Gộp Admin Small theo site; phản hồi một phần nếu site thiếu |
 | `GET /api/v1/admin/admins-small/{ma_tai_khoan}` | Admin Big | `GLOBAL` định vị rồi `LOCAL` đọc hồ sơ | Chi tiết tài khoản và cơ sở được phân công; báo rõ site thiếu |
-| `POST /api/v1/admin/admins-small` | Admin Big | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Tạo tài khoản `nhan_vien`, phân công `ma_co_so`, tạo `NhanVien.chuc_vu = quan_ly_co_so`; phải có trạng thái phục hồi nếu hai chặng lệch |
+| `GET, POST /api/v1/admin/admin-smalls/` | Admin Big | Đọc `GLOBAL`; tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: liệt kê hoặc tạo Admin Small. Tài khoản có role `nhan_vien`; hồ sơ là `Admin.loai_admin = admin_small` tại site được gán, không phải `NhanVien.chuc_vu`. Request tạo dùng `full_name`, `email`, `site_code` (username/slug tùy chọn). |
 | `DELETE /api/v1/admin/admin-smalls/{account_id}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Xóa vật lý hồ sơ `Admin`, các bản sao `TaiKhoan`, phiên/token đặt lại mật khẩu và ảnh Cloudinary; giữ `Logs`, điểm danh, lịch sử chuyển cơ sở và chứng từ. Từ chối trước khi ghi nếu còn hồ sơ nghiệp vụ, yêu cầu thanh toán hoặc giao dịch chuyển cơ sở đang mở. Có dấu tiến trình/retry; không bảo đảm ACID xuyên CSDL |
 | `PATCH /api/v1/admin/admin-smalls/{slug}/status/` | Admin Big | `REPLICATED-WRITE` | Chỉ đổi trạng thái `active`/`inactive`; không xóa hồ sơ hoặc dữ liệu. Đây là thao tác riêng với DELETE |
 | `GET /api/v1/admin/accounts` | Admin Big | `GLOBAL`/bản sao tài khoản | Danh sách tài khoản nội bộ, trạng thái và phạm vi; không trả hash mật khẩu |
 | `GET /api/v1/admin/accounts/{ma_tai_khoan}` | Admin Big | Đọc bản sao tài khoản và tra cứu hồ sơ site cần thiết | Chi tiết tài khoản/phạm vi được phép; không trả hash hoặc secret |
 | `PATCH /api/v1/admin/accounts/{ma_tai_khoan}/status` | Admin Big | `REPLICATED-WRITE` | Khóa/mở tài khoản qua dịch vụ đồng bộ chung; không cho tự khóa tài khoản Admin Big cuối cùng nếu nhóm đặt quy tắc đó |
-| `GET /api/v1/admin/teachers?ma_co_so=...` | Admin Big hoặc Admin Small đúng site | Admin Big: `GLOBAL`; Admin Small: `LOCAL` | Đọc hồ sơ `GiaoVien`, trạng thái và phân công; site lấy từ quyền nếu Admin Small |
-| `GET /api/v1/admin/teachers/{ma_giao_vien}` | Admin Big hoặc Admin Small đúng site | Admin Big: định vị rồi `LOCAL`; Admin Small: `LOCAL` | Chi tiết giáo viên và các phân công trong phạm vi được cấp |
-| `POST /api/v1/admin/teachers` | Admin Big | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Tạo tài khoản `giao_vien`, hồ sơ `GiaoVien` tại cơ sở được chọn; không để tài khoản hoạt động nếu hồ sơ site chưa tạo |
-| `PUT /api/v1/admin/teachers/{ma_giao_vien}/assignments` | Admin Big hoặc Admin Small đúng site | `LOCAL` | Cập nhật lớp/buổi được giao qua `LopHoc` và `BuoiHoc`; từ chối lớp/buổi ngoài site hoặc trùng lịch |
+| `GET, POST /api/v1/admin/teachers/` | Admin Big hoặc Admin Small theo quyền | Đọc theo site/phạm vi; tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: liệt kê/tạo hồ sơ giáo viên; site chọn qua quyền/`site_code`, không nhận role tùy ý |
+| `GET, DELETE /api/v1/admin/teachers/{slug}/?site_code=...` | Admin Big hoặc Admin Small đúng site | Đọc `LOCAL`; xóa mềm/tắt tài khoản theo các site và hồ sơ tại site | Route source: GET chi tiết; DELETE vô hiệu hóa tài khoản và chuyển hồ sơ sang nghỉ việc, giữ dữ liệu lịch sử |
+| `PATCH /api/v1/admin/teachers/{slug}/status/?site_code=...` | Admin Big hoặc Admin Small đúng site | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: đổi trạng thái tài khoản/hồ sơ giáo viên, thu hồi phiên; không phải endpoint cập nhật phân công lớp |
+| `PUT /api/v1/admin/classes/{class_id}/teacher/` | Admin Big/Admin Small theo quyền lớp | `LOCAL` | Route source: gán giáo viên cho lớp tại site sở hữu lớp; kiểm tra giáo viên và lớp cùng site |
 | `GET /api/v1/admin/shared/subjects/` | Admin Big | `GLOBAL` chỉ đọc | Đọc `MonHoc` từ từng site đang hoạt động và tổng hợp danh sách ở API. Trả `complete`, `missing_sites`, `inconsistent_sites`; không cho chọn môn nếu danh mục chưa được đối chiếu đầy đủ |
 | `PATCH /api/v1/admin/shared/subjects/{slug}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Route đã có: cập nhật `MonHoc` trên mọi site hoạt động, ghi ACK vào `Logs`, bắt buộc `Idempotency-Key`; trả `200` khi đủ site, `202` khi còn site cần retry, `409` khi key/body hoặc bản sao xung đột. Không tạo môn mới |
 | `POST /api/v1/admin/courses/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Tạo `KhoaHoc` ở các site hoạt động; `ma_khoa_hoc` tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số và có thể chứa các đoạn bổ sung ngăn bằng dấu gạch nối đơn (ví dụ `FG`, `HK-TOEIC-450-550`); giao diện chuẩn hóa mã nhập thành chữ in hoa. API bắt buộc `ma_mon` tồn tại và có bản sao giống nhau tại mọi site; `so_buoi` là tổng số buổi theo chương trình và được nhập riêng, không suy ra từ số tháng; thời lượng tháng nhận số thập phân tối đa 2 chữ số, thời lượng ngày phải nguyên; ghi ACK `Logs`, retry bằng cùng `Idempotency-Key` |
@@ -284,21 +305,20 @@ Tạo thông báo nhận `category`, `severity`, `audience`, `title`, `message` 
 
 API không nhận `ma_giao_vien` từ body để quyết định quyền. Người ghi lấy từ phiên đã xác thực; API xác nhận giáo viên thuộc cùng site và được phân công vào đúng lớp/buổi.
 
-## Phạm vi học viên đề xuất — chưa được bật
+## API học viên có trong source — chưa được duyệt phạm vi
 
-README/schema hiện tại không có tài khoản học viên: `TaiKhoan.vai_tro` chỉ gồm `admin`, `nhan_vien`, `giao_vien`; `HocVien` chưa liên kết với `TaiKhoan`. Để API không hứa chức năng chưa có, các route sau chỉ là **phương án tối thiểu để nhóm duyệt**, không được triển khai trước khi schema và quy tắc tài khoản được cập nhật.
+Schema, API và UI hiện có tài khoản học viên, portal đọc hồ sơ/đăng ký/lịch/học phí/điểm, cấp tài khoản bởi Admin và route tạo/tra cứu yêu cầu SePay. Đây là code trong repo, chưa phải quyết định đưa portal vào đồ án; các API này không được coi là phạm vi đã duyệt cho tới khi nhóm thống nhất và cập nhật README, FS, schema, API/UI spec.
 
-Đề xuất giới hạn ban đầu là **portal chỉ đọc dữ liệu của chính học viên**: xem hồ sơ, đăng ký/lớp hiện tại, lịch, học phí và điểm. Không tự đăng ký khóa học, đóng học phí online, sửa hồ sơ quan trọng hoặc tạo tài khoản công khai. Nhân viên tiếp tục thực hiện sáu nghiệp vụ bắt buộc theo các endpoint hiện có.
+Các đường dẫn thực tế được khai báo trong `src/api/core/urls.py`:
 
-| Method và path đề xuất | Kiểu phân tán | Dữ liệu/điều kiện |
+| Route source | Hành vi | Trạng thái phạm vi |
 |---|---|---|
-| `GET /api/v1/student/me` | `GLOBAL` định vị hồ sơ hiện hành, sau đó `LOCAL` đọc | Hồ sơ `HocVien` có tài khoản đang liên kết; chỉ trả bản hiện hành, không trả site khác/history nhạy cảm |
-| `GET /api/v1/student/me/enrollments` | `GLOBAL` định vị rồi `LOCAL` | Đăng ký của học viên hiện hành tại site chứa hồ sơ `dang_hoc` |
-| `GET /api/v1/student/me/schedule` | `GLOBAL` định vị rồi `LOCAL` | `DangKy`, `LopHoc`, `BuoiHoc` hiện hành |
-| `GET /api/v1/student/me/tuition` | `GLOBAL` định vị rồi `LOCAL` | Số phải đóng và phiếu thu chỉ đọc; không trả thông tin thanh toán nhạy cảm |
-| `GET /api/v1/student/me/grades` | `GLOBAL` định vị rồi `LOCAL` | Chỉ điểm của đăng ký thuộc hồ sơ hiện hành |
+| `/api/v1/admin/students/{slug}/account/` | Admin cấp tài khoản học viên | Có code; portal chưa được duyệt |
+| `/api/v1/students/profile/{slug}/` và các route con `/enrollments/`, `/schedule/`, `/tuition/`, `/grades/` | Đọc hồ sơ/portal theo tài khoản đã xác thực | Có code; chỉ trả dữ liệu theo hồ sơ hiện hành; phạm vi chưa được duyệt |
+| `/api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/` | Tạo yêu cầu thanh toán SePay | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
+| `/api/v1/students/profile/{slug}/payments/{attempt_id}/` | Đọc trạng thái lượt thanh toán | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
 
-**Điều kiện để chuyển các route học viên từ đề xuất sang hợp đồng:** nhóm phải duyệt có cấp tài khoản hay không; ai tạo/kích hoạt; cơ chế xác minh danh tính; quyền xem/sửa; hành vi khi học viên chuyển cơ sở. Nếu duyệt, cập nhật `docs/DATABASE_SCHEMA.md` để thêm mô hình liên kết duy nhất giữa tài khoản và `HocVien` (và vai trò/điều kiện nhân bản tương ứng), cập nhật README về đăng nhập, đồng bộ `specs/ui-ux.md` và đổi trạng thái route trong file này. Không suy liên kết bằng email đơn thuần; không JOIN xuyên site.
+Không có account-signup endpoint công khai. `POST /api/v1/public/enrollments/` là đăng ký khóa học, không tự tạo tài khoản. API vẫn phải xác thực quyền và giới hạn bản ghi ở server; không tin slug/site do client gửi để mở rộng quyền. Bằng chứng source và giới hạn phạm vi được ghi trong [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
 
 ## Quy ước response và lỗi — đề xuất
 
@@ -392,25 +412,26 @@ API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, ki
 
 Khuyến nghị phiên trình duyệt dùng cookie `HttpOnly`, `Secure`, `SameSite` và cơ chế CSRF phù hợp; không lưu access token/mật khẩu trong `localStorage`. Nếu nhóm chọn cơ chế bearer token khác, phải đặc tả thời hạn, thu hồi, refresh và nơi lưu trước khi code.
 
-`GET /api/v1/auth/profile/{slug}/` trả hồ sơ của tài khoản đang đăng nhập khi slug khớp với danh tính trong phiên, để giao diện dựng menu và route:
+`GET /api/v1/auth/profile/{slug}/` trả user context và hạn phiên khi slug khớp với danh tính trong phiên. Source dùng `role`, `site_code`, `profile_id`, `must_change_password` và `avatar_secure_url`; không trả `permissions` hoặc `default_route` trong response này:
 
 ```json
 {
-  "data": {
-    "user": {
-      "ma_tai_khoan": "Q1-TK-000001",
-      "vai_tro": "nhan_vien",
-      "chuc_vu": "quan_ly_co_so",
-      "ma_co_so": "Q1"
-    },
-    "scope": { "type": "site", "ma_co_so": "Q1" },
-    "permissions": ["students.read", "transfers.create"],
-    "default_route": "/portal/admin-small"
-  }
+  "user": {
+    "account_id": "Q1-TK-000001",
+    "slug": "quan-ly-q1",
+    "email": "quanly@example.test",
+    "username": "quanly.q1",
+    "role": "admin_small",
+    "site_code": "Q1",
+    "profile_id": "Q1-ADM-000001",
+    "must_change_password": false,
+    "avatar_secure_url": null
+  },
+  "expires_at": "2026-11-15T10:00:00Z"
 }
 ```
 
-Ví dụ trên chỉ minh họa cấu trúc, không cấp quyền bằng chuỗi do frontend gửi. Danh sách quyền thực tế phải suy ra từ vai trò/chức vụ và được API kiểm tra lại mỗi request. Giáo viên nhận `scope.type = assigned_classes`; Admin Big nhận `scope.type = global`. Hiện chưa có `student` trong response.
+Ví dụ trên phản ánh các trường serializer hiện có; giá trị ID và thời điểm chỉ là mẫu. Admin Small có `role = admin_small` trong user context dù `TaiKhoan.vai_tro = nhan_vien`; Admin Big và các vai trò nghiệp vụ được serialize tương tự. API kiểm tra quyền ở mỗi request; không trả `permissions`, `scope` hay `default_route` trong payload profile này.
 
 ### Tạo tài khoản Admin Small hoặc giáo viên
 
@@ -426,15 +447,15 @@ Các thao tác này do Admin Big thực hiện. Ví dụ request tạo Admin Sma
 }
 ```
 
-API tự đặt `vai_tro = nhan_vien`, `chuc_vu = quan_ly_co_so`, gắn site và tạo `TaiKhoan` theo chính sách nhân bản cùng hồ sơ `NhanVien` tại Q7. Không cho client gửi `vai_tro` hoặc `chuc_vu` tùy ý. Với giáo viên, API tự đặt `vai_tro = giao_vien`, tạo `TaiKhoan` dùng chung và hồ sơ `GiaoVien` tại site được chọn.
+API tự đặt `TaiKhoan.vai_tro = nhan_vien`, gắn site và tạo hồ sơ `Admin.loai_admin = admin_small` tại Q7; không tạo hồ sơ `NhanVien` cho Admin Small. Không cho client gửi `vai_tro` hoặc `loai_admin`. Với giáo viên, API đặt `vai_tro = giao_vien`, tạo `TaiKhoan` dùng chung và hồ sơ `GiaoVien` tại site được chọn.
 
-Sau khi schema có trạng thái kích hoạt và token riêng, quy trình phải gửi liên kết đặt mật khẩu ban đầu cho email của người được tạo; Admin Big không biết hoặc gửi mật khẩu người dùng. Hiện endpoint tạo tài khoản và gửi email đều chưa được triển khai.
+Source có endpoint tạo Admin Small và giáo viên; API khởi tạo mật khẩu theo cấu hình, lưu hash, bắt buộc đổi mật khẩu ở lần đăng nhập đầu, rồi gửi email thông tin tài khoản qua endpoint credential-email riêng. Chưa có token kích hoạt tài khoản kiểu invitation. Gửi email thật vẫn phụ thuộc SMTP và cần xác minh tại môi trường chạy.
 
 Đây là nhiều bước ghi (`REPLICATED-WRITE` cho `TaiKhoan`, `LOCAL` cho hồ sơ). Response cần có trạng thái xử lý theo từng chặng; chỉ trả thành công hoàn toàn khi tài khoản có hồ sơ/phạm vi dùng được. Nếu đồng bộ tài khoản thành công nhưng tạo hồ sơ site thất bại, vô hiệu hóa hoặc đưa tài khoản về trạng thái chờ xử lý có thể phục hồi; không để tài khoản hoạt động không có site/phạm vi. Kiểm tra trùng `ten_dang_nhap`/`email` trên các bản sao trước khi ghi.
 
 ### Phân công giáo viên
 
-`PUT /api/v1/admin/teachers/{ma_giao_vien}/assignments` nhận danh sách lớp/buổi được phân công. API lấy site từ người gọi (Admin Small) hoặc xác thực site đích theo quyền (Admin Big), xác nhận giáo viên, lớp, buổi và phòng thuộc cùng CSDL site; sau đó cập nhật quan hệ lớp/buổi trong transaction `LOCAL`. Nếu một phần danh sách sai, mặc định từ chối toàn request và không lưu phần hợp lệ một phần.
+Source chưa có route tổng hợp `PUT .../assignments` cho giáo viên. Việc gán giáo viên vào lớp đi qua `PUT /api/v1/admin/classes/{class_id}/teacher/` trong site của lớp; API kiểm tra quyền và hồ sơ giáo viên cùng site. Danh sách lớp/buổi được giao được truy xuất qua API giáo viên; không mô tả một hợp đồng phân công nhiều lớp trong một request khi route đó chưa tồn tại.
 
 ### Điểm danh buổi học
 
@@ -476,7 +497,7 @@ Request tối thiểu gồm `ma_lop_moi`. API lấy site từ đăng ký hiện 
 
 ## Thanh toán học phí
 
-Phần này gom toàn bộ API thu, hoàn và theo dõi học phí. Thu/hoàn tại quầy là thao tác `LOCAL` của kế toán hoặc Admin Small có quyền, tại site đang giữ `HocPhi`. Thanh toán qua cổng là luồng đề xuất riêng nếu nhóm quyết định tích hợp; không dùng trạng thái frontend thay cho trạng thái lưu tại SQL Server.
+Phần này mô tả yêu cầu API thu, hoàn và theo dõi học phí. Thu/hoàn tại quầy là thao tác `LOCAL` tại site giữ `HocPhi`; schema hiện chưa lưu idempotency bền vững cho thu/hoàn. Source có tích hợp SePay nhưng portal học viên/thanh toán online chưa được duyệt vào phạm vi và `SEPAY_ENABLED=false` mặc định. Không dùng trạng thái frontend thay cho trạng thái SQL Server.
 
 ### Thu hoặc hoàn học phí tại quầy
 
@@ -496,11 +517,13 @@ Client gửi `Idempotency-Key: <UUID>` cho mỗi thao tác thu/hoàn. API tự l
 
 Với `loai = hoan`, request phải tham chiếu `ma_phieu_goc`; API kiểm tra số đã hoàn trước đó và không cho tổng hoàn vượt số tiền thu còn có thể hoàn. Phiếu gốc được giữ nguyên. Hợp đồng hiện tại cho phép người có quyền hoàn tiền ghi nhận trực tiếp; **chưa có** quy trình đề nghị/duyệt hoàn tiền riêng. Nếu nhóm muốn bắt buộc duyệt, cần thêm trạng thái và endpoint duyệt trước khi giao diện hiển thị nút đó.
 
-### Thanh toán qua cổng
+### SePay — code có trong source, phạm vi và vận hành chưa được duyệt
 
-Đây là hợp đồng đề xuất nếu nhóm tích hợp cổng thanh toán; nhà cung cấp chưa được chốt. Portal học viên và quyền cho học viên tự thanh toán vẫn cần được nhóm duyệt riêng. Cổng thanh toán là dịch vụ ngoài, không phải một site SQL Server. Nghiệp vụ khoản học phí vẫn là `LOCAL` tại CSDL của cơ sở đang giữ `HocPhi`; không tuyên bố transaction ACID bao trùm SQL Server và cổng thanh toán. Các lỗi, cách khôi phục và yêu cầu bảo mật được quy định riêng tại mục [Bài toán lỗi, phục hồi và bảo mật thanh toán](#bài-toán-lỗi-phục-hồi-và-bảo-mật-thanh-toán).
+SePay là provider được triển khai trong source. `POST /api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/`, `GET /api/v1/students/profile/{slug}/payments/{attempt_id}/` và `POST /api/v1/webhooks/sepay/` là các route hiện có. Tích hợp mặc định tắt, phụ thuộc merchant/webhook secret và chưa có bằng chứng chạy giao dịch thật. Cổng thanh toán là dịch vụ ngoài, không phải một site SQL Server; nghiệp vụ khoản phí là `LOCAL` tại database chứa `HocPhi`, không phải giao dịch xuyên DB. Các quy tắc bên dưới là tiêu chí an toàn/thiết kế, không phải bằng chứng mọi trường hợp lỗi đã được triển khai.
 
-#### Endpoint và thứ tự xử lý
+#### Hợp đồng thiết kế và thứ tự xử lý
+
+Các đường dẫn tổng quát dưới đây là mẫu thiết kế, không phải route source hiện tại. Khi cập nhật hợp đồng, dùng chính xác route SePay ở trên và đối chiếu `src/api/core/urls.py`.
 
 1. Trước lần gửi đầu, frontend tạo một UUID cho `Idempotency-Key` và giữ nguyên key cho đúng lần thao tác đó. `POST /api/v1/tuition-payment-attempts` nhận key cùng tối thiểu `ma_hoc_phi`, `so_tien` (nếu cho phép trả một phần) và `provider` nếu đã cấu hình. API lấy site từ `HocPhi`, tự kiểm tra dư nợ phía server, xác thực quyền, rồi ghi yêu cầu thanh toán bền vững ở site đó **trước khi** trả URL/đưa người dùng sang cổng. Không tin số tiền hay trạng thái do client gửi; nếu cho phép trả một phần, kiểm tra số tiền dương và không vượt dư nợ. Response lần đầu có `202 Accepted`, `ma_yeu_cau`, `trang_thai: cho_thanh_toan`, `han_thanh_toan` và URL cổng nếu đã tạo được phiên. Gửi lại đúng key/nội dung trả cùng yêu cầu và URL hiện có; key cũ với nội dung khác trả `409`.
 2. Nếu ứng dụng reload/chết sau khi server đã lưu yêu cầu nhưng trước khi nhận `ma_yeu_cau`, frontend gọi `GET /api/v1/tuition/{ma_hoc_phi}/payment-attempts?active=true` để tìm yêu cầu đang mở theo phiên/quyền người dùng. Nếu response của POST chỉ bị mất và client còn key, có thể lặp lại đúng POST với cùng key. Khi server tìm thấy yêu cầu khác đang mở cho khoản phí đó, trả `409 PAYMENT_IN_PROGRESS` kèm mã/trạng thái yêu cầu hiện có; không gọi cổng lần nữa.
@@ -546,7 +569,7 @@ Thanh toán kết hợp hai hệ thống độc lập: cổng có thể đã nh�
 
 ### Máy trạng thái và quy tắc không thu trùng
 
-Các trạng thái đề xuất: `cho_thanh_toan` → `dang_xu_ly` → `da_thanh_toan`; kết thúc thay thế gồm `that_bai`, `da_huy`, `het_han`; trường hợp chưa thể xác minh là `can_doi_soat`. Chỉ `da_thanh_toan` mới được tính vào `HocPhi.so_tien_da_dong`. `cho_thanh_toan`, `dang_xu_ly`, `dang_yeu_cau_huy` và `can_doi_soat` không phải trạng thái đã thu tiền. Chuyển trạng thái phải hợp lệ, có thời điểm và tác nhân/sự kiện nguồn; không cho client PATCH trạng thái.
+Schema hiện tại cho `YeuCauThanhToan.trang_thai` các giá trị `cho_thanh_toan`, `da_thanh_toan`, `het_han`, `can_doi_soat`, `da_huy`. Không dùng các trạng thái thiết kế như `dang_xu_ly` hoặc `dang_yeu_cau_huy` như enum đã có. Chỉ `da_thanh_toan` mới được tính vào `HocPhi.so_tien_da_dong`; chuyển trạng thái phải do API/provider đã xác minh, không để client PATCH trực tiếp.
 
 - Mỗi lần tạo yêu cầu dùng idempotency key ở API và cùng mã yêu cầu làm khóa idempotency khi gọi cổng (nếu cổng hỗ trợ). Nếu request tạo phiên tới cổng timeout, tra cứu bằng mã tham chiếu đó trước khi thử lại; không tạo phiên mới mù quáng.
 - Webhook chỉ được trả thành công cho cổng sau khi sự kiện đã được xác minh và transaction cập nhật site đã commit, hoặc khi xác định đó là sự kiện đã xử lý trước. Nếu site DB tạm lỗi, trả lỗi có thể retry và để tác vụ đối soát xử lý; không ACK callback rồi làm mất sự kiện.
@@ -564,14 +587,11 @@ Các trạng thái đề xuất: `cho_thanh_toan` → `dang_xu_ly` → `da_thanh
 - Nhật ký chỉ lưu mã yêu cầu, mã sự kiện, kết quả kiểm tra, người thao tác và thời điểm `Asia/Ho_Chi_Minh`; không lưu thông tin thẻ, chữ ký, secret, token, cookie hoặc payload nhạy cảm.
 - Giới hạn quyền hoàn tiền riêng với quyền thu tiền; bắt buộc lý do và audit. Nếu nhóm yêu cầu duyệt hoàn tiền, người đề nghị và người duyệt phải được phân tách theo vai trò đã thống nhất.
 
-### Schema cần bổ sung trước khi viết code
+### Schema và giới hạn triển khai hiện tại
 
-Schema hiện tại chưa có nơi lưu lần thử thanh toán, khóa idempotency, mã callback duy nhất hoặc trạng thái chờ. Cần cập nhật `docs/DATABASE_SCHEMA.md` trước implementation, giữ mọi bảng dưới đây tại CSDL site chứa `HocPhi`, không tạo database thanh toán trung tâm:
+`db/01_create_schema.sql` đã có `YeuCauThanhToan` và `SuKienThanhToan`, đặt cục bộ tại từng database site; `PhieuThu` có liên kết tới yêu cầu. `YeuCauThanhToan` giữ khoản học phí, kỳ, tài khoản, số tiền, mã tham chiếu, khóa idempotency, trạng thái và thời hạn; `SuKienThanhToan` lưu ID giao dịch SePay duy nhất cùng metadata đã lọc và kết quả nhận. Không có database thanh toán trung tâm. Đối chiếu đủ cột/ràng buộc trong [`DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).
 
-- Thêm bảng cục bộ `YeuCauThanhToan`: khóa chính `ma_yeu_cau`; `ma_hoc_phi`; người tạo; số tiền/đơn vị tiền tệ do server xác định; provider; tham chiếu giao dịch provider; `khoa_idempotency`; hash nội dung request; trạng thái; hạn thanh toán; thời điểm tạo/cập nhật/kết thúc. Đặt unique constraint cho khóa idempotency trong phạm vi site/người gọi/endpoint và cho tham chiếu provider; chỉ cho tối đa một lượt còn mở (`cho_thanh_toan`, `dang_xu_ly`, `dang_yeu_cau_huy`, `can_doi_soat`) trên một `HocPhi`, dùng transaction/khóa hàng để chống hai yêu cầu đồng thời.
-- Thêm bảng cục bộ append-only `SuKienThanhToan` với mã sự kiện provider duy nhất, mã yêu cầu, loại sự kiện, thời điểm nhận, kết quả xác minh và metadata đã lọc. Không lưu PAN/CVV, secret, token hoặc payload cổng thô; không sửa/xóa sự kiện đã ghi.
-- `PhieuThu` cần liên kết duy nhất với yêu cầu thanh toán online (cột `ma_yeu_cau` nullable và unique cho bản thu online, hoặc ràng buộc tương đương) và request ledger idempotency cho thu/hoàn tại quầy. Thu/hoàn thủ công và callback thành công đều phải cập nhật `PhieuThu` + `HocPhi` + ledger/audit trong cùng transaction site.
-- Quy định retention, quyền đọc trạng thái, migration/rollback an toàn và tác vụ đối soát. Migration không được tạo giao dịch giả hay thay đổi số đã thu của dữ liệu hiện hữu.
+Thu/hoàn tại quầy chưa có request ledger bền vững riêng theo `Idempotency-Key`; không khẳng định request lặp sau timeout luôn lấy lại phiếu cũ. SePay có code/schema nhưng mặc định tắt và chưa được kiểm chứng merchant/webhook thật. Chốt phạm vi với nhóm trước khi bật portal/payment; nếu thay đổi schema hoặc hợp đồng API, cập nhật schema/script trong cùng thay đổi.
 
 ## Quản lý điểm
 
@@ -592,7 +612,7 @@ Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm
 - Mọi thao tác tạo/sửa kiểm tra quyền, phạm vi site và điều kiện nghiệp vụ trước khi ghi; API không dùng `DELETE` để xóa học viên, phiếu thu, điểm danh hoặc nhật ký đã phát sinh.
 - Ràng buộc duy nhất hiện có giúp chặn một số thao tác trùng: `DangKy(ma_hoc_vien, ma_lop)`, `Diem(ma_dang_ky, loai_diem)`, `DiemDanh(ma_buoi, ma_dang_ky)`, và `GiaoDichChuyenCoSo.khoa_chong_lap`. Khi nhận lại cùng thao tác hợp lệ, API nên trả kết quả cũ thay vì tạo thêm nghiệp vụ.
 - Thu/hoàn tại quầy phải chống gửi lại request sau timeout bằng khóa idempotency lưu bền vững và ghi cùng transaction với `PhieuThu`/`HocPhi`; hiện schema chưa có khóa hoặc request ledger.
-- Thanh toán trực tuyến phải lưu `YeuCauThanhToan` và sự kiện callback ở đúng CSDL site, tra cứu được sau reload/đăng nhập lại, xử lý callback lặp idempotent và khóa lượt mới khi kết quả cổng chưa rõ. Hiện schema chưa có các bảng/trạng thái này; xem mục “Thanh toán trực tuyến: reload, thoát trang, timeout và callback lặp”. Không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
+- SePay hiện có `YeuCauThanhToan`/`SuKienThanhToan` tại database site và API callback; tích hợp mặc định tắt, chưa có bằng chứng giao dịch thật. Khi được nhóm duyệt, cần kiểm chứng callback lặp, timeout, retry và đối soát; không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
 - Tạo tài khoản nội bộ vừa ghi bản sao `TaiKhoan` vừa tạo hồ sơ site. API phải lưu đủ tiến trình để tiếp tục hoặc vô hiệu hóa an toàn nếu một chặng lỗi; không tuyên bố transaction ACID xuyên site.
 - Giao dịch chuyển dùng `GiaoDichChuyenCoSo.khoa_chong_lap` và trạng thái Coordinator trong CSDL nguồn. Nếu site đích đã commit hồ sơ, phục hồi phải tiến về phía trước theo README mục 5.5.
 - `GLOBAL` không trả thành công toàn phần khi site bị lỗi: giữ kết quả từng site, đặt `complete: false`, liệt kê `missing_sites`; các thao tác yêu cầu đủ site như `REPLICATED-WRITE` phải báo thất bại/chờ đối soát theo chính sách, không giả thành công.
@@ -622,7 +642,7 @@ Replication runtime hiện có cho cập nhật `MonHoc` và tạo/sửa/xóa `K
 | Hủy/thất bại/hết hạn | Chỉ cho thử lượt mới sau kết quả cuối đã xác nhận không thu tiền; yêu cầu hủy đang xử lý không được xem là đã hủy |
 | Chuyển cơ sở | Admin Small tạo đề nghị ở nguồn; Admin Big duyệt/từ chối; thử lỗi trước/sau khi đích commit và chạy phục hồi |
 | Tài khoản | Mật khẩu sai dùng lỗi chung; tài khoản bị khóa không tạo phiên; reset token hết hạn/đã dùng bị từ chối |
-| Học viên | Cho tới khi portal được duyệt, mọi đăng nhập/route học viên bị từ chối; sau khi duyệt phải kiểm tra chỉ đọc đúng hồ sơ liên kết và theo đúng site hiện hành |
+| Học viên | Source có tài khoản/portal và API đọc hồ sơ; chỉ tính vào phạm vi đồ án sau khi nhóm duyệt. Khi được duyệt, kiểm tra hồ sơ liên kết, quyền, site hiện hành và luồng chuyển cơ sở |
 | Validation | Gửi thiếu trường, sai kiểu, sai enum, ngày kết thúc trước ngày bắt đầu, ngày ngoài phạm vi và body quá lớn; API từ chối mà không ghi DB |
 | SQL injection | Thử payload SQL trên login, search, filter, sort và các endpoint ghi; không được mở rộng kết quả, vượt quyền hoặc thay đổi bảng |
 | CRUD thực tế | Với từng tài nguyên được phép: gọi create/read/update trên SQL Server test, đọc lại để xác nhận dữ liệu đã lưu đúng; thử sai quyền và sai site |
@@ -689,13 +709,12 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 - Thay đổi giao diện/schema/tài liệu liên quan:
 ```
 
-## Các điểm schema chưa khớp cần xử lý trước khi triển khai
+## Các điểm còn phải thống nhất hoặc kiểm chứng
 
-1. Portal học viên còn là đề xuất. Nếu nhóm duyệt, `TaiKhoan.vai_tro`, quan hệ tài khoản–`HocVien`, quy tắc chuyển quan hệ sang site đích, seed/migration và kiểm thử quyền phải được cập nhật trong `docs/DATABASE_SCHEMA.md` trước khi bật các route `/student/me/...`.
-2. `specs/api.md` đề xuất API quản lý Admin Small, giáo viên và phân công. Các route này chưa đồng nghĩa code đã tồn tại; cần xác nhận trạng thái triển khai và migration/permission trước khi frontend gọi thật.
-3. `PhieuThu` cần khóa idempotency bền vững (hoặc request ledger tại site) cho thu/hoàn tại quầy. Nếu tích hợp cổng trực tuyến, cần thêm `YeuCauThanhToan`, `SuKienThanhToan`, liên kết unique từ phiếu thu tới yêu cầu và trạng thái đối soát theo mục thanh toán; tất cả đặt tại CSDL site chứa `HocPhi`, không tạo DB thanh toán trung tâm. Cập nhật `docs/DATABASE_SCHEMA.md`, phân loại/định vị các bảng và migration trước khi triển khai API.
-4. Chốt cách lưu phiên/CSRF, quy tắc pagination, danh sách lỗi nghiệp vụ và cơ chế lưu tiến trình tạo tài khoản nhiều site. Khi chốt phải sửa mục này và ví dụ response trước khi viết client/server.
-5. Schema chưa có metadata Cloudinary. Bổ sung bảng/quan hệ metadata và quy tắc phân mảnh/nhân bản trước khi gắn ảnh vào giao diện; binary chỉ ở Cloudinary.
-6. Chốt storage bền vững cho giới hạn/rate limit khi có nhiều worker và đặt ngưỡng bcrypt theo benchmark; không lưu bộ đếm chỉ trong memory nếu chạy nhiều instance.
-7. OAuth Google/Facebook đã có thiết kế dùng `TaiKhoan.google_subject` và `TaiKhoan.facebook_subject`; database cũ chạy `db/27_move_oauth_identity_to_account.sql` sau khi có `Logs`. Trước khi bật route phải chốt cách lưu/thu hồi phiên, callback HTTPS, tạo OAuth apps và triển khai/test flow liên kết trong `src/api`. OAuth credentials chỉ điền ở `src/api/.env`, không commit.
-8. YC-03 có phương pháp replication tầng ứng dụng cho `MonHoc`; YC-07 có ACK/retry cho luồng này nhưng còn thiếu bài outage/recovery thật và mở rộng có chủ đích sang bảng dùng chung khác. YC-04 đã có Coordinator chuyển cơ sở với phục hồi tiến về phía trước qua các transaction cục bộ, nhưng chưa có kiểm thử fault injection hai site và không được gọi là ACID nguyên tử xuyên DB. YC-05 có kiểm soát sĩ số trong code nhưng còn thiếu kiểm thử hai phiên SQL Server chạy đồng thời. Không tự dùng DB trung tâm hoặc coi các mục chưa kiểm chứng là đã đạt.
+1. Tài khoản/portal học viên và SePay có code/schema/UI nhưng chưa được nhóm duyệt vào phạm vi đồ án; không bật các luồng này trước khi đồng bộ README, FS, schema, API và UI spec.
+2. Thu/hoàn tại quầy chưa có request ledger bền vững riêng cho chống lặp sau timeout. Chốt hợp đồng idempotency và cập nhật schema/source nếu nhóm yêu cầu bảo đảm này.
+3. API quản lý `CoSo` chưa có; runtime replication cho `CoSo` còn thiếu. `MonHoc`/`KhoaHoc` có service ghi replication; một số luồng ghi `TaiKhoan` vẫn có cơ chế riêng, chưa gom về một điểm vào.
+4. Chạy đủ TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên các database SQL Server đang dùng. Còn thiếu outage/recovery, fault injection chuyển cơ sở, concurrency hai phiên và Global Query khi thiếu site; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
+5. Xác nhận với giảng viên mức bảo đảm của Coordinator chuyển cơ sở. Cơ chế hiện tại dùng transaction cục bộ và phục hồi tiến về phía trước; không phải ACID nguyên tử xuyên database, MSDTC hoặc 2PC.
+6. SMTP, OAuth provider, Cloudinary và SePay cần kiểm tra cấu hình/tích hợp thật tại môi trường tương ứng. Không ghi secret vào source, tài liệu hoặc log.
+7. Chốt rate limit bền vững khi chạy nhiều worker, ngưỡng bcrypt và mục tiêu p50/p95 theo môi trường đo.

@@ -12,7 +12,7 @@ py -3.13 -m venv .venv
 Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py test
-.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
 ```
 
 Nếu môi trường đã có Python khác tương thích, thay `py -3.13` bằng launcher/version tương ứng. Không cài package vào Python toàn máy; dependency được cài trong `.venv` của API. Cần cài driver SQL Server tương thích nếu máy API kết nối SQL Server qua ODBC.
@@ -22,7 +22,7 @@ Khi mở repository ở thư mục gốc bằng VS Code, terminal tích hợp CM
 ```cmd
 cd src
 cd api
-python manage.py runserver 127.0.0.1:8000
+python manage.py runserver 127.0.0.1:8001
 ```
 
 Profile trong `.vscode/settings.json` tự kích hoạt `.venv` khi `cd` vào thư mục có `Scripts/activate.bat`. Cấu hình này chỉ áp dụng cho terminal tích hợp của VS Code khi mở repository; cửa sổ CMD mở bên ngoài VS Code không đọc cấu hình workspace. Nếu profile chưa đổi sau khi cập nhật, chạy **Developer: Reload Window**, đóng terminal cũ và mở terminal mới.
@@ -33,9 +33,9 @@ Giao diện tài liệu được **sinh từ API bằng `drf-spectacular`**; sou
 
 Khi `API_DOCS_ENABLED=true` (mặc định theo `DJANGO_DEBUG`):
 
-- Swagger UI: <http://127.0.0.1:8000/api/docs>
-- OpenAPI JSON/YAML: <http://127.0.0.1:8000/api/schema/> (thêm `?format=json` để yêu cầu JSON)
-- Liveness API: <http://127.0.0.1:8000/api/v1/health/>
+- Swagger UI: <http://127.0.0.1:8001/api/docs>
+- OpenAPI JSON/YAML: <http://127.0.0.1:8001/api/schema/> (thêm `?format=json` để yêu cầu JSON)
+- Liveness API: <http://127.0.0.1:8001/api/v1/health/>
 
 Đặt `API_DOCS_ENABLED=false` để gỡ Swagger và schema endpoint khỏi URL khi triển khai. Không bật debug trên môi trường công khai.
 
@@ -43,7 +43,7 @@ Khi `API_DOCS_ENABLED=true` (mặc định theo `DJANGO_DEBUG`):
 
 **Yêu cầu chung:** đồ án dùng 3 site trong giới hạn 2–4; phải chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency, một distributed query và đồng bộ dữ liệu. Đọc [yêu cầu chung và kịch bản demo trong README chính](../../README.md#yêu-cầu-chung-áp-dụng-cho-mọi-đề-tài) cùng [API spec](../../specs/api.md) trước khi triển khai module nghiệp vụ.
 
-API/Coordinator phải cung cấp định tuyến mảnh, một điểm vào replication, trạng thái/phục hồi chuyển cơ sở, bảo vệ chỗ cuối của lớp và Global Query có thông tin site thiếu. Kết nối alias, liveness hoặc Swagger hoạt động chưa chứng minh các yêu cầu này; chạy TC-REP-01/TC-SYNC-01, TC-DTX-01, TC-CON-01 và TC-DQ-01 trên SQL Server test trước khi ghi đạt. Các cơ chế còn mở phải được chốt theo README/FS; đây là yêu cầu phải làm, không phải xác nhận đã triển khai.
+API/Coordinator có Site Router, service replication `MonHoc`/`KhoaHoc`, luồng chuyển cơ sở có retry, kiểm soát sức chứa và Global Query có `missing_sites`. Các cơ chế này cần kiểm chứng theo TC-REP-01/TC-SYNC-01, TC-DTX-01, TC-CON-01 và TC-DQ-01 trên SQL Server test trước khi ghi đạt; xem [ma trận trạng thái](../../docs/Trang-Thai-Trien-Khai.md).
 
 Mỗi cơ sở có CSDL SQL Server riêng. Cấu hình chỉ tạo một alias/kết nối riêng cho từng entry trong `SITE_DATABASES_JSON`; không tạo CSDL nghiệp vụ trung tâm và không có alias mặc định dùng để lưu dữ liệu (`default` dùng dummy backend). Ví dụ máy demo hiện tại có thể khai báo ba DB riêng cùng SQL Server host; khi demo trên nhiều máy, `host` của mỗi entry là địa chỉ VPN/LAN của máy chứa CSDL đó.
 
@@ -65,26 +65,42 @@ Với `GLOBAL`, chỉ hỏi các site cần thiết qua kết nối riêng. Nế
 
 Cấu hình SMTP nằm trong `src/api/.env`; Django chỉ đọc cấu hình ở backend. Gmail dùng `smtp.gmail.com`, cổng `587`, STARTTLS; `EMAIL_HOST_USER` là địa chỉ Gmail gửi thư và `EMAIL_HOST_PASSWORD` là **Google App Password mới**. Nếu App Password cũ đã bị lộ, hãy thu hồi trước khi dùng cấu hình này. Không dùng App Password cho đăng nhập Google OAuth, không đưa nó vào frontend, Swagger, log hoặc Git.
 
-Các biến đã có trong `.env.example`: `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, `EMAIL_TIMEOUT`, `WEB_APP_BASE_URL`, `PASSWORD_RESET_TIMEOUT` (mặc định 15 phút) và `ACCOUNT_ACTIVATION_TIMEOUT` (mặc định 24 giờ). Thay địa chỉ gửi bằng Gmail thật và dán App Password mới trực tiếp vào `.env` trên máy cá nhân; không gửi giá trị bí mật trong chat. Khi chưa có thông tin gửi thư, dùng `django.core.mail.backends.console.EmailBackend` để chỉ in thư ra console trong môi trường phát triển.
+Các biến đã có trong `.env.example`: `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, `EMAIL_TIMEOUT`, `WEB_APP_BASE_URL`, `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây) và `ACCOUNT_ACTIVATION_TIMEOUT`. Thông tin SMTP thật chỉ đặt trong `.env` cục bộ hoặc secret store; không gửi giá trị bí mật trong chat. Khi chưa có SMTP, có thể dùng `django.core.mail.backends.console.EmailBackend` trong môi trường phát triển.
 
-SMTP đã được khai báo trong settings, nhưng **chưa có endpoint tạo tài khoản, gửi thư, kích hoạt tài khoản hay quên mật khẩu**; vì vậy cấu hình này chưa tự gửi email. Khi triển khai nghiệp vụ, Admin Big nên tạo Admin Small/giáo viên ở trạng thái chưa kích hoạt và gửi liên kết đặt mật khẩu ban đầu dùng một lần; không tự đặt rồi gửi mật khẩu qua email. Quên mật khẩu nên gửi liên kết chứa token ngẫu nhiên dùng một lần, hết hạn sau 15 phút; chỉ lưu hash token tại site xử lý, trả cùng thông báo dù email tồn tại hay không, giới hạn tốc độ và thu hồi token sau khi dùng. Schema hiện có `TokenDatLaiMatKhau` cho reset; luồng kích hoạt tài khoản cần được thiết kế/cập nhật schema trước khi bật.
+API hiện có gửi email thông tin cấp tài khoản Admin Small/giáo viên và OTP đặt lại mật khẩu cho tài khoản quản trị. Reset dùng `TokenDatLaiMatKhau` cùng ledger phục hồi `GiaoDichDatLaiMatKhau`; hạn OTP mặc định là 120 giây. Cấu hình thật phụ thuộc SMTP trong môi trường chạy. Không ghi giá trị bí mật vào tài liệu hoặc Git; việc có code gửi thư không chứng minh SMTP đã gửi thành công ở môi trường của nhóm.
 
-Để kiểm tra cấu hình sau khi nhập email gửi và App Password mới, khởi động API rồi dùng một endpoint email thử nghiệm chỉ trong môi trường phát triển (endpoint này hiện chưa có); không đưa thông tin SMTP vào request hoặc Swagger. Chưa thể kiểm thử gửi thật khi `EMAIL_HOST_USER` và `EMAIL_HOST_PASSWORD` còn trống.
+Các luồng gửi thư dùng `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` và `DEFAULT_FROM_EMAIL`. Email gửi thật phụ thuộc cấu hình SMTP, DNS/mạng và chấp nhận từ mail provider; kiểm tra cấu hình qua luồng nghiệp vụ trong môi trường phát triển, không thêm endpoint thử chỉ để gửi email.
 
-`core.sites.connections.get_site_connection(site_code)` chỉ phân giải một mã site tin cậy sang đúng alias riêng đã cấu hình. Chưa có API nghiệp vụ để tự phát hiện site đang `hoat_dong` từ bảng `CoSo`; việc đó sẽ thuộc Site Router/Coordinator khi triển khai nghiệp vụ. Mã site phải đến từ danh tính đã xác thực hoặc ngữ cảnh server, không tin mã/alias database do client tự gửi.
+`core.sites.connections.get_site_connection(site_code)` phân giải mã site đã kiểm tra sang alias riêng. Danh sách site hoạt động được đọc từ `CoSo` qua các database đã cấu hình; Coordinator đối chiếu dữ liệu và kết nối, không cố định vòng lặp Q1/Q7/TD. API lấy site từ phiên/quyền hoặc xác thực bộ lọc theo vai trò; client không chọn alias hay database tùy ý.
 
-Global Query về sau phải truy vấn từng CSDL site riêng trong phạm vi quyền, tổng hợp tại tầng API và báo site lỗi; không thực hiện `JOIN`/khóa ngoại xuyên site, không sao chép dữ liệu nghiệp vụ vào một DB chung. Các nghiệp vụ `LOCAL`, `GLOBAL`, `REPLICATED-WRITE` và `DISTRIBUTED-TX` phải theo `../../README.md`, `../../docs/DATABASE_SCHEMA.md` và `../../specs/api.md`.
+Global Query hiện truy vấn từng CSDL site riêng trong phạm vi quyền, tổng hợp tại tầng API và trả site thiếu; không thực hiện `JOIN`/khóa ngoại xuyên site, không sao chép dữ liệu nghiệp vụ vào một DB chung. Các nghiệp vụ `LOCAL`, `GLOBAL`, `REPLICATED-WRITE` và `DISTRIBUTED-TX` phải theo `../../README.md`, `../../docs/DATABASE_SCHEMA.md` và `../../specs/api.md`.
 
 ## Cloudinary và cách xếp thư mục ảnh
 
 `src/api/.env.example` khai báo placeholders cho Cloud Name, API Key, API Secret và `CLOUDINARY_ROOT_FOLDER=language-center-management`. Sau khi tạo API secret mới trong Cloudinary, đặt credentials thật vào `src/api/.env` (đã bị Git bỏ qua); không đưa secret vào frontend, source, log hoặc PR.
 
-Folder path được dựng từ loại tài nguyên và dữ liệu đã được API xác thực, ví dụ `language-center-management/hoc-vien/Q1/Q1-HV-000001/anh/<uuid>/`. Mỗi ảnh có UUID riêng; ảnh học viên/giáo viên có phân đoạn site, còn ảnh khóa học/cơ sở dùng nhánh `dung-chung`. Hàm `core.media.folders.build_asset_folder` chỉ tạo đường dẫn an toàn, chưa upload file. API upload chưa được triển khai vì schema metadata ảnh và các luồng xác thực/quyền chưa hoàn tất. Cloudinary Dynamic folders dùng `asset_folder`; cần kiểm tra chế độ folder của Product Environment trước khi bật luồng upload.
+API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại diện Admin, Admin Small và giáo viên. Django ký intent ngắn hạn, giới hạn tài khoản/bản ghi, xác minh asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url`; bytes ảnh gửi thẳng tới Cloudinary. Cấu hình vẫn cần secret Cloudinary của môi trường chạy. Chưa có API MediaAsset tổng quát cho ảnh khóa học/cơ sở hoặc bằng chứng upload thật trong môi trường nhóm.
 
 ## Phạm vi đã khởi tạo
 
-Hiện có scaffold Django REST Framework, OpenAPI/Swagger UI sinh tự động, cấu hình an toàn mặc định cho quyền endpoint, bcrypt password hasher, giờ Việt Nam, CORS theo cấu hình và tiện ích định tuyến tới kết nối site. Endpoint duy nhất hiện hoạt động là liveness check. Endpoint này chỉ xác nhận tiến trình API còn chạy, **không** kiểm tra kết nối SQL Server.
+## Module API hiện có
 
-Chưa triển khai đăng nhập, tài khoản Admin Big/Admin Small, giáo viên/học viên, đăng ký khóa học, xếp lớp, thu học phí, quản lý điểm, đề nghị/duyệt/chuyển cơ sở, Global Query hoặc đồng bộ bảng dùng chung. Chưa có migration Django hay CSDL trung tâm. Các luồng đó phải được triển khai theo schema SQL Server hiện có và kiểm thử với từng site trước khi được xem là hoàn tất. Chỉ endpoint đã triển khai và kiểm thử mới xuất hiện như API hoạt động trong Swagger.
+`core.urls.py` là danh mục route trong source. Các view gọi service theo domain; route xuất hiện trong OpenAPI chứng minh route được khai báo, không chứng minh database site hay tích hợp ngoài đang sẵn sàng.
 
-Đăng nhập thường và Google/Facebook hiện mới có đặc tả; các endpoint chưa hoạt động và không được coi là đã tích hợp. Trước khi bật cần triển khai xác thực, callback/kiểm tra danh tính, liên kết tài khoản đã xác thực, cơ chế phiên có thể thu hồi, rate limit và test với OAuth apps thật. Mỗi phiên phải hết hạn sau 3600 giây không có hoạt động thật; API phải từ chối phiên quá hạn, frontend tự đưa người dùng về đăng nhập, còn polling nền không được kéo dài phiên. Chưa có session backend hoặc nơi lưu trạng thái phiên trong schema; phải chốt cách lưu tương thích mô hình CSDL riêng từng site trước khi bật auth. Google/Facebook subject được lưu ở `TaiKhoan.google_subject` và `TaiKhoan.facebook_subject`; database cũ cần chạy `db/27_move_oauth_identity_to_account.sql` sau khi đã có `Logs`. Không điền client secret vào `.env.example`, Git hoặc gửi trong chat; chỉ đặt secret mới trong `.env` cục bộ/secret store.
+| Module | Trách nhiệm |
+|---|---|
+| `core/sites/connections.py` | Đọc cấu hình kết nối riêng từng site và chọn alias qua Site Router |
+| `core/auth/` | Đăng nhập, phiên có thể thu hồi, CSRF, idle timeout, hồ sơ, đổi/reset mật khẩu, OAuth học viên và vòng đời Admin Small |
+| `core/catalog/` | Danh mục môn/khóa học, danh sách khóa học công khai và ghi danh mục dùng chung |
+| `core/classes/` | Phòng/lớp/buổi, đăng ký công khai và đăng ký/xếp lớp cục bộ |
+| `core/academics/` | Chuyển cơ sở, học phí/phiếu thu/kỳ đóng, nhắc phí, báo cáo, điểm danh/điểm và SePay |
+| `core/students/` | Danh sách hồ sơ, cấp tài khoản, portal đọc dữ liệu và xóa hồ sơ theo tiến trình nhiều site |
+| `core/teachers/`, `core/employees/` | Quản lý hồ sơ, tài khoản và trạng thái giáo viên/nhân viên |
+| `core/notifications/`, `core/audit/` | Thông báo quản trị và truy vấn nhật ký có giới hạn quyền/site |
+| `core/media/` | Intent upload và hoàn tất ảnh đại diện Cloudinary |
+
+Các nghiệp vụ bắt buộc của đề tài đã có route/service tương ứng trong source: đăng ký khóa học, xếp lớp, chuyển cơ sở, thu học phí tại quầy, quản lý điểm và thống kê học viên theo cơ sở. Chuyển cơ sở điều phối nhiều transaction cục bộ với phục hồi tiến về phía trước sau khi đích commit; không phải ACID nguyên tử xuyên database. Cơ chế khóa/transaction đăng ký bảo vệ chỗ cuối ở một site; phải chạy hai phiên SQL Server để chứng minh TC-CON-01.
+
+Học viên/portal và thanh toán SePay có code cùng schema nhưng **không được hiểu là đã được nhóm duyệt vào phạm vi môn học**. SePay mặc định tắt bằng `SEPAY_ENABLED=false`; không coi tích hợp là chạy thật khi chưa cấu hình merchant/webhook và kiểm chứng trên môi trường được cấp phép.
+
+Trạng thái source, giới hạn phạm vi và bằng chứng còn thiếu được tổng hợp tại [Trạng thái triển khai](../../docs/Trang-Thai-Trien-Khai.md). Yêu cầu môn học và kết quả TC nằm trong [ma trận kiểm chứng](../../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Không đánh dấu đạt từ việc có code, Swagger, seed hoặc unit test mô phỏng.

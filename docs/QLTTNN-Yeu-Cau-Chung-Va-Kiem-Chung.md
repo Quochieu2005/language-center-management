@@ -33,7 +33,7 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 | Nội dung | Đã xác định trong thiết kế | Cần chốt/kiểm chứng |
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
-| Replication | YC-03 chọn replication tầng ứng dụng cho `MonHoc`; endpoint là `PATCH /api/v1/admin/shared/subjects/{slug}/` | Đối chiếu update, `phien_ban`, ACK trong `Logs`, idempotency và retry. `CoSo`/`KhoaHoc` chưa có luồng ghi runtime đầy đủ; không bật Publication trùng cùng bảng |
+| Replication | YC-03 chọn replication tầng ứng dụng cho `MonHoc`; endpoint là `PATCH /api/v1/admin/shared/subjects/{slug}/`. Source hiện cũng có service ghi `KhoaHoc` | Đối chiếu update, `phien_ban`, ACK trong `Logs`, idempotency và retry. `CoSo` chưa có luồng ghi runtime đầy đủ; không bật Publication trùng cùng bảng. Code/seed chưa phải bằng chứng TC-REP-01/TC-SYNC-01 |
 | Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |

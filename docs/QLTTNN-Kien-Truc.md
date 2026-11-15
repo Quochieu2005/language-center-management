@@ -85,7 +85,7 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 | Kế toán | Cơ sở của mình; thu học phí |
 | Giáo viên | Lớp mình dạy; nhập điểm và điểm danh |
 
-`TaiKhoan.vai_tro` là `admin`, `nhan_vien`, `giao_vien`; Admin Big dùng tài khoản `admin`, còn Admin Small là `nhan_vien` có `NhanVien.chuc_vu = quan_ly_co_so` và site được gán. Backend kiểm tra đăng nhập, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small chỉ tạo đề nghị; chỉ Admin Big được quyết định. Ma trận chi tiết ở README mục 3–4.
+`TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin = admin_small` và site được gán; không biểu diễn bằng `NhanVien.chuc_vu`. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ riêng. Backend kiểm tra danh tính, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small chỉ tạo đề nghị; chỉ Admin Big được quyết định. Ma trận chi tiết ở README mục 3–4.
 
 ## 6. Quy tắc liên site
 

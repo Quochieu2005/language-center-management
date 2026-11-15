@@ -22,7 +22,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Mở `http://localhost:3000`. Khi API Django chạy ở địa chỉ khác, sửa `NEXT_PUBLIC_API_BASE_URL` trong `.env.local`. Không đặt secret, mật khẩu hay chuỗi kết nối SQL Server vào biến `NEXT_PUBLIC_*`.
+Mở `http://localhost:3001`. Khi API Django chạy ở địa chỉ khác, sửa `NEXT_PUBLIC_API_BASE_URL` trong `.env.local`. Không đặt secret, mật khẩu hay chuỗi kết nối SQL Server vào biến `NEXT_PUBLIC_*`.
 
 Lần đầu mở một route bằng `npm run dev` có thể chậm do Next.js biên dịch route theo nhu cầu. So sánh lần mở đầu với lần mở lại; không dùng riêng số đo development để kết luận production. Với trang có dữ liệu, render layout và skeleton trong lúc API xử lý, không để cả trang chờ mọi request. Xem [README chính mục 12](../../README.md#12-tốc-độ-tải-trang-và-dữ-liệu) và [hướng dẫn Development Environment của Next.js](https://nextjs.org/docs/app/guides/local-development).
 
@@ -49,3 +49,5 @@ npm run build
 - `src/styles/`: token và style toàn cục
 
 Chi tiết trang, section và quy tắc giao diện nằm trong `../../specs/ui-ux.md`; hợp đồng endpoint nằm trong `../../specs/api.md`.
+
+Các route hiện có và trạng thái phê duyệt portal/thanh toán được đối chiếu tại [ma trận trạng thái triển khai](../../docs/Trang-Thai-Trien-Khai.md). Có màn hình trong source không đồng nghĩa với phạm vi đồ án đã được nhóm duyệt hoặc đã kiểm chứng với các CSDL site.

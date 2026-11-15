@@ -1,6 +1,6 @@
 # Hướng dẫn đọc và tổ chức source
 
-Tài liệu này chuyển [README chính](../README.md), mục 2–5 và 11, thành chỉ dẫn cho thành viên bắt đầu làm code. Stack đã chốt là **Next.js frontend**, **Django API/backend** và **SQL Server**; **SSMS** dùng để quản trị/kiểm tra CSDL. Chuyển cơ sở dùng trạng thái tại nguồn, sự kiện append-only và phục hồi tiến về phía trước; nhịp chạy worker phục hồi còn cần cấu hình ở README mục 9. Cơ chế xử lý lỗi cho ghi dữ liệu nhân bản được mô tả riêng ở mục 5.14.
+Tài liệu này giải thích kiến trúc và cách lần theo source cho thành viên. Stack là **Next.js frontend**, **Django REST API/Coordinator** và **SQL Server**; **SSMS** dùng để quản trị/kiểm tra CSDL. Chuyển cơ sở có route retry do Admin Big gọi; worker/lịch chạy nền tự động chưa được xác nhận trong source. Ghi catalog dùng chung có service cho `MonHoc` và `KhoaHoc`; các nghiệp vụ khác có cơ chế riêng, không giả định đã gom vào một replication service tổng quát.
 
 ## 1. Luồng một yêu cầu
 
@@ -30,15 +30,16 @@ Thứ tự bắt buộc: xác định người dùng và phạm vi quyền trư�
 | Module logic | Nhiệm vụ | Không được làm |
 |---|---|---|
 | Xác thực/phân quyền | Đăng nhập, trạng thái tài khoản, vai trò, cơ sở và quyền lớp | Tin vào quyền giao diện gửi lên mà không kiểm tra lại |
-| Site Router | Đọc danh sách site hoạt động và ánh xạ sang cấu hình kết nối | Viết cứng vòng lặp ba site hoặc suy ra cơ sở hiện tại từ mã học viên |
-| Service nghiệp vụ | Áp dụng quy tắc đăng ký, học phí, điểm, lớp... | Tự triển khai lại logic đồng bộ nhiều site |
-| Global Query | Gọi site cần thiết, gắn nguồn kết quả, gộp và ghi nhận site thiếu | JOIN giữa CSDL hoặc che việc một site lỗi |
-| Đồng bộ dữ liệu dùng chung | Một điểm vào cho mọi ghi `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, gồm cả cột subject Google/Facebook | Trả thành công khi chưa ghi đủ các site hoạt động |
-| Điều phối chuyển cơ sở | Điều phối nguồn/đích, lưu tiến trình và phục hồi | Dùng hai câu ghi rời mà không có theo dõi trạng thái bền vững |
+| Site Router (`src/api/core/sites/`) | Đọc danh sách site hoạt động và ánh xạ sang cấu hình kết nối | Viết cứng vòng lặp ba site hoặc suy ra cơ sở hiện tại từ mã học viên |
+| Service nghiệp vụ (`core/classes/`, `core/academics/`, `core/students/`...) | Áp dụng quy tắc đăng ký, học phí, điểm, lớp và hồ sơ | Tự triển khai lại logic fan-out dùng chung khi nghiệp vụ đã có service điều phối riêng |
+| Truy vấn nhiều site | Nằm trong service của nghiệp vụ cần `GLOBAL`, đọc từng kết nối site rồi gộp tại API | JOIN giữa CSDL hoặc che việc một site lỗi; hiện không có package `global_queries/` riêng |
+| Catalog dùng chung (`core/catalog/`) | Ghi `MonHoc`/`KhoaHoc` bằng các service có ACK và retry theo chính sách từng loại | Coi seed là replication hoặc coi mọi bảng dùng chung đã có một writer chung |
+| Chuyển cơ sở (`core/academics/transfers.py`) | Điều phối transaction cục bộ nguồn/đích, lưu tiến trình và cho Admin Big retry | Gọi là ACID nguyên tử xuyên CSDL hoặc mặc định có worker chạy nền |
+| Ghi các bản sao khác | `TaiKhoan` và một số luồng thông báo có service/fan-out riêng; `CoSo` chưa có fan-out runtime đầy đủ | Mặc định có một replication writer chung cho mọi bảng; trạng thái cụ thể xem ma trận triển khai |
 | Audit/log | Ghi người, site, thời điểm, loại hành động, kết quả và thay đổi | Ghi mật khẩu/token hoặc cho phép sửa/xóa log |
 | Repository | Thực hiện truy vấn cục bộ với kết nối đã nhận | Tự quyết định site bằng tiền tố mã |
 
-Các nhiệm vụ Coordinator ở bảng trên được thực hiện trong Django API theo README mục 2. Next.js chỉ gọi API; Django mới chọn kết nối SQL Server qua Site Router.
+Các nhiệm vụ Coordinator hiện được thực hiện trong Django API theo từng nghiệp vụ. Next.js chỉ gọi API; Django mới chọn kết nối SQL Server qua Site Router. Hợp đồng kiến trúc “một điểm vào ghi mọi bảng dùng chung” là nguyên tắc cần hoàn thiện, chưa phải cấu trúc source hiện có.
 
 ## 3. Cách xử lý từng loại nghiệp vụ
 
@@ -56,7 +57,7 @@ Gọi từng cơ sở đang hoạt động, thực hiện truy vấn cục bộ 
 
 Chỉ service đồng bộ dùng chung được ghi bảng nhân bản. Xác định tất cả site `hoat_dong`; nếu site nào không sẵn sàng thì từ chối trước khi tuyên bố thành công. Thao tác bao gồm tạo/sửa/đóng danh mục, tài khoản, hoặc cập nhật trạng thái site theo luồng README.
 
-Không rải `for each site: UPDATE` trong từng màn hình. API có service replication cho `MonHoc`: cập nhật từng CSDL site riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ; retry tiếp tục site chưa ACK. Cơ chế này chưa áp dụng đầy đủ cho `CoSo`, `KhoaHoc` hoặc mọi luồng `TaiKhoan`. Đây không phải commit ACID nguyên tử xuyên database; các kịch bản outage/recovery vẫn cần kiểm chứng.
+Không rải `for each site: UPDATE` trong từng màn hình. API có service ghi nhân bản riêng cho `MonHoc` và `KhoaHoc`, cập nhật từng CSDL site và ghi ACK append-only vào `Logs` trong transaction cục bộ; retry tiếp tục site chưa ACK. `CoSo` chưa có fan-out runtime đầy đủ, còn một số luồng `TaiKhoan` dùng cơ chế riêng. Chưa có một writer duy nhất bao phủ mọi bảng dùng chung. Đây không phải commit ACID nguyên tử xuyên database; các kịch bản outage/recovery vẫn cần kiểm chứng.
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 
@@ -212,44 +213,40 @@ executeApprovedTransfer(requestId, source, destination):
     verifyBothSitesAndCompleteAtSource(tx)
 ```
 
-`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Worker bỏ qua `cho_duyet` và `tu_choi`, chỉ xử lý `dang_xu_ly`. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Nếu đích đã commit rồi ứng dụng dừng, recovery tìm trạng thái mở ở nguồn, đối chiếu sự kiện có cùng `ma_chuyen` tại đích và làm nốt nguồn. Không tạo hồ sơ đích lần hai, không xóa đích. Dùng `khoa_chong_lap`, unique index trên học viên đang mở và `rowversion` để chặn gửi trùng/cạnh tranh. Đây là điều phối phục hồi tiến về phía trước bằng các transaction cục bộ, không khẳng định ACID nguyên tử xuyên CSDL; Global Query xử lý bản hiện hành theo mục 7 của tài liệu giao dịch phân tán.
+`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Coordinator không bắt đầu với `cho_duyet` hoặc `tu_choi`, chỉ xử lý `dang_xu_ly`; source cho Admin Big gọi route retry. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Nếu đích đã commit rồi ứng dụng dừng, lần retry đối chiếu trạng thái mở ở nguồn với sự kiện có cùng `ma_chuyen` tại đích và làm nốt nguồn. Không tạo hồ sơ đích lần hai, không xóa đích. Dùng `khoa_chong_lap`, unique index trên học viên đang mở và `rowversion` để chặn gửi trùng/cạnh tranh. Đây là điều phối phục hồi tiến về phía trước bằng các transaction cục bộ, không khẳng định ACID nguyên tử xuyên CSDL; Global Query xử lý bản hiện hành theo mục 7 của tài liệu giao dịch phân tán.
 
-## 5. Cấu trúc source gợi ý
+## 5. Cấu trúc source hiện có
 
 ```text
 src/
-├── web/                           Next.js project root
+├── web/                            Next.js project root
 │   └── src/
-│       ├── app/                   Màn hình/routes frontend
-│       ├── components/            Thành phần giao diện
-│       └── lib/api/               Client gọi Django API; không có credential SQL Server
-└── api/                           Django API và Coordinator
-    ├── config/                    Cấu hình Django và biến môi trường
-    ├── api/                       Endpoint, xác thực request và định dạng response
-    ├── core/
-    │   ├── permissions/           Vai trò, phạm vi cơ sở/lớp
-    │   ├── sites/                 Site Router và cấu hình kết nối SQL Server
-    │   ├── global_queries/        Đọc từng site và gộp kết quả
-    │   ├── replication/           Điểm vào ghi dữ liệu dùng chung
-    │   ├── distributed_tx/        Chuyển cơ sở, trạng thái và phục hồi
-    │   └── audit/                 Nhật ký và đối soát
-    └── modules/
-        ├── accounts/              Tài khoản
-        ├── catalogs/              Cơ sở, môn học, khóa học
-        ├── students/              Học viên
-        ├── classes/               Lớp, phòng, buổi học
-        ├── enrollments/           Đăng ký, đổi lớp
-        ├── tuition/                Học phí, phiếu thu
-        ├── grades/                 Điểm
-        ├── attendance/            Điểm danh
-        └── reports/               Thống kê
+│       ├── app/                    Route hiện có: public, login, admin, teacher, student
+│       ├── components/             Thành phần giao diện theo nghiệp vụ
+│       ├── lib/                    API client, auth/session và tiện ích
+│       └── styles/                 Style và token giao diện
+└── api/                            Django REST API và Coordinator
+    ├── config/                     Settings, middleware và root URLs
+    └── core/
+        ├── auth/                   Đăng nhập, session, tài khoản và reset OTP
+        ├── sites/                  Site Router và kết nối SQL Server
+        ├── catalog/                Môn/khóa học, đọc và ghi bản sao
+        ├── classes/                Lớp, phòng, đăng ký và xếp lớp
+        ├── academics/              Lịch, điểm danh, điểm, học phí, chuyển và báo cáo
+        ├── students/               Hồ sơ, portal và điều phối xóa học viên
+        ├── teachers/               Hồ sơ, trạng thái và phân công giáo viên
+        ├── employees/              Hồ sơ nhân viên nghiệp vụ
+        ├── notifications/          Thông báo quản trị
+        ├── audit/                  Truy vấn Logs theo quyền/site
+        └── media/                  Intent/hoàn tất avatar Cloudinary
 
-db/
-  sqlserver/                        Script tạo cùng schema trên từng CSDL site
-  seed/                             Bộ dữ liệu demo theo site
+db/                                 SQL Server schema, seed, verify và migrations
+specs/                              Đặc tả API và UI/UX
+fs/                                 Functional Specification
+docs/                               Schema, kiến trúc, TC và trạng thái triển khai
 ```
 
-Đây là cấu trúc định hướng để tránh trộn trách nhiệm. Trong repo hiện đã có dự án Next.js tại `src/web` và thư mục giữ chỗ `src/api`; các module Django trong sơ đồ chưa được khởi tạo. Next.js chỉ gọi Django API; Django là nơi duy nhất đọc biến kết nối và truy cập SQL Server. Không tạo module chưa cần, nhưng Site Router, Global Query, replicated write và transfer transaction phải có người sở hữu rõ.
+Đây là thư mục thực tế; tên một số trách nhiệm nghiệp vụ gộp chung trong `core/academics/` thay vì tách thành package riêng. Route API hiện có được đăng ký tại `src/api/core/urls.py`. Next.js chỉ gọi Django API; Django là nơi duy nhất đọc biến kết nối và truy cập SQL Server. Source hiện có service replication catalog và điều phối chuyển cơ sở, nhưng chỉ chạy TC trên SQL Server thật mới chứng minh yêu cầu phân tán.
 
 ## 6. Lỗi và kết quả trả về
 
