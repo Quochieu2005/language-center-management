@@ -163,7 +163,7 @@ def send_admin_small_credentials(*, account_id: str, remote_ip: str) -> dict[str
     if site_code not in sites:
         raise AdminSmallTargetNotFound
 
-    email, username, _password_hash = _claim_delivery(
+    email, _username, _password_hash = _claim_delivery(
         site_code=site_code, account_id=account_id.strip(), password=password,
         remote_ip=remote_ip,
     )
@@ -172,8 +172,9 @@ def send_admin_small_credentials(*, account_id: str, remote_ip: str) -> dict[str
             subject="Tài khoản Admin Small Trung tâm Ngoại ngữ",
             message=(
                 "Tài khoản Admin Small của bạn đã được tạo.\n"
-                f"Tên đăng nhập: {username}\n"
+                f"Email đăng nhập: {email}\n"
                 f"Mật khẩu tạm thời: {password}\n\n"
+                "Hãy đăng nhập bằng email này.\n"
                 "Hãy đổi mật khẩu ngay lần đăng nhập đầu tiên và không chia sẻ mật khẩu."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,

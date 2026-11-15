@@ -134,7 +134,7 @@ Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một l
 
 Django gửi thư từ backend qua SMTP; thông tin kết nối chỉ nằm trong biến môi trường/secret store (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS` hoặc `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`). Với Gmail, cấu hình mặc định là `smtp.gmail.com:587` + STARTTLS, dùng địa chỉ Gmail và Google App Password. App Password chỉ dành cho SMTP, không phải OAuth Client Secret. Không ghi thông tin này vào source, Git, log, Swagger response hoặc frontend. Chỉ báo gửi thành công sau khi SMTP chấp nhận thư; lỗi gửi thư phải có trạng thái retry an toàn và không log nội dung bí mật.
 
-Source hiện tạo tài khoản Admin Small/giáo viên bằng mật khẩu khởi tạo từ cấu hình backend, lưu hash và gửi thông tin cấp tài khoản qua email; chưa có token kích hoạt riêng. Email thật phụ thuộc SMTP và phải kiểm tra kết quả gửi. Không ghi mật khẩu/secret vào log, Git hay response.
+Source hiện tạo tài khoản Admin Small/giáo viên bằng mật khẩu khởi tạo từ cấu hình backend, lưu hash và gửi email cấp tài khoản; email là thông tin đăng nhập chính, username không bắt buộc. Chưa có token kích hoạt riêng. Email thật phụ thuộc SMTP và phải kiểm tra kết quả gửi. Không ghi mật khẩu/secret vào log, Git hay response.
 
 Source hiện reset mật khẩu quản trị bằng OTP 6 số, lưu hash, giới hạn số lần sai và hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây). OTP dùng một lần; ledger phục hồi giữ trạng thái cập nhật mật khẩu trên các bản sao. Response yêu cầu reset không tiết lộ tài khoản tồn tại hay không. Luồng SMTP vẫn cần kiểm thử ở môi trường nhóm.
 
@@ -341,7 +341,7 @@ PATCH nhận ít nhất một trong `full_name`, `phone`, `job_title`; body có 
 
 API GET danh sách/chi tiết nhân viên dùng scope đọc `employee_read` (120 request/phút), tách khỏi scope ghi `employee_management` (10 request/giờ) của POST/PATCH/DELETE. Việc tải danh sách sau khi tạo không tiêu hao hạn mức ghi.
 
-Email cấp tài khoản nhân viên hiển thị email và tên đăng nhập; người dùng có thể đăng nhập bằng một trong hai giá trị.
+Email cấp tài khoản nhân viên hiển thị email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động. Login API vẫn chấp nhận username như định danh thay thế.
 
 `tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này trước khi triển khai phiên bản mới. Chức vụ `le_tan` là nhân viên tiếp nhận tại quầy; trong source hiện tại được thao tác lớp/đăng ký và kế hoạch đóng học phí, còn tra cứu danh sách học viên thuộc `tu_van`.
 

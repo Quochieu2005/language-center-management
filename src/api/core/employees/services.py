@@ -257,15 +257,15 @@ def _recover_employee_provisioning(
         raise EmployeeInfrastructureUnavailable from exc
 
 
-def _send_credentials(email: str, full_name: str, username: str, password: str) -> bool:
+def _send_credentials(email: str, full_name: str, password: str) -> bool:
     try:
         return send_mail(
             subject="Tài khoản nhân viên Trung tâm Ngoại ngữ",
             message=(
                 f"Chào {full_name},\n\nTài khoản nhân viên của bạn đã được tạo.\n"
-                f"Email đăng nhập: {email}\nTên đăng nhập: {username}\n"
+                f"Email đăng nhập: {email}\n"
                 f"Mật khẩu tạm thời: {password}\n\n"
-                "Bạn có thể đăng nhập bằng email hoặc tên đăng nhập.\n"
+                "Hãy đăng nhập bằng email này.\n"
                 "Hãy đổi mật khẩu ngay lần đăng nhập đầu tiên và không chia sẻ mật khẩu."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -333,7 +333,7 @@ def create_employee(
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise EmployeeInfrastructureUnavailable from exc
-    email_sent = _send_credentials(normalized_email, normalized_name, normalized_username, temporary_password)
+    email_sent = _send_credentials(normalized_email, normalized_name, temporary_password)
     return EmployeeProvisioningResult(
         employee_id=employee_id, account_id=account_id, slug=account_slug,
         username=normalized_username, email=normalized_email, site_code=site,

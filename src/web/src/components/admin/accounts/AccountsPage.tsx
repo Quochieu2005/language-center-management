@@ -222,7 +222,6 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   const adminColumns: ColumnsType<AdminSmall> = [
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
-    { title: "Tên đăng nhập", dataIndex: "username" },
     { title: "Cơ sở", dataIndex: "site_code" },
     {
       title: "Mật khẩu qua email",
@@ -325,7 +324,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
             <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>
+            <Form.Item name="username" label="Tên đăng nhập phụ (không bắt buộc)" extra="Email cũng dùng để đăng nhập."><Input maxLength={100} /></Form.Item>
           </Col>
           <Col xs={24} md={12}>
             {isEmployeeView
