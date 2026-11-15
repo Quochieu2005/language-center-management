@@ -100,7 +100,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 
 Giảng viên yêu cầu **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Đồ án chọn **3 site Q1, Q7, TD**; BT trong kịch bản mở rộng là site thứ tư. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh, nhưng phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
 
-Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Lựa chọn cơ chế còn mở ở mục 9 không làm các yêu cầu này trở thành tùy chọn.
+Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Cơ chế replication ứng dụng cho `MonHoc` đã được chọn; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
 
 ### Sáu nghiệp vụ bắt buộc theo đề tài
 
@@ -194,7 +194,7 @@ Nếu cơ sở đang `hoat_dong` nhưng thiếu cấu hình kết nối, Django 
 
 **Admin Big** giữ quyền quản trị toàn hệ thống: tạo/đóng cơ sở, phân công Admin Small, quản lý dữ liệu dùng chung, xem thống kê toàn trung tâm và duyệt hoặc từ chối đề nghị chuyển học viên giữa các cơ sở. Sau khi duyệt, Coordinator mới chạy giao dịch phân tán. **Admin Small** điều hành cơ sở được giao và là người tạo đề nghị chuyển học viên từ cơ sở mình; Admin Small có thể theo dõi kết quả nhưng không thể tự duyệt đề nghị. Các việc thường ngày khác gồm giám sát nhân sự, lớp/lịch, hồ sơ học viên, đăng ký, học phí, điểm danh, điểm và báo cáo tại cơ sở. Mỗi cơ sở phải có người phụ trách Admin Small.
 
-Trong schema hiện tại, `TaiKhoan.vai_tro` vẫn chỉ có `admin`, `nhan_vien`, `giao_vien`. Admin Small được biểu diễn bằng tài khoản `nhan_vien`, `TaiKhoan.ma_co_so` xác định site được giao và `NhanVien.chuc_vu = quan_ly_co_so`; không tự thêm một giá trị vai trò mới vào schema.
+Trong schema hiện tại, `TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, nhưng hồ sơ quyền được xác định qua `Admin.loai_admin = admin_small` và `ma_co_so`; không nhầm hồ sơ Admin Small với hồ sơ nhân viên tại `NhanVien`. Nhân viên thường dùng `NhanVien.chuc_vu` gồm `le_tan`, `tu_van`, `ke_toan`, `xep_lop`.
 
 ```mermaid
 flowchart LR
@@ -211,7 +211,7 @@ flowchart LR
 | Lễ tân | Một site | Hồ sơ học viên, đăng ký, xếp/đổi lớp tại cơ sở |
 | Kế toán | Một site | Thu/hoàn học phí, xem công nợ và biên nhận tại cơ sở |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
-| Học viên | Chưa có tài khoản trong phạm vi hiện tại | Hồ sơ do nhân viên quản lý; không đăng nhập trực tiếp trong phiên bản này |
+| Học viên | Schema/API/UI có tài khoản và portal trong source; phạm vi này chưa được chốt cho đồ án | Chỉ đưa vào phạm vi sau khi nhóm duyệt và đồng bộ README, FS, schema, API và UI |
 
 ### 3.2. Backend luôn kiểm tra quyền trước khi truy cập dữ liệu
 
@@ -237,10 +237,10 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Bản sao đồng nhất tại mọi site hoạt động; ghi qua một dịch vụ đồng bộ dùng chung |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`), `DanhMucBlog`, `BaiVietBlog` | Cùng schema và bản sao theo site. API có luồng ghi runtime cho tài khoản, `MonHoc`, `KhoaHoc` và CMS Blog; Blog dùng Coordinator ghi từng site, ACK trong `Logs`, retry idempotent. Seed không thay cho bằng chứng replication runtime |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
-| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện lịch sử chỉ ghi thêm tại site phát sinh; không nhân bản |
+| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện/log ghi tại site phát sinh; không nhân bản |
 
 | Dữ liệu mẫu | Q1 | Q7 | TD |
 |---|:---:|:---:|:---:|
@@ -256,7 +256,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 |---|---|---|---|
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
-| `REPLICATED-WRITE` | Ghi bảng dùng chung qua một dịch vụ vào mọi site đang hoạt động | Cập nhật môn học, khóa học, tài khoản và subject đăng nhập trên TaiKhoan | Từ chối báo thành công nếu chưa xác nhận đủ site; ghi lại kết quả từng site |
+| `REPLICATED-WRITE` | Ghi bảng dùng chung qua Coordinator vào các CSDL site riêng | `PATCH /api/v1/admin/shared/subjects/{slug}/` cập nhật `MonHoc`; tạo/sửa/xóa `KhoaHoc`; một số luồng tài khoản cũng có replication | Trả kết quả chưa hoàn tất nếu thiếu ACK; retry dùng lại `Idempotency-Key` và body |
 | `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
@@ -271,7 +271,11 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-Mọi module cần ghi `CoSo`, `MonHoc`, `KhoaHoc` hoặc `TaiKhoan` (kể cả liên kết/thu hồi subject Google/Facebook) đều gọi cùng một dịch vụ `DongBoDuLieuChung`. Không viết riêng vòng lặp ghi site trong màn hình danh mục, tài khoản và cơ sở. Dịch vụ phải kiểm tra tập site hoạt động, ghi kết quả từng nơi và cho phép đối soát theo phiên bản.
+API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+
+CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
+
+Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -413,7 +417,7 @@ flowchart LR
 
 | Điểm dừng | Kết quả phải đảm bảo sau phục hồi |
 |---|---|
-| Đề nghị đang chờ duyệt (`trang_thai = cho_duyet`) | Chưa tạo bản đích; bản nguồn vẫn `dang_hoc`, tiếp tục được tính tại nguồn; worker chuyển cơ sở không xử lý trạng thái này |
+| Đề nghị đang chờ duyệt (`trang_thai = cho_duyet`) | Chưa tạo bản đích; bản nguồn vẫn `dang_hoc`, tiếp tục được tính tại nguồn; Coordinator chỉ chạy sau khi Admin Big duyệt |
 | Trước khi tạo bản đích (`buoc_cuoi = da_tiep_nhan`) | Bản nguồn vẫn `dang_hoc`; lỗi nghiệp vụ dứt điểm có thể kết thúc `that_bai`; lỗi kết nối thì giữ giao dịch để thử lại |
 | Đích đã commit, nguồn chưa cập nhật (`buoc_cuoi = da_tao_ho_so_dich`) | Giữ `dang_xu_ly` và phục hồi tiến về phía trước; Global Query tính bản nguồn, tạm ẩn bản đích |
 | Nguồn đã cập nhật (`buoc_cuoi = da_cap_nhat_nguon`) | Transaction nguồn đã đổi nguồn thành `da_chuyen_di`; Global Query tính bản đích |
@@ -455,15 +459,15 @@ flowchart LR
     DangNhap["Đăng nhập"] -->|ghi nhận đăng nhập| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Thiết kế đăng nhập dùng chung dự kiến hỗ trợ tên đăng nhập/mật khẩu và OAuth Google/Facebook sau khi tài khoản đã được liên kết. Với OAuth, backend sẽ xác minh code/token trực tiếp với provider rồi tìm `sub`/Facebook app-scoped ID trong `TaiKhoan.google_subject` hoặc `TaiKhoan.facebook_subject` ở các CSDL site riêng. Không tự tạo tài khoản, không tự ghép qua email và không dùng danh tính provider để cấp quyền. Liên kết/thu hồi subject là `REPLICATED-WRITE`; tra cứu khi đăng nhập là `GLOBAL`. Mỗi site giữ bản sao `TaiKhoan`; không có bảng identity riêng, CSDL identity trung tâm hay JOIN xuyên site. Chi tiết endpoint và kiểm tra bảo mật nằm trong [`specs/api.md`](specs/api.md); hiện API mới có health check nên đăng nhập/OAuth chưa hoạt động.
+Đăng nhập bằng tên đăng nhập/email và mật khẩu, phiên có thể thu hồi, idle timeout và các route OAuth Google/Facebook đã có code. OAuth hiện chỉ cho học viên có subject liên kết trước; cấu hình provider và kiểm thử với app thật còn phụ thuộc môi trường. Tra cứu tài khoản/subject đọc các CSDL site riêng, liên kết subject cập nhật bản sao `TaiKhoan`; không tự tạo tài khoản hoặc tự ghép qua email. Tài khoản học viên, portal và OAuth học viên đã có code nhưng chưa được tính là phạm vi đồ án đã duyệt cho tới khi nhóm thống nhất. Không có CSDL identity trung tâm hay JOIN xuyên site. Xem [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) và [API spec](specs/api.md).
 
-Mỗi phiên sau khi xác thực phải tự hết hạn sau **60 phút không có hoạt động người dùng thật**, áp dụng như nhau cho Admin Big, Admin Small, nhân viên và giáo viên. Request nền như polling, health check và tự refresh không được tính hoạt động. API phải xác minh idle expiry và thu hồi phiên; giao diện đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và đưa người dùng về đăng nhập khi hết hạn. Mỗi thiết bị là phiên riêng. Cơ chế lưu trạng thái phiên có thể thu hồi còn phải được chốt theo mô hình CSDL riêng từng site; không dùng CSDL nghiệp vụ trung tâm. Do xác thực hiện chưa được triển khai, chính sách này hiện là yêu cầu thiết kế chứ chưa phải hành vi đang chạy.
+Phiên đăng nhập hết hạn sau **60 phút không có hoạt động người dùng thật**. Backend kiểm tra hạn và thu hồi phiên; endpoint `/auth/activity/` là đường gia hạn tường minh, frontend không được gọi nó bằng polling/health check. Mỗi thiết bị có phiên riêng. Trạng thái phiên hiện được lưu tại CSDL site cấu hình `AUTH_SESSION_SITE_CODE`, không phải CSDL nghiệp vụ trung tâm; site này ngừng hoạt động có thể ảnh hưởng đăng nhập và xác thực phiên toàn hệ thống. Việc đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và chuyển hướng giao diện sau khi hết phiên cần được kiểm chứng/hoàn thiện ở frontend.
 
 ### 5.8. Quên và đặt lại mật khẩu
 
-**Loại:** yêu cầu tra cứu nhiều site; cập nhật tài khoản dùng chung bằng `REPLICATED-WRITE`.
+**Loại:** tra cứu tài khoản trên các site; lưu OTP/tiến trình ở database kỹ thuật được cấu hình; cập nhật bản sao mật khẩu theo service đồng bộ.
 
-**Yêu cầu liên kết đặt lại:**
+**Yêu cầu mã đặt lại:**
 
 ```mermaid
 flowchart LR
@@ -472,27 +476,27 @@ flowchart LR
     API["API"] -->|điều phối nghiệp vụ| DatLaiMatKhau["Đặt lại mật khẩu"]
     DatLaiMatKhau["Đặt lại mật khẩu"] -->|tìm tài khoản tại cơ sở| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|đọc tài khoản| SQLServer_CSDL_Site["SQL Server của cơ sở"]
-    DatLaiMatKhau["Đặt lại mật khẩu"] -->|tạo token liên kết ngẫu nhiên, dùng một lần| KiemTraLienKet["Kiểm tra liên kết"]
-    DatLaiMatKhau["Đặt lại mật khẩu"] -->|gửi liên kết| DichVuEmail["Dịch vụ email"]
+    DatLaiMatKhau["Đặt lại mật khẩu"] -->|tạo OTP 6 số, chỉ lưu hash và hạn dùng| KiemTraOtp["Kiểm tra OTP"]
+    DatLaiMatKhau["Đặt lại mật khẩu"] -->|gửi OTP| DichVuEmail["Dịch vụ email"]
 ```
 
-**Xác nhận liên kết và đổi mật khẩu:**
+**Xác nhận OTP và đổi mật khẩu:**
 
 ```mermaid
 flowchart LR
     NguoiDung["Người dùng"] -->|gửi thao tác| GiaoDienWeb["GiaoDienWeb"]
     GiaoDienWeb["GiaoDienWeb"] -->|gửi yêu cầu| API["API"]
     API["API"] -->|điều phối nghiệp vụ| DatLaiMatKhau["Đặt lại mật khẩu"]
-    DatLaiMatKhau["Đặt lại mật khẩu"] -->|xác thực liên kết| SiteRouter["Bộ định tuyến cơ sở"]
+    DatLaiMatKhau["Đặt lại mật khẩu"] -->|xác thực OTP| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|đổi mật khẩu mới ở mọi cơ sở| SQLServer_CSDL_Site["SQL Server của cơ sở"]
-    DatLaiMatKhau["Đặt lại mật khẩu"] -->|kiểm tra hạn và trạng thái| KiemTraLienKet["Kiểm tra liên kết"]
+    DatLaiMatKhau["Đặt lại mật khẩu"] -->|kiểm tra hạn và trạng thái| KiemTraOtp["Kiểm tra OTP"]
     DatLaiMatKhau["Đặt lại mật khẩu"] -->|ghi tại mọi cơ sở đang hoạt động| DongBoDuLieuChung["Đồng bộ dữ liệu chung"]
     DatLaiMatKhau["Đặt lại mật khẩu"] -->|đăng xuất phiên cũ| PhienDangNhap["Phiên đăng nhập"]
 ```
 
-Phản hồi yêu cầu quên mật khẩu không tiết lộ email có tồn tại hay không. Token có hạn dùng và chỉ dùng một lần; CSDL lưu `token_bam`, email chỉ nhận liên kết cần thiết. Khi đổi mật khẩu, cập nhật `TaiKhoan` tới mọi site đang hoạt động bằng cùng bộ đồng bộ dữ liệu dùng chung, vô hiệu hóa token và đăng xuất phiên cũ. Không ghi token thô vào log.
+Luồng hiện có áp dụng cho Admin Big/Admin Small: API trả phản hồi chung, gửi OTP 6 số qua SMTP, chỉ lưu hash và hết hạn theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây). OTP được kiểm tra một lần; khi hợp lệ, Coordinator lưu ledger phục hồi, cập nhật hash mật khẩu tới các bản `TaiKhoan` và vô hiệu hóa phiên cũ. Không ghi OTP/token hay mật khẩu vào log. Chưa xác nhận gửi email thật ở môi trường nhóm.
 
-API đã có cấu hình nền Gmail SMTP trong `src/api/.env` (máy cá nhân); dùng địa chỉ Gmail gửi thư và App Password riêng, không phải OAuth Client Secret. Nếu App Password cũ đã bị lộ, hãy thu hồi trước khi điền mật khẩu mới. Các luồng gửi thư/đặt lại mật khẩu trong README là thiết kế nghiệp vụ, chưa chạy được vì API hiện chưa có endpoint xác thực; trang phục hồi cũng chưa thể gửi email thật.
+API có route quên/đặt lại mật khẩu và luồng gửi thư, nhưng việc gửi thật phụ thuộc SMTP secrets cục bộ. Không ghi email/password SMTP hoặc secret vào README, Git, log hay chat; `.env.example` chỉ giữ placeholder.
 
 ### 5.9. Tạo tài khoản nhân viên/giáo viên và phân công Admin Small
 
@@ -509,7 +513,7 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big tạo tài khoản dùng chung và hồ sơ nhân viên/giáo viên tại đúng cơ sở làm việc. Với Admin Small, tài khoản có `vai_tro = nhan_vien`, gắn `ma_co_so` của cơ sở được phân công và hồ sơ có `chuc_vu = quan_ly_co_so`. Không để Admin Big đặt hoặc gửi mật khẩu thay người nhận: sau khi hồ sơ và dữ liệu phân tán sẵn sàng, API sẽ gửi liên kết kích hoạt dùng một lần để người nhận tự đặt mật khẩu. Kiểm tra email/tên đăng nhập toàn hệ thống trước khi ghi. Nếu tạo hồ sơ site thất bại sau khi tài khoản đã được nhân bản, phải vô hiệu hóa/khôi phục theo trạng thái lưu; không để tài khoản hoạt động mà thiếu phạm vi cơ sở. Hiện schema chưa có trạng thái/token kích hoạt và API chưa có endpoint tạo tài khoản hay gửi email, nên luồng này chưa được bật.
+Admin Big tạo tài khoản và hồ sơ đúng site qua API. Admin Small là tài khoản `nhan_vien` có hồ sơ `Admin.loai_admin = admin_small`; nhân viên thường có hồ sơ `NhanVien` với chức vụ cụ thể. Tài khoản được nhân bản theo service, hồ sơ công tác nằm tại site được giao. API dùng mật khẩu khởi tạo lấy từ cấu hình backend, lưu hash và gửi thông tin cấp theo trạng thái email có thể theo dõi/gửi lại an toàn theo nghiệp vụ. Giáo viên có route xem/cập nhật hồ sơ, trạng thái, cấp thông tin và avatar. Việc email thật và hoàn tất đồng bộ nhiều site cần được kiểm tra tại môi trường chạy.
 
 ### 5.10. Mở lớp và sinh lịch học
 
@@ -606,6 +610,19 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 
 ---
 
+### 5.15. Đọc và quản trị Blog
+
+**Loại:** `GLOBAL` · **Ai làm:** khách chưa đăng nhập.
+
+- `GET /api/v1/blog/categories/` đọc danh mục và số bài đã xuất bản.
+- `GET /api/v1/blog/{slug}/` đọc chi tiết bài theo slug; chỉ trả bài đã xuất bản, danh mục đang hoạt động và đã đến thời điểm xuất bản.
+- API hỏi riêng từng CSDL site qua Site Router, đối chiếu các bản sao `DanhMucBlog`/`BaiVietBlog` rồi trả kết quả ở tầng ứng dụng. Không tạo DB trung tâm hoặc JOIN xuyên site. Danh sách báo `complete`, `missing_sites`, `inconsistent_sites`; chi tiết trả 404 khi không có slug, 409 khi bản sao khác nhau, 503 khi không đọc đủ site.
+- Admin Big dùng `/api/v1/admin/blog/categories/` và `/api/v1/admin/blog/articles/` để đọc, tạo, sửa, xóa danh mục/bài viết; API yêu cầu phiên Admin Big và `Idempotency-Key`. Danh mục đang được bài viết dùng không thể xóa.
+- CMS ghi theo `REPLICATED-WRITE` tới từng site đang hoạt động, mỗi site dùng transaction cục bộ và lưu ACK trong `Logs`. Nếu lỗi sau khi một phần đã commit, API trả `202` với site thiếu; retry phải dùng cùng key/payload. Không có cam kết ACID nguyên tử xuyên database; bản sao lệch trả conflict để đối soát.
+- Migration `36_add_blog_tables.sql` tạo hai bảng và nạp ba bài mẫu ban đầu vào từng database. Seed là khởi tạo, không phải bằng chứng kiểm chứng replication. Giao diện `/blog` vẫn dùng nội dung tĩnh và chưa có màn hình CMS nối các API mới.
+
+Blog là chức năng hỗ trợ, không thay thế sáu nghiệp vụ bắt buộc của đề tài. Xem [hợp đồng API](specs/api.md), [schema](docs/DATABASE_SCHEMA.md) và [ma trận trạng thái](docs/Trang-Thai-Trien-Khai.md).
+
 ## 6. Kịch bản demo
 
 | # | Kịch bản | Điều cần kiểm chứng |
@@ -674,22 +691,20 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | DBMS | Microsoft SQL Server | Chạy CSDL riêng của từng cơ sở |
 | Công cụ quản trị | SQL Server Management Studio (SSMS) | Tạo schema, chạy lệnh, xem dữ liệu và kiểm tra đồng bộ/giao dịch |
 
-### 9.2. Những việc nhóm vẫn phải chốt trước khi triển khai thật
+### 9.2. Cấu hình và kiểm chứng còn lại
 
 | Quyết định còn mở | Câu hỏi cần thống nhất |
 |---|---|
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
-| Worker phục hồi chuyển cơ sở | Nhịp quét, timeout/backoff, cảnh báo giao dịch `dang_xu_ly` quá lâu và cách vận hành worker được cấu hình thế nào? |
-| Phương pháp replication bắt buộc | Cơ chế nào truyền thay đổi bảng dùng chung? Nơi được phép ghi, các bản sao, phiên bản, ACK, xung đột và retry được xử lý thế nào? Nếu dùng Publication, chốt publisher/distributor/subscriber và tránh hai cơ chế ghi cùng bảng |
-| Trạng thái bền vững của đồng bộ | `NhatKyDongBo` hiện là nhật ký chỉ thêm theo site đích. Cần chốt cách lưu mã thao tác/phiên bản/trạng thái mỗi site và khôi phục sau timeout; xác định có cần bảng tiến trình/outbox và cập nhật schema/script không |
+| Tự động retry chuyển cơ sở | Source có route để Admin Big retry; nhóm cần quyết định có thêm worker/lịch tự động không, nhịp quét, timeout/backoff và cảnh báo giao dịch `dang_xu_ly` quá lâu |
+| Replication và đồng bộ | Source có replication tầng ứng dụng cho `MonHoc` và `KhoaHoc`; TC-REP-01/TC-SYNC-01 vẫn cần kết quả thay đổi được giữ, site lỗi, phục hồi và retry trên các DB site. Chưa bật SQL Server Publication |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
-| Kiểm soát concurrency | Cách bảo vệ kiểm tra/cập nhật chỗ cuối trong một transaction và cách tạo cạnh tranh giữa hai phiên ở TC-CON-01 là gì? |
+| Kiểm soát concurrency | Source có khóa/transaction cho sức chứa; TC-CON-01 vẫn cần hai phiên SQL Server đồng thời tranh một chỗ cuối và kiểm tra không để dữ liệu dở dang |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |
-| Giao diện API và bảo mật | Hợp đồng endpoint, cơ chế lưu/thu hồi phiên phù hợp CSDL riêng từng site, CORS, cookie/CSRF và cách thực thi idle timeout 60 phút được thống nhất thế nào? |
-| Cấu hình môi trường | Tên biến môi trường và nơi lưu chuỗi kết nối/bí mật; tuyệt đối không commit bí mật vào Git |
+| Kiểm chứng tích hợp ngoài | Cấu hình và kiểm tra SMTP, OAuth, Cloudinary; SePay chỉ bật sau khi nhóm chốt phạm vi, merchant/webhook và kịch bản đối soát. Bí mật chỉ nằm trong secret store hoặc `.env` cục bộ |
 
-Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay đồng bộ vật lý đã hoàn tất. Replication, distributed transaction, concurrency, distributed query và phân mảnh phải có minh chứng; đồng bộ phải thử cả lỗi/phục hồi. Công cụ cụ thể phải bám yêu cầu cài đặt của giảng viên. Django vẫn hỏi từng CSDL rồi gộp ở ứng dụng; không tự đổi nghiệp vụ sang JOIN xuyên site hoặc để API và Publication ghi trùng cùng bảng. Kết quả kiểm chứng và quyết định cơ chế phải được ghi riêng với mô tả thiết kế.
+`MonHoc` và `KhoaHoc` có service ghi nhân bản trong source; bằng chứng runtime được ghi riêng trong [ma trận kiểm chứng](docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Chưa có bằng chứng outage/recovery qua mạng thật, chuyển cơ sở chạy lỗi giữa hai site hoặc hai phiên SQL Server tranh chỗ cuối. Q1/Q7/TD được xác minh là ba CSDL riêng trên cùng một SQL Server instance trong môi trường kiểm tra trước đây; điều này không chứng minh ba máy chủ vật lý hay trạng thái hiện tại. Xem [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) và ma trận YC/TC để phân biệt source với kết quả kiểm chứng.
 
 ---
 
@@ -697,13 +712,13 @@ Việc đã chọn SQL Server **không** có nghĩa các bước cài đặt hay
 
 | Hạng mục | Trạng thái | Bằng chứng cần có |
 |---|---|---|
-| Nghiệp vụ, phân quyền, các kiểu truy cập | Đã mô tả trong README | Review của nhóm |
-| Schema và phân loại dữ liệu | Mô tả trong `docs/DATABASE_SCHEMA.md` | Script tạo và kiểm tra trên từng CSDL |
-| Frontend Next.js / Django API | Stack đã chọn; tình trạng source cần cập nhật theo repo | Source, lệnh chạy và kiểm thử API/UI |
-| Ba CSDL SQL Server | Thiết kế yêu cầu ba DB độc lập; tình trạng cài đặt cần cập nhật | Ảnh SSMS, truy vấn xác nhận từng site |
+| Nghiệp vụ, phân quyền, các kiểu truy cập | Mô tả trong README/FS; đối chiếu source ở [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) | Review của nhóm và kiểm tra theo role/site |
+| Schema và phân loại dữ liệu | Có schema khởi tạo, migration và hướng dẫn SQL trong `docs/DATABASE_SCHEMA.md`/`db/README.md` | Script và kết quả áp dụng trên từng CSDL đang dùng |
+| Frontend Next.js / Django API | Có source frontend và API cho nhiều luồng nghiệp vụ; trạng thái tích hợp ở ma trận triển khai | Lệnh chạy, kiểm tra API/UI và bằng chứng môi trường |
+| Ba CSDL SQL Server | Kiến trúc yêu cầu DB riêng Q1/Q7/TD; không kết luận cài đặt hiện tại chỉ từ tài liệu | Kết quả truy vấn xác nhận từng site và kết nối riêng |
 | VPN/Linked Server/Agent/Publication | Chỉ ghi nhận nếu thực tế được yêu cầu và cài | Ảnh cấu hình, script và kết quả thử |
 | YC-01–YC-07 của môn học | Đã bổ sung tiêu chí; chưa kiểm chứng trong đợt cập nhật tài liệu này | Kết quả bảy kịch bản TC, dữ liệu từng site, lỗi/phục hồi và concurrency thực tế |
-| Phục hồi giao dịch chuyển cơ sở | Schema và quy tắc phục hồi đã thiết kế; code worker và bằng chứng fault-injection còn cần thực hiện | Kịch bản lỗi trước/sau từng bước, trạng thái từng site, thống kê và kết quả phục hồi |
+| Phục hồi giao dịch chuyển cơ sở | Coordinator và route retry có trong source; lịch chạy retry tự động chưa được xác nhận | Fault-injection trước/sau commit đích, trạng thái hai site và retry/đối soát |
 
 Khi cập nhật bảng này, chỉ đánh dấu hoàn thành khi có source hoặc bằng chứng chạy được. Không ghi kế hoạch thành kết quả đã triển khai.
 

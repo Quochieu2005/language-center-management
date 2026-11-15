@@ -15,7 +15,7 @@ Q1, Q7 và TD có cùng cấu trúc bảng, nhưng không gộp thành một CSD
 | Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Bản sao thống nhất ở mọi site đang `hoat_dong` |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Dựa theo `ma_co_so` của bản ghi |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Theo site của bảng cha, không tự định tuyến độc lập |
-| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `NhatKyHeThong`, `NhatKyDongBo` | Trạng thái chuyển chỉ tại CSDL nguồn; sự kiện chuyển append-only tại site phát sinh; các bảng khác tại site xử lý |
+| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái chuyển chỉ tại CSDL nguồn; sự kiện chuyển append-only tại site phát sinh; `Logs` nằm riêng ở từng CSDL, ACK replication `MonHoc` được ghi tại site nhận |
 
 Với bảng dẫn xuất, đọc bảng cha để biết site trước khi thao tác. Ví dụ: xác định site của lớp rồi mới truy cập đăng ký lớp đó. Không tạo foreign key xuyên site.
 
@@ -62,7 +62,7 @@ Mã chính dùng dạng `<SITE>-<LOẠI>-<SỐ THỨ TỰ 6 CHỮ SỐ>`, ví d�
 
 ## 7. Nhật ký và bí mật
 
-`NhatKyHeThong`, `NhatKyDongBo`, `LichSuChuyenCoSo` là log/history, không cập nhật/xóa theo schema. `GiaoDichChuyenCoSo` là bảng trạng thái, được Coordinator cập nhật và không được nhầm với nhật ký append-only. Ghi hành động thành công cùng giao dịch nghiệp vụ; từ chối quyền hoặc đăng nhập sai vẫn ghi thất bại. Khi sửa dữ liệu, lưu giá trị cũ và mới. Mật khẩu/token chỉ lưu bản băm và tuyệt đối không đưa vào trường nhật ký.
+`Logs` và `LichSuChuyenCoSo` là log/history; không cập nhật trong luồng thông thường. `Logs` chỉ được xóa trong luồng xóa học viên có phạm vi đã được kiểm soát ở schema hiện tại. `GiaoDichChuyenCoSo` là bảng trạng thái, được Coordinator cập nhật và không được nhầm với nhật ký append-only. Ghi hành động thành công cùng giao dịch nghiệp vụ; từ chối quyền hoặc đăng nhập sai vẫn ghi thất bại. Khi sửa dữ liệu, lưu giá trị cũ và mới. Mật khẩu/token chỉ lưu bản băm và tuyệt đối không đưa vào trường nhật ký.
 
 ## 8. Quy tắc thay đổi schema
 

@@ -14,6 +14,8 @@ Việc có bước duyệt làm rõ trách nhiệm quản trị, còn tính phâ
 
 **Giới hạn phải ghi khi nghiệm thu:** thiết kế hiện tại phối hợp các transaction cục bộ và phục hồi tiến về phía trước, chưa chứng minh ACID nguyên tử xuyên site. Phải ghi giao thức thực tế và chốt mức bảo đảm đáp ứng tiêu chí distributed transaction của giảng viên. Nếu cần cơ chế DBMS quản lý, triển khai/kiểm thử bổ sung; không bỏ YC-04 hoặc tự ghi đã có MSDTC/2PC.
 
+Trong source hiện tại, Coordinator chạy sau quyết định duyệt và Admin Big có thể gọi route retry cho giao dịch chưa hoàn tất. Các từ “worker”/“retry” trong bảng trạng thái dưới đây mô tả trách nhiệm xử lý nghiệp vụ, không xác nhận đã cấu hình tiến trình nền hoặc lịch tự động.
+
 ## 1. Phân biệt các thao tác ghi nhiều site
 
 | Thao tác | Kiểu | Nơi đọc/ghi | Kết quả |
@@ -32,9 +34,9 @@ Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 3. Nếu thiếu site: từ chối, không cập nhật site nào.
 4. Ghi cùng thay đổi vào các site tham gia.
 5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
-6. Ghi `NhatKyDongBo` cho từng site đích và đối soát các bản sao.
+6. Với luồng cập nhật `MonHoc` đã triển khai, ghi ACK cho từng site vào `Logs` cùng transaction cục bộ và dùng key/site để retry, đối soát. Không suy ra các luồng nhân bản khác đã có cơ chế này.
 
-Các bước trên là hợp đồng bắt buộc cho replication/đồng bộ, không phải mô tả cơ chế đã triển khai. Nhóm phải chốt phương pháp truyền thay đổi, nơi được phép ghi, phiên bản, tiến trình và ACK từng site (README mục 9). Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
+Các bước trên là hợp đồng cần áp dụng cho luồng replication. Đồ án đã chọn và triển khai replication tầng ứng dụng cho cập nhật `MonHoc`; route ghi rõ ở README mục 9. Các bảng dùng chung khác chưa có một cơ chế runtime chung đầy đủ. Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
 
 ## 3. Vai trò và dữ liệu đề nghị
 
@@ -44,7 +46,7 @@ Các bước trên là hợp đồng bắt buộc cho replication/đồng bộ, 
 | Admin Big | Xem hộp thư toàn cục; duyệt hoặc từ chối một đề nghị; xem kết quả và lịch sử | Thay đổi dữ liệu quyết định bằng cách gọi trực tiếp SQL; duyệt khi không kết nối được site nguồn |
 | Coordinator trong Django | Xác minh vai trò, định tuyến, kiểm tra quy tắc, ghi quyết định, thực hiện và phục hồi chuyển | Tin mã site do trình duyệt gửi; tạo DB trung tâm; JOIN xuyên site |
 
-Trong schema hiện tại, Admin Big là tài khoản `TaiKhoan.vai_tro = 'admin'` có `ma_co_so IS NULL`. Admin Small là tài khoản `nhan_vien` gắn với site và hồ sơ `NhanVien.chuc_vu = 'quan_ly_co_so'`. API phải kiểm tra tài khoản còn hoạt động, vai trò/chức vụ và phạm vi cơ sở ở mọi endpoint; ẩn nút trên giao diện không phải là phân quyền.
+Trong schema hiện tại, Admin Big là tài khoản `TaiKhoan.vai_tro = 'admin_big'` có `ma_co_so IS NULL`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, có hồ sơ `Admin.loai_admin = 'admin_small'` và site được gán. `NhanVien.chuc_vu` chỉ mô tả nhân viên nghiệp vụ. API phải kiểm tra tài khoản còn hoạt động, vai trò/hồ sơ và phạm vi cơ sở ở mọi endpoint; ẩn nút trên giao diện không phải là phân quyền.
 
 Đề nghị gồm mã học viên, site nguồn, site đích, lý do, tài khoản gửi và thời điểm gửi. API lấy site nguồn từ tài khoản Admin Small, không chấp nhận nguồn do client tự gửi. Một dòng `GiaoDichChuyenCoSo` được tạo tại CSDL nguồn với `trang_thai = 'cho_duyet'`, `buoc_cuoi = 'cho_duyet'`. Sự kiện `de_nghi` được ghi trong `LichSuChuyenCoSo` cùng transaction cục bộ đó.
 
@@ -100,7 +102,7 @@ Nếu CSDL nguồn không truy cập được hoặc transaction quyết định
 
 ## 5. Chuyển hồ sơ sau khi duyệt
 
-Chỉ trạng thái `dang_xu_ly` mới được worker chuyển cơ sở xử lý. Các transaction là transaction cục bộ riêng, không tuyên bố atomic ACID xuyên hai CSDL.
+Chỉ trạng thái `dang_xu_ly` mới đủ điều kiện để Coordinator chuyển cơ sở xử lý; source cho phép Admin Big gọi lại route retry. Các transaction là transaction cục bộ riêng, không tuyên bố atomic ACID xuyên hai CSDL.
 
 1. **Tại nguồn**, tạo trạng thái `dang_xu_ly / da_tiep_nhan` khi Admin Big duyệt; sự kiện `duyet` ghi cùng transaction này.
 2. **Tại đích**, trong một transaction cục bộ, tạo `HocVien` cùng mã với trạng thái `dang_hoc` và sự kiện `tao_ho_so_dich`. Kiểm tra `ma_chuyen` để không tạo lặp.
@@ -116,10 +118,10 @@ Nếu lỗi nghiệp vụ dứt điểm xảy ra trước khi đích commit, có
 
 ### `GiaoDichChuyenCoSo`
 
-| Trạng thái | Bước | Ý nghĩa | Worker chuyển cơ sở |
+| Trạng thái | Bước | Ý nghĩa | Coordinator/retry |
 |---|---|---|---|
 | `cho_duyet` | `cho_duyet` | Đề nghị đã lưu ở nguồn; chờ Admin Big; học viên chưa đổi | Không xử lý |
-| `dang_xu_ly` | `da_tiep_nhan` | Admin Big đã duyệt; chưa xác nhận hồ sơ đích commit | Có thể retry/tiếp tục |
+| `dang_xu_ly` | `da_tiep_nhan` | Admin Big đã duyệt; chưa xác nhận hồ sơ đích commit | Coordinator có thể retry/tiếp tục |
 | `dang_xu_ly` | `da_tao_ho_so_dich` | Đích đã commit; nguồn chưa cập nhật xong | Phục hồi tiến về phía trước |
 | `dang_xu_ly` | `da_cap_nhat_nguon` | Nguồn đã đánh dấu `da_chuyen_di`; chờ đối chiếu/kết thúc | Hoàn tất |
 | `hoan_tat` | `hoan_tat` | Chuyển đã đối chiếu xong | Không xử lý |
@@ -162,7 +164,7 @@ Nếu không đọc được CSDL nguồn để biết trạng thái giao dịch
 6. Hai quyết định đồng thời hoặc tạo đề nghị trùng: chỉ một đề nghị/giao dịch mở được chấp nhận; retry cùng idempotency key không tạo bản ghi thứ hai.
 7. Điều kiện đổi trong lúc chờ duyệt (phát sinh công nợ, học viên đổi trạng thái, site đích đóng): API không bắt đầu chuyển dựa trên kiểm tra cũ.
 8. Đích lỗi trước commit: giữ nguồn và retry hoặc kết thúc `that_bai` theo loại lỗi.
-9. Ứng dụng dừng sau khi đích commit: worker đối chiếu sự kiện rồi hoàn tất nguồn, không tạo đích lần hai.
+9. Ứng dụng dừng sau khi đích commit: route retry đối chiếu sự kiện rồi hoàn tất nguồn, không tạo đích lần hai.
 
 ## 9. Trách nhiệm phối hợp nhóm
 

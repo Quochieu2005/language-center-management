@@ -18,4 +18,4 @@ Thư mục này chứa đặc tả chức năng của hệ thống Quản lý tr
 
 ## Trạng thái
 
-FS là tài liệu yêu cầu. Theo trạng thái được ghi trong [src/api/README.md](../src/api/README.md), API hiện mới có liveness check; các nghiệp vụ trong tài liệu chưa được xem là đã triển khai chỉ vì đã được mô tả ở đây.
+FS là tài liệu yêu cầu và tiêu chí nghiệm thu, không phải báo cáo source. API hiện có nhiều luồng nghiệp vụ; đối chiếu từng luồng và bằng chứng phân tán tại [trạng thái triển khai](../docs/Trang-Thai-Trien-Khai.md). Không suy ra đã đạt môn học từ route, source, seed hay unit test.
