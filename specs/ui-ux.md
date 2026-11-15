@@ -127,7 +127,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
 | Trang chủ | Điều hướng chung tới Chương trình, Khóa học, Blog, Liên hệ và Đăng nhập; Hero, định hướng học, lợi ích, trạng thái khóa học, bài viết, FAQ, liên hệ, CTA, footer | Giúp người xem hiểu hướng học và tìm bước tiếp theo; nội dung động chỉ hiển thị khi API xác nhận; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
 | Chương trình | Hero định hướng, nhóm mục tiêu học tập, câu hỏi xác định nhu cầu, trạng thái danh mục, FAQ | Nhóm mục tiêu và ví dụ chỉ mang tính định hướng; không mô tả như khóa/lớp đang tuyển sinh khi chưa có API |
-| Blog | Bài viết gợi ý, chủ đề, danh sách/chi tiết bài và hướng dẫn áp dụng nội dung | Nội dung biên tập tĩnh, không dùng số liệu, tác giả hoặc chứng thực giả |
+| Blog | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc Blog đã có; Next.js hiện vẫn dùng nội dung tĩnh và chưa nối hai endpoint. Khi tích hợp, chỉ hiển thị dữ liệu API, giữ cảnh báo thiếu site và render nội dung dưới dạng text đã escape |
 | Liên hệ | Lối tắt khóa học/cơ sở, các bước tra cứu, trạng thái kênh liên hệ và FAQ | Không tự tạo email, số điện thoại, địa chỉ hoặc form gửi thành công khi API chưa có |
 | Danh sách khóa học | Trạng thái danh mục, hướng dẫn chọn khóa, các trường thông tin cần xem, FAQ | So sánh khóa học/lớp đang được API trả về; khi API chưa có thì hiển thị trạng thái và hướng dẫn, không dựng bộ lọc/lớp giả |
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
@@ -373,7 +373,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 | `/courses` | Danh sách khóa học | Kết quả GLOBAL, lọc theo môn từ dữ liệu trả về, trạng thái thiếu site, loading/empty/error, hướng dẫn và FAQ | Dùng `GET /api/v1/courses/`; không tự bỏ qua site lỗi |
 | `/courses/[slug]` | Chi tiết khóa học | Môn, trình độ, số buổi, học phí chuẩn, cơ sở/lớp đang mở và trạng thái danh mục | Tìm trong danh mục API; không tuyên bố đã đăng ký lớp |
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
-| `/blog` và `/blog/[slug]` | Bài viết học tập | Bài gợi ý, chủ đề, danh sách/chi tiết và hướng dẫn áp dụng | Nội dung biên tập tĩnh; không bịa tác giả hay thành tích |
+| `/blog` và `/blog/[slug]` | Bài viết học tập | Danh mục, danh sách/chi tiết và hướng dẫn áp dụng | API đã có `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`; giao diện hiện chưa nối API và còn dùng dữ liệu tĩnh |
 | `/contact` | Liên hệ và hướng dẫn | Lối tắt khóa học/cơ sở, chuẩn bị trao đổi, FAQ và trạng thái kênh liên hệ | Không bịa địa chỉ/điện thoại hoặc giả vờ gửi form |
 | `/login` | Đăng nhập dùng chung | Form mật khẩu, lỗi và trạng thái gửi; OAuth chỉ khi provider được cấu hình | Route có trong source; API dựng role từ tài khoản, OAuth chỉ dành cho học viên đã liên kết; không tự đăng ký/chọn role |
 | — (chưa có route kích hoạt) | Kích hoạt tài khoản nội bộ | Không hiển thị luồng mở liên kết/mời trong UI hiện tại | Source gửi thông tin tài khoản/mật khẩu khởi tạo; không có token activation route |

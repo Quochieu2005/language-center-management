@@ -237,7 +237,7 @@ Với mỗi yêu cầu, Django phải kiểm tra lần lượt: tài khoản có
 
 | Kiểu dữ liệu | Bảng chính | Vị trí và cách dùng |
 |---|---|---|
-| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Cùng schema và bản sao theo site. API hiện có luồng ghi runtime cho tài khoản, cập nhật `MonHoc`, và tạo/sửa/xóa `KhoaHoc`; luồng khóa học kiểm tra môn đã có trên mọi site và ghi ACK `Logs` theo từng transaction cục bộ. Cơ chế code chưa thay cho bằng chứng chạy kiểm chứng đồng bộ thực tế |
+| Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`), `DanhMucBlog`, `BaiVietBlog` | Cùng schema và bản sao theo site. API hiện có luồng ghi runtime cho tài khoản, cập nhật `MonHoc`, và tạo/sửa/xóa `KhoaHoc`; Blog được seed ban đầu và chỉ có API đọc/đối chiếu, chưa có writer CMS. Seed không thay cho bằng chứng replication runtime |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Mỗi dòng nằm ở site quản lý dòng đó theo `ma_co_so` |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Nằm cùng site với lớp, buổi học hoặc đăng ký cha |
 | Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái giao dịch chuyển chỉ lưu ở CSDL nguồn; sự kiện/log ghi tại site phát sinh; không nhân bản |
@@ -607,6 +607,17 @@ flowchart LR
 Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc viết thêm nhánh riêng cho `BT`. Khi đóng site, hoàn tất hoặc xử lý rõ mọi đề nghị `cho_duyet` và giao dịch `dang_xu_ly`, chuyển học viên đang học theo nghiệp vụ, rồi đánh dấu site `dong_cua`; ngừng nhận thao tác mới nhưng giữ dữ liệu lịch sử.
 
 ---
+
+### 5.15. Đọc danh mục và bài Blog công khai
+
+**Loại:** `GLOBAL` · **Ai làm:** khách chưa đăng nhập.
+
+- `GET /api/v1/blog/categories/` đọc danh mục và số bài đã xuất bản.
+- `GET /api/v1/blog/{slug}/` đọc chi tiết bài theo slug; chỉ trả bài đã xuất bản, danh mục đang hoạt động và đã đến thời điểm xuất bản.
+- API hỏi riêng từng CSDL site qua Site Router, đối chiếu các bản sao `DanhMucBlog`/`BaiVietBlog` rồi trả kết quả ở tầng ứng dụng. Không tạo DB trung tâm hoặc JOIN xuyên site. Danh sách báo `complete`, `missing_sites`, `inconsistent_sites`; chi tiết trả 404 khi không có slug, 409 khi bản sao khác nhau, 503 khi không đọc đủ site.
+- Migration `36_add_blog_tables.sql` tạo hai bảng và nạp ba bài mẫu tĩnh hiện có vào từng database. Đây là dữ liệu khởi tạo, không phải replication runtime. Chưa có API Admin tạo/sửa/xóa bài; giao diện `/blog` hiện vẫn dùng nội dung tĩnh cho tới khi được nối API.
+
+Blog là chức năng hỗ trợ, không thay thế sáu nghiệp vụ bắt buộc của đề tài. Xem [hợp đồng API](specs/api.md), [schema](docs/DATABASE_SCHEMA.md) và [ma trận trạng thái](docs/Trang-Thai-Trien-Khai.md).
 
 ## 6. Kịch bản demo
 

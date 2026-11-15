@@ -48,7 +48,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 
 | Kiểu | Nhóm (mục 3) | Ý nghĩa | Bảng |
 |------|:---------------:|---------|------|
-| **Nhân bản** | ① Dùng chung | Cả 3 site có bản sao **giống hệt nhau**; ghi đồng bộ | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` (gồm danh tính Google/Facebook nếu đã liên kết) |
+| **Nhân bản** | ① Dùng chung | Cả 3 site có bản sao **giống hệt nhau**; ghi đồng bộ theo chính sách của từng bảng | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` (gồm danh tính Google/Facebook nếu đã liên kết) `DanhMucBlog` `BaiVietBlog` |
 | **Phân mảnh nguyên thủy** | ② Riêng của cơ sở | Mỗi dòng nằm ở **đúng 1 site**, quyết định bởi cột `ma_co_so` | `HocVien` `GiaoVien` `NhanVien` `Admin` (hồ sơ Admin Small) `PhongHoc` `LopHoc` |
 | **Phân mảnh dẫn xuất** | ③ Đi theo lớp / đăng ký | Dòng nằm **cùng site với dòng cha** | `BuoiHoc` `DangKy` `DiemDanh` `HocPhi` `DotHocPhi` `PhieuThu` `Diem` |
 | **Cục bộ** | ④ Trạng thái điều phối, xác thực, thanh toán theo site, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `PhienDangNhap` `TokenDatLaiMatKhau` `GiaoDichDatLaiMatKhau` `YeuCauThanhToan` `SuKienThanhToan` `ThongBao` `Logs` |
@@ -89,7 +89,7 @@ flowchart LR
 
 | Bảng | Kiểu | Tiêu chí phân mảnh | Vị trí |
 |------|------|--------------------|--------|
-| `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` | Nhân bản | – | Tất cả site đang hoạt động (ban đầu Q1, Q7, TD) |
+| `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `DanhMucBlog`, `BaiVietBlog` | Nhân bản theo schema | – | Tất cả site đang hoạt động (ban đầu Q1, Q7, TD) |
 | `HocVien` | Nguyên thủy | `ma_co_so` (cơ sở hiện tại) | Site tương ứng |
 | `GiaoVien` | Nguyên thủy | `ma_co_so` (cơ sở công tác) | Site tương ứng |
 | `NhanVien` | Nguyên thủy | `ma_co_so` | Site tương ứng |
@@ -140,6 +140,7 @@ Sơ đồ dưới đây thể hiện các liên kết nghiệp vụ chính giữ
 ```mermaid
 flowchart LR
     MonHoc["Môn học"] -->|gồm các khóa học| KhoaHoc["Khóa học"]
+    DanhMucBlog["Danh mục Blog"] -->|phân loại| BaiVietBlog["Bài viết Blog"]
     KhoaHoc -->|được mở thành các lớp| LopHoc["Lớp học"]
     LopHoc -->|phát sinh các lượt đăng ký| DangKy["Đăng ký"]
     DangKy -->|có một khoản| HocPhi["Học phí"]
@@ -211,6 +212,26 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | `thoi_luong_so` | `DECIMAL(7,2)`, nullable | Số tháng (cho phép tối đa 2 chữ số thập phân, ví dụ 3,5) hoặc số ngày nguyên |
 | `thoi_luong_don_vi` | `VARCHAR(10)`, nullable | `thang` hoặc `ngay`; nếu là ngày thì số lượng phải nguyên |
 | `hoc_phi_chuan` | | Số tiền |
+
+**`DanhMucBlog` và `BaiVietBlog`**
+
+Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tables.sql` tạo cấu trúc và nạp ba bài mẫu ban đầu giống nhau; đây là seed khởi tạo, không phải writer replication runtime hoặc bằng chứng YC-03. API hiện chỉ đọc và đối chiếu các bản qua `GLOBAL`; chưa có endpoint quản trị ghi Blog. Nếu sau này thêm ghi/sửa/xóa, phải thống nhất và triển khai cơ chế đồng bộ tới mọi site hoạt động.
+
+| Bảng/cột | Ràng buộc | Mô tả |
+|-----|-----------|-------|
+| `DanhMucBlog.ma_danh_muc_blog` | PK, `BIGINT IDENTITY` | Khóa nội bộ riêng của từng database |
+| `DanhMucBlog.slug` | UQ, `VARCHAR(120)` | Slug danh mục ổn định để trả qua API |
+| `DanhMucBlog.ten_danh_muc` | `NVARCHAR(100)` | Tên danh mục công khai |
+| `DanhMucBlog.mo_ta` | `NVARCHAR(500)`, nullable | Mô tả ngắn |
+| `DanhMucBlog.trang_thai` | `hoat_dong` / `ngung` | Chỉ danh mục hoạt động được trả ra |
+| `BaiVietBlog.ma_bai_viet_blog` | PK, `BIGINT IDENTITY` | Khóa nội bộ riêng của từng database |
+| `BaiVietBlog.ma_danh_muc_blog` | FK → `DanhMucBlog` | Chỉ tham chiếu trong cùng database site |
+| `BaiVietBlog.slug` | UQ, `VARCHAR(160)` | Slug duy nhất trong từng bản sao; API đối chiếu slug trên mọi site |
+| `BaiVietBlog.tieu_de`, `tom_tat` | `NVARCHAR(200)`, `NVARCHAR(500)` | Tiêu đề và mô tả công khai |
+| `BaiVietBlog.noi_dung` | `NVARCHAR(MAX)` | Nội dung văn bản thường, không render như HTML |
+| `BaiVietBlog.so_phut_doc` | `SMALLINT`, 1–240 | Thời lượng đọc ước tính |
+| `BaiVietBlog.trang_thai` | `nhap` / `da_xuat_ban` / `an` | API chỉ đọc bài đã xuất bản và tới thời điểm xuất bản |
+| `BaiVietBlog.ngay_xuat_ban_utc` | `DATETIME2(0)`, nullable | `NULL` nghĩa là bài đã xuất bản ngay; thời điểm tương lai được ẩn đến hạn |
 
 ### 6.2. Tài khoản và phương thức đăng nhập (nhân bản, dùng chung các vai trò)
 

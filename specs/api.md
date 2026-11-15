@@ -194,6 +194,8 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 |---|---|---|---|
 | `GET /api/v1/public/sites` | Khách chưa đăng nhập | Đề xuất, chưa có route tương ứng trong source | Nếu nhóm cần API danh sách cơ sở công khai, phải bổ sung route theo schema; không giả định endpoint đang chạy |
 | `GET /api/v1/courses/` | Khách chưa đăng nhập | `GLOBAL` đọc từng CSDL site riêng | Đọc danh mục `KhoaHoc`/`MonHoc` và số lớp đang mở theo site; trả `scope`, `complete`, `site_codes`, `missing_sites`, `inconsistent_sites`, `count`, `results`; nếu thiếu site, kết quả đánh dấu chưa đầy đủ |
+| `GET /api/v1/blog/categories/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu các bản Blog ở từng site | Đọc `DanhMucBlog`/`BaiVietBlog`; trả danh mục hoạt động, `post_count`, `complete`, `missing_sites`, `inconsistent_sites`; `503` nếu không đọc được site nào |
+| `GET /api/v1/blog/{slug}/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu bài theo slug ở từng site | Chỉ trả bài đã xuất bản nếu các bản khớp; `404` nếu không có, `409` nếu lệch, `503` nếu thiếu site |
 | `GET /api/v1/courses/{course_slug}/classes/` | Khách chưa đăng nhập | Route hiện có; truy vấn theo phạm vi API | Đọc lớp công khai của khóa học; đối chiếu status/missing site theo response hiện tại trước khi dùng như hợp đồng |
 | `POST /api/v1/auth/login/` | Tài khoản có trong source | `GLOBAL` tra cứu tài khoản nhân bản, xác thực ở Django | Route đã có trong source. Nhận tên đăng nhập/mật khẩu; trả cookie phiên và user context, không trả hash mật khẩu hoặc chuỗi kết nối |
 | `GET /api/v1/auth/oauth/{provider}/start/` | Học viên chưa đăng nhập hoặc đã xác thực để liên kết | Route hiện có; `provider` chỉ `google` hoặc `facebook` | Tạo state dùng một lần; callback chỉ đăng nhập tài khoản học viên đã liên kết, không tự tạo hoặc ghép theo email |
@@ -209,6 +211,15 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 | `POST /api/v1/auth/account-activations` | Người có liên kết mời hợp lệ | Đề xuất; chưa có route/schema token kích hoạt trong source | Không dùng như endpoint đang hoạt động; quy trình source hiện cấp mật khẩu khởi tạo theo cấu hình và email thông tin tài khoản |
 
 API không có endpoint đăng ký tài khoản công khai; source có `POST /api/v1/public/enrollments/` để gửi đăng ký khóa học, không phải tạo tài khoản. Admin Big tạo tài khoản nội bộ. Portal học viên có code/schema nhưng chưa được duyệt vào phạm vi đồ án; không bật public signup.
+
+### Blog công khai — route đọc đã có trong source
+
+Hai route chỉ đọc và cho phép khách chưa đăng nhập:
+
+- `GET /api/v1/blog/categories/` trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`. Mỗi danh mục có `slug`, `name`, `description`, `post_count`. `post_count` chỉ tính bài `da_xuat_ban` đã tới thời điểm xuất bản.
+- `GET /api/v1/blog/{slug}/` trả `{scope, complete, site_codes, result}`. `result` có `slug`, `title`, `excerpt`, `content` dạng văn bản thường, `reading_time_minutes`, `published_at` và `category: {slug, name}`.
+
+API đọc `DanhMucBlog` và `BaiVietBlog` từ từng CSDL site đang hoạt động qua Site Router. Migration 36 tạo cùng dữ liệu mẫu ở từng database; API so sánh kết quả trước khi trả chi tiết. Đây là khởi tạo bản sao, không phải writer replication runtime và không phải bằng chứng YC-03/TC-REP-01. Danh sách có thể trả `200` cùng `complete=false` và site thiếu/lệch; chi tiết trả `404` nếu không có slug, `409` nếu bản sao khác nhau, `503` nếu không đọc đủ site. Nội dung phải được frontend render như text đã escape. Chưa có API Admin tạo/sửa/xóa Blog.
 
 ### Đăng nhập và liên kết tài khoản Google/Facebook — đã có code, cần cấu hình môi trường
 

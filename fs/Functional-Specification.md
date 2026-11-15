@@ -168,6 +168,18 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 **Nghiệm thu:** trang công khai không yêu cầu đăng nhập; API không trả hồ sơ học viên, thông tin tài khoản hoặc dữ liệu nội bộ.
 
+### FS-BLOG-01 — Danh mục và chi tiết Blog công khai
+
+**Người dùng:** khách, người dùng chưa đăng nhập. **Phân tán:** `GLOBAL` đọc các bản `DanhMucBlog` và `BaiVietBlog` riêng tại từng site, tổng hợp/đối chiếu ở API.
+
+1. `GET /api/v1/blog/categories/` trả danh mục đang hoạt động cùng số bài đã xuất bản; chỉ tính bài đã xuất bản, không ẩn và không có ngày xuất bản trong tương lai.
+2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung văn bản, thời gian đọc, ngày xuất bản và danh mục.
+3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô.
+4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
+5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
+
+**Nghiệm thu:** danh sách và chi tiết lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện, slug được truy vấn có tham số, và lỗi site/lệch bản sao được hiển thị đúng trạng thái. API đọc Blog không bao gồm tạo/sửa/xóa CMS.
+
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
 **Người dùng:** Admin Big, Admin Small, nhân viên, giáo viên. **Phân tán:** tra cứu bản TaiKhoan nhân bản; xác thực tại API.

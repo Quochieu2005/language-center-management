@@ -92,6 +92,7 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 | `core/sites/connections.py` | Đọc cấu hình kết nối riêng từng site và chọn alias qua Site Router |
 | `core/auth/` | Đăng nhập, phiên có thể thu hồi, CSRF, idle timeout, hồ sơ, đổi/reset mật khẩu, OAuth học viên và vòng đời Admin Small |
 | `core/catalog/` | Danh mục môn/khóa học, danh sách khóa học công khai và ghi danh mục dùng chung |
+| `core/blog/` | API công khai đọc danh mục và chi tiết Blog theo slug bằng Global Query; đối chiếu bản sao từng site và báo site thiếu/lệch |
 | `core/classes/` | Phòng/lớp/buổi, đăng ký công khai và đăng ký/xếp lớp cục bộ |
 | `core/academics/` | Chuyển cơ sở, học phí/phiếu thu/kỳ đóng, nhắc phí, báo cáo, điểm danh/điểm và SePay |
 | `core/students/` | Danh sách hồ sơ, cấp tài khoản, portal đọc dữ liệu và xóa hồ sơ theo tiến trình nhiều site |
@@ -100,6 +101,8 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 | `core/media/` | Intent upload và hoàn tất ảnh đại diện Cloudinary |
 
 Các nghiệp vụ bắt buộc của đề tài đã có route/service tương ứng trong source: đăng ký khóa học, xếp lớp, chuyển cơ sở, thu học phí tại quầy, quản lý điểm và thống kê học viên theo cơ sở. Chuyển cơ sở điều phối nhiều transaction cục bộ với phục hồi tiến về phía trước sau khi đích commit; không phải ACID nguyên tử xuyên database. Cơ chế khóa/transaction đăng ký bảo vệ chỗ cuối ở một site; phải chạy hai phiên SQL Server để chứng minh TC-CON-01.
+
+Blog có hai route đọc công khai: `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`. Service đọc `DanhMucBlog`/`BaiVietBlog` ở mọi site hoạt động; không có route ghi CMS. Chạy migration 36 trên từng DB trước khi gọi API; response Blog có cờ thiếu/lệch site theo hợp đồng trong `specs/api.md`.
 
 Học viên/portal và thanh toán SePay có code cùng schema nhưng **không được hiểu là đã được nhóm duyệt vào phạm vi môn học**. SePay mặc định tắt bằng `SEPAY_ENABLED=false`; không coi tích hợp là chạy thật khi chưa cấu hình merchant/webhook và kiểm chứng trên môi trường được cấp phép.
 
