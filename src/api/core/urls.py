@@ -88,7 +88,14 @@ from core.catalog.views import (
     SharedSubjectCollectionView,
     SharedSubjectDetailView,
 )
-from core.blog.views import PublicBlogCategoriesView, PublicBlogDetailView
+from core.blog.views import (
+    AdminBlogArticleCollectionView,
+    AdminBlogArticleDetailView,
+    AdminBlogCategoryCollectionView,
+    AdminBlogCategoryDetailView,
+    PublicBlogCategoriesView,
+    PublicBlogDetailView,
+)
 from core.media.views import (
     AdminAvatarCompleteView,
     AdminAvatarUploadIntentView,
@@ -142,6 +149,10 @@ urlpatterns = [
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
     path("blog/categories/", PublicBlogCategoriesView.as_view(), name="public-blog-categories"),
     path("blog/<slug:slug>/", PublicBlogDetailView.as_view(), name="public-blog-detail"),
+    path("admin/blog/categories/", AdminBlogCategoryCollectionView.as_view(), name="admin-blog-categories"),
+    path("admin/blog/categories/<slug:slug>/", AdminBlogCategoryDetailView.as_view(), name="admin-blog-category-detail"),
+    path("admin/blog/articles/", AdminBlogArticleCollectionView.as_view(), name="admin-blog-articles"),
+    path("admin/blog/articles/<slug:slug>/", AdminBlogArticleDetailView.as_view(), name="admin-blog-article-detail"),
     path("courses/<str:course_slug>/classes/", PublicCourseClassListView.as_view(), name="public-course-classes"),
     path("public/enrollments/", PublicEnrollmentCreateView.as_view(), name="public-enrollment-create"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),

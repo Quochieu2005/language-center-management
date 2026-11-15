@@ -215,7 +215,7 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 
 **`DanhMucBlog` và `BaiVietBlog`**
 
-Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tables.sql` tạo cấu trúc và nạp ba bài mẫu ban đầu giống nhau; đây là seed khởi tạo, không phải writer replication runtime hoặc bằng chứng YC-03. API hiện chỉ đọc và đối chiếu các bản qua `GLOBAL`; chưa có endpoint quản trị ghi Blog. Nếu sau này thêm ghi/sửa/xóa, phải thống nhất và triển khai cơ chế đồng bộ tới mọi site hoạt động.
+Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tables.sql` tạo cấu trúc và nạp ba bài mẫu ban đầu giống nhau; seed không phải bằng chứng replication runtime. API public đọc/đối chiếu qua `GLOBAL`; CMS Admin Big ghi qua Coordinator theo `REPLICATED-WRITE`. Mỗi site dùng transaction cục bộ; `Logs` lưu ACK và ảnh chụp trước/sau để retry an toàn. Không có transaction ACID nguyên tử xuyên database. Slug là khóa định danh liên site; khóa `IDENTITY` chỉ có ý nghĩa trong database cục bộ và không được gửi sang site khác.
 
 | Bảng/cột | Ràng buộc | Mô tả |
 |-----|-----------|-------|
