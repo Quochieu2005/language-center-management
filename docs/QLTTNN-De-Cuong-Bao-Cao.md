@@ -289,7 +289,7 @@ Theo README, đây là kiến trúc **Client/Server có Coordinator**: máy tr�
 
 #### Publication/Replication và tránh hai cơ chế ghi
 
-Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. Đồ án hiện chọn replication tầng ứng dụng cho `MonHoc`: Admin Big gửi một yêu cầu, Coordinator cập nhật từng CSDL site riêng và ghi ACK `Logs` trong cùng transaction cục bộ. Chưa bật SQL Server Publication; không cấu hình hai cơ chế ghi trùng cùng bảng. Nếu nhóm mở rộng sang Publication hoặc bảng dùng chung khác, phải chốt publisher/distributor/subscriber, article, hướng đồng bộ, lịch/độ trễ và xử lý xung đột trước khi triển khai.
+Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. YC-03 chọn replication tầng ứng dụng cho `MonHoc` làm phương pháp tối thiểu: Admin Big gửi một yêu cầu, Coordinator cập nhật từng CSDL site riêng và ghi ACK `Logs` trong cùng transaction cục bộ. Source cũng có service ghi `KhoaHoc`, nhưng không cần mở rộng phạm vi YC-03 để chứng minh mức tối thiểu. Chưa bật SQL Server Publication; không cấu hình hai cơ chế ghi trùng cùng bảng. Nếu nhóm mở rộng sang Publication hoặc bảng dùng chung khác, phải chốt publisher/distributor/subscriber, article, hướng đồng bộ, lịch/độ trễ và xử lý xung đột trước khi triển khai.
 
 README hiện yêu cầu ghi đồng bộ vào mọi site hoạt động và từ chối nếu thiếu site. Cơ chế Publication mặc định của môi trường cần được kiểm tra có đạt được hợp đồng này không; báo cáo phải mô tả cấu hình và kết quả thực đo, không chỉ chụp wizard đã tạo.
 

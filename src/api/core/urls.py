@@ -88,6 +88,7 @@ from core.catalog.views import (
     SharedSubjectCollectionView,
     SharedSubjectDetailView,
 )
+from core.blog.views import PublicBlogCategoriesView, PublicBlogDetailView
 from core.media.views import (
     AdminAvatarCompleteView,
     AdminAvatarUploadIntentView,
@@ -139,6 +140,8 @@ urlpatterns = [
     path("admin/courses/", SharedCourseCollectionView.as_view(), name="admin-course-create"),
     path("admin/courses/<str:slug>/", SharedCourseDetailView.as_view(), name="admin-course-detail"),
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
+    path("blog/categories/", PublicBlogCategoriesView.as_view(), name="public-blog-categories"),
+    path("blog/<slug:slug>/", PublicBlogDetailView.as_view(), name="public-blog-detail"),
     path("courses/<str:course_slug>/classes/", PublicCourseClassListView.as_view(), name="public-course-classes"),
     path("public/enrollments/", PublicEnrollmentCreateView.as_view(), name="public-enrollment-create"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),

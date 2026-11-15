@@ -140,8 +140,8 @@ class AuthLoginView(APIView):
         tags=["Xác thực"],
         summary="Đăng nhập theo vai trò đã cấp",
         description=(
-            "Xác minh tài khoản đã được cấp trong TaiKhoan và tự xác định vai trò từ hồ sơ "
-            "NhanVien, GiaoVien hoặc HocVien. Hỗ trợ Admin Big, Admin Small, lễ tân, tư vấn, "
+            "Xác minh tài khoản đã được cấp trong TaiKhoan và tự xác định vai trò từ tài khoản "
+            "cùng hồ sơ Admin, NhanVien, GiaoVien hoặc HocVien tương ứng. Hỗ trợ Admin Big, Admin Small, lễ tân, tư vấn, "
             "kế toán, nhân viên xếp lớp, giáo viên và học viên; không nhận vai trò hoặc cơ sở từ client. Hồ sơ học viên được "
             "định vị bằng Global Query trên các site đang hoạt động; chỉ đăng nhập khi tìm thấy "
             "đúng một hồ sơ hiện hành. "
@@ -303,9 +303,9 @@ class AdminSmallCreateView(APIView):
         tags=["Quản lý tài khoản"],
         summary="Admin Big tạo Admin Small cho một cơ sở",
         description=(
-            "Chỉ Admin Big được gọi. API tạo tài khoản nhan_vien với hồ sơ NhanVien có "
-            "chuc_vu=quan_ly_co_so tại cơ sở được chọn; vai trò hiệu lực là admin_small. "
-            "TaiKhoan được nhân bản tới mọi site đang hoạt động; hồ sơ nhân viên chỉ nằm "
+            "Chỉ Admin Big được gọi. API tạo TaiKhoan có vai_tro=nhan_vien và hồ sơ "
+            "Admin.loai_admin=admin_small tại cơ sở được chọn; không tạo hồ sơ NhanVien. "
+            "TaiKhoan được nhân bản tới mọi site đang hoạt động; hồ sơ Admin chỉ nằm "
             "ở site được giao. API chỉ tạo tài khoản; Admin Big chủ động bấm API gửi mật khẩu tạm "
             "một lần. Tài khoản bắt buộc đổi mật khẩu sau đăng nhập đầu tiên và mật khẩu không "
             "được trả trong response. "

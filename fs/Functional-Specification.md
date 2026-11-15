@@ -6,7 +6,7 @@
 
 **Phiên bản:** 1.0
 
-**Trạng thái:** Bản đặc tả nền để nhóm triển khai và nghiệm thu; các chức năng nghiệp vụ chưa được xác nhận là đã có trong source.
+**Trạng thái:** Tài liệu yêu cầu và tiêu chí nghiệm thu. Code hiện có nhiều luồng nghiệp vụ; phạm vi source, tình trạng vận hành và bằng chứng môn học được phân biệt trong [ma trận trạng thái triển khai](../docs/Trang-Thai-Trien-Khai.md).
 
 ## 1. Mục đích và người đọc
 
@@ -49,8 +49,7 @@ Danh sách site không được đóng cứng trong code. Khi có thêm cơ sở
 
 ### 2.2. Ngoài phạm vi hiện được chốt
 
-- Tài khoản/portal để học viên tự đăng nhập, tự đăng ký hoặc tự thanh toán. Chỉ đưa vào sau khi nhóm duyệt và cập nhật đồng bộ schema, API, UI và FS.
-- Một nhà cung cấp thanh toán trực tuyến cụ thể. Chưa chốt cổng, thông tin merchant, webhook và quy trình đối soát thực tế.
+- Portal/tài khoản học viên và thanh toán online chưa được duyệt vào phạm vi môn học. Source hiện có portal và tích hợp SePay; không bật/công nhận phạm vi nghiệp vụ này trước khi nhóm thống nhất và cập nhật các tài liệu liên quan.
 - Khẳng định transaction ACID nguyên tử xuyên hai SQL Server độc lập cho chuyển cơ sở. Thiết kế hiện tại là điều phối có trạng thái, idempotency và phục hồi tiến về phía trước.
 - Xóa cứng học viên, phiếu thu, điểm, điểm danh hoặc lịch sử nghiệp vụ đã phát sinh.
 
@@ -92,12 +91,12 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 
 | Vai trò | Biểu diễn theo schema hiện tại | Phạm vi |
 |---|---|---|
-| Admin Big | TaiKhoan.vai_tro=admin, ma_co_so=NULL | Toàn hệ thống |
-| Admin Small | TaiKhoan.vai_tro=nhan_vien, ma_co_so là site được giao; NhanVien.chuc_vu=quan_ly_co_so | Một site được giao |
+| Admin Big | `TaiKhoan.vai_tro=admin_big`, `ma_co_so=NULL` | Toàn hệ thống |
+| Admin Small | `TaiKhoan.vai_tro=nhan_vien`, hồ sơ `Admin.loai_admin=admin_small`, có site được giao | Một site được giao |
 | Lễ tân | Tài khoản nhân viên, chức vụ lễ tân | Hồ sơ, đăng ký và xếp lớp tại site |
 | Kế toán | Tài khoản nhân viên, chức vụ kế toán | Công nợ, thu/hoàn và phiếu thu tại site |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
-| Học viên | Chưa có tài khoản/portal trong phạm vi đã chốt | Không đăng nhập trực tiếp |
+| Học viên | Schema/API/UI có tài khoản và portal; chưa được duyệt vào phạm vi đã chốt | Chỉ mở cho đồ án sau khi nhóm thống nhất phạm vi |
 | Khách | Chưa xác thực | Chỉ xem nội dung công khai được phép |
 
 ### 4.1. Ma trận quyền chức năng
@@ -124,7 +123,7 @@ Không dùng vai trò do client gửi để cấp quyền. Không cho Admin Smal
 - Kiểm tra kiểu, độ dài, miền giá trị, quan hệ giữa trường, trạng thái bản ghi và quyền sở hữu/site tại API. Validation ở giao diện không thay thế validation server.
 - Mật khẩu lưu bằng hash bcrypt qua cấu hình Django phù hợp; không lưu/ghi log mật khẩu gốc, hash, token, cookie, khóa ký hay secret.
 - Phản hồi login, đăng ký và quên mật khẩu không tiết lộ tài khoản/email có tồn tại. Áp dụng rate limit theo IP và định danh; trả 429 cùng Retry-After.
-- Ảnh nhị phân chỉ được đưa lên Cloudinary; không commit ảnh tải lên vào source hoặc thư mục media. Chỉ bật upload sau khi schema có metadata và API kiểm tra quyền, MIME thực tế, dung lượng và chữ ký upload.
+- Ảnh nhị phân chỉ được đưa lên Cloudinary; không commit ảnh tải lên vào source hoặc thư mục media. Source có upload ảnh đại diện và metadata tài khoản; chưa có MediaAsset tổng quát hoặc bằng chứng upload thật.
 - Lỗi API không trả SQL, stack trace, connection string hoặc secret. Có mã request để truy vết.
 
 ### 5.2. Thời gian, tiền và định dạng
@@ -157,7 +156,7 @@ API phân trang ở server (mặc định 25 dòng, tối đa 100 theo API spec)
 
 ## 6. Yêu cầu chức năng
 
-Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, chưa triển khai**, trừ khi một mục ghi rõ khác. Theo trạng thái hiện tại của API project README, chỉ endpoint liveness đang hoạt động; chưa có endpoint nghiệp vụ.
+Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không khẳng định đã triển khai. Đối chiếu trạng thái source và bằng chứng hiện có theo [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md); route hoặc unit test không thay thế TC phân tán chạy trên SQL Server.
 
 ### FS-PUB-01 — Xem nội dung công khai
 
@@ -168,6 +167,18 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 3. Nếu một nguồn dữ liệu công khai lỗi, giao diện hiển thị trạng thái lỗi có thể thử lại, không giả lập dữ liệu thành công.
 
 **Nghiệm thu:** trang công khai không yêu cầu đăng nhập; API không trả hồ sơ học viên, thông tin tài khoản hoặc dữ liệu nội bộ.
+
+### FS-BLOG-01 — Danh mục và chi tiết Blog công khai
+
+**Người dùng:** khách, người dùng chưa đăng nhập. **Phân tán:** `GLOBAL` đọc các bản `DanhMucBlog` và `BaiVietBlog` riêng tại từng site, tổng hợp/đối chiếu ở API.
+
+1. `GET /api/v1/blog/categories/` trả danh mục đang hoạt động cùng số bài đã xuất bản; chỉ tính bài đã xuất bản, không ẩn và không có ngày xuất bản trong tương lai.
+2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung văn bản, thời gian đọc, ngày xuất bản và danh mục.
+3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô.
+4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
+5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
+
+**Nghiệm thu:** danh sách và chi tiết lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện, slug được truy vấn có tham số, và lỗi site/lệch bản sao được hiển thị đúng trạng thái. API đọc Blog không bao gồm tạo/sửa/xóa CMS.
 
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
@@ -187,7 +198,7 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 ### FS-AUTH-02 — Đăng nhập Google/Facebook
 
-**Trạng thái:** đề xuất chưa bật. **Phân tán:** Global đọc các bản TaiKhoan riêng để đối chiếu `google_subject` hoặc `facebook_subject`; liên kết/thu hồi cập nhật cột subject trên TaiKhoan bằng Replicated-Write.
+**Trạng thái source:** Có route OAuth start/callback và code liên kết subject cho tài khoản học viên. Tích hợp provider thật chưa được kiểm chứng; tài khoản/portal học viên chưa được duyệt phạm vi. **Phân tán:** Global đọc các bản `TaiKhoan`; liên kết/thu hồi cập nhật subject theo luồng nhân bản.
 
 1. Người dùng chọn Google hoặc Facebook.
 2. Backend tạo state/nonce chống CSRF/replay và khởi tạo OAuth Authorization Code flow.
@@ -197,26 +208,26 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 **Nghiệm thu:** callback lỗi/state không hợp lệ bị từ chối; access/refresh token của provider không lưu vào TaiKhoan hoặc Logs; một provider subject không thể gắn hai tài khoản.
 
-**Điều kiện mở chức năng:** cấu hình OAuth thật, HTTPS callback, quản lý session/revoke, chạy migration `27_move_oauth_identity_to_account.sql` ở mọi CSDL cũ và kiểm thử provider. API hiện chưa triển khai endpoint OAuth.
+**Điều kiện nghiệm thu:** cấu hình OAuth thật và HTTPS callback, áp dụng migration `27_move_oauth_identity_to_account.sql` cho database cũ, kiểm thử provider và quyết định phạm vi portal học viên. Có code/route không chứng minh provider đã hoạt động.
 
 ### FS-AUTH-03 — Quên và đặt lại mật khẩu
 
-**Người dùng:** tài khoản nội bộ. **Phân tán:** yêu cầu tìm tài khoản qua site; token cục bộ; đổi TaiKhoan bằng Replicated-Write.
+**Người dùng:** Admin Big/Admin Small theo source hiện tại. **Phân tán:** tra cứu tài khoản trên các site; OTP/ledger lưu ở database kỹ thuật được cấu hình; mật khẩu được cập nhật tới các bản `TaiKhoan`.
 
 1. Người dùng gửi email/định danh đã đăng ký.
-2. API luôn trả thông báo chung; nếu có tài khoản, tạo token ngẫu nhiên một lần, lưu hash và hạn dùng 15 phút tại site chịu trách nhiệm, rồi gửi liên kết qua SMTP.
-3. Người dùng mở liên kết, nhập mật khẩu mới; API kiểm tra token, hạn, trạng thái và chính sách mật khẩu.
+2. API luôn trả thông báo chung; với tài khoản đủ điều kiện, tạo OTP 6 số một lần, lưu hash và hạn dùng theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây), rồi gửi qua SMTP.
+3. Người dùng gửi OTP và mật khẩu mới; API kiểm tra mã, hạn, số lần sai, trạng thái và chính sách mật khẩu.
 4. API cập nhật hash bcrypt tới tất cả site hoạt động bằng service đồng bộ chung, đánh dấu token đã dùng và thu hồi phiên cũ.
 
 **Lỗi:** token sai/hết hạn/đã dùng không đổi mật khẩu; nếu replicated write chưa hoàn tất thì không báo thành công và lưu trạng thái để đối soát; giới hạn spam theo IP/email.
 
 **Nghiệm thu:** token thô chỉ xuất hiện trong liên kết gửi người dùng, không lưu/log; cùng một token chỉ dùng một lần; email không tiết lộ account existence.
 
-**Điều kiện mở chức năng:** SMTP settings hiện có nhưng API gửi thư và endpoint reset chưa triển khai. Kiểm thử gửi thật cần tài khoản SMTP cục bộ, không ghi secret vào repo.
+**Trạng thái source:** Có endpoint reset, bảng OTP/event và ledger phục hồi mật khẩu; luồng hiện áp dụng cho Admin Big/Admin Small. Cần xác nhận SMTP và kiểm tra end-to-end ở môi trường nhóm; secret không được ghi vào repo.
 
 ### FS-AUTH-04 — Tự đăng xuất sau 1 giờ không hoạt động
 
-**Người dùng:** mọi tài khoản nội bộ đã đăng nhập: Admin Big, Admin Small, nhân viên, giáo viên; áp dụng cho tài khoản học viên nếu phạm vi tài khoản học viên được duyệt sau này. **Phân tán:** phiên xác thực là trạng thái kỹ thuật có thể thu hồi; việc đặt nơi lưu phải tuân theo kiến trúc CSDL riêng từng site, không tạo CSDL nghiệp vụ trung tâm.
+**Người dùng:** mọi tài khoản nội bộ đã đăng nhập: Admin Big, Admin Small, nhân viên, giáo viên. **Phân tán:** phiên là trạng thái kỹ thuật có thể thu hồi được lưu ở database site cấu hình `AUTH_SESSION_SITE_CODE`, không phải database nghiệp vụ trung tâm.
 
 **Quy tắc:**
 
@@ -226,9 +237,9 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 4. Frontend đồng bộ hoạt động giữa các tab cùng phiên. Có thể cảnh báo ở phút 55; nút “Tiếp tục phiên” phải được API xác nhận và không được dùng để hồi sinh phiên đã hết hạn.
 5. Logout thủ công, khóa/vô hiệu tài khoản hoặc reset mật khẩu phải thu hồi phiên theo chính sách bảo mật; không ghi cookie/token vào log.
 
-**Nghiệm thu:** phiên còn hiệu lực tại 59:59 nếu có hoạt động; sau 60:00 không hoạt động thì không truy cập được API và giao diện trở về đăng nhập; hoạt động thật đặt lại hạn; polling nền không đặt lại; reload/tab ngủ không vượt hạn; test riêng Admin Big, Admin Small và giáo viên cho cùng kết quả. Nơi lưu trạng thái phiên phải được chốt và cập nhật schema/migration trước khi triển khai.
+**Nghiệm thu:** phiên còn hiệu lực tại 59:59 nếu có hoạt động; sau 60:00 không hoạt động thì không truy cập được API và giao diện trở về đăng nhập; hoạt động thật đặt lại hạn; polling nền không đặt lại; reload/tab ngủ không vượt hạn; test riêng Admin Big, Admin Small và giáo viên cho cùng kết quả. Schema/API lưu phiên đã có; cần kiểm chứng timeout và đồng bộ tab trên frontend.
 
-**Trạng thái hiện tại:** chưa triển khai vì API chưa có đăng nhập, logout hoặc session backend. Yêu cầu này là tiêu chí bắt buộc cho FS-AUTH-01/02 khi xây dựng xác thực, không phải xác nhận tính năng đang chạy.
+**Trạng thái source:** API có cookie session, thu hồi phiên và idle timeout; kiểm chứng tích hợp frontend, nhiều tab và runtime vẫn phải ghi riêng.
 
 ### FS-ACC-01 — Tạo và phân công tài khoản nội bộ
 
@@ -237,14 +248,14 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 1. Admin Big nhập thông tin nhân sự, vai trò nội bộ, site, chức vụ và trạng thái dự kiến.
 2. API kiểm tra site hoạt động, chức vụ hợp lệ, email/tên đăng nhập duy nhất toàn hệ thống và quyền Admin Big.
 3. API tạo định danh tài khoản một lần, bản sao TaiKhoan theo chính sách nhân bản và hồ sơ nhân sự tại site được phân công.
-4. Sau khi hoàn tất, gửi liên kết kích hoạt/đặt mật khẩu dùng một lần; không tự đặt mật khẩu gửi qua email.
+4. Cấp mật khẩu khởi tạo theo cấu hình backend, lưu hash và gửi thông tin tài khoản qua luồng email có thể retry; buộc đổi mật khẩu theo chính sách hiện có. Không gửi mật khẩu dạng rõ qua log hoặc response API.
 5. Nếu một bước nhiều site lỗi, ghi tiến trình; không cho đăng nhập bằng tài khoản mới ở trạng thái tạo dở; có thao tác retry/đối soát hoặc vô hiệu hóa an toàn.
 
-**Quy tắc vai trò:** Admin Big dùng admin và không có site; Admin Small là nhân viên chức vụ quan_ly_co_so và chỉ một site; giáo viên dùng vai trò giao_vien và liên kết hồ sơ GiaoVien.
+**Quy tắc vai trò:** Admin Big dùng `admin_big` và không có site; Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin=admin_small`; nhân viên có hồ sơ `NhanVien` và chức vụ nghiệp vụ; giáo viên dùng `giao_vien` và liên kết hồ sơ `GiaoVien`.
 
 **Nghiệm thu:** trùng username/email bị chặn toàn hệ thống; nhân viên/giáo viên không thể đổi site qua client; thao tác tạo dở không tạo tài khoản hoạt động một phần.
 
-**Điều kiện mở chức năng:** schema hiện có TaiKhoan nhưng chưa có luồng tạo tài khoản/invitation ledger và trạng thái kích hoạt đủ dùng. Cập nhật schema/API trước khi triển khai.
+**Trạng thái source:** Có API tạo Admin Small/giáo viên, nhân bản tài khoản, hồ sơ site và cấp email thông tin đăng nhập; giao dịch email thật và lỗi nhiều site cần kiểm chứng. Source không dùng luồng token kích hoạt được mô tả trước đây.
 
 ### FS-ACC-02 — Xóa vĩnh viễn Admin Small
 
@@ -377,9 +388,9 @@ Trạng thái của mọi yêu cầu trong bảng dưới là **đặc tả, ch�
 
 ### FS-PAY-01 — Thanh toán trực tuyến học phí
 
-**Trạng thái:** yêu cầu tương lai, chưa thể triển khai/ nghiệm thu end-to-end vì chưa chọn nhà cung cấp và schema chưa có bảng lần thanh toán/sự kiện/idempotency. **Kiểu dự kiến:** khởi tạo/cập nhật Local ở site chứa HocPhi; callback được xác thực rồi commit tại đúng site.
+**Trạng thái phạm vi:** Có code/schema/API cho SePay, nhưng portal học viên và thanh toán online chưa được nhóm duyệt vào phạm vi đồ án; `SEPAY_ENABLED=false` mặc định và chưa có bằng chứng giao dịch thật. **Kiểu:** `LOCAL` tại site chứa `HocPhi`; không phải giao dịch xuyên site.
 
-Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng phải đáp ứng:
+Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 1. API lấy site, số tiền, loại tiền, chủ khoản nợ từ HocPhi; frontend không được quyết định giá trị này.
 2. Tạo YeuCauThanhToan bền vững cùng idempotency key trước khi chuyển người dùng đến cổng. Một HocPhi chỉ có tối đa một yêu cầu còn mở theo trạng thái được chốt.
@@ -389,7 +400,7 @@ Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng ph�
 6. Timeout hoặc DB lỗi khi kết quả cổng chưa rõ chuyển sang can_doi_soat; chặn tạo lượt mới cho đến khi đối soát/retry có kết quả rõ.
 7. Hoàn online là bút toán bù trừ tham chiếu giao dịch gốc. Không lưu PAN/CVV, secret, token provider hoặc payload thô.
 
-**Điều kiện nghiệm thu trước khi bật:** chốt provider/merchant; thêm YeuCauThanhToan, SuKienThanhToan, liên kết idempotency với PhieuThu tại từng CSDL site; cập nhật schema/script/API/UI; kiểm thử webhook đúng/sai chữ ký, phát lại, reload, thoát giữa chừng, timeout, lỗi database và refund.
+**Điều kiện nghiệm thu trước khi bật:** cấu hình merchant/webhook và HTTPS; đối chiếu schema hiện có `YeuCauThanhToan`/`SuKienThanhToan`; kiểm thử webhook đúng/sai chữ ký, phát lại, reload, thoát giữa chừng, timeout, lỗi database và refund. Không coi schema hoặc code là bằng chứng giao dịch đã chạy.
 
 ### FS-GRADE-01 — Nhập, sửa và xem điểm
 
@@ -431,14 +442,14 @@ Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng ph�
 
 ### FS-TRF-03 — Thực hiện và phục hồi giao dịch chuyển
 
-**Người dùng:** Coordinator/worker được ủy quyền; không phải thao tác tự do của Admin Small. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien tại đích; LichSuChuyenCoSo tại site phát sinh.
+**Người dùng:** Coordinator chạy sau khi Admin Big duyệt; Admin Big được gọi route retry cho giao dịch chưa hoàn tất. Đây không phải thao tác tự do của Admin Small. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien tại đích; LichSuChuyenCoSo tại site phát sinh.
 
 1. Coordinator chỉ nhận giao dịch đã duyệt. Tải trạng thái nguồn, khóa chống lặp và bước cuối đã commit.
 2. Tạo hồ sơ HocVien cùng mã ở đích trong transaction đích; ghi sự kiện tao_ho_so_dich. Bản đích phải duy nhất theo mã và ma_chuyen.
 3. Sau khi xác nhận đích commit, lưu bước da_tao_ho_so_dich tại nguồn.
 4. Cập nhật nguồn: HocVien thành da_chuyen_di; đóng/đánh dấu các DangKy cũ theo trạng thái chuyen_di; cập nhật bước da_cap_nhat_nguon và ghi sự kiện.
 5. Đối soát hai site; đánh dấu giao dịch hoan_tat và ghi sự kiện kết thúc. Bản nguồn được giữ lại làm lịch sử.
-6. Worker có thể chạy lại an toàn. Nếu đích chưa commit, nguồn vẫn là bản hiện hành; nếu đích đã commit, phải tiếp tục tiến về phía trước, không xóa đích.
+6. Coordinator/retry có thể chạy lại an toàn. Nếu đích chưa commit, nguồn vẫn là bản hiện hành; nếu đích đã commit, phải tiếp tục tiến về phía trước, không xóa đích. Source hiện có route retry của Admin Big; lịch chạy tự động chưa được xác nhận.
 
 | Điểm dừng/ lỗi | Hành vi bắt buộc |
 |---|---|
@@ -466,7 +477,7 @@ Khi được nhóm duyệt nhà cung cấp và cập nhật schema, luồng ph�
 
 **Người dùng:** hệ thống ghi tự động; Admin Big đọc toàn cục, Admin Small đọc site được giao theo chính sách. **Kiểu:** Local theo site phát sinh; Global khi Admin Big xem nhiều site.
 
-`Logs` lưu audit và ACK đồng bộ theo site; luồng replication `MonHoc` hiện ghi ACK thành công tại từng DB cùng transaction cập nhật bản sao. Các luồng dùng chung khác chưa được bao phủ đầy đủ. Nhật ký chuyển nằm ở `LichSuChuyenCoSo` và chỉ append-only.
+`Logs` lưu audit và ACK đồng bộ theo site; source có luồng replication cho `MonHoc` (được chọn làm YC-03 tối thiểu) và service riêng cho `KhoaHoc`, ghi ACK cùng transaction cập nhật từng bản sao. `CoSo` chưa có fan-out runtime đầy đủ và các luồng `TaiKhoan` chưa gom về một writer chung. Các cơ chế cần TC-REP-01/TC-SYNC-01 chạy thật; nhật ký chuyển nằm ở `LichSuChuyenCoSo` và chỉ append-only.
 
 Không ghi password/hash, token, cookie, header xác thực, secret Cloudinary/SMTP/OAuth/SQL, PAN/CVV hay payload thanh toán thô. Không trả nội dung nội bộ trong lỗi API.
 
@@ -482,18 +493,6 @@ Mỗi site ghi `ThongBao` và audit `Logs` trong transaction cục bộ. Bắt b
 
 **Nghiệm thu:** người không phải Admin nhận 403; Admin Small chỉ tạo ở site của mình; Admin Big phát tới toàn bộ site hoạt động; nội dung sai/đường dẫn ngoài admin bị từ chối; gửi lại cùng key không tạo trùng, đổi body với key cũ nhận 409; khi một site lỗi, response liệt kê site thiếu và retry cùng request hoàn tất mà không nhân đôi các site đã ghi.
 
-### FS-NOTIF-01 — Admin tạo thông báo quản trị
-
-**Người dùng:** Admin Big và Admin Small. **Bảng hiện có:** `ThongBao`, `Logs` trên các CSDL site; không thêm database hoặc bảng mới.
-
-1. Admin Big có thể tạo thông báo cho Admin Big, Admin Small hoặc cả hai. Coordinator ghi cùng nội dung tới từng site đang hoạt động theo chính sách `REPLICATED-WRITE`; Admin Big không ghi vào một CSDL tổng hợp.
-2. Admin Small chỉ tạo thông báo tại cơ sở được gán (`LOCAL`), cho Admin Small hoặc cả hai nhóm admin. Không được gửi thông báo riêng cho Admin Big hay chọn site khác.
-3. Thông báo có tiêu đề, nội dung, nhóm, mức độ, nhóm nhận và đường dẫn nội bộ tùy chọn. Không chấp nhận đường dẫn ngoài khu vực `/admin/`.
-4. Mỗi yêu cầu ghi cần `Idempotency-Key`. Gửi lại cùng key và cùng nội dung không tạo bản ghi trùng; dùng lại key với nội dung khác bị từ chối. Nếu chỉ một số site nhận được, API trả danh sách site thiếu; Admin Big có thể gửi lại cùng nội dung/key để hoàn tất.
-5. Mỗi site ghi `ThongBao` và nhật ký `Logs` trong transaction cục bộ. Các site không cùng một transaction ACID; khi thiếu site không báo hoàn tất toàn phần.
-
-**Nghiệm thu:** Admin Small không thể ghi ngoài site hoặc nhắm Admin Big; Admin Big ghi được tới site hoạt động; site lỗi được báo rõ; retry không nhân đôi thông báo; không thêm bảng/database.
-
 ## 7. Quy tắc trạng thái nghiệp vụ
 
 Tên trạng thái cuối cùng phải khớp check constraint trong schema. Bảng dưới tóm tắt hành vi dự kiến, không thay thế enum/ràng buộc chính thức.
@@ -506,7 +505,7 @@ Tên trạng thái cuối cùng phải khớp check constraint trong schema. B�
 | Đăng ký | da_dang_ky, dang_hoc, hoan_thanh, huy, chuyen_di | Không coi đăng ký đã hủy/chuyển/hoàn thành là đăng ký đang hoạt động. |
 | Học phí | chua_dong, dong_mot_phan, da_dong, hoan_tien | Trạng thái suy ra từ phải thu, tổng thu và hoàn theo quy tắc kế toán. |
 | Đề nghị chuyển | cho_duyet, tu_choi, dang_xu_ly, hoan_tat/that_bai theo schema | Chỉ cho_duyet chờ quyết định; chỉ đã duyệt mới chạy chuyển; lịch sử quyết định được giữ lại. |
-| Giao dịch thanh toán trực tuyến | trạng thái chưa chốt trong schema | Không triển khai production trước khi thêm bảng/trạng thái và chốt provider. |
+| Giao dịch thanh toán trực tuyến | `cho_thanh_toan`, `da_thanh_toan`, `het_han`, `can_doi_soat`, `da_huy` | SePay có code/schema; tích hợp mặc định tắt, phạm vi chưa duyệt và chưa có bằng chứng giao dịch thật. |
 
 ## 8. Hành vi lỗi và thông tin trả về
 
@@ -571,29 +570,20 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 
 ## 11. Các quyết định và khoảng trống còn phải chốt
 
-| Mã | Việc cần chốt trước khi triển khai | Tài liệu/bảng bị ảnh hưởng |
+| Mã | Việc còn phải quyết định hoặc kiểm chứng | Tài liệu/bảng bị ảnh hưởng |
 |---|---|---|
-| OPEN-01 | Session cookie, CSRF, logout/revoke và thời hạn phiên | specs/api.md, API auth |
-| OPEN-02 | Pagination/filter/sort và danh mục lỗi API thống nhất | specs/api.md, frontend |
-| OPEN-03 | Cơ chế bền vững cho rate limit khi chạy nhiều worker; ngưỡng bcrypt theo benchmark | API settings/deployment |
-| OPEN-04 | Quy trình bootstrap tài khoản, activation token và trạng thái chưa kích hoạt | DATABASE_SCHEMA.md, TaiKhoan, API email |
-| OPEN-05 | Tiến trình và retry khi tạo TaiKhoan nhân bản cùng hồ sơ site bị lỗi một phần | Schema/control tables, Coordinator |
-| OPEN-06 | Request ledger/idempotency bền vững cho thu/hoàn tại quầy | DATABASE_SCHEMA.md, PhieuThu/payment service |
-| OPEN-07 | Nhà cung cấp thanh toán, YeuCauThanhToan, SuKienThanhToan, webhook, đối soát và hoàn online | DATABASE_SCHEMA.md, specs/api.md, UI |
-| OPEN-08 | Metadata Cloudinary, quyền upload/xóa và ràng buộc site sở hữu ảnh | DATABASE_SCHEMA.md, API upload |
-| OPEN-09 | Có đưa tài khoản/portal học viên vào phạm vi không; nếu có phải thiết kế vai trò và liên kết HocVien | README, schema, API, UI, FS |
-| OPEN-10 | Ngưỡng thời gian truy vấn p50/p95 và thiết bị/mạng đo cho mục tiêu hiệu năng | specs/api.md, specs/ui-ux.md |
-| OPEN-11 | Bổ sung replication runtime cho `CoSo` và gom các luồng ghi `TaiKhoan` vào service chung; `MonHoc` và `KhoaHoc` đã có luồng API nhưng còn phải chạy kiểm chứng nhiều site. Chưa bật SQL Server Publication | README mục 9, schema, tài liệu đồng bộ, YC-03/YC-07 |
-| OPEN-12 | Giao thức distributed transaction và mức bảo đảm đáp ứng tiêu chí giảng viên; nếu cần DBMS quản lý phải triển khai/kiểm thử bổ sung | README mục 9, tài liệu giao dịch, YC-04 |
-| OPEN-13 | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện để bảo vệ chỗ cuối, bộ kiểm thử hai phiên | FS-ENR-01, specs/api.md, source, YC-05 |
-| OPEN-14 | `MonHoc` và `KhoaHoc` ghi ACK append-only vào `Logs` trong cùng transaction cục bộ, định danh theo idempotency key/site và lưu dữ liệu trước/sau; cơ chế chưa được áp dụng chung cho mọi bảng danh mục/tài khoản và vẫn cần kiểm chứng replication thực tế | `Logs`, service danh mục dùng chung, README mục 9, specs/api.md, TC-REP-01/TC-SYNC-01 |
-
+| OPEN-01 | Chuẩn hóa response lỗi, pagination/filter/sort và idempotency thu/hoàn tại quầy; schema chưa có request ledger bền vững cho phiếu thu | `specs/api.md`, `PhieuThu`, giao diện thu phí |
+| OPEN-02 | Rate limit bền vững khi chạy nhiều worker và ngưỡng bcrypt theo benchmark | API settings/deployment |
+| OPEN-03 | Tiến trình/retry khi tạo tài khoản và hồ sơ site lỗi một phần; cần thống nhất cách vận hành, email và đối soát | `TaiKhoan`, hồ sơ site, Coordinator |
+| OPEN-04 | Có đưa portal/tài khoản học viên vào phạm vi đồ án hay không; code/schema hiện có nhưng chưa được duyệt | README, schema, API, UI |
+| OPEN-05 | Phạm vi vận hành SePay, merchant/webhook/HTTPS và đối soát; schema/API đã có nhưng tích hợp mặc định tắt | `YeuCauThanhToan`, `SuKienThanhToan`, API/UI |
+| OPEN-06 | Cấu hình/tích hợp thật và chính sách dọn asset mồ côi cho Cloudinary; metadata avatar nằm trong bản `TaiKhoan`, không có `MediaAsset` | API media, `TaiKhoan`, môi trường |
+| OPEN-07 | Bổ sung runtime replication cho `CoSo` và thống nhất một điểm vào cho mọi luồng ghi `TaiKhoan`; `MonHoc`/`KhoaHoc` đã có service | README, schema, service dùng chung |
+| OPEN-08 | Xác nhận với giảng viên mức bảo đảm của Coordinator chuyển cơ sở; nếu cần DBMS-managed transaction thì triển khai và kiểm thử bổ sung | README, tài liệu giao dịch, YC-04 |
+| OPEN-09 | Chạy TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên SQL Server site và lưu bằng chứng; còn thiếu outage/recovery, lỗi trước/sau commit đích, concurrency hai phiên và site thiếu | Ma trận trạng thái, YC/TC, evidence |
+| OPEN-10 | Đo p50/p95 trên môi trường, kích thước dữ liệu và số site đã thống nhất | `specs/api.md`, `specs/ui-ux.md` |
 Không tự coi các mục OPEN là đã chốt. Khi nhóm thống nhất, cập nhật các tài liệu liên quan trong cùng thay đổi và bổ sung tiêu chí nghiệm thu cụ thể.
 
 ## 12. Trạng thái triển khai hiện tại
 
-Đây là trạng thái đối chiếu với source và kiểm tra của ngày 2026-10-29; liveness chỉ xác nhận tiến trình API, không xác nhận các CSDL site hoặc nghiệp vụ phân tán.
-
-API source có các module xác thực, giáo viên/nhân viên/học viên, lớp/đăng ký, học phí/phiếu thu, điểm danh/điểm, chuyển cơ sở, thống kê toàn cục, thông báo và catalog. `manage.py check` và test suite đã chạy. Trong phạm vi phân tán: script ràng buộc site đã chạy trên Q1/Q7/TD (16 `CHECK` mỗi DB); luồng replication `MonHoc` đã chạy qua ba DB trong transaction kiểm thử rollback, gồm retry cùng key và xác nhận không để lại dữ liệu thử. Thống kê Global Query đã được gọi thành công tại ba site.
-
-Chưa được kết luận toàn đồ án đạt yêu cầu môn học: TC-SYNC-01 chưa có outage/recovery qua mạng thật; TC-DTX-01 chưa chạy fault injection với hồ sơ nguồn/đích; TC-CON-01 chưa chạy hai phiên SQL Server đồng thời. Các bảng nghiệp vụ trên ba DB hiện chưa có dữ liệu phù hợp để làm an toàn các bài thử này. Topology đang xác minh là ba database riêng trên cùng một SQL Server instance, không phải ba máy chủ vật lý.
+Tình trạng source, các tích hợp phụ thuộc môi trường, topology và bằng chứng từng yêu cầu được duy trì trong [ma trận trạng thái triển khai](../docs/Trang-Thai-Trien-Khai.md) và [ma trận YC/TC](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Đây là trạng thái đã ghi nhận trong tài liệu, không phải kết quả chạy mới của lần cập nhật FS này. Chỉ kết luận đạt yêu cầu môn học khi có bằng chứng cho đủ các kịch bản; có module API, schema hoặc unit test riêng lẻ chưa đủ.
