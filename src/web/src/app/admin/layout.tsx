@@ -8,6 +8,6 @@ export const metadata = {
 };
 
 export default function Layout({ children }: { children: ReactNode }) {
-  return <RequireSession roles={["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan", "xep_lop"]}><AdminLayout>{children}</AdminLayout></RequireSession>;
+  return <RequireSession roles={["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"]}><AdminLayout>{children}</AdminLayout></RequireSession>;
 }
 

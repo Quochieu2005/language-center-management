@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 _SITE_CODE = r"^[A-Za-z0-9_-]{2,10}$"
 _USERNAME = r"^[A-Za-z0-9._-]{3,100}$"
-_STAFF_ROLES = ("le_tan", "tu_van", "ke_toan", "xep_lop")
+_STAFF_ROLES = ("le_tan", "tu_van", "ke_toan")
 
 
 class StrictInputSerializer(serializers.Serializer):
@@ -23,8 +23,9 @@ class EmployeeCreateSerializer(StrictInputSerializer):
     username = serializers.RegexField(regex=_USERNAME, max_length=100, required=False)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     job_title = serializers.ChoiceField(choices=_STAFF_ROLES)
+    avatar_requested = serializers.BooleanField(required=False, default=False)
     site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
-    allowed_fields = {"full_name", "email", "username", "phone", "job_title", "site_code"}
+    allowed_fields = {"full_name", "email", "username", "phone", "job_title", "avatar_requested", "site_code"}
 
     def validate_full_name(self, value):
         value = value.strip()
@@ -119,8 +120,10 @@ class EmployeeResponseSerializer(serializers.Serializer):
     phone = serializers.CharField(allow_null=True)
     account_status = serializers.ChoiceField(choices=("active", "inactive"))
     employee_status = serializers.ChoiceField(choices=("dang_lam", "nghi_viec"))
+    avatar_secure_url = serializers.URLField(allow_null=True)
 
 
 class EmployeeCreateResponseSerializer(EmployeeResponseSerializer):
     must_change_password = serializers.BooleanField()
     email_sent = serializers.BooleanField()
+    avatar_setup_token = serializers.CharField(allow_null=True)

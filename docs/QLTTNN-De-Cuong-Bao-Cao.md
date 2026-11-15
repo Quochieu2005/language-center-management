@@ -55,7 +55,8 @@ Hệ thống hỗ trợ đăng nhập và phân quyền; quản lý học viên,
 |---|---|---|
 | Admin Big | Quản lý tài khoản/danh mục/cơ sở; xem báo cáo/nhật ký toàn hệ thống; duyệt hoặc từ chối đề nghị chuyển học viên | Toàn hệ thống theo quyền |
 | Admin Small | Quản lý lớp, phòng, lịch, học viên, học phí; tạo đề nghị chuyển học viên từ cơ sở mình; xem báo cáo tại cơ sở | Site được gán |
-| Lễ tân | Hồ sơ học viên, đăng ký và đổi lớp | Site được gán |
+| Lễ tân | Tiếp nhận tại quầy; đăng ký/lớp và kế hoạch học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu | Site được gán |
+| Tư vấn & xếp lớp | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp | Site được gán |
 | Kế toán | Thu học phí và xem danh sách lớp | Site được gán |
 | Giáo viên | Xem lớp mình dạy, điểm danh, nhập điểm | Các lớp mình dạy |
 | Máy trạm tại cơ sở | Giao diện người dùng, gửi yêu cầu tới ứng dụng | Không kết nối tùy tiện sang CSDL site khác |

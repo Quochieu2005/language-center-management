@@ -1,6 +1,6 @@
 import { apiRequest, jsonBody } from "./client";
 
-export type Role = "admin_big" | "admin_small" | "le_tan" | "tu_van" | "ke_toan" | "xep_lop" | "giao_vien" | "hoc_vien";
+export type Role = "admin_big" | "admin_small" | "le_tan" | "tu_van" | "ke_toan" | "giao_vien" | "hoc_vien";
 export type SessionUser = {
   account_id: string;
   slug: string;

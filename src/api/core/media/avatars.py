@@ -53,6 +53,7 @@ class AvatarTargetNotFound(Exception):
 _INTENT_SALT = "core.media.admin-avatar.v1"
 _ADMIN_SMALL_SETUP_SALT = "core.media.admin-small-avatar-setup.v1"
 _TEACHER_SETUP_SALT = "core.media.teacher-avatar-setup.v1"
+_EMPLOYEE_SETUP_SALT = "core.media.employee-avatar-setup.v1"
 _INTENT_TTL_SECONDS = 3600
 _MAX_FILE_BYTES = 5 * 1024 * 1024
 _ALLOWED_FORMATS = "jpg,jpeg,png,webp"
@@ -62,7 +63,6 @@ _ACCOUNT_ROLE = {
     "le_tan": "nhan_vien",
     "tu_van": "nhan_vien",
     "ke_toan": "nhan_vien",
-    "xep_lop": "nhan_vien",
     "giao_vien": "giao_vien",
     "hoc_vien": "hoc_vien",
 }
@@ -72,7 +72,6 @@ _AVATAR_RESOURCE = {
     "le_tan": "employee",
     "tu_van": "employee",
     "ke_toan": "employee",
-    "xep_lop": "employee",
     "giao_vien": "teacher",
     "hoc_vien": "student",
 }
@@ -282,6 +281,93 @@ def _resolve_teacher_setup_target(actor, slug: str, setup_token: str) -> Authent
     )
 
 
+def create_employee_avatar_setup_token(actor, employee) -> str:
+    actor_role = str(getattr(actor, "role", ""))
+    site = str(getattr(employee, "site_code", "")).upper()
+    if actor_role not in {"admin_big", "admin_small"} or not getattr(actor, "account_id", ""):
+        raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho nhân viên.")
+    if actor_role == "admin_small" and str(getattr(actor, "site_code", "")).upper() != site:
+        raise AvatarConflict("Admin Small chỉ được cấp ảnh tại cơ sở của mình.")
+    return signing.dumps(
+        {
+            "actor_id": str(actor.account_id),
+            "actor_role": actor_role,
+            "actor_site": str(getattr(actor, "site_code", "") or "").upper() or None,
+            "target_id": str(employee.account_id),
+            "target_slug": str(employee.slug),
+            "target_site": site,
+            "target_job_title": str(employee.job_title),
+        },
+        salt=_EMPLOYEE_SETUP_SALT,
+        compress=True,
+    )
+
+
+def _resolve_employee_setup_target(actor, slug: str, setup_token: str) -> AuthenticatedUser:
+    actor_role = str(getattr(actor, "role", ""))
+    actor_id = str(getattr(actor, "account_id", ""))
+    actor_site = str(getattr(actor, "site_code", "") or "").upper() or None
+    if actor_role not in {"admin_big", "admin_small"} or not actor_id:
+        raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho nhân viên.")
+    try:
+        claims = signing.loads(setup_token, salt=_EMPLOYEE_SETUP_SALT, max_age=_INTENT_TTL_SECONDS)
+    except signing.BadSignature as exc:
+        raise AvatarInvalidIntent("Quyền tải ảnh ban đầu đã hết hạn hoặc không hợp lệ.") from exc
+    if (
+        not isinstance(claims, dict)
+        or claims.get("actor_id") != actor_id
+        or claims.get("actor_role") != actor_role
+        or claims.get("actor_site") != actor_site
+        or claims.get("target_slug") != slug
+    ):
+        raise AvatarInvalidIntent("Quyền tải ảnh ban đầu không thuộc yêu cầu này.")
+
+    sites = _active_sites()
+    site_code = str(claims.get("target_site", "")).upper()
+    if site_code not in sites or (actor_role == "admin_small" and actor_site != site_code):
+        raise AvatarTargetNotFound
+    with connections[get_site_database_alias(site_code)].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP (2) t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email,
+                           t.vai_tro, t.ma_co_so, t.trang_thai, t.bat_buoc_doi_mat_khau,
+                           n.ma_nhan_vien, n.chuc_vu, n.trang_thai
+            FROM dbo.TaiKhoan AS t
+            INNER JOIN dbo.NhanVien AS n
+              ON n.ma_tai_khoan = t.ma_tai_khoan AND n.ma_co_so = t.ma_co_so
+            WHERE t.ma_co_so = %s AND t.slug = %s AND t.vai_tro = 'nhan_vien'
+              AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
+            """,
+            [site_code, slug],
+        )
+        rows = cursor.fetchall()
+    if len(rows) > 1:
+        raise AvatarConflict("Slug không định danh duy nhất một hồ sơ nhân viên.")
+    if not rows:
+        raise AvatarTargetNotFound
+    row = rows[0]
+    job_title = str(row[9]).lower()
+    if (
+        claims.get("target_id") != str(row[0])
+        or claims.get("target_site") != str(row[5]).upper()
+        or claims.get("target_job_title") != job_title
+        or str(row[1]) != slug
+        or not bool(row[6])
+        or str(row[10]).lower() != "dang_lam"
+    ):
+        raise AvatarTargetNotFound
+    return AuthenticatedUser(
+        account_id=str(row[0]),
+        email=str(row[3]),
+        username=str(row[2]),
+        slug=str(row[1]),
+        role=job_title,
+        site_code=site_code,
+        profile_id=str(row[8]),
+        must_change_password=bool(row[7]),
+    )
+
+
 def _read_account(site_code: str, account_id: str, role: str, account_site: str | None) -> dict:
     alias = get_site_database_alias(site_code)
     with connections[alias].cursor() as cursor:
@@ -403,7 +489,8 @@ def destroy_cloudinary_avatar_asset(public_id: str | None) -> None:
 
 
 def _create_admin_avatar_upload_intent(
-    actor, target=None, *, initial_admin_small: bool = False, initial_teacher: bool = False
+    actor, target=None, *, initial_admin_small: bool = False,
+    initial_teacher: bool = False, initial_employee: bool = False,
 ) -> dict:
     target = target or actor
     actor_role = str(getattr(actor, "role", ""))
@@ -420,6 +507,11 @@ def _create_admin_avatar_upload_intent(
             raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho giáo viên.")
         if actor_role == "admin_small" and str(getattr(actor, "site_code", "")).upper() != str(getattr(target, "site_code", "")).upper():
             raise AvatarConflict("Admin Small chỉ được cấp ảnh tại cơ sở của mình.")
+    elif initial_employee:
+        if actor_role not in {"admin_big", "admin_small"} or role not in {"le_tan", "tu_van", "ke_toan"}:
+            raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được cấp ảnh ban đầu cho nhân viên.")
+        if actor_role == "admin_small" and str(getattr(actor, "site_code", "")).upper() != str(getattr(target, "site_code", "")).upper():
+            raise AvatarConflict("Admin Small chỉ được cấp ảnh tại cơ sở của mình.")
     elif actor_id != account_id or actor_role != role:
         raise AvatarConflict("Chỉ được tải ảnh cho tài khoản của chính mình.")
     account_site = str(getattr(target, "site_code", "") or "").strip().upper() or None
@@ -429,7 +521,7 @@ def _create_admin_avatar_upload_intent(
     with _account_lock(account_id):
         sites = _active_sites()
         old_avatar = _replicated_avatar(account_id, role, account_site, sites)
-        if (initial_admin_small or initial_teacher) and any(old_avatar.values()):
+        if (initial_admin_small or initial_teacher or initial_employee) and any(old_avatar.values()):
             raise AvatarConflict("Ảnh ban đầu đã được thiết lập cho tài khoản này.")
         image_id = str(uuid.uuid4())
         try:
@@ -497,6 +589,16 @@ def create_teacher_avatar_upload_intent(actor, slug: str, setup_token: str) -> d
     try:
         target = _resolve_teacher_setup_target(actor, slug, setup_token)
         return _create_admin_avatar_upload_intent(actor, target, initial_teacher=True)
+    except (AvatarConflict, AvatarInvalidIntent, AvatarTargetNotFound, AvatarUnavailable):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AvatarUnavailable from exc
+
+
+def create_employee_avatar_upload_intent(actor, slug: str, setup_token: str) -> dict:
+    try:
+        target = _resolve_employee_setup_target(actor, slug, setup_token)
+        return _create_admin_avatar_upload_intent(actor, target, initial_employee=True)
     except (AvatarConflict, AvatarInvalidIntent, AvatarTargetNotFound, AvatarUnavailable):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
@@ -652,7 +754,9 @@ def _apply_site(site_code: str, account_id: str, role: str, account_site: str | 
             )
 
 
-def _complete_admin_avatar_upload(actor, target, token: str, public_id: str, remote_ip: str) -> dict:
+def _complete_admin_avatar_upload(
+    actor, target, token: str, public_id: str, remote_ip: str, *, initial_employee: bool = False
+) -> dict:
     actor_role = str(getattr(actor, "role", ""))
     if actor_role not in _ACCOUNT_ROLE:
         raise AvatarConflict("Vai trò không được phép đổi ảnh đại diện.")
@@ -666,6 +770,12 @@ def _complete_admin_avatar_upload(actor, target, token: str, public_id: str, rem
         or (
             actor_role in {"admin_big", "admin_small"}
             and role == "giao_vien"
+            and (actor_role != "admin_small" or str(getattr(actor, "site_code", "")).upper() == str(getattr(target, "site_code", "")).upper())
+        )
+        or (
+            initial_employee
+            and actor_role in {"admin_big", "admin_small"}
+            and role in {"le_tan", "tu_van", "ke_toan"}
             and (actor_role != "admin_small" or str(getattr(actor, "site_code", "")).upper() == str(getattr(target, "site_code", "")).upper())
         )
     ):
@@ -728,6 +838,20 @@ def complete_teacher_avatar_upload(
     try:
         target = _resolve_teacher_setup_target(actor, slug, setup_token)
         return _complete_admin_avatar_upload(actor, target, token, public_id, remote_ip)
+    except (AvatarConflict, AvatarInvalidIntent, AvatarInvalidUpload, AvatarTargetNotFound, AvatarUnavailable):
+        raise
+    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise AvatarUnavailable from exc
+
+
+def complete_employee_avatar_upload(
+    actor, slug: str, setup_token: str, token: str, public_id: str, remote_ip: str
+) -> dict:
+    try:
+        target = _resolve_employee_setup_target(actor, slug, setup_token)
+        return _complete_admin_avatar_upload(
+            actor, target, token, public_id, remote_ip, initial_employee=True
+        )
     except (AvatarConflict, AvatarInvalidIntent, AvatarInvalidUpload, AvatarTargetNotFound, AvatarUnavailable):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:

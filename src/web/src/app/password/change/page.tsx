@@ -7,7 +7,7 @@ import AdminLayout from "@/components/admin/layout/AdminLayout";
 import { authApi } from "@/lib/api/auth";
 import { RequireSession, useSession } from "@/lib/auth/session";
 
-const ADMIN_ROLES = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan", "xep_lop"];
+const ADMIN_ROLES = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"];
 
 type PasswordForm = {
   current_password: string;

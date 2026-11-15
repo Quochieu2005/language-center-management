@@ -81,7 +81,7 @@ export default function ProfileRoute() {
 
 function ProfileRouteContent() {
   const { user } = useSession();
-  const hasAdminShell = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan", "xep_lop"].includes(user?.role || "");
+  const hasAdminShell = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
   const content = <ProfilePage />;
 
   return hasAdminShell ? <AdminLayout>{content}</AdminLayout> : <main>{content}</main>;
@@ -323,7 +323,7 @@ function formatProfileValue(key: string, value: unknown): string {
 function roleName(role?: string) {
   return ({
     admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Lễ tân",
-    tu_van: "Tư vấn", ke_toan: "Kế toán", xep_lop: "Nhân viên xếp lớp",
+    tu_van: "Tư vấn & xếp lớp", ke_toan: "Kế toán",
     giao_vien: "Giáo viên", hoc_vien: "Học viên",
   } as Record<string, string>)[role || ""] || "Tài khoản";
 }

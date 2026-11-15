@@ -79,7 +79,7 @@ Global Query hiện truy vấn từng CSDL site riêng trong phạm vi quyền, 
 
 `src/api/.env.example` khai báo placeholders cho Cloud Name, API Key, API Secret và `CLOUDINARY_ROOT_FOLDER=language-center-management`. Sau khi tạo API secret mới trong Cloudinary, đặt credentials thật vào `src/api/.env` (đã bị Git bỏ qua); không đưa secret vào frontend, source, log hoặc PR.
 
-API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại diện Admin, Admin Small và giáo viên. Django ký intent ngắn hạn, giới hạn tài khoản/bản ghi, xác minh asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url`; bytes ảnh gửi thẳng tới Cloudinary. Cấu hình vẫn cần secret Cloudinary của môi trường chạy. Chưa có API MediaAsset tổng quát cho ảnh khóa học/cơ sở hoặc bằng chứng upload thật trong môi trường nhóm.
+API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại diện Admin, Admin Small, giáo viên và nhân viên mới. Django ký intent ngắn hạn, giới hạn tài khoản/bản ghi, xác minh asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url`; bytes ảnh gửi thẳng tới Cloudinary. Cấu hình vẫn cần secret Cloudinary của môi trường chạy. Chưa có API MediaAsset tổng quát cho ảnh khóa học/cơ sở hoặc bằng chứng upload thật trong môi trường nhóm.
 
 ## Phạm vi đã khởi tạo
 
@@ -104,7 +104,7 @@ Các nghiệp vụ bắt buộc của đề tài đã có route/service tương 
 
 Blog có hai route đọc công khai: `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`. CMS Admin Big có route đọc danh sách/chi tiết và tạo/sửa/xóa danh mục, bài viết dưới `/api/v1/admin/blog/`. Writer dùng `REPLICATED-WRITE`: từng database site có transaction cục bộ và ACK trong `Logs`; request ghi cần `Idempotency-Key`, site lỗi sau khi đã commit một phần trả incomplete để retry cùng key. Chạy migration 36 trên từng DB trước khi gọi API; chi tiết hợp đồng, quyền và giới hạn commit ở `specs/api.md`.
 
-Quản lý nhân viên có `GET/POST /api/v1/admin/employees/` và `GET/PATCH/DELETE /api/v1/admin/employees/{slug}/`. PATCH chỉ sửa họ tên, điện thoại, chức vụ tại site; DELETE là nghỉ việc, khóa tài khoản nhân bản và thu hồi phiên, không xóa hồ sơ/chứng từ. Admin Big chọn một site; Admin Small chỉ dùng site của mình. Tạo/xóa có thành phần `REPLICATED-WRITE` và không phải ACID xuyên site; chi tiết trường, bảng, quyền và giới hạn nằm trong FS-EMP-01, schema và API spec.
+Quản lý nhân viên có `GET/POST /api/v1/admin/employees/` và `GET/PATCH/DELETE /api/v1/admin/employees/{slug}/`; ảnh tạo ban đầu dùng `/avatar/upload-intents/` và `/avatar/complete/`. PATCH chỉ sửa họ tên, điện thoại, chức vụ tại site; DELETE là nghỉ việc, khóa tài khoản nhân bản và thu hồi phiên, không xóa hồ sơ/chứng từ. Admin Big chọn một site; Admin Small chỉ dùng site của mình. Chức vụ `tu_van` hiển thị Tư vấn & xếp lớp; chạy migration 37 trên mọi site trước khi triển khai code gộp. Tạo/xóa/ảnh tài khoản có thành phần `REPLICATED-WRITE` và không phải ACID xuyên site; chi tiết trường, bảng, quyền và giới hạn nằm trong FS-EMP-01, schema và API spec.
 
 Học viên/portal và thanh toán SePay có code cùng schema nhưng **không được hiểu là đã được nhóm duyệt vào phạm vi môn học**. SePay mặc định tắt bằng `SEPAY_ENABLED=false`; không coi tích hợp là chạy thật khi chưa cấu hình merchant/webhook và kiểm chứng trên môi trường được cấp phép.
 

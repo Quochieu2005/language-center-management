@@ -56,11 +56,19 @@ class TeacherAvatarFinalizeRequestSerializer(AdminSmallAvatarFinalizeRequestSeri
     pass
 
 
+class EmployeeAvatarUploadIntentRequestSerializer(TeacherAvatarUploadIntentRequestSerializer):
+    pass
+
+
+class EmployeeAvatarFinalizeRequestSerializer(TeacherAvatarFinalizeRequestSerializer):
+    pass
+
+
 class AdminAvatarResponseSerializer(serializers.Serializer):
     account_id = serializers.CharField()
     role = serializers.ChoiceField(choices=(
         "admin_big", "admin_small", "le_tan", "tu_van", "ke_toan",
-        "xep_lop", "giao_vien", "hoc_vien",
+        "giao_vien", "hoc_vien",
     ))
     avatar_secure_url = serializers.URLField()
     complete = serializers.BooleanField()

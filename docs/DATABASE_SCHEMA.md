@@ -254,7 +254,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 | `phien_ban`, `cap_nhat_luc` | | Đối soát đồng bộ (mục 2) |
 | `avatar_public_id`, `avatar_secure_url` | *null* được phép | Metadata ảnh đại diện Cloudinary; không lưu bytes ảnh trong SQL Server |
 
-Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ `le_tan`, `tu_van`, `ke_toan` hoặc `xep_lop`.
+Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ `le_tan`, `tu_van` (hiển thị “Tư vấn & xếp lớp”) hoặc `ke_toan`.
 
 Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL. Coordinator phải kiểm tra các bản sao trước khi liên kết/thu hồi subject (`REPLICATED-WRITE`). Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret hoặc email provider trong `TaiKhoan`; chỉ lưu metadata avatar Cloudinary nêu trên.
 
@@ -303,10 +303,10 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_co_so` | FK | |
 | `ma_tai_khoan` | FK, UQ, *null* | → `TaiKhoan` |
 | `ho_ten`, `sdt`, `email` | | |
-| `chuc_vu` | | `le_tan` · `tu_van` · `ke_toan` · `xep_lop` |
+| `chuc_vu` | | `le_tan` · `tu_van` (tư vấn và xếp lớp) · `ke_toan` |
 | `trang_thai` | | `dang_lam` · `nghi_viec` |
 
-Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Nghỉ việc cập nhật trạng thái, không xóa vật lý `NhanVien`, chứng từ hoặc log. Không thêm bảng/cột/migration cho API này.
+Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. Ảnh dùng `TaiKhoan.avatar_public_id` và `avatar_secure_url`; bytes nằm trên Cloudinary và metadata được đồng bộ cùng tài khoản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Nghỉ việc cập nhật trạng thái, không xóa vật lý `NhanVien`, chứng từ hoặc log. Migration 37 chuyển dữ liệu `xep_lop` cũ thành `tu_van`; không thêm bảng/cột cho ảnh nhân viên.
 
 ### 6.4. Lớp học
 

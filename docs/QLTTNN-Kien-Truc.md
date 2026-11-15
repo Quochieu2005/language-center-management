@@ -81,7 +81,8 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 |---|---|
 | Admin Big | Toàn hệ thống; quản lý tài khoản/danh mục, xem báo cáo và nhật ký toàn cục; duyệt/từ chối đề nghị chuyển |
 | Admin Small | Cơ sở được phân công; điều hành nghiệp vụ, tạo đề nghị chuyển ra cơ sở khác và theo dõi đề nghị của cơ sở mình |
-| Lễ tân | Cơ sở của mình; hồ sơ học viên, đăng ký, đổi lớp |
+| Lễ tân | Cơ sở của mình; tiếp nhận, thao tác đăng ký/lớp và kế hoạch học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
+| Tư vấn & xếp lớp | Cơ sở của mình; tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp |
 | Kế toán | Cơ sở của mình; thu học phí |
 | Giáo viên | Lớp mình dạy; nhập điểm và điểm danh |
 

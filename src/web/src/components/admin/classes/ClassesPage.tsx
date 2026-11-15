@@ -11,8 +11,8 @@ const weekdays = [2, 3, 4, 5, 6].map((value) => ({ value, label: `Thứ ${value}
 
 export default function ClassesPage() {
   const { user } = useSession();
-  const canManage = ["admin_big", "admin_small", "le_tan", "xep_lop"].includes(user?.role || "");
-  const canEnroll = canManage || user?.role === "tu_van";
+  const canManage = ["admin_big", "admin_small", "le_tan", "tu_van"].includes(user?.role || "");
+  const canEnroll = canManage;
   const { selectedSite } = useSiteScope();
   const site = user?.role === "admin_big" ? selectedSite : user?.site_code || null;
   const [classes, setClasses] = useState<ClassRow[]>([]);

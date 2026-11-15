@@ -27,7 +27,7 @@ from core.sites.connections import UnknownSiteError, get_site_connection, get_si
 from core.slug_utils import make_slug
 
 logger = logging.getLogger("core.employees")
-_JOB_TITLES = {"le_tan", "tu_van", "ke_toan", "xep_lop"}
+_JOB_TITLES = {"le_tan", "tu_van", "ke_toan"}
 
 
 class EmployeeConflict(Exception):
@@ -347,7 +347,7 @@ def list_employees(
 ) -> dict:
     site = str(site_code).strip().upper()
     alias = require_active_site(site)
-    clauses = ["n.ma_co_so = %s", "n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')"]
+    clauses = ["n.ma_co_so = %s", "n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')"]
     params: list[object] = [site]
     if job_title:
         clauses.append("n.chuc_vu = %s")
@@ -370,7 +370,7 @@ def list_employees(
         cursor.execute(
             """
             SELECT n.ma_nhan_vien, n.ma_tai_khoan, t.slug, n.ho_ten, n.sdt, n.email,
-                   n.chuc_vu, n.trang_thai, t.trang_thai, t.ten_dang_nhap
+                   n.chuc_vu, n.trang_thai, t.trang_thai, t.ten_dang_nhap, t.avatar_secure_url
             FROM dbo.NhanVien AS n
             LEFT JOIN dbo.TaiKhoan AS t
               ON t.ma_tai_khoan = n.ma_tai_khoan AND t.ma_co_so = n.ma_co_so
@@ -389,6 +389,7 @@ def list_employees(
                 "employee_status": str(row[7]).lower(),
                 "account_status": "active" if row[8] in (True, 1, "1") else "inactive" if row[8] is not None else None,
                 "username": str(row[9]) if row[9] else None,
+                "avatar_secure_url": str(row[10]) if row[10] else None,
             }
             for row in rows
         ],
@@ -408,6 +409,7 @@ def _employee_response(site_code: str, row) -> dict:
         "employee_status": employee_status, "slug": str(row[7]),
         "account_status": "active" if account_status else "inactive",
         "username": str(row[11]), "site_code": site_code,
+        "avatar_secure_url": str(row[12]) if row[12] else None,
     }
 
 
@@ -415,7 +417,8 @@ def _employee_by_slug(cursor, site_code: str, slug: str, *, lock: bool = False):
     if lock:
         cursor.execute(
             """
-            SELECT TOP (2) ma_tai_khoan, slug, vai_tro, ma_co_so, trang_thai, ten_dang_nhap
+            SELECT TOP (2) ma_tai_khoan, slug, vai_tro, ma_co_so, trang_thai, ten_dang_nhap,
+                           avatar_secure_url
             FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK)
             WHERE ma_co_so = %s AND slug = %s AND vai_tro = 'nhan_vien'
             """,
@@ -433,7 +436,7 @@ def _employee_by_slug(cursor, site_code: str, slug: str, *, lock: bool = False):
                            chuc_vu, trang_thai
             FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK)
             WHERE ma_tai_khoan = %s AND ma_co_so = %s
-              AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+              AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
             """,
             [account[0], site_code],
         )
@@ -445,19 +448,19 @@ def _employee_by_slug(cursor, site_code: str, slug: str, *, lock: bool = False):
         profile = profiles[0]
         return (
             profile[0], profile[1], profile[2], profile[3], profile[4], profile[5],
-            profile[6], account[1], account[2], account[3], account[4], account[5],
+            profile[6], account[1], account[2], account[3], account[4], account[5], account[6],
         )
 
     cursor.execute(
         """
         SELECT TOP (2) n.ma_nhan_vien, n.ma_tai_khoan, n.ho_ten, n.sdt, n.email,
                        n.chuc_vu, n.trang_thai, t.slug, t.vai_tro, t.ma_co_so,
-                       t.trang_thai, t.ten_dang_nhap
+                       t.trang_thai, t.ten_dang_nhap, t.avatar_secure_url
         FROM dbo.TaiKhoan AS t
         INNER JOIN dbo.NhanVien AS n
           ON n.ma_tai_khoan = t.ma_tai_khoan AND n.ma_co_so = t.ma_co_so
         WHERE n.ma_co_so = %s AND t.slug = %s AND t.vai_tro = 'nhan_vien'
-          AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+          AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
         """,
         [site_code, slug],
     )
@@ -537,7 +540,7 @@ def _read_employee_for_deactivation(site_code: str, slug: str):
             INNER JOIN dbo.TaiKhoan AS t
               ON t.ma_tai_khoan = n.ma_tai_khoan AND t.ma_co_so = n.ma_co_so
             WHERE n.ma_co_so = %s AND t.slug = %s
-              AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+              AND n.chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
             """,
             [site_code, slug],
         )
@@ -647,7 +650,7 @@ def _deactivate_account_copy(
                     """
                     SELECT trang_thai FROM dbo.NhanVien WITH (UPDLOCK, HOLDLOCK)
                     WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                      AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop')
+                      AND chuc_vu IN ('le_tan', 'tu_van', 'ke_toan')
                     """,
                     [employee_id, profile_site, account_id],
                 )

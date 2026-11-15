@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from core.academics.common import AcademicError, AcademicForbidden, AcademicInvalid, site_scope
 from core.auth.authentication import AuthCookieAuthentication
+from core.media.avatars import create_employee_avatar_setup_token
 from core.employees.serializers import (
     EmployeeCreateSerializer,
     EmployeeCreateResponseSerializer,
@@ -85,12 +86,13 @@ class EmployeeCollectionView(APIView):
     @extend_schema(
         operation_id="employee_create",
         tags=["Quản lý nhân viên"],
-        summary="Tạo tài khoản nhân viên tư vấn, kế toán hoặc xếp lớp",
+        summary="Tạo tài khoản nhân viên lễ tân, tư vấn/xếp lớp hoặc kế toán",
         description=(
             "LOCAL cho hồ sơ dbo.NhanVien tại site đã chọn; bản ghi TaiKhoan nhan_vien được nhân bản "
             "đến các site hoạt động theo chính sách tài khoản hiện có. Admin Big chọn site; Admin Small "
             "chỉ tạo ở site của mình. Mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD được gửi qua SMTP, "
-            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Không tạo bảng hoặc CSDL mới."
+            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Nếu avatar_requested=true, API trả "
+            "setup_token ngắn hạn để tải ảnh lên Cloudinary; bytes ảnh không đi qua Django/SQL Server."
         ),
         request=EmployeeCreateSerializer,
         responses={201: EmployeeCreateResponseSerializer, 400: OpenApiResponse(), 401: OpenApiResponse(), 403: OpenApiResponse(), 409: OpenApiResponse(), 429: OpenApiResponse(), 503: OpenApiResponse()},
@@ -111,6 +113,7 @@ class EmployeeCollectionView(APIView):
             return Response({"detail": "Email, tên đăng nhập hoặc hồ sơ nhân viên đã tồn tại."}, status=409)
         except (AcademicError, EmployeeInfrastructureUnavailable, ValueError, KeyError) as exc:
             return _site_error(exc)
+        avatar_setup_token = create_employee_avatar_setup_token(request.user, result) if data["avatar_requested"] else None
         return Response(
             {
                 "employee_id": result.employee_id,
@@ -124,6 +127,8 @@ class EmployeeCollectionView(APIView):
                 "phone": result.phone,
                 "account_status": "active",
                 "employee_status": "dang_lam",
+                "avatar_secure_url": None,
+                "avatar_setup_token": avatar_setup_token,
                 "must_change_password": result.must_change_password,
                 "email_sent": result.email_sent,
             },
