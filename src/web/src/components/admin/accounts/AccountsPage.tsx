@@ -32,6 +32,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingAdminSmall, setDeletingAdminSmall] = useState<AdminSmall | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCredentialId, setSendingCredentialId] = useState("");
@@ -226,6 +227,23 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     }
   };
 
+  const confirmDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    setDeleteSubmitting(true);
+    try {
+      const result = await adminApi.deleteEmployee(deletingEmployee.slug, deletingEmployee.site_code);
+      message.success(result.profile_retained
+        ? "Đã xóa tài khoản; hồ sơ được giữ lại để bảo toàn phiếu thu."
+        : "Đã xóa vĩnh viễn tài khoản và hồ sơ nhân viên.");
+      setDeletingEmployee(null);
+      void load();
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Không xóa được tài khoản; có thể thử lại.");
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
   const adminColumns: ColumnsType<AdminSmall> = [
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
@@ -338,24 +356,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
             void load();
           } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không cập nhật được trạng thái tài khoản."); }
         }}>Ngưng</Button>}
-        <Popconfirm
-          title="Xóa vĩnh viễn tài khoản nhân viên này?"
-          description="Tài khoản đăng nhập, phiên và ảnh đại diện sẽ bị xóa. Hồ sơ có phiếu thu sẽ được giữ để bảo toàn chứng từ."
-          okText="Xóa vĩnh viễn"
-          cancelText="Hủy"
-          okButtonProps={{ danger: true }}
-          onConfirm={async () => {
-            try {
-              const result = await adminApi.deleteEmployee(row.slug, row.site_code);
-              message.success(result.profile_retained
-                ? "Đã xóa tài khoản; hồ sơ được giữ lại để bảo toàn phiếu thu."
-                : "Đã xóa vĩnh viễn tài khoản và hồ sơ nhân viên.");
-              void load();
-            } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không xóa được tài khoản; có thể thử lại."); }
-          }}
-        >
-          <Button danger size="small">Xóa vĩnh viễn</Button>
-        </Popconfirm>
+        <Button danger size="small" onClick={() => setDeletingEmployee(row)}>Xóa vĩnh viễn</Button>
       </Space>,
     },
   ];
@@ -442,6 +443,31 @@ export default function AccountsPage({ view }: AccountsPageProps) {
         </Typography.Text>
         <Typography.Text type="secondary">
           Nhật ký và lịch sử liên quan vẫn được giữ. Hệ thống sẽ từ chối nếu tài khoản còn dữ liệu nghiệp vụ cần bảo toàn.
+        </Typography.Text>
+      </Space>
+    </Modal>
+    <Modal
+      title="Xóa vĩnh viễn tài khoản nhân viên?"
+      open={deletingEmployee !== null}
+      centered
+      width={500}
+      okText="Xóa vĩnh viễn"
+      cancelText="Hủy"
+      okButtonProps={{ danger: true }}
+      confirmLoading={deleteSubmitting}
+      closable={!deleteSubmitting}
+      mask={{ closable: !deleteSubmitting }}
+      keyboard={!deleteSubmitting}
+      onCancel={() => { if (!deleteSubmitting) setDeletingEmployee(null); }}
+      onOk={confirmDeleteEmployee}
+    >
+      <Space orientation="vertical" size={8}>
+        <Typography.Text>
+          Xóa tài khoản đăng nhập của <strong>{deletingEmployee?.full_name}</strong> tại cơ sở <strong>{deletingEmployee?.site_code}</strong>?
+          Thao tác này không thể hoàn tác.
+        </Typography.Text>
+        <Typography.Text type="secondary">
+          Phiên đăng nhập, token đặt lại mật khẩu và ảnh đại diện sẽ bị xóa. Hồ sơ có phiếu thu sẽ được giữ rời tài khoản để bảo toàn chứng từ.
         </Typography.Text>
       </Space>
     </Modal>
