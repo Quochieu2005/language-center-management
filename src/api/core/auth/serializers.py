@@ -308,7 +308,7 @@ class AuthUserSerializer(serializers.Serializer):
     role = serializers.ChoiceField(
         choices=[
             "admin_big", "admin_small", "le_tan", "tu_van", "ke_toan",
-            "xep_lop", "giao_vien", "hoc_vien",
+            "giao_vien", "hoc_vien",
         ]
     )
     site_code = serializers.CharField(allow_null=True)

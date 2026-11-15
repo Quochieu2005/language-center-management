@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UploadOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, App, Avatar, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography } from "antd";
+import { Alert, App, Avatar, Button, Card, Col, Form, Input, Modal, Popconfirm, Row, Select, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type AdminSmall, type Employee } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
@@ -10,6 +10,12 @@ import { useSession } from "@/lib/auth/session";
 import { useSiteScope } from "@/lib/auth/site-scope";
 
 type AccountsPageProps = { view: "admin-smalls" | "employees" };
+
+const employeeRoleLabels: Record<Employee["job_title"], string> = {
+  le_tan: "Lễ tân",
+  tu_van: "Tư vấn & xếp lớp",
+  ke_toan: "Kế toán",
+};
 
 function toSlug(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d")
@@ -102,15 +108,43 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     setSubmitting(true);
     try {
       if (isEmployeeView && values.job_title) {
-        await adminApi.createEmployee({
+        const createdEmployee = await adminApi.createEmployee({
           site_code: isAdminBig ? values.site_code : undefined,
           full_name: values.full_name,
           email: values.email,
           username: values.username,
           phone: values.phone,
           job_title: values.job_title,
+          avatar_requested: Boolean(avatarFile),
         });
-        message.success("Đã tạo tài khoản nhân viên theo phản hồi của API.");
+        let avatarUploaded = false;
+        let avatarUploadError = "";
+        if (avatarFile) {
+          try {
+            if (!createdEmployee.avatar_setup_token) throw new Error("API không cấp quyền tải ảnh ban đầu.");
+            const intent = await adminApi.createEmployeeAvatarUploadIntent(createdEmployee.slug, createdEmployee.avatar_setup_token);
+            const body = new FormData();
+            body.append("file", avatarFile);
+            body.append("api_key", intent.api_key);
+            Object.entries(intent.fields).forEach(([key, value]) => body.append(key, value));
+            const upload = await fetch(intent.upload_url, { method: "POST", body, cache: "no-store" });
+            const uploaded = await upload.json().catch(() => null) as { public_id?: unknown } | null;
+            if (!upload.ok || typeof uploaded?.public_id !== "string") throw new Error("Cloudinary chưa nhận được ảnh.");
+            await adminApi.completeEmployeeAvatarUpload(createdEmployee.slug, {
+              setup_token: createdEmployee.avatar_setup_token,
+              intent_token: intent.intent_token,
+              public_id: uploaded.public_id,
+            });
+            avatarUploaded = true;
+          } catch (reason) {
+            avatarUploadError = reason instanceof Error ? reason.message : "Lỗi tải ảnh không xác định.";
+          }
+        }
+        if (avatarUploadError) {
+          message.warning(`Đã tạo nhân viên nhưng ảnh chưa được lưu: ${avatarUploadError}. Nhân viên có thể tải ảnh sau khi đăng nhập.`);
+        } else {
+          message.success(avatarUploaded ? "Đã tạo nhân viên và tải ảnh đại diện lên." : "Đã tạo tài khoản nhân viên.");
+        }
       } else if (!isEmployeeView && values.site_code) {
         const createdAccount = await adminApi.createAdminSmall({
           full_name: values.full_name,
@@ -230,10 +264,11 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   ];
 
   const employeeColumns: ColumnsType<Employee> = [
+    { title: "Ảnh", dataIndex: "avatar_secure_url", width: 72, render: (value: string | null, row) => <Avatar src={value || undefined} icon={<UserOutlined />} alt={`Ảnh đại diện ${row.full_name}`} /> },
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
     { title: "Cơ sở", dataIndex: "site_code" },
-    { title: "Chức vụ", dataIndex: "job_title" },
+    { title: "Chức vụ", dataIndex: "job_title", render: (value: Employee["job_title"]) => employeeRoleLabels[value] },
     { title: "Trạng thái", dataIndex: "account_status", render: (value: string) => <Tag color={value === "active" ? "green" : "default"}>{value}</Tag> },
     {
       title: "Thao tác",
@@ -252,38 +287,56 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     {isEmployeeView
       ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 760 }} />
       : <Table<AdminSmall> rowKey="account_id" loading={loading} columns={adminColumns} dataSource={admins} scroll={{ x: 760 }} />}
-    <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} destroyOnHidden closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting}>
+    <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} width="min(760px, calc(100vw - 32px))" onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} destroyOnHidden closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting} styles={{ body: { maxHeight: "calc(100dvh - 140px)", overflowY: "auto" } }}>
       <Form form={form} layout="vertical" onFinish={submit}>
-        {!isEmployeeView && <Form.Item label="Ảnh đại diện (không bắt buộc)">
-          <Space align="center">
-            <Avatar size={56} src={avatarPreview || undefined} icon={<UserOutlined />} alt="Ảnh đại diện Admin Small" />
-            <Space orientation="vertical" size={4}>
-              <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => { chooseAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-              <Button icon={<UploadOutlined />} onClick={() => avatarInput.current?.click()}>Chọn ảnh</Button>
-              <Typography.Text type="secondary">JPG, PNG hoặc WebP · tối đa 5 MB</Typography.Text>
-            </Space>
-          </Space>
-          {avatarFile && <Typography.Text type="secondary" style={{ display: "block", marginTop: 8 }}>{avatarFile.name}</Typography.Text>}
-        </Form.Item>}
-        <Form.Item name="full_name" label="Họ tên" rules={[{ required: true, max: 120 }]}><Input maxLength={120} onChange={(event) => {
-          if (!isEmployeeView && !slugManuallyEdited.current) form.setFieldValue("slug", toSlug(event.target.value));
-        }} /></Form.Item>
-        <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
-        <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>
-        {!isEmployeeView && <Form.Item name="slug" label="Slug hồ sơ" extra="Tự tạo theo họ tên; bạn có thể tự sửa." rules={[{ pattern: /^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$/, message: "Slug chỉ gồm chữ không dấu, số và dấu gạch ngang." }, { max: 120 }]}><Input maxLength={120} onChange={(event) => {
-          const slug = event.target.value;
-          slugManuallyEdited.current = Boolean(slug);
-          if (!slug) form.setFieldValue("slug", toSlug(form.getFieldValue("full_name") || ""));
-        }} /></Form.Item>}
-        {isEmployeeView && <Form.Item name="phone" label="Số điện thoại"><Input maxLength={20} /></Form.Item>}
-        {isAdminBig && <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true }]}><Select options={siteCodes.map((value) => ({ value, label: value }))} /></Form.Item>}
-        {isEmployeeView && <Form.Item name="job_title" label="Chức vụ" rules={[{ required: true }]}><Select options={[
-          { value: "le_tan", label: "Lễ tân" },
-          { value: "tu_van", label: "Tư vấn" },
-          { value: "ke_toan", label: "Kế toán" },
-          { value: "xep_lop", label: "Xếp lớp" },
-        ]} /></Form.Item>}
-        <Button type="primary" htmlType="submit" loading={submitting} block>Tạo tài khoản</Button>
+        <Row gutter={[16, 0]}>
+          <Col span={24}>
+            <Form.Item label="Ảnh đại diện (không bắt buộc)">
+              <Space align="center">
+                <Avatar size={56} src={avatarPreview || undefined} icon={<UserOutlined />} alt={isEmployeeView ? "Ảnh đại diện nhân viên" : "Ảnh đại diện Admin Small"} />
+                <Space orientation="vertical" size={4}>
+                  <input ref={avatarInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => { chooseAvatar(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+                  <Button icon={<UploadOutlined />} onClick={() => avatarInput.current?.click()}>Chọn ảnh</Button>
+                  <Typography.Text type="secondary">JPG, PNG hoặc WebP · tối đa 5 MB</Typography.Text>
+                </Space>
+              </Space>
+              {avatarFile && <Typography.Text type="secondary" style={{ display: "block", marginTop: 8 }}>{avatarFile.name}</Typography.Text>}
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="full_name" label="Họ tên" rules={[{ required: true, max: 120 }]}><Input maxLength={120} onChange={(event) => {
+              if (!isEmployeeView && !slugManuallyEdited.current) form.setFieldValue("slug", toSlug(event.target.value));
+            }} /></Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}><Input maxLength={254} /></Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="username" label="Tên đăng nhập"><Input maxLength={100} /></Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            {isEmployeeView
+              ? <Form.Item name="phone" label="Số điện thoại"><Input maxLength={20} /></Form.Item>
+              : <Form.Item name="slug" label="Slug hồ sơ" extra="Tự tạo theo họ tên; bạn có thể tự sửa." rules={[{ pattern: /^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$/, message: "Slug chỉ gồm chữ không dấu, số và dấu gạch ngang." }, { max: 120 }]}><Input maxLength={120} onChange={(event) => {
+                const slug = event.target.value;
+                slugManuallyEdited.current = Boolean(slug);
+                if (!slug) form.setFieldValue("slug", toSlug(form.getFieldValue("full_name") || ""));
+              }} /></Form.Item>}
+          </Col>
+          {isAdminBig && <Col xs={24} md={isEmployeeView ? 12 : 24}>
+            <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true }]}><Select options={siteCodes.map((value) => ({ value, label: value }))} /></Form.Item>
+          </Col>}
+          {isEmployeeView && <Col xs={24} md={isAdminBig ? 12 : 24}>
+            <Form.Item name="job_title" label="Chức vụ" extra="Lễ tân tiếp nhận và thao tác đăng ký/lớp; Tư vấn & xếp lớp tra cứu học viên; Kế toán ghi phiếu thu." rules={[{ required: true }]}><Select options={[
+              { value: "le_tan", label: "Lễ tân" },
+              { value: "tu_van", label: "Tư vấn & xếp lớp" },
+              { value: "ke_toan", label: "Kế toán" },
+            ]} /></Form.Item>
+          </Col>}
+          <Col span={24}>
+            <Button type="primary" htmlType="submit" loading={submitting} block>Tạo tài khoản</Button>
+          </Col>
+        </Row>
       </Form>
     </Modal>
     <Modal

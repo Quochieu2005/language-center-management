@@ -627,6 +627,188 @@
   box-shadow: var(--admin-shadow);
 }
 
+.dashboardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  :global(.ant-typography) {
+    margin: 0 0 6px;
+  }
+}
+
+.roleBadge {
+  margin: 4px 0 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dashboardMetricCard,
+.dashboardChartCard {
+  height: 100%;
+  overflow: hidden;
+  border-color: var(--admin-border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--admin-card-bg, #ffffff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.dashboardMetricCard :global(.ant-card-body) {
+  padding: 18px 20px;
+}
+
+.dashboardMetricCard :global(.ant-statistic-title) {
+  min-height: 36px;
+  color: var(--admin-text-secondary, #64748b);
+  font-size: 13px;
+}
+
+.dashboardMetricCard :global(.ant-statistic-content-value) {
+  color: var(--admin-text, #0f172a);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.dashboardChartCard :global(.ant-card-head) {
+  border-bottom-color: var(--admin-border, #e2e8f0);
+}
+
+.siteChart {
+  display: grid;
+  gap: 18px;
+  padding: 4px 0;
+}
+
+.siteBarRow {
+  display: grid;
+  gap: 8px;
+}
+
+.siteBarLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--admin-text, #0f172a);
+  font-size: 13px;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.siteBarTrack {
+  height: 11px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--admin-hover-bg, #eef2f7);
+}
+
+.siteBarFill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2c746b, #3b82f6);
+}
+
+.classChart {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+  min-height: 220px;
+  padding: 8px 4px 0;
+}
+
+.classBarItem {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--admin-text, #0f172a);
+  text-align: center;
+
+  strong {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.classBarTrack {
+  display: flex;
+  width: min(100%, 54px);
+  height: 142px;
+  align-items: flex-end;
+  overflow: hidden;
+  border-radius: 9px 9px 4px 4px;
+  background: var(--admin-hover-bg, #eef2f7);
+}
+
+.classBarFill {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  border-radius: inherit;
+}
+
+.classBarLabel {
+  min-height: 34px;
+  color: var(--admin-text-secondary, #64748b);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.chartNote {
+  display: block;
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quickLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quickLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--admin-border, #e2e8f0);
+  border-radius: 9px;
+  background: var(--admin-card-bg, #ffffff);
+  color: var(--admin-text, #0f172a);
+  font-size: 13px;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #2c746b;
+    color: #2c746b;
+  }
+}
+
+@media (max-width: 480px) {
+  .classChart {
+    gap: 8px;
+  }
+
+  .classBarLabel {
+    font-size: 10px;
+  }
+}
+
 .timeline {
   display: flex;
   flex-direction: column;

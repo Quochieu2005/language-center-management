@@ -99,6 +99,8 @@ from core.blog.views import (
 from core.media.views import (
     AdminAvatarCompleteView,
     AdminAvatarUploadIntentView,
+    EmployeeAvatarCompleteView,
+    EmployeeAvatarUploadIntentView,
     AdminSmallAvatarCompleteView,
     AdminSmallAvatarUploadIntentView,
     TeacherAvatarCompleteView,
@@ -135,6 +137,8 @@ urlpatterns = [
     path("admin/admin-smalls/<str:slug>/avatar/complete/", AdminSmallAvatarCompleteView.as_view(), name="admin-small-avatar-complete"),
     path("admin/teachers/<str:slug>/avatar/upload-intents/", TeacherAvatarUploadIntentView.as_view(), name="teacher-avatar-upload-intent"),
     path("admin/teachers/<str:slug>/avatar/complete/", TeacherAvatarCompleteView.as_view(), name="teacher-avatar-complete"),
+    path("admin/employees/<str:slug>/avatar/upload-intents/", EmployeeAvatarUploadIntentView.as_view(), name="employee-avatar-upload-intent"),
+    path("admin/employees/<str:slug>/avatar/complete/", EmployeeAvatarCompleteView.as_view(), name="employee-avatar-complete"),
     path("teachers/profile/<str:slug>/", TeacherProfileView.as_view(), name="teacher-profile"),
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
     path("admin/teachers/<str:slug>/credential-email/", TeacherCredentialEmailView.as_view(), name="teacher-credential-email"),

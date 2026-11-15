@@ -234,7 +234,7 @@ BEGIN TRY
         CONSTRAINT FK_NhanVien_TaiKhoan FOREIGN KEY (ma_tai_khoan, ma_co_so)
             REFERENCES dbo.TaiKhoan(ma_tai_khoan, ma_co_so),
         CONSTRAINT CK_NhanVien_chuc_vu CHECK
-            (chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'xep_lop', 'quan_ly_co_so')),
+            (chuc_vu IN ('le_tan', 'tu_van', 'ke_toan', 'quan_ly_co_so')),
         CONSTRAINT CK_NhanVien_trang_thai CHECK (trang_thai IN ('dang_lam', 'nghi_viec'))
     );
 

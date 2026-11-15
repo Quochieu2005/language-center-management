@@ -25,9 +25,9 @@ export type Teacher = {
 };
 export type Employee = {
   employee_id: string; account_id: string; slug: string; username: string; email: string;
-  site_code: string; job_title: "le_tan" | "tu_van" | "ke_toan" | "xep_lop";
+  site_code: string; job_title: "le_tan" | "tu_van" | "ke_toan";
   full_name: string; phone: string | null; account_status: "active" | "inactive";
-  employee_status: "dang_lam" | "nghi_viec";
+  employee_status: "dang_lam" | "nghi_viec"; avatar_secure_url: string | null;
 };
 export type AdminNotification = {
   slug: string;
@@ -152,8 +152,20 @@ export const adminApi = {
     apiRequest<Teacher>(`/teachers/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   employees: (site_code: string, options: { job_title?: string; status?: string; search?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Employee>>(`/admin/employees/${query({ site_code, ...options })}`),
-  createEmployee: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; job_title: Employee["job_title"] }) =>
-    apiRequest<Employee>("/admin/employees/", { method: "POST", body: jsonBody(body) }),
+  createEmployee: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; job_title: Employee["job_title"]; avatar_requested?: boolean }) =>
+    apiRequest<Employee & { must_change_password: boolean; email_sent: boolean; avatar_setup_token: string | null }>("/admin/employees/", { method: "POST", body: jsonBody(body) }),
+  createEmployeeAvatarUploadIntent: (slug: string, setupToken: string) =>
+    apiRequest<AdminAvatarUploadIntent>(`/admin/employees/${encodeURIComponent(slug)}/avatar/upload-intents/`, {
+      method: "POST", body: jsonBody({ setup_token: setupToken }),
+    }),
+  completeEmployeeAvatarUpload: (slug: string, body: { setup_token: string; intent_token: string; public_id: string }) =>
+    apiRequest<{ account_id: string; role: Employee["job_title"]; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
+      `/admin/employees/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
+    ),
+  employee: (slug: string, site_code: string) =>
+    apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`),
+  updateEmployee: (slug: string, site_code: string, body: { full_name?: string; phone?: string | null; job_title?: Employee["job_title"] }) =>
+    apiRequest<Employee>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
   deleteEmployee: (slug: string, site_code: string) =>
     apiRequest<Record<string, unknown>>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   students: (options: { site_code?: string; status?: string; search?: string; account_issued?: boolean; limit?: number; offset?: number } = {}) =>

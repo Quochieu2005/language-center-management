@@ -48,7 +48,7 @@ Prefix thực tế là `/api/v1/`; bảng dưới tóm tắt các path nghiệp 
 | OAuth | `/auth/oauth/{provider}/start/`, `/auth/oauth/{provider}/callback/`, `/auth/oauth/connections/{slug}/` |
 | Admin Small/Big | `/admin/admin-smalls/`, `/admin/admin-smalls/{account_id}/credential-email/`, `/admin/admin-smalls/{slug}/status/`, `/admin/admin-smalls/{account_id}/`, `/admin/admin-smalls/profile/{slug}/`, `/admin/admin-bigs/profile/{slug}/` |
 | Giáo viên/nhân viên | `/admin/teachers/`, `/admin/teachers/{slug}/`, `/admin/teachers/{slug}/status/`, `/admin/teachers/{slug}/credential-email/`, `/teachers/profile/{slug}/`, `/admin/employees/`, `/admin/employees/{slug}/` |
-| Avatar | `/auth/profile/{slug}/avatar/upload-intents/`, `/auth/profile/{slug}/avatar/complete/`, `/admin/admin-smalls/{slug}/avatar/upload-intents/`, `/admin/admin-smalls/{slug}/avatar/complete/`, `/admin/teachers/{slug}/avatar/upload-intents/`, `/admin/teachers/{slug}/avatar/complete/` |
+| Avatar | `/auth/profile/{slug}/avatar/upload-intents/`, `/auth/profile/{slug}/avatar/complete/`, `/admin/admin-smalls/{slug}/avatar/upload-intents/`, `/admin/admin-smalls/{slug}/avatar/complete/`, `/admin/teachers/{slug}/avatar/upload-intents/`, `/admin/teachers/{slug}/avatar/complete/`, `/admin/employees/{slug}/avatar/upload-intents/`, `/admin/employees/{slug}/avatar/complete/` |
 | Danh mục | `/admin/shared/subjects/`, `/admin/shared/subjects/{slug}/`, `/admin/courses/`, `/admin/courses/{slug}/`, `/courses/`, `/courses/{course_slug}/classes/` |
 | Tuyển sinh, học viên | `/public/enrollments/`, `/admin/students/`, `/admin/students/{slug}/`, `/admin/students/{slug}/account/`, `/students/profile/{slug}/` và các route con `enrollments/`, `schedule/`, `tuition/`, `grades/` |
 | Lớp, đăng ký | `/admin/classes/`, `/admin/classes/{class_id}/`, `/admin/classes/{class_id}/students/`, `/admin/classes/{class_id}/sessions/`, `/admin/classes/{class_id}/teacher/`, `/admin/enrollments/`, `/admin/enrollments/{enrollment_id}/class/`, `/admin/rooms/`, `/admin/rooms/{room_id}/` |
@@ -157,7 +157,7 @@ language-center-management/
 
 Tên người, email, số điện thoại và nội dung nhạy cảm không được dùng làm tên folder hoặc `public_id`; mã site/mã hồ sơ phải lấy từ bản ghi và quyền đã xác thực ở server. Mã ảnh là UUID ngẫu nhiên riêng cho từng asset. API dự kiến dùng `asset_folder` với Cloudinary Dynamic folders để phân loại trong Media Library mà không bắt buộc đưa đường dẫn folder vào `public_id`; không dùng thư mục để thay thế kiểm soát quyền truy cập. Ảnh cá nhân cần chính sách delivery hạn chế phù hợp. Xem [Cloudinary Folder Modes](https://cloudinary.com/documentation/folder_modes) và [Upload API Reference](https://cloudinary.com/documentation/image_upload_api_reference).
 
-Source hiện có upload intent và endpoint hoàn tất Cloudinary cho ảnh đại diện Admin, Admin Small và giáo viên; các biến môi trường chỉ có placeholders trong `.env.example`. Django kiểm tra quyền/asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url` theo các bản sao tài khoản. Chưa có API MediaAsset tổng quát hoặc bằng chứng upload thật trên Cloudinary; schema avatar đã có trong `docs/DATABASE_SCHEMA.md`.
+Source hiện có upload intent và endpoint hoàn tất Cloudinary cho ảnh đại diện Admin, Admin Small, giáo viên và nhân viên mới được tạo; các biến môi trường chỉ có placeholders trong `.env.example`. Django kiểm tra quyền/asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url` theo các bản sao tài khoản. Chưa có API MediaAsset tổng quát hoặc bằng chứng upload thật trên Cloudinary; schema avatar đã có trong `docs/DATABASE_SCHEMA.md`.
 
 Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có thời hạn → frontend gửi bytes ảnh trực tiếp tới Cloudinary → frontend gửi `public_id` về API → API xác minh lại asset rồi gắn metadata vào bản ghi tại site đúng. Nếu upload Cloudinary thành công nhưng ghi metadata thất bại, không báo hoàn tất; ghi nhận asset mồ côi để dọn an toàn.
 
@@ -179,7 +179,8 @@ SQL Server chỉ lưu metadata avatar hiện được triển khai (`avatar_publ
 |---|---|---|
 | Admin Big | `TaiKhoan.vai_tro = admin_big`, `ma_co_so = NULL` | Toàn hệ thống; thao tác nhiều site phải được gắn `GLOBAL`, `REPLICATED-WRITE` hoặc `DISTRIBUTED-TX` rõ ràng |
 | Admin Small | `TaiKhoan.vai_tro = nhan_vien`, hồ sơ `Admin.loai_admin = admin_small`, có site được gán | Một site được gán; không được chọn site khác trong query/body để mở rộng quyền |
-| Lễ tân | `nhan_vien` với chức vụ tương ứng | Hồ sơ học viên, đăng ký và xếp lớp trong site được gán |
+| Lễ tân | `nhan_vien`, `NhanVien.chuc_vu=le_tan` | Tiếp nhận tại quầy; thao tác lớp/đăng ký và kế hoạch học phí tại site được gán; không tra cứu danh sách học viên hoặc ghi phiếu thu |
+| Tư vấn & xếp lớp | `nhan_vien`, `NhanVien.chuc_vu=tu_van` | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp trong site được gán |
 | Kế toán | `nhan_vien` với chức vụ tương ứng | Học phí và phiếu thu trong site được gán |
 | Giáo viên | `TaiKhoan.vai_tro = giao_vien`, hồ sơ `GiaoVien` tại site | Chỉ lớp/buổi được phân công; API kiểm tra phân công ở mỗi thao tác |
 | Học viên | Schema/API/UI có tài khoản và portal trong source; phạm vi đồ án chưa được duyệt | Không đưa vào phạm vi nghiệm thu trước khi nhóm thống nhất và cập nhật các tài liệu liên quan |
@@ -274,7 +275,7 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 |---|---|---|---|
 | `GET /api/v1/admin/sites` | Admin Big | Đọc bản sao `CoSo`; tổng hợp trạng thái kết nối theo nhu cầu | `CoSo` ở bản sao tại site; không trả thông tin bí mật kết nối |
 | `GET /api/v1/admin/sites/{ma_co_so}` | Admin Big | Đọc bản sao `CoSo` và trạng thái site | Chi tiết cơ sở; không trả credential/chuỗi kết nối |
-| `GET /api/v1/admin/dashboard` | Admin Big | `GLOBAL` | Số liệu toàn hệ thống, việc chờ duyệt và tình trạng site; response báo site thiếu |
+| `GET /api/v1/admin/dashboard` | Admin Big | Đề xuất, chưa có route source | Dashboard web hiện tổng hợp dữ liệu từ `GET /api/v1/admin/reports/students-by-site/`; không gọi endpoint này |
 | `POST /api/v1/admin/sites` | Admin Big | Điều phối cấu hình + nạp dữ liệu dùng chung | Tạo metadata và khởi chạy quy trình provisioning; không cho trình duyệt truyền credential SQL Server |
 | `PATCH /api/v1/admin/sites/{ma_co_so}/status` | Admin Big | `REPLICATED-WRITE`/quy trình đóng site | Chỉ nhận trạng thái cho phép; trước khi đóng phải xử lý giao dịch chuyển và dữ liệu đang hoạt động theo README mục 5.14 |
 | `GET /api/v1/admin/admins-small` | Admin Big | `GLOBAL` hoặc đọc bản sao tài khoản kèm tra cứu hồ sơ từng site | Gộp Admin Small theo site; phản hồi một phần nếu site thiếu |
@@ -295,19 +296,19 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `PATCH /api/v1/admin/courses/{slug}/` / `DELETE /api/v1/admin/courses/{slug}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Cập nhật/xóa khóa học dùng chung tại các site với cùng quy tắc thời lượng; khi đổi `ma_khoa_hoc`, áp dụng cùng quy tắc định dạng tối đa 30 ký tự (giao diện chuẩn hóa thành chữ in hoa) và đồng bộ mã cùng các tham chiếu lớp liên quan; xóa bị từ chối nếu lớp còn tham chiếu; dùng `Idempotency-Key` và xử lý retry/đối soát |
 | `GET /api/v1/admin/notifications/` | Admin Big hoặc Admin Small | Admin Big: `GLOBAL`; Admin Small: `LOCAL` | Đọc `ThongBao`; kết quả toàn cục được gộp ở API, báo `complete=false`/`missing_sites` khi thiếu site; không theo dõi ai đã đọc |
 | `POST /api/v1/admin/notifications/` | Admin Big hoặc Admin Small | Admin Big: `REPLICATED-WRITE`; Admin Small: `LOCAL` | Ghi `ThongBao` và `Logs` hiện có. Admin Big ghi các site hoạt động; Admin Small chỉ ghi site được gán. Bắt buộc `Idempotency-Key`; 200 đủ site, 202 còn site thiếu, 409 cùng key nhưng khác nội dung. Mỗi site có transaction cục bộ, không phải ACID xuyên site |
-| `GET /api/v1/students?search=...&trang_thai=...&cursor=...&limit=...` | Admin Big; Admin Small/lễ tân trong site | Admin Big: `GLOBAL`; nhân viên cơ sở: `LOCAL` | Tìm/lọc `HocVien`, phân trang; giới hạn kết quả theo phạm vi người gọi, không đoán site bằng tiền tố mã |
-| `POST /api/v1/students` | Admin Small/lễ tân đúng site | `LOCAL` | Tạo `HocVien` tại site do API lấy từ tài khoản; không nhận site tùy ý từ client |
-| `GET /api/v1/students/{ma_hoc_vien}` | Admin Big; nhân viên đúng site | Admin Big: `GLOBAL` định vị hồ sơ hiện hành; nhân viên: `LOCAL` | Trả hồ sơ theo quyền; không JOIN xuyên CSDL |
-| `PATCH /api/v1/students/{ma_hoc_vien}` | Admin Small/lễ tân đúng site | `LOCAL` | Chỉ cho sửa trường hồ sơ được phép; kiểm tra version để tránh ghi đè cập nhật mới |
+| `GET /api/v1/students?search=...&trang_thai=...&cursor=...&limit=...` | Admin Big; Admin Small/Tư vấn & xếp lớp trong site | Admin Big: `GLOBAL`; nhân viên cơ sở: `LOCAL` | Tìm/lọc `HocVien`, phân trang; giới hạn kết quả theo phạm vi người gọi, không đoán site bằng tiền tố mã |
+| `POST /api/v1/students` | Admin Small đúng site; luồng tiếp nhận theo quyền được nhóm chốt | `LOCAL` | Tạo `HocVien` tại site do API lấy từ tài khoản; không nhận site tùy ý từ client |
+| `GET /api/v1/students/{ma_hoc_vien}` | Admin Big; Admin Small/Tư vấn & xếp lớp đúng site theo endpoint được bật | Admin Big: `GLOBAL` định vị hồ sơ hiện hành; nhân viên: `LOCAL` | Trả hồ sơ theo quyền; không JOIN xuyên CSDL |
+| `PATCH /api/v1/students/{ma_hoc_vien}` | Admin Small đúng site; luồng cập nhật theo quyền được nhóm chốt | `LOCAL` | Chỉ cho sửa trường hồ sơ được phép; kiểm tra version để tránh ghi đè cập nhật mới |
 | `GET /api/v1/classes` / `POST /api/v1/classes` | Admin Small đúng site | `LOCAL` | Đọc/tạo `LopHoc`; khi tạo lịch phải kiểm tra khóa học, giáo viên, phòng, lịch và sức chứa cùng site |
-| `GET /api/v1/admin/rooms/?site_code=...` / `POST /api/v1/admin/rooms/` | Admin Big chọn site; Admin Small/lễ tân/xếp lớp tại site được phân công | `LOCAL` | Đọc/tạo `PhongHoc` trong đúng CSDL site; không thao tác nhiều site trong một request |
+| `GET /api/v1/admin/rooms/?site_code=...` / `POST /api/v1/admin/rooms/` | Admin Big chọn site; Admin Small/Lễ tân/Tư vấn & xếp lớp tại site được phân công | `LOCAL` | Đọc/tạo `PhongHoc` trong đúng CSDL site; không thao tác nhiều site trong một request |
 | `DELETE /api/v1/admin/rooms/{ma_phong}/?site_code=...` | Admin Big chọn site; Admin Small tại site được phân công | `LOCAL` | Xóa phòng chưa được LopHoc/BuoiHoc sử dụng; ghi `Logs` cùng transaction. Trả `409` nếu còn tham chiếu để giữ lịch sử và khóa ngoại |
 | `GET /api/v1/classes/{ma_lop}` / `PATCH /api/v1/classes/{ma_lop}` | Admin Small đúng site; giáo viên chỉ đọc lớp được giao | `LOCAL` | Không cho đổi lớp sang site khác; ghi nhật ký các thay đổi quan trọng |
 | `GET /api/v1/classes/{ma_lop}/sessions` / `POST /api/v1/classes/{ma_lop}/sessions` | Admin Small đúng site; giáo viên được phân công chỉ đọc | `LOCAL` | Đọc/tạo `BuoiHoc`; kiểm tra phòng, giờ, giáo viên và trùng lịch trong cùng site |
 | `PATCH /api/v1/classes/{ma_lop}/sessions/{ma_buoi}` | Admin Small đúng site | `LOCAL` | Sửa lịch/buổi hợp lệ, cập nhật audit và từ chối nếu phát sinh xung đột |
-| `GET /api/v1/site/dashboard` | Admin Small, lễ tân, kế toán đúng site | `LOCAL` | Tóm tắt việc cần xử lý tại site được gán; chỉ trả widget phù hợp quyền |
-| `GET /api/v1/enrollments?ma_hoc_vien=...&ma_lop=...` | Admin Small/lễ tân tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi được cấp | Đọc `DangKy`; API giới hạn site, phân trang và trạng thái |
-| `GET /api/v1/enrollments/{ma_dang_ky}` | Admin Small/lễ tân đúng site; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết đăng ký, lớp và khoản học phí liên quan; không JOIN xuyên site |
+| `GET /api/v1/site/dashboard` | Admin Small, lễ tân, Tư vấn & xếp lớp, kế toán đúng site | `LOCAL` | Tóm tắt việc cần xử lý tại site được gán; chỉ trả widget phù hợp quyền |
+| `GET /api/v1/enrollments?ma_hoc_vien=...&ma_lop=...` | Admin Small/lễ tân/Tư vấn & xếp lớp tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi được cấp | Đọc `DangKy`; API giới hạn site, phân trang và trạng thái |
+| `GET /api/v1/enrollments/{ma_dang_ky}` | Admin Small/lễ tân/Tư vấn & xếp lớp đúng site; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết đăng ký, lớp và khoản học phí liên quan; không JOIN xuyên site |
 | `GET /api/v1/tuition?ma_hoc_vien=...&ma_dang_ky=...&trang_thai=...&cursor=...&limit=...` | Kế toán/Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi | Tìm/lọc `HocPhi`, phân trang; không trả dữ liệu ngoài quyền tài chính |
 | `GET /api/v1/tuition/{ma_hoc_phi}` | Kế toán/Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết khoản phí, dư nợ và lịch sử thu/hoàn tại site sở hữu dữ liệu |
 | `GET /api/v1/tuition-receipts?ma_hoc_phi=...&ma_hoc_vien=...&ma_phieu=...&tu_ngay=...&den_ngay=...&loai=...&cursor=...&limit=...` | Kế toán; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi | Tìm/lọc biên nhận theo học phí, học viên, mã phiếu, khoảng ngày và loại thu/hoàn; phân trang, giới hạn site và quyền tài chính |
@@ -321,6 +322,26 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 Tạo thông báo nhận `category`, `severity`, `audience`, `title`, `message` và `target_path` nội bộ `/admin/...` (không bắt buộc). Chỉ Admin Big/Admin Small được tạo; Admin Small chỉ ghi tại site của mình và không thể nhắm riêng Admin Big. Admin Big gửi tới mọi site hoạt động. Nhóm nhận hợp lệ là `admin_all`, `admin_big`, `admin_small`; schema hiện tại không hỗ trợ phát trực tiếp cho học viên, giáo viên hoặc nhân viên. Các lần ghi dùng transaction và audit riêng tại từng CSDL site; nếu một site lỗi, API không báo hoàn tất toàn phần. Dùng cùng `Idempotency-Key` và cùng body để tiếp tục các site còn thiếu; dùng key cũ với nội dung khác trả `409`.
 
 `POST /admin/sites` không có nghĩa API tự tạo CSDL tùy ý bằng credential từ browser. Khâu tạo database, cấu hình kết nối bí mật, chạy migration và nạp bản sao phải thuộc provisioning phía server/nhóm triển khai; endpoint chỉ khởi chạy quy trình đã được bảo vệ.
+
+### Nhân viên nghiệp vụ — đã có route trong source
+
+Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan`); giao diện hiển thị `tu_van` là “Tư vấn & xếp lớp”, gộp quyền tra cứu/tư vấn và quản lý lớp/đăng ký. Không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big phải chỉ định một `site_code` đang hoạt động cho mỗi request; Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body. Các endpoint hồ sơ thao tác một site, không phải Global Query.
+
+| Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
+|---|---|---|---|
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien` và `TaiKhoan` cục bộ để liệt kê nhân viên/phân trang, gồm `avatar_secure_url`; Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
+| `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn, gồm `avatar_secure_url`; không dò hoặc JOIN qua site khác |
+| `PATCH /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Chỉ cập nhật `NhanVien.ho_ten`, `sdt`, `chuc_vu`; ghi `Logs` cùng transaction cục bộ |
+| `DELETE /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Xóa mềm: vô hiệu hóa các bản `TaiKhoan`, thu hồi `PhienDangNhap`, đổi `NhanVien.trang_thai` thành `nghi_viec`; giữ hồ sơ và chứng từ/lịch sử |
+| `POST /api/v1/admin/employees/{slug}/avatar/upload-intents/` | Admin Big; Admin Small đúng site, token cấp lúc tạo | `GLOBAL` đọc bản sao + `LOCAL` đọc hồ sơ | Xác minh tài khoản/hồ sơ nhân viên, trạng thái ảnh và site hoạt động; ký intent ngắn hạn để client tải trực tiếp lên Cloudinary |
+| `POST /api/v1/admin/employees/{slug}/avatar/complete/` | Admin Big; Admin Small đúng site, token cấp lúc tạo | `REPLICATED-WRITE` | Xác minh asset Cloudinary rồi cập nhật `TaiKhoan.avatar_public_id`/`avatar_secure_url` cùng audit tại từng site hoạt động; lỗi site trả incomplete/503, không báo hoàn tất giả |
+
+PATCH nhận ít nhất một trong `full_name`, `phone`, `job_title`; body có trường lạ nhận `400`. `phone: null` hoặc `phone: ""` xóa số điện thoại. Chỉ hồ sơ đang làm việc có tài khoản hoạt động được sửa; email/tên đăng nhập là danh tính tài khoản nhân bản, còn `site_code` xác định mảnh nên các trường này không được sửa bằng endpoint hồ sơ. GET/PATCH/DELETE dùng query `site_code` cho Admin Big; Admin Small có thể bỏ query hoặc truyền đúng site của mình.
+
+`tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này trước khi triển khai phiên bản mới. Chức vụ `le_tan` là nhân viên tiếp nhận tại quầy; trong source hiện tại được thao tác lớp/đăng ký và kế hoạch đóng học phí, còn tra cứu danh sách học viên thuộc `tu_van`.
+
+Create trả `201`; GET/PATCH trả `200`; lỗi validation/quyền/không tìm thấy/xung đột lần lượt có thể trả `400`/`403`/`404`/`409`. Ảnh không bắt buộc, chỉ nhận JPG/JPEG/PNG/WebP tối đa 5 MB; API xác minh setup token, upload intent và asset, client gửi bytes trực tiếp Cloudinary, không qua Django. Nếu upload ảnh thất bại thì tài khoản đã tạo vẫn tồn tại và giao diện phải báo ảnh chưa lưu. DELETE là nghỉ việc, không xóa vật lý; nếu một site chưa đồng bộ hoặc thu hồi phiên được thì trả `503`, không báo thành công toàn phần, và có thể gọi lại cùng slug để tiếp tục. Các database commit độc lập nên `REPLICATED-WRITE` không đồng nghĩa ACID xuyên site. Tài khoản/phiên/nhật ký được xử lý theo service hiện có; chưa có bằng chứng lỗi và phục hồi nhiều site thật.
 
 ## Endpoint cho giáo viên
 
@@ -407,8 +428,8 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 
 | Nghiệp vụ | Endpoint đề xuất | Vai trò | Kiểu phân tán | Site và bảng chính |
 |---|---|---|---|---|
-| Đăng ký khóa học | `POST /api/v1/enrollments` | Admin Small, lễ tân | `LOCAL` | Site học viên/lớp; đọc `HocVien`, `LopHoc`; ghi `DangKy`, `HocPhi`, cập nhật sĩ số `LopHoc` |
-| Xếp/đổi lớp | `PATCH /api/v1/enrollments/{ma_dang_ky}/class` | Admin Small, lễ tân | `LOCAL` | Site của đăng ký; đọc lớp và sĩ số; cập nhật `DangKy`, sĩ số hai lớp |
+| Đăng ký khóa học | `POST /api/v1/enrollments` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site học viên/lớp; đọc `HocVien`, `LopHoc`; ghi `DangKy`, `HocPhi`, cập nhật sĩ số `LopHoc` |
+| Xếp/đổi lớp | `PATCH /api/v1/enrollments/{ma_dang_ky}/class` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site của đăng ký; đọc lớp và sĩ số; cập nhật `DangKy`, sĩ số hai lớp |
 | Thu/hoàn học phí tại quầy | `POST /api/v1/tuition-receipts` | Kế toán; Admin Small theo quyền | `LOCAL` | Site chứa `HocPhi`; ghi `PhieuThu`, cập nhật số đã thu/trạng thái `HocPhi`; bắt buộc idempotency key |
 | Tạo/tiếp tục yêu cầu thanh toán trực tuyến (nếu nhóm chọn tích hợp cổng) | `POST /api/v1/tuition-payment-attempts` | Vai trò thanh toán đã được nhóm duyệt | `LOCAL` | Lưu yêu cầu tại đúng site của `HocPhi`; chưa ghi `PhieuThu` hay tăng số đã thu khi chưa xác minh thành công |
 | Tra cứu trạng thái thanh toán | `GET /api/v1/tuition-payment-attempts/{ma_yeu_cau}` | Người tạo và nhân viên có quyền tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` định vị rồi `LOCAL` | Đọc trạng thái bền vững tại site chứa khoản học phí; không suy site từ tiền tố mã |

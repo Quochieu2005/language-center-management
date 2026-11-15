@@ -51,9 +51,9 @@ from core.classes.services import (
 )
 
 
-_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "xep_lop"}
-_CLASS_READ_ROLES = _MANAGEMENT_ROLES | {"tu_van"}
-_ENROLLMENT_ROLES = _MANAGEMENT_ROLES | {"tu_van"}
+_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "tu_van"}
+_CLASS_READ_ROLES = _MANAGEMENT_ROLES
+_ENROLLMENT_ROLES = _MANAGEMENT_ROLES
 _SITE_RECORD_ID = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 
 
@@ -271,7 +271,7 @@ class ClassCollectionView(_ClassApiView):
         tags=["Xếp lớp"],
         summary="Liệt kê lớp và sĩ số tại một cơ sở",
         description=(
-            "Đọc đúng một CSDL site. Admin Big phải chọn site_code; Admin Small/lễ tân chỉ dùng site "
+            "Đọc đúng một CSDL site. Admin Big phải chọn site_code; Admin Small/lễ tân/tư vấn & xếp lớp chỉ dùng site "
             "trong phiên đăng nhập. current_count là bộ đếm LopHoc; registered_count được tính từ "
             "DangKy đang hoạt động để phát hiện lệch sĩ số. Không truy vấn xuyên site."
         ),
@@ -315,7 +315,7 @@ class ClassCollectionView(_ClassApiView):
         description=(
             "Tạo LopHoc cùng BuoiHoc trong một transaction cục bộ. Nếu khóa học chưa chốt số buổi, số buổi được xác định từ khoảng ngày và các thứ đã chọn. "
             "Kiểm tra khóa học, giáo viên đang dạy, phòng hoạt động/sức chứa, ngày giờ và xung đột "
-            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/lễ tân dùng site phiên đăng nhập."
+            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/lễ tân/tư vấn & xếp lớp dùng site phiên đăng nhập."
         ),
         request=ClassCreateSerializer,
         responses={

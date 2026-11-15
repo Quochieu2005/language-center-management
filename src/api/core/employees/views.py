@@ -11,10 +11,14 @@ from rest_framework.views import APIView
 
 from core.academics.common import AcademicError, AcademicForbidden, AcademicInvalid, site_scope
 from core.auth.authentication import AuthCookieAuthentication
+from core.media.avatars import create_employee_avatar_setup_token
 from core.employees.serializers import (
     EmployeeCreateSerializer,
+    EmployeeCreateResponseSerializer,
     EmployeeListQuerySerializer,
+    EmployeeResponseSerializer,
     EmployeeSiteQuerySerializer,
+    EmployeeUpdateSerializer,
 )
 from core.employees.services import (
     EmployeeConflict,
@@ -22,7 +26,9 @@ from core.employees.services import (
     EmployeeNotFound,
     create_employee,
     deactivate_employee,
+    get_employee,
     list_employees,
+    update_employee,
 )
 
 
@@ -34,7 +40,7 @@ def _site_error(exc):
     if isinstance(exc, ValueError):
         return Response({"detail": str(exc)}, status=400)
     return Response(
-        {"detail": "CSDL site hoặc email chưa sẵn sàng; kiểm tra trạng thái trước khi gọi lại."},
+        {"detail": "CSDL cơ sở hoặc dịch vụ cần thiết chưa sẵn sàng; kiểm tra trạng thái trước khi gọi lại."},
         status=503,
     )
 
@@ -80,15 +86,16 @@ class EmployeeCollectionView(APIView):
     @extend_schema(
         operation_id="employee_create",
         tags=["Quản lý nhân viên"],
-        summary="Tạo tài khoản nhân viên tư vấn, kế toán hoặc xếp lớp",
+        summary="Tạo tài khoản nhân viên lễ tân, tư vấn/xếp lớp hoặc kế toán",
         description=(
             "LOCAL cho hồ sơ dbo.NhanVien tại site đã chọn; bản ghi TaiKhoan nhan_vien được nhân bản "
             "đến các site hoạt động theo chính sách tài khoản hiện có. Admin Big chọn site; Admin Small "
             "chỉ tạo ở site của mình. Mật khẩu tạm từ ADMIN_SMALL_TEMP_PASSWORD được gửi qua SMTP, "
-            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Không tạo bảng hoặc CSDL mới."
+            "bắt buộc đổi ở lần đăng nhập đầu; API không trả mật khẩu. Nếu avatar_requested=true, API trả "
+            "setup_token ngắn hạn để tải ảnh lên Cloudinary; bytes ảnh không đi qua Django/SQL Server."
         ),
         request=EmployeeCreateSerializer,
-        responses={201: OpenApiResponse(), 400: OpenApiResponse(), 401: OpenApiResponse(), 403: OpenApiResponse(), 409: OpenApiResponse(), 429: OpenApiResponse(), 503: OpenApiResponse()},
+        responses={201: EmployeeCreateResponseSerializer, 400: OpenApiResponse(), 401: OpenApiResponse(), 403: OpenApiResponse(), 409: OpenApiResponse(), 429: OpenApiResponse(), 503: OpenApiResponse()},
     )
     def post(self, request):
         serializer = EmployeeCreateSerializer(data=request.data)
@@ -106,6 +113,7 @@ class EmployeeCollectionView(APIView):
             return Response({"detail": "Email, tên đăng nhập hoặc hồ sơ nhân viên đã tồn tại."}, status=409)
         except (AcademicError, EmployeeInfrastructureUnavailable, ValueError, KeyError) as exc:
             return _site_error(exc)
+        avatar_setup_token = create_employee_avatar_setup_token(request.user, result) if data["avatar_requested"] else None
         return Response(
             {
                 "employee_id": result.employee_id,
@@ -119,6 +127,8 @@ class EmployeeCollectionView(APIView):
                 "phone": result.phone,
                 "account_status": "active",
                 "employee_status": "dang_lam",
+                "avatar_secure_url": None,
+                "avatar_setup_token": avatar_setup_token,
                 "must_change_password": result.must_change_password,
                 "email_sent": result.email_sent,
             },
@@ -132,6 +142,73 @@ class EmployeeDetailView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "employee_management"
+
+    @extend_schema(
+        operation_id="employee_detail_by_slug",
+        tags=["Quản lý nhân viên"],
+        summary="Xem chi tiết nhân viên theo slug",
+        description=(
+            "LOCAL: đọc NhanVien và bản TaiKhoan tại CSDL site được chọn. Admin Big gửi site_code; "
+            "Admin Small chỉ đọc site gắn với phiên. Email và tên đăng nhập là danh tính TaiKhoan, "
+            "không phải trường hồ sơ có thể sửa ở endpoint này."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={200: EmployeeResponseSerializer, 400: OpenApiResponse(), 401: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def get(self, request, slug: str):
+        query = EmployeeSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        try:
+            site = site_scope(
+                request.user, query.validated_data.get("site_code"),
+                roles={"admin_big", "admin_small"},
+            )
+            return Response(get_employee(slug=slug, site_code=site))
+        except EmployeeNotFound:
+            return Response({"detail": "Không tìm thấy nhân viên trong cơ sở được chọn."}, status=404)
+        except EmployeeConflict:
+            return Response({"detail": "Dữ liệu tài khoản hoặc hồ sơ nhân viên đang xung đột."}, status=409)
+        except (AcademicError, EmployeeInfrastructureUnavailable, KeyError) as exc:
+            return _site_error(exc)
+
+    @extend_schema(
+        operation_id="employee_update_by_slug",
+        tags=["Quản lý nhân viên"],
+        summary="Cập nhật hồ sơ nhân viên theo slug",
+        description=(
+            "LOCAL: cập nhật NhanVien.ho_ten, sdt hoặc chuc_vu và ghi Logs trong cùng transaction tại site. "
+            "Chỉ hồ sơ/tài khoản đang hoạt động được sửa. Không nhận email, username hoặc site_code trong body: "
+            "danh tính đăng nhập được nhân bản, còn đổi cơ sở cần nghiệp vụ riêng."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        request=EmployeeUpdateSerializer,
+        responses={200: EmployeeResponseSerializer, 400: OpenApiResponse(), 401: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 429: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def patch(self, request, slug: str):
+        serializer = EmployeeUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        query = EmployeeSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        try:
+            site = site_scope(
+                request.user, query.validated_data.get("site_code"),
+                roles={"admin_big", "admin_small"},
+            )
+            result = update_employee(
+                slug=slug, site_code=site, fields=serializer.validated_data,
+                actor_id=request.user.account_id,
+                remote_ip=request.META.get("REMOTE_ADDR", "") or "unknown",
+            )
+        except EmployeeNotFound:
+            return Response({"detail": "Không tìm thấy nhân viên trong cơ sở được chọn."}, status=404)
+        except EmployeeConflict:
+            return Response(
+                {"detail": "Nhân viên đã nghỉ việc hoặc dữ liệu tài khoản đang xung đột; hãy tải lại."},
+                status=409,
+            )
+        except (AcademicError, EmployeeInfrastructureUnavailable, ValueError, KeyError) as exc:
+            return _site_error(exc)
+        return Response(result, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="employee_delete_by_slug",
