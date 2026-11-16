@@ -297,7 +297,7 @@ flowchart TD
 3. API xác thực trạng thái hoạt động và quyền; mật khẩu không được lưu ở trình duyệt hoặc ghi ra log. API là nơi quyết định vai trò, chức vụ, site và phạm vi lớp.
 4. Sau đăng nhập thành công, frontend gọi `GET /api/v1/auth/profile/{slug}/` với slug nhận từ phản hồi đăng nhập, đọc hồ sơ phiên do API trả về rồi mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; lễ tân, kế toán và giáo viên thấy menu theo nhiệm vụ.
 5. Các API nghiệp vụ vẫn phải kiểm tra quyền và site ở phía máy chủ. Frontend không được dùng giá trị site từ URL/local storage để cấp quyền hoặc truy vấn thẳng cơ sở dữ liệu.
-6. Đăng xuất kết thúc phiên phía server rồi xóa cookie. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
+6. Mọi trang có phiên đã xác thực đều cung cấp thao tác Đăng xuất, gồm route cổng học viên đang có trong source; thao tác thu hồi phiên phía server rồi xóa phiên phía giao diện. Đây không đồng nghĩa portal tự phục vụ đã được duyệt vào phạm vi môn học. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
 7. Tài khoản nội bộ được Admin Big tạo qua quy trình hiện có; không hiển thị route kích hoạt `/auth/activate` khi source chưa có route đó. Quên mật khẩu dùng trang `/forgot-password` và luồng OTP; API chỉ lưu hash OTP, mặc định hết hạn sau 120 giây theo `PASSWORD_RESET_TIMEOUT`. Không hiển thị việc tài khoản/email có tồn tại hay không. Đổi mật khẩu đã xác thực dùng trang `/password/change`.
 
 #### Tự đăng xuất khi không hoạt động

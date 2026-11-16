@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Input, Space, Tabs, Typography, message } from "antd";
+import { LogoutOutlined } from "@ant-design/icons";
 import { academicsApi, type ApiRow } from "@/lib/api/academics";
 import { RequireSession, useSession } from "@/lib/auth/session";
 import { ApiDataTable } from "@/components/shared/ApiPage";
@@ -12,7 +13,7 @@ type PortalData = { profile: ApiRow | null; enrollments: ApiRow[]; schedule: Api
 export default function StudentRoute() { return <RequireSession roles={["hoc_vien"]}><StudentPortal /></RequireSession>; }
 
 function StudentPortal() {
-  const { user } = useSession();
+  const { user, signOut } = useSession();
   const [data, setData] = useState<PortalData>({ profile: null, enrollments: [], schedule: [], tuition: [], grades: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ function StudentPortal() {
     try { await academicsApi.updateStudentProfile(user.slug, values); message.success("Đã cập nhật thông tin liên hệ."); void load(); }
     catch (reason) { message.error(reason instanceof Error ? reason.message : "Không lưu được hồ sơ."); }
   };
-  return <main style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}><Space orientation="vertical" size="middle" style={{ width: "100%" }}><div><Typography.Title level={2}>Cổng học viên</Typography.Title><Typography.Text type="secondary">Dữ liệu cá nhân, đăng ký, lịch học, học phí và điểm của tài khoản hiện tại.</Typography.Text></div>
+  return <main style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}><Space orientation="vertical" size="middle" style={{ width: "100%" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}><div><Typography.Title level={2}>Cổng học viên</Typography.Title><Typography.Text type="secondary">Dữ liệu cá nhân, đăng ký, lịch học, học phí và điểm của tài khoản hiện tại.</Typography.Text></div><Button danger icon={<LogoutOutlined />} onClick={async () => { try { await signOut(); } catch { message.error("Không thu hồi được phiên trên máy chủ."); } }}>Đăng xuất</Button></div>
     {error && <Alert type="warning" showIcon title="Một số dữ liệu chưa tải được" description={error} />}
     <Card title="Hồ sơ của tôi"><Form form={form} layout="inline" onFinish={save}><Form.Item label="Họ tên"><Input value={String(data.profile?.full_name || "")} disabled /></Form.Item><Form.Item label="Điện thoại" name="phone"><Input maxLength={20} /></Form.Item><Form.Item label="Địa chỉ" name="address"><Input maxLength={300} /></Form.Item><Button type="primary" htmlType="submit">Lưu liên hệ</Button></Form></Card>
     <SocialAccountConnections />
