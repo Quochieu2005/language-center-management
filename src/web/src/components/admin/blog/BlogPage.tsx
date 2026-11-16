@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ApiError } from "@/lib/api/client";
+import BlogContentEditor from "./BlogContentEditor";
+import styles from "./BlogPage.module.scss";
 import {
   blogApi, type BlogArticleInput, type BlogArticleSummary,
   type BlogCategory, type BlogCategoryInput, type BlogList, type BlogWriteResult,
@@ -25,24 +27,27 @@ const pendingStorageKey = "admin-blog-pending-write";
 const categoryStatus = { hoat_dong: "Đang hoạt động", ngung: "Ngừng" };
 const articleStatus = { nhap: "Bản nháp", da_xuat_ban: "Đã xuất bản", an: "Đã ẩn" };
 const slugRule = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const vietnamDateTime = new Intl.DateTimeFormat("vi-VN", {
-  dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh",
+function articleSlug(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[đĐ]/g, "d")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 160).replace(/-+$/g, "");
+}
+const vietnamDate = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short", timeZone: "Asia/Ho_Chi_Minh",
 });
 
-function toLocalDateTime(value: string | null) {
+function toLocalDate(value: string | null) {
   if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   }).formatToParts(date).map(({ type, value: part }) => [type, part]));
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function toUtcDateTime(value?: string) {
   if (!value) return null;
-  const date = new Date(`${value}${value.length === 16 ? ":00" : ""}+07:00`);
+  const date = new Date(`${value}T00:00:00+07:00`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
@@ -86,6 +91,7 @@ export default function BlogPage() {
   const [pending, setPending] = useState<PendingWrite | null>(null);
   const [categoryForm] = Form.useForm<CategoryForm>();
   const [articleForm] = Form.useForm<ArticleForm>();
+  const articleSlugManuallyEdited = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,14 +184,16 @@ export default function BlogPage() {
   const openArticle = async (row?: BlogArticleSummary) => {
     articleForm.resetFields();
     if (!row) {
-      articleForm.setFieldsValue({ status: "nhap", reading_time_minutes: 5 });
+      articleSlugManuallyEdited.current = false;
+      articleForm.setFieldsValue({ status: "nhap", reading_time_minutes: 5, published_at: toLocalDate(new Date().toISOString()) });
       setEditor({ kind: "article" });
       return;
     }
     setLoadingArticle(row.slug);
     try {
       const { result } = await blogApi.article(row.slug);
-      articleForm.setFieldsValue({ ...result, published_at: toLocalDateTime(result.published_at) });
+      articleForm.setFieldsValue({ ...result, published_at: toLocalDate(result.published_at) });
+      articleSlugManuallyEdited.current = result.slug !== articleSlug(result.title);
       setEditor({ kind: "article", slug: row.slug });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được nội dung bài viết.");
@@ -245,7 +253,7 @@ export default function BlogPage() {
     { title: "Tóm tắt", dataIndex: "excerpt" },
     { title: "Thời gian đọc", dataIndex: "reading_time_minutes", render: (value) => `${value} phút` },
     { title: "Trạng thái", dataIndex: "status", render: (value: BlogArticleSummary["status"]) => <Tag color={value === "da_xuat_ban" ? "green" : value === "an" ? "default" : "gold"}>{articleStatus[value]}</Tag> },
-    { title: "Ngày xuất bản", dataIndex: "published_at", render: (value: string | null) => value ? vietnamDateTime.format(new Date(value)) : "Ngay khi xuất bản" },
+    { title: "Ngày xuất bản", dataIndex: "published_at", render: (value: string | null) => value ? vietnamDate.format(new Date(value)) : "Ngay khi xuất bản" },
     { title: "Thao tác", render: (_, row) => <Space><Button size="small" disabled={!canWrite} loading={loadingArticle === row.slug} onClick={() => void openArticle(row)}>Sửa</Button><Button danger size="small" disabled={!canWrite} onClick={() => confirmDelete("article", row)}>Xóa</Button></Space> },
   ];
 
@@ -272,18 +280,26 @@ export default function BlogPage() {
       </Form>
     </Modal>
 
-    <Modal title={editor?.slug ? "Sửa bài viết Blog" : "Tạo bài viết Blog"} open={editor?.kind === "article"} onCancel={finishEditor} footer={null} width="min(760px, calc(100vw - 32px))" destroyOnHidden>
+    <Modal title={editor?.slug ? "Sửa bài viết Blog" : "Tạo bài viết Blog"} open={editor?.kind === "article"} onCancel={finishEditor} footer={null} width="min(1120px, calc(100vw - 32px))" destroyOnHidden>
       <Form form={articleForm} layout="vertical" onFinish={submitArticle}>
-        <Form.Item name="title" label="Tiêu đề" rules={[{ required: true }, { max: 200 }]}><Input maxLength={200} /></Form.Item>
-        <Form.Item name="slug" label="Slug bài viết" extra="Đây là phần dùng trong URL /blog/{slug}." rules={[{ required: true }, { max: 160 }, { pattern: slugRule, message: "Slug chỉ gồm chữ thường, số và dấu gạch nối đơn." }]}><Input maxLength={160} /></Form.Item>
-        <Form.Item name="category_slug" label="Danh mục" rules={[{ required: true }]}><Select options={activeCategories.map((category) => ({ value: category.slug, label: category.name }))} placeholder="Chọn danh mục đang hoạt động" /></Form.Item>
-        <Form.Item name="excerpt" label="Tóm tắt" rules={[{ required: true }, { max: 500 }]}><Input.TextArea rows={3} maxLength={500} /></Form.Item>
-        <Form.Item name="content" label="Nội dung chi tiết" extra="Nhập văn bản thường; nội dung sẽ được hiển thị an toàn, không chạy HTML." rules={[{ required: true }, { max: 20000 }]}><Input.TextArea rows={10} maxLength={20000} showCount /></Form.Item>
-        <Space size="middle" style={{ display: "flex" }} align="start">
-          <Form.Item name="reading_time_minutes" label="Thời gian đọc (phút)" rules={[{ required: true }]}><InputNumber min={1} max={240} precision={0} /></Form.Item>
-          <Form.Item name="status" label="Trạng thái" rules={[{ required: true }]}><Select style={{ minWidth: 180 }} options={[{ value: "nhap", label: "Bản nháp" }, { value: "da_xuat_ban", label: "Đã xuất bản" }, { value: "an", label: "Đã ẩn" }]} /></Form.Item>
-          <Form.Item name="published_at" label="Thời điểm xuất bản" extra="Để trống nếu xuất bản ngay khi bật trạng thái." ><Input type="datetime-local" /></Form.Item>
-        </Space>
+        <div className={styles.articleIdentityFields}>
+          <Form.Item name="title" label="Tiêu đề" rules={[{ required: true }, { max: 200 }]}><Input maxLength={200} onChange={(event) => {
+            if (!articleSlugManuallyEdited.current) articleForm.setFieldValue("slug", articleSlug(event.target.value));
+          }} /></Form.Item>
+          <Form.Item name="slug" label="Slug bài viết" extra="Tự tạo từ tiêu đề; bạn có thể tự sửa. Bài viết cũ giữ URL nếu slug đã được tùy chỉnh." rules={[{ required: true }, { max: 160 }, { pattern: slugRule, message: "Slug chỉ gồm chữ thường, số và dấu gạch nối đơn." }]}><Input maxLength={160} onChange={(event) => {
+            const slug = event.target.value;
+            articleSlugManuallyEdited.current = Boolean(slug) && slug !== articleSlug(articleForm.getFieldValue("title") || "");
+            if (!slug) articleForm.setFieldValue("slug", articleSlug(articleForm.getFieldValue("title") || ""));
+          }} /></Form.Item>
+        </div>
+        <div className={styles.articleMetaFields}>
+          <Form.Item name="category_slug" label="Danh mục" rules={[{ required: true }]}><Select options={activeCategories.map((category) => ({ value: category.slug, label: category.name }))} placeholder="Chọn danh mục đang hoạt động" /></Form.Item>
+          <Form.Item name="reading_time_minutes" label="Thời gian đọc (phút)" rules={[{ required: true }]}><InputNumber min={1} max={240} precision={0} style={{ width: "100%" }} /></Form.Item>
+          <Form.Item name="status" label="Trạng thái" rules={[{ required: true }]}><Select options={[{ value: "nhap", label: "Bản nháp" }, { value: "da_xuat_ban", label: "Đã xuất bản" }, { value: "an", label: "Đã ẩn" }]} /></Form.Item>
+          <Form.Item name="published_at" label="Ngày xuất bản" extra="Mặc định là ngày tạo; để trống nếu xuất bản ngay khi bật trạng thái."><Input type="date" /></Form.Item>
+        </div>
+        <Form.Item name="excerpt" label="Tóm tắt" rules={[{ required: true }, { max: 500 }]}><Input.TextArea rows={2} maxLength={500} /></Form.Item>
+        <Form.Item name="content" label="Nội dung chi tiết" rules={[{ required: true }, { max: 20000 }]}><BlogContentEditor /></Form.Item>
         <Button type="primary" htmlType="submit" block loading={saving}>{editor?.slug ? "Lưu và đồng bộ" : "Tạo và đồng bộ"}</Button>
       </Form>
     </Modal>

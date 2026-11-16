@@ -1,7 +1,9 @@
 import Link from "next/link";
 import WebFooter from "@/components/web/layout/WebFooter";
 import WebHeader from "@/components/web/layout/WebHeader";
+import BlogContent from "@/components/web/blog/BlogContent";
 import { articles } from "@/lib/content/articles";
+import type { PublicBlogArticle } from "@/lib/api/blog";
 import styles from "./PublicInfoPage.module.scss";
 
 const programs = [
@@ -23,10 +25,9 @@ export function BlogPage() {
   return <Shell title="Blog"><section className={styles.hero}><p className={styles.eyebrow}>GHI CHÚ HỌC TẬP</p><h1>Những ý tưởng nhỏ<br /><span>để học đều hơn.</span></h1><p className={styles.lead}>Bài viết tham khảo về cách bắt đầu, luyện tập và duy trì thói quen học ngoại ngữ.</p></section><Link className={styles.featured} href={`/blog/${featured.slug}`}><div className={styles.featureArt}><span>GHI CHÚ<br />01</span><i>ĐỌC VÀ THỬ</i></div><div className={styles.featureCopy}><span className={styles.eyebrow}>BÀI VIẾT GỢI Ý · {featured.readingTime}</span><h2>{featured.title}</h2><p>{featured.excerpt}</p><b>Đọc bài viết <span aria-hidden="true">↗</span></b></div></Link><div className={styles.topicBar}><span>CHỦ ĐỀ</span><i>Bắt đầu</i><i>Kỹ năng</i><i>Phương pháp</i><span className={styles.topicNote}>NỘI DUNG THAM KHẢO, KHÔNG PHẢI KẾT QUẢ CAM KẾT</span></div><div className={styles.articleGrid}>{articles.map((article, index) => <article className={styles.articleCard} key={article.slug}><div className={`${styles.art} ${styles[`art${index + 1}`]}`} aria-hidden="true"><span>{String(index + 1).padStart(2, "0")}</span><i>{article.category}</i></div><div className={styles.articleCopy}><span>{article.category} · {article.readingTime}</span><h2><Link href={`/blog/${article.slug}`}>{article.title}</Link></h2><p>{article.excerpt}</p><Link className={styles.read} href={`/blog/${article.slug}`}>Đọc bài viết <span aria-hidden="true">↗</span></Link></div></article>)}</div><section className={styles.readingGuide}><div><p className={styles.eyebrow}>ĐỌC VÀ THỬ</p><h2>Biến một ý tưởng<br />thành buổi luyện tập.</h2></div><div><p><b>01</b> Chọn một gợi ý phù hợp với mục tiêu hiện tại.</p><p><b>02</b> Thử áp dụng trong một lần học ngắn.</p><p><b>03</b> Ghi lại điều hữu ích và điều cần đổi.</p></div><Link href="/programs">Xem cách xác định mục tiêu ↗</Link></section><p className={styles.editorialNote}>Các bài viết là nội dung biên tập tham khảo; không gắn tác giả, trích dẫn hay số liệu chưa được xác nhận.</p></Shell>;
 }
 
-export function ArticlePage({ slug }: { slug: string }) {
-  const article = articles.find((item) => item.slug === slug);
-  if (!article) return <Shell title="Bài viết"><section className={styles.hero}><p className={styles.eyebrow}>KHÔNG TÌM THẤY BÀI VIẾT</p><h1>Nội dung này<br /><span>chưa có ở đây.</span></h1><p className={styles.lead}>Hãy quay lại danh sách để chọn một bài viết khác.</p><Link className={styles.button} href="/blog">Về trang Blog ↗</Link></section></Shell>;
-  return <Shell title="Blog"><article className={styles.article}><Link className={styles.back} href="/blog">← Tất cả bài viết</Link><p className={styles.eyebrow}>{article.category} · {article.readingTime}</p><h1>{article.title}</h1><p className={styles.lead}>{article.excerpt}</p><div className={styles.articleBody}>{article.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div><aside className={styles.articleEnd}><strong>Tiếp tục khám phá</strong><p>Xem các hướng học và tình trạng danh mục chương trình tại trung tâm.</p><Link href="/programs">Xem chương trình ↗</Link></aside></article></Shell>;
+export function ArticlePage({ article }: { article: PublicBlogArticle | null }) {
+  if (!article) return <Shell title="Bài viết"><section className={styles.hero}><p className={styles.eyebrow}>BLOG CHƯA KHẢ DỤNG</p><h1>Chưa tải được<br /><span>bài viết này.</span></h1><p className={styles.lead}>Các cơ sở chưa trả đủ dữ liệu Blog. Hãy thử tải lại sau.</p><Link className={styles.button} href="/blog">Về trang Blog ↗</Link></section></Shell>;
+  return <Shell title="Blog"><article className={styles.article}><Link className={styles.back} href="/blog">← Tất cả bài viết</Link><p className={styles.eyebrow}>{article.category.name} · {article.reading_time_minutes} phút đọc</p><h1>{article.title}</h1><p className={styles.lead}>{article.excerpt}</p><div className={styles.articleBody}><BlogContent content={article.content} /></div><aside className={styles.articleEnd}><strong>Tiếp tục khám phá</strong><p>Xem các hướng học và tình trạng danh mục chương trình tại trung tâm.</p><Link href="/programs">Xem chương trình ↗</Link></aside></article></Shell>;
 }
 
 export function ContactPage() {

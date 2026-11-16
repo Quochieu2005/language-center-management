@@ -29,6 +29,15 @@ export type BlogArticleSummary = {
 };
 
 export type BlogArticle = BlogArticleSummary & { content: string };
+export type PublicBlogArticle = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  reading_time_minutes: number;
+  published_at: string | null;
+  category: { slug: string; name: string };
+};
 export type BlogCategoryInput = Pick<BlogCategory, "slug" | "name" | "description" | "status">;
 export type BlogArticleInput = Omit<BlogArticle, "published_at"> & { published_at: string | null };
 
@@ -42,8 +51,10 @@ export type BlogWriteResult = {
 };
 
 type BlogDetail<T> = { scope: "GLOBAL"; complete: boolean; site_codes: string[]; result: T };
+type PublicBlogDetail = BlogDetail<PublicBlogArticle>;
 
 export const blogApi = {
+  publicArticle: (slug: string) => apiRequest<PublicBlogDetail>(`/blog/${encodeURIComponent(slug)}/`),
   categories: () => apiRequest<BlogList<BlogCategory>>("/admin/blog/categories/"),
   articles: () => apiRequest<BlogList<BlogArticleSummary>>("/admin/blog/articles/"),
   article: (slug: string) => apiRequest<BlogDetail<BlogArticle>>(`/admin/blog/articles/${encodeURIComponent(slug)}/`),

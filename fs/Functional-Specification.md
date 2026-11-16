@@ -175,16 +175,19 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 **Người dùng:** khách chưa đăng nhập (đọc công khai), Admin Big (quản trị CMS). **Phân tán:** public `GLOBAL`; CMS `REPLICATED-WRITE` tới các bản `DanhMucBlog`/`BaiVietBlog` riêng tại từng site.
 
 1. `GET /api/v1/blog/categories/` trả danh mục đang hoạt động cùng số bài đã xuất bản; chỉ tính bài đã xuất bản, không ẩn và không có ngày xuất bản trong tương lai.
-2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung văn bản, thời gian đọc, ngày xuất bản và danh mục.
-3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô.
+2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung Markdown giới hạn, thời gian đọc, ngày xuất bản và danh mục. Nội dung có thể dùng đoạn văn, tiêu đề `##`/`###`, danh sách đánh số (`1. Nội dung`) và bảng Markdown; bảng và danh sách là tùy chọn.
+3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô; HTML nhập trong nội dung chỉ được hiển thị như văn bản.
 4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
 5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
 6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái và tạo, sửa, xóa qua CMS `/admin/blog` cùng các route `/api/v1/admin/blog/...`; quyền lấy từ phiên đã xác thực ở server. Admin Small không được ghi dữ liệu Blog dùng chung.
+   - Khi tạo bài, CMS tự tạo slug từ tiêu đề; người dùng có thể tự sửa slug. Khi sửa bài đã có slug tùy chỉnh, đổi tiêu đề không tự thay URL đó.
+   - Ngày xuất bản mặc định là ngày tạo theo `Asia/Ho_Chi_Minh`, chỉ chọn ngày; API nhận mốc 00:00 theo múi giờ này. Để trống ngày nếu muốn xuất bản ngay khi bật trạng thái.
+   - Trình soạn Markdown có nút thêm một hàng vào bảng tại vị trí con trỏ; hàng mới dùng đúng số cột của bảng.
 7. Ghi Blog là `REPLICATED-WRITE`: Coordinator dùng danh sách site hoạt động từ dữ liệu và cấu hình, ghi mỗi bản sao trong transaction cục bộ, lưu ACK vào `Logs`, yêu cầu `Idempotency-Key` và retry bằng cùng key. Không cam kết ACID nguyên tử xuyên database.
 8. Nếu site thiếu trước khi ghi, trả lỗi dịch vụ; nếu một site lỗi sau khi các site khác đã commit, trả trạng thái chưa hoàn tất cùng `missing_sites`. Bản sao lệch hoặc key dùng lại với payload khác trả xung đột; không báo hoàn tất.
 9. Không xóa danh mục đang có bài viết tham chiếu. Xóa bài viết lưu ảnh chụp trước thao tác vào nhật ký đồng bộ; bài viết chỉ xuất hiện công khai khi đã xuất bản, danh mục hoạt động và đến thời điểm xuất bản.
 
-**Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; Admin Big quản lý được cả danh mục và bài viết; quyền, validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
+**Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; nội dung thường vẫn hiển thị khi không có bảng/danh sách, còn Markdown bảng và danh sách đánh số hiển thị đúng khi có; HTML thô không được thực thi. Trình soạn thảo thêm được hàng bảng đúng số cột tại vị trí con trỏ. Slug bài viết mới tự sinh từ tiêu đề và vẫn có thể nhập tay; slug tùy chỉnh của bài cũ không tự đổi khi sửa tiêu đề. Ngày xuất bản chỉ có ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh` và được lưu ở đầu ngày địa phương; có thể để trống để xuất bản ngay. Admin Big quản lý được cả danh mục và bài viết; quyền, validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
 
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
