@@ -355,7 +355,7 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 **Người dùng:** Admin Big đọc danh sách toàn hệ thống hoặc chọn một site để quản lý; Admin Small/lễ tân/Tư vấn & xếp lớp thao tác theo quyền tại site được cấp. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `LopHoc` cùng số liệu `DangKy` tại từng site rồi tổng hợp trong API; tạo/sửa/phân công lớp là `LOCAL`. **Bảng:** KhoaHoc, GiaoVien, PhongHoc, LopHoc, BuoiHoc, DangKy, Logs.
 
-Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, có `site_code` trên mỗi dòng và trả `complete=false`/`missing_sites` khi thiếu site. Xem chi tiết định tuyến theo site của lớp; mở lớp, đổi giáo viên, đăng ký và xếp lớp yêu cầu chọn một site cụ thể. Không JOIN xuyên site.
+Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, có `site_code` trên mỗi dòng và trả `complete=false`/`missing_sites` khi thiếu site. Xem chi tiết định tuyến theo site của lớp. Khi bộ lọc đang ở `Toàn hệ thống`, Admin Big vẫn dùng được các thao tác mở lớp, thêm phòng, đăng ký, đổi lớp và phân công giáo viên; giao diện yêu cầu chọn site ngay trong biểu mẫu thao tác, rồi API chỉ ghi `LOCAL` tại site đó. Khi mở thao tác từ chi tiết lớp, phân công giáo viên dùng site trên bản ghi lớp. Admin Small/lễ tân/Tư vấn & xếp lớp tiếp tục thao tác tại site trong phiên. Không JOIN xuyên site.
 
 1. Nhân viên chọn khóa học, giáo viên, phòng, sức chứa, ngày bắt đầu/kết thúc, thứ trong tuần và khung giờ.
 2. API kiểm tra tất cả dữ liệu thuộc site, giáo viên đang dạy, phòng khả dụng, ngày/giờ hợp lệ và không trùng lịch giáo viên/phòng.

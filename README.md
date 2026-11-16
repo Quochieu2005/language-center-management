@@ -215,7 +215,7 @@ flowchart LR
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
-Các danh sách toàn hệ thống của Admin Big là Global Query tại Django: API hỏi riêng từng CSDL site đang hoạt động rồi gộp kết quả trong bộ nhớ, không tạo database nghiệp vụ trung tâm hoặc JOIN xuyên site. Bộ chọn cơ sở mặc định là `Toàn hệ thống`; lọc một cơ sở chỉ đổi phạm vi đọc. Các thao tác ghi cần một site hợp lệ và quyền vẫn được xác thực ở API. Nếu một site không đọc được, response/giao diện phải nêu `complete=false` và `missing_sites`, không báo danh sách là đầy đủ.
+Các danh sách toàn hệ thống của Admin Big là Global Query tại Django: API hỏi riêng từng CSDL site đang hoạt động rồi gộp kết quả trong bộ nhớ, không tạo database nghiệp vụ trung tâm hoặc JOIN xuyên site. Bộ chọn cơ sở mặc định là `Toàn hệ thống`; lọc một cơ sở chỉ đổi phạm vi đọc. Các thao tác ghi cần một site hợp lệ và quyền vẫn được xác thực ở API; tại trang lớp, Admin Big chọn site ngay trong biểu mẫu nghiệp vụ nếu đang xem toàn hệ thống, còn thao tác từ một lớp có sẵn định tuyến theo site của lớp. Nếu một site không đọc được, response/giao diện phải nêu `complete=false` và `missing_sites`, không báo danh sách là đầy đủ.
 
 ### 3.2. Backend luôn kiểm tra quyền trước khi truy cập dữ liệu
 
@@ -524,7 +524,7 @@ Tạo nhân viên ghi `NhanVien` ở site công tác và nhân bản `TaiKhoan`;
 
 ### 5.10. Mở lớp và sinh lịch học
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small tại cơ sở.
+**Loại:** `LOCAL` · **Ai làm:** Admin Big chọn site thao tác; Admin Small tại cơ sở.
 
 ```mermaid
 flowchart LR
@@ -537,7 +537,7 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
 
 ### 5.11. Điểm danh buổi học
 
