@@ -62,7 +62,8 @@ class TuitionFinancialReportView(APIView):
         description=(
             "Kế toán và Admin Small chỉ đọc site trong phiên đăng nhập; Kế toán phải có hồ sơ nhân viên còn làm việc. "
             "Admin Big có thể chọn một site hoặc đọc GLOBAL. Mỗi site được truy vấn riêng; kết quả toàn hệ thống được "
-            "tổng hợp tại API và nêu missing_sites khi thiếu dữ liệu."
+            "tổng hợp tại API gồm tổng số khoản học phí, số khoản còn nợ, phải thu, đã thu ròng, thu, hoàn và dư nợ; "
+            "nêu missing_sites khi thiếu dữ liệu."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         responses={200: OpenApiResponse(), 400: OpenApiResponse(), 403: OpenApiResponse(), 503: OpenApiResponse()},

@@ -46,17 +46,28 @@ def _verify_cashier(cursor, site_code: str, actor_id: str, employee_id: str, rol
 @translate_database_errors
 def list_tuition(
     *, site_code: str, status_filter: str | None, student_slug: str | None,
+    search: str | None,
     limit: int, offset: int,
 ) -> dict[str, Any]:
     alias = require_active_site(site_code)
     where: list[str] = ["hp.ma_co_so = %s"]
     params: list[Any] = [site_code]
     if status_filter:
-        where.append("hp.trang_thai = %s")
-        params.append(status_filter)
+        if status_filter == "con_no":
+            where.append("hp.so_tien_phai_dong - hp.giam_gia - hp.so_tien_da_dong > 0")
+        else:
+            where.append("hp.trang_thai = %s")
+            params.append(status_filter)
     if student_slug:
         where.append("hv.slug = %s")
         params.append(student_slug)
+    if search:
+        where.append(
+            "(CHARINDEX(%s, hv.ho_ten) > 0 OR CHARINDEX(%s, hv.ma_hoc_vien) > 0 "
+            "OR CHARINDEX(%s, hv.slug) > 0 OR CHARINDEX(%s, lh.ten_lop) > 0 "
+            "OR CHARINDEX(%s, lh.ma_lop) > 0)"
+        )
+        params.extend([search] * 5)
     clause = " AND ".join(where)
     with connections[alias].cursor() as cursor:
         cursor.execute(

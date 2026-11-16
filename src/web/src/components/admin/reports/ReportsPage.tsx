@@ -60,6 +60,7 @@ function TuitionFinanceReport() {
         <Col xs={24} sm={12} xl={8}><Statistic title="Tổng phiếu thu" value={data.totals.total_collected} formatter={(value) => money(Number(value))} /></Col>
         <Col xs={24} sm={12} xl={8}><Statistic title="Tổng phiếu hoàn" value={data.totals.total_refunded} formatter={(value) => money(Number(value))} /></Col>
         <Col xs={24} sm={12} xl={8}><Statistic title="Số khoản học phí" value={data.totals.tuition_accounts} /></Col>
+        <Col xs={24} sm={12} xl={8}><Statistic title="Khoản còn nợ" value={data.totals.accounts_with_balance} /></Col>
       </Row>
       <Table rowKey="site_code" loading={loading} dataSource={data.results} pagination={false} scroll={{ x: 900 }} columns={[
         { title: "Cơ sở", dataIndex: "site_code" },
@@ -68,6 +69,7 @@ function TuitionFinanceReport() {
         { title: "Đã thu", dataIndex: "total_collected", render: money },
         { title: "Đã hoàn", dataIndex: "total_refunded", render: money },
         { title: "Còn nợ", dataIndex: "outstanding", render: money },
+        { title: "Khoản còn nợ", dataIndex: "accounts_with_balance" },
         { title: "Phạm vi", render: () => <Tag color={data.scope === "GLOBAL" ? "blue" : "default"}>{data.scope}</Tag> },
       ]} />
     </>}

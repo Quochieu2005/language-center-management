@@ -73,6 +73,7 @@ def _tuition_financial_summary_for_site(
                    COALESCE(SUM(so_tien_phai_dong - giam_gia), 0),
                    COALESCE(SUM(so_tien_da_dong), 0),
                    COALESCE(SUM(so_tien_phai_dong - giam_gia - so_tien_da_dong), 0),
+                   COUNT_BIG(CASE WHEN so_tien_phai_dong - giam_gia - so_tien_da_dong > 0 THEN 1 END),
                    (SELECT COALESCE(SUM(so_tien), 0) FROM dbo.PhieuThu
                     WHERE ma_co_so = %s AND loai = 'thu'),
                    (SELECT COALESCE(SUM(so_tien), 0) FROM dbo.PhieuThu
@@ -89,8 +90,9 @@ def _tuition_financial_summary_for_site(
         "total_due": int(row[1]),
         "net_collected": int(row[2]),
         "outstanding": int(row[3]),
-        "total_collected": int(row[4]),
-        "total_refunded": int(row[5]),
+        "accounts_with_balance": int(row[4]),
+        "total_collected": int(row[5]),
+        "total_refunded": int(row[6]),
     }
 
 
@@ -120,7 +122,7 @@ def tuition_financial_summary(
     results.sort(key=lambda row: row["site_code"])
     if not results and unavailable:
         raise AcademicInfrastructureUnavailable
-    fields = ("tuition_accounts", "total_due", "net_collected", "outstanding", "total_collected", "total_refunded")
+    fields = ("tuition_accounts", "accounts_with_balance", "total_due", "net_collected", "outstanding", "total_collected", "total_refunded")
     return {
         "scope": "GLOBAL", "complete": not unavailable,
         "missing_sites": sorted(set(unavailable)), "site_codes": list(available),

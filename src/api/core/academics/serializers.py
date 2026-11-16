@@ -68,10 +68,11 @@ class GradeWriteSerializer(StrictSerializer):
 
 class TuitionQuerySerializer(PaginationQuerySerializer):
     status = serializers.ChoiceField(
-        choices=("chua_dong", "dong_mot_phan", "da_dong", "hoan_tien"), required=False
+        choices=("con_no", "chua_dong", "dong_mot_phan", "da_dong", "hoan_tien"), required=False
     )
     student_slug = serializers.RegexField(regex=_SLUG, max_length=160, required=False)
-    allowed_fields = {"site_code", "limit", "offset", "status", "student_slug"}
+    search = serializers.CharField(max_length=100, trim_whitespace=True, required=False)
+    allowed_fields = {"site_code", "limit", "offset", "status", "student_slug", "search"}
 
 
 class TuitionReceiptSerializer(StrictSerializer):

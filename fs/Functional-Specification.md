@@ -420,11 +420,12 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 **Người dùng:** Admin Big xem danh sách toàn hệ thống; kế toán ghi nhận thu/hoàn tại site được cấp; Admin Small giám sát theo quyền tại site. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; thu/hoàn/kế hoạch và nhắc học phí là `LOCAL` tại site của khoản phí/lớp. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
-1. Kế toán mở khoản phải thu theo đăng ký; API tự xác định site, số phải thu, tổng đã thu/hoàn và số còn lại.
-2. Người dùng nhập số tiền dương không vượt quá số còn nợ, phương thức hợp lệ và ghi chú không chứa dữ liệu thanh toán nhạy cảm.
-3. API kiểm tra quyền, trạng thái khoản phí và khóa chống gửi lặp/idempotency.
-4. Trong transaction site, thêm PhieuThu loại thu, cập nhật trạng thái HocPhi, ghi audit; không sửa/xóa lịch sử phiếu đã phát hành.
-5. Trả mã phiếu, số tiền, số dư và trạng thái mới.
+1. Kế toán xem danh sách theo site; mặc định lọc khoản có số dư dương và mỗi dòng thể hiện học viên, lớp, tổng học phí, đã thu, còn lại và trạng thái.
+2. Có thể tìm theo tên/mã học viên hoặc tên/mã lớp, chọn trạng thái và phân trang trên server; báo cáo tổng công nợ không chỉ cộng trang hiện tại.
+3. Người dùng nhập số tiền dương không vượt quá số còn nợ, phương thức hợp lệ và ghi chú không chứa dữ liệu thanh toán nhạy cảm.
+4. API kiểm tra quyền, trạng thái khoản phí và khóa chống gửi lặp/idempotency.
+5. Trong transaction site, thêm PhieuThu loại thu, cập nhật trạng thái HocPhi, ghi audit; không sửa/xóa lịch sử phiếu đã phát hành.
+6. Trả mã phiếu, số tiền, số dư và trạng thái mới.
 
 **Nghiệm thu:** gửi lại cùng idempotency key và payload trả cùng kết quả; cùng key nhưng payload khác bị conflict; hai request cạnh tranh không thể thu vượt số dư; lỗi DB không để phiếu thu và HocPhi lệch nhau.
 
@@ -446,7 +447,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 **Người dùng:** Kế toán tại site được giao; Admin Small tại site được giao; Admin Big theo site hoặc toàn hệ thống. **Kiểu:** `LOCAL` hoặc `GLOBAL`. **Bảng:** `HocPhi`, `PhieuThu`.
 
 1. Kế toán và Admin Small chỉ đọc CSDL site trong phiên; Admin Big chọn một site hoặc để trống để đọc toàn bộ site hoạt động.
-2. API truy vấn độc lập từng CSDL rồi tổng hợp tại ứng dụng, trả số khoản, tổng phải thu, đã thu ròng, còn nợ, tổng phiếu thu và tổng phiếu hoàn.
+2. API truy vấn độc lập từng CSDL rồi tổng hợp tại ứng dụng, trả số khoản, số khoản còn nợ, tổng phải thu, đã thu ròng, còn nợ, tổng phiếu thu và tổng phiếu hoàn.
 3. Nếu thiếu site trong Global Query, trả `complete=false` cùng `missing_sites`, không trình bày phần đã đọc như tổng đầy đủ.
 
 **Nghiệm thu:** số liệu từng site khớp `HocPhi`/`PhieuThu` tại site đó; vai trò bị giới hạn đúng phạm vi; khi một site lỗi, API và giao diện chỉ rõ kết quả chưa đầy đủ. Báo cáo hiện là snapshot tổng hợp, chưa lọc theo khoảng ngày.

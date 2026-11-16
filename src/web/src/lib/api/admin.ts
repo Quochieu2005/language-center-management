@@ -18,8 +18,8 @@ export type TuitionFinancialReport = {
   complete: boolean;
   missing_sites: string[];
   site_codes: string[];
-  totals: { tuition_accounts: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number };
-  results: { site_code: string; tuition_accounts: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number }[];
+  totals: { tuition_accounts: number; accounts_with_balance: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number };
+  results: { site_code: string; tuition_accounts: number; accounts_with_balance: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number }[];
 };
 export type AdminSmall = {
   admin_id: string; site_code: string; full_name: string; phone: string | null;

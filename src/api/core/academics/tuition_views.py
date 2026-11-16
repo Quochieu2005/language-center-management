@@ -54,6 +54,7 @@ class AdminTuitionListView(_TuitionApiView):
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
             OpenApiParameter("status", str, OpenApiParameter.QUERY),
             OpenApiParameter("student_slug", str, OpenApiParameter.QUERY),
+            OpenApiParameter("search", str, OpenApiParameter.QUERY),
             OpenApiParameter("limit", int, OpenApiParameter.QUERY),
             OpenApiParameter("offset", int, OpenApiParameter.QUERY),
         ],
@@ -68,7 +69,8 @@ class AdminTuitionListView(_TuitionApiView):
                 return Response(global_site_list(
                     lambda site, limit, offset: list_tuition(
                         site_code=site, status_filter=data.get("status"),
-                        student_slug=data.get("student_slug"), limit=limit, offset=offset,
+                        student_slug=data.get("student_slug"), search=data.get("search"),
+                        limit=limit, offset=offset,
                     ),
                     limit=data["limit"], offset=data["offset"],
                     unavailable_exceptions=(AcademicError,),
@@ -76,7 +78,8 @@ class AdminTuitionListView(_TuitionApiView):
             site = _tuition_site(request, data.get("site_code"))
             return Response(list_tuition(
                 site_code=site, status_filter=data.get("status"),
-                student_slug=data.get("student_slug"), limit=data["limit"], offset=data["offset"],
+                student_slug=data.get("student_slug"), search=data.get("search"),
+                limit=data["limit"], offset=data["offset"],
             ))
         except AcademicError as exc:
             return academic_error(exc)
