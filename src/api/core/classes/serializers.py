@@ -71,6 +71,24 @@ class RoomCreateSerializer(StrictInputSerializer):
         return value
 
 
+class RoomUpdateSerializer(StrictInputSerializer):
+    name = serializers.CharField(max_length=100, trim_whitespace=True, required=False)
+    capacity = serializers.IntegerField(min_value=1, max_value=300, required=False)
+    status = serializers.ChoiceField(choices=("hoat_dong", "bao_tri"), required=False)
+    allowed_fields = {"name", "capacity", "status"}
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value or any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Tên phòng không hợp lệ.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError({"detail": "Cần cung cấp ít nhất một trường để cập nhật."})
+        return attrs
+
+
 class EnrollmentCreateSerializer(StrictInputSerializer):
     site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
     student_id = serializers.CharField(max_length=24, trim_whitespace=True)
@@ -258,14 +276,22 @@ class RoomItemSerializer(serializers.Serializer):
 
 
 class RoomListResponseSerializer(serializers.Serializer):
-    site_code = serializers.CharField()
-    count = serializers.IntegerField()
+    site_code = serializers.CharField(required=False)
+    scope = serializers.ChoiceField(choices=("LOCAL", "GLOBAL"), required=False)
+    complete = serializers.BooleanField(required=False)
+    site_codes = serializers.ListField(child=serializers.CharField(), required=False)
+    missing_sites = serializers.ListField(child=serializers.CharField(), required=False)
+    count = serializers.IntegerField(allow_null=True)
     limit = serializers.IntegerField()
     offset = serializers.IntegerField()
     results = RoomItemSerializer(many=True)
 
 
 class RoomCreateResponseSerializer(RoomItemSerializer):
+    pass
+
+
+class RoomUpdateResponseSerializer(RoomItemSerializer):
     pass
 
 
