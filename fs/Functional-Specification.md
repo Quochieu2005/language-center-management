@@ -366,13 +366,15 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-ROOM-01 — Quản lý phòng học
 
-**Người dùng:** Admin Big chọn site hoặc Admin Small tại site được phân công. **Kiểu:** LOCAL. **Bảng:** PhongHoc, LopHoc, BuoiHoc, Logs.
+**Người dùng:** Admin Big và Admin Small tại site được phân công. Danh sách của Admin Big có thể đọc toàn hệ thống; CRUD luôn chọn một site. **Kiểu:** đọc `GLOBAL` hoặc `LOCAL`; ghi `LOCAL`. **Bảng:** PhongHoc, LopHoc, BuoiHoc, Logs.
 
-- Admin có thể liệt kê, tạo và xóa phòng trong một CSDL site qua Site Router.
+- Admin Big xem danh sách phòng qua Global Query hoặc lọc một site; Admin Small chỉ xem site trong phiên. Mỗi dòng Global mang `site_code`; nếu thiếu site, API/UI phải nêu `missing_sites` và không báo dữ liệu đầy đủ.
+- Admin có thể tạo phòng với tên và sức chứa; phòng mới ở trạng thái `hoat_dong`. Sửa tên, sức chứa hoặc trạng thái (`hoat_dong`/`bao_tri`) tại đúng site. Tên không được trùng trong cùng site; không cho giảm sức chứa thấp hơn sĩ số tối đa của lớp đang dùng phòng mặc định hoặc phòng của buổi học.
+- Ghi thêm/sửa/xóa `PhongHoc` và `Logs` trong một transaction tại site được chọn; không ghi nhiều site trong một request. Admin Small không thể chọn site khác.
 - Chỉ xóa vật lý phòng chưa được `LopHoc` hoặc `BuoiHoc` tham chiếu. Nếu đang được sử dụng, API từ chối với xung đột; không xóa lịch sử lớp/buổi và không bỏ qua khóa ngoại.
-- Ghi nhật ký xóa cùng transaction site-local. Admin Big không dùng một request để xóa phòng ở nhiều site; Admin Small không thể chọn site khác.
+- Trang quản lý phòng riêng tại `/admin/rooms`; trang `/admin/classes` chỉ chọn phòng có sẵn khi mở lớp.
 
-**Nghiệm thu:** Admin Big/Small đúng site xóa được phòng chưa sử dụng; nhân viên không có quyền quản trị và Admin Small vượt site bị từ chối; phòng đang được lớp/buổi sử dụng nhận `409` và dữ liệu giữ nguyên.
+**Nghiệm thu:** Admin Big xem được các site hoạt động và nhận cảnh báo site thiếu; Admin Big/Small đúng site thêm/sửa/xóa được phòng; nhân viên không có quyền quản trị và Admin Small vượt site bị từ chối; tên trùng hoặc sức chứa không hợp lệ nhận xung đột; phòng đang được lớp/buổi sử dụng nhận `409` và dữ liệu giữ nguyên.
 
 ### FS-CLASS-02 — Xếp học viên vào lớp hoặc đổi lớp
 

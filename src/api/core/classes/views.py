@@ -31,7 +31,10 @@ from core.classes.serializers import (
     RoomDeleteResponseSerializer,
     RoomListQuerySerializer,
     RoomListResponseSerializer,
+    RoomUpdateResponseSerializer,
+    RoomUpdateSerializer,
 )
+from core.classes.room_services import create_room, list_rooms, update_room
 from core.classes.services import (
     ClassConflict,
     ClassInfrastructureUnavailable,
@@ -41,13 +44,11 @@ from core.classes.services import (
     assign_class_teacher,
     assign_enrollment_to_class,
     create_class,
-    create_room,
     delete_room,
     get_class,
     list_class_students,
     list_class_sessions,
     list_classes,
-    list_rooms,
     register_student_to_class,
 )
 
@@ -115,7 +116,7 @@ class RoomCollectionView(_ClassApiView):
     @extend_schema(
         operation_id="room_list",
         tags=["Phòng học"],
-        summary="Liệt kê phòng học tại một cơ sở",
+        summary="Liệt kê phòng học tại một cơ sở hoặc toàn hệ thống",
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
             OpenApiParameter("status", str, OpenApiParameter.QUERY),
@@ -129,6 +130,19 @@ class RoomCollectionView(_ClassApiView):
         query = RoomListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
+        if request.user.role == "admin_big" and not data.get("site_code"):
+            try:
+                result = global_site_list(
+                    lambda site, limit, offset: list_rooms(
+                        site_code=site, status_filter=data.get("status"), search=data.get("search"),
+                        limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(ClassInfrastructureUnavailable, ClassSiteUnavailable),
+                )
+            except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+                return _error_response(exc)
+            return Response(result)
         site_code, error = _site_scope(request.user, data.get("site_code"))
         if error:
             return error
@@ -155,7 +169,9 @@ class RoomCollectionView(_ClassApiView):
         if request.user.role != "admin_big" and data.get("site_code"):
             if data["site_code"] != str(request.user.site_code or "").upper():
                 return Response({"detail": "Không được chọn cơ sở khác."}, status=403)
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+        )
         if error:
             return error
         try:
@@ -170,6 +186,47 @@ class RoomCollectionView(_ClassApiView):
 
 class RoomDetailView(_ClassApiView):
     throttle_scope = "class_management"
+
+    @extend_schema(
+        operation_id="room_update",
+        tags=["Phòng học"],
+        summary="Cập nhật tên, sức chứa hoặc trạng thái phòng học tại một cơ sở",
+        description=(
+            "Ghi LOCAL trong một CSDL site và ghi Logs cùng transaction. Không cho đổi tên trùng; "
+            "không cho giảm sức chứa thấp hơn sĩ số tối đa của lớp đang tham chiếu phòng."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        request=RoomUpdateSerializer,
+        responses={
+            200: RoomUpdateResponseSerializer,
+            400: OpenApiResponse(description="Thiếu site_code hoặc dữ liệu cập nhật không hợp lệ."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được sửa phòng."),
+            404: OpenApiResponse(description="Không tìm thấy phòng tại site."),
+            409: OpenApiResponse(description="Tên phòng trùng hoặc sức chứa xung đột với lớp."),
+            503: OpenApiResponse(description="CSDL site không sẵn sàng."),
+        },
+    )
+    def patch(self, request, room_id: str):
+        invalid_id = _validate_record_id(room_id)
+        if invalid_id:
+            return invalid_id
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        serializer = RoomUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+        )
+        if error:
+            return error
+        try:
+            result = update_room(
+                site_code=site_code, room_id=room_id, actor_id=request.user.account_id,
+                remote_ip=_remote_ip(request), **serializer.validated_data,
+            )
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
 
     @extend_schema(
         operation_id="room_delete",

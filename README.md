@@ -537,7 +537,13 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
+
+### 5.10.1. Quản lý phòng học
+
+**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small chỉ đọc site được phân công (`LOCAL`). Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
+
+**Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
 
 ### 5.11. Điểm danh buổi học
 
