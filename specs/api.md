@@ -126,7 +126,7 @@ Các ngưỡng dưới đây là **giá trị khởi đầu đề xuất**, ph�
 | Quên mật khẩu | Tối đa 10 request/IP/giờ và 3 lần cho cùng email/giờ | Trả cùng response `202` dù email có tồn tại hay không; không gửi nhiều email reset |
 | Xác nhận reset mật khẩu | Giới hạn theo IP và token; token một lần, có hạn | Token sai/hết hạn/đã dùng không đổi dữ liệu; trả lỗi chung và ghi audit không chứa token |
 
-IP chỉ được lấy từ proxy đã tin cậy; không tin header IP tùy ý từ client. Rate limit phải phối hợp IP, tài khoản/email đã chuẩn hóa và thời gian; CAPTCHA không thay thế rate limit. API đăng ký tài khoản công khai chưa được duyệt và không có route trong source. API ghi danh khóa học công khai (`POST /api/v1/public/enrollments/`) là nghiệp vụ khác; portal/tài khoản học viên có code nhưng chưa được duyệt phạm vi đồ án.
+IP chỉ được lấy từ proxy đã tin cậy; không tin header IP tùy ý từ client. Rate limit phải phối hợp IP, tài khoản/email đã chuẩn hóa và thời gian; CAPTCHA không thay thế rate limit. API đăng ký tài khoản công khai chưa được duyệt và không có route trong source. API ghi danh khóa học công khai (`POST /api/v1/public/enrollments/`) là nghiệp vụ khác. Phạm vi Admin CRUD hồ sơ và cấp tài khoản học viên theo thao tác riêng được mô tả tại FS-STU-01; portal học viên và thanh toán SePay vẫn chưa được duyệt.
 
 Token reset sinh ngẫu nhiên bằng CSPRNG, đủ entropy, chỉ dùng một lần và lưu dạng hash; token gửi qua email không ghi log. Khác với mật khẩu người dùng, token ngẫu nhiên có thể lưu bằng SHA-256/HMAC hash phục vụ tra cứu an toàn; mật khẩu vẫn phải dùng bcrypt.
 
@@ -157,7 +157,7 @@ language-center-management/
 
 Tên người, email, số điện thoại và nội dung nhạy cảm không được dùng làm tên folder hoặc `public_id`; mã site/mã hồ sơ phải lấy từ bản ghi và quyền đã xác thực ở server. Mã ảnh là UUID ngẫu nhiên riêng cho từng asset. API dự kiến dùng `asset_folder` với Cloudinary Dynamic folders để phân loại trong Media Library mà không bắt buộc đưa đường dẫn folder vào `public_id`; không dùng thư mục để thay thế kiểm soát quyền truy cập. Ảnh cá nhân cần chính sách delivery hạn chế phù hợp. Xem [Cloudinary Folder Modes](https://cloudinary.com/documentation/folder_modes) và [Upload API Reference](https://cloudinary.com/documentation/image_upload_api_reference).
 
-Source hiện có upload intent và endpoint hoàn tất Cloudinary cho ảnh đại diện Admin, Admin Small, giáo viên và nhân viên mới được tạo; các biến môi trường chỉ có placeholders trong `.env.example`. Django kiểm tra quyền/asset rồi cập nhật `TaiKhoan.avatar_public_id` và `TaiKhoan.avatar_secure_url` theo các bản sao tài khoản. Chưa có API MediaAsset tổng quát hoặc bằng chứng upload thật trên Cloudinary; schema avatar đã có trong `docs/DATABASE_SCHEMA.md`.
+Source hiện có upload intent và endpoint hoàn tất Cloudinary cho ảnh đại diện Admin, Admin Small, giáo viên, nhân viên mới và hồ sơ học viên. Avatar tài khoản cập nhật `TaiKhoan.avatar_public_id`/`avatar_secure_url` theo các bản sao tài khoản; avatar học viên cập nhật hai cột cùng tên trên `HocVien` tại site sở hữu (`LOCAL`). Luồng chuyển cơ sở cũng đọc các cột này để sao chép metadata sang site đích, nên phải áp dụng migration 38 trên mọi site trước khi triển khai source mới. Django kiểm tra quyền/asset; ảnh tải trực tiếp lên Cloudinary. Chưa có API MediaAsset tổng quát hoặc bằng chứng upload thật trên Cloudinary.
 
 Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có thời hạn → frontend gửi bytes ảnh trực tiếp tới Cloudinary → frontend gửi `public_id` về API → API xác minh lại asset rồi gắn metadata vào bản ghi tại site đúng. Nếu upload Cloudinary thành công nhưng ghi metadata thất bại, không báo hoàn tất; ghi nhận asset mồ côi để dọn an toàn.
 
@@ -169,7 +169,7 @@ Luồng chuẩn: frontend xin upload intent từ API → API cấp chữ ký có
 
 Yêu cầu upload: chỉ MIME ảnh trong allowlist; kiểm tra cả MIME thực và phần mở rộng; giới hạn dung lượng/chiều rộng/chiều cao theo cấu hình; đổi tên bằng public ID phía server; không nhận URL tùy ý rồi tải hộ (tránh SSRF). Có thể dùng Cloudinary transformation để tạo thumbnail/responsive format. Upload intent hết hạn, gắn với tài khoản, site, mục đích và bản ghi được phép; không cho tái sử dụng để ghi đè ảnh tùy ý. Trước khi xóa asset, xác minh không còn bản ghi tham chiếu tại các site cần thiết; nếu xóa metadata/asset bị lỗi giữa chừng, trả trạng thái phục hồi và không để URL hỏng được báo là đã xóa sạch.
 
-SQL Server chỉ lưu metadata avatar hiện được triển khai (`avatar_public_id`, `avatar_secure_url`) trong `TaiKhoan`; các cột này đi cùng bản sao tài khoản và được ghi theo `REPLICATED-WRITE`. Bytes ảnh ở Cloudinary. Schema chưa có bảng metadata tổng quát cho ảnh khóa học/cơ sở; không tạo database media trung tâm.
+SQL Server chỉ lưu metadata (`avatar_public_id`, `avatar_secure_url`): trong `TaiKhoan` cho ảnh tài khoản (`REPLICATED-WRITE`) và trong `HocVien` cho ảnh hồ sơ học viên (`LOCAL` theo site sở hữu). Bytes ảnh ở Cloudinary. Schema chưa có bảng metadata tổng quát cho ảnh khóa học/cơ sở; không tạo database media trung tâm.
 
 ## Danh tính, vai trò và phạm vi site
 
@@ -282,7 +282,7 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `PATCH /api/v1/admin/sites/{ma_co_so}/status` | Admin Big | `REPLICATED-WRITE`/quy trình đóng site | Chỉ nhận trạng thái cho phép; trước khi đóng phải xử lý giao dịch chuyển và dữ liệu đang hoạt động theo README mục 5.14 |
 | `GET /api/v1/admin/admins-small` | Admin Big | `GLOBAL` hoặc đọc bản sao tài khoản kèm tra cứu hồ sơ từng site | Gộp Admin Small theo site; phản hồi một phần nếu site thiếu |
 | `GET /api/v1/admin/admins-small/{ma_tai_khoan}` | Admin Big | `GLOBAL` định vị rồi `LOCAL` đọc hồ sơ | Chi tiết tài khoản và cơ sở được phân công; báo rõ site thiếu |
-| `GET, POST /api/v1/admin/admin-smalls/` | Admin Big | Đọc `GLOBAL`; tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: liệt kê hoặc tạo Admin Small. Tài khoản có role `nhan_vien`; hồ sơ là `Admin.loai_admin = admin_small` tại site được gán, không phải `NhanVien.chuc_vu`. Request tạo dùng `full_name`, `email`, `site_code` (username/slug tùy chọn). |
+| `GET, POST /api/v1/admin/admin-smalls/` | Admin Big | Đọc `GLOBAL`; tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: liệt kê hoặc tạo Admin Small. Danh sách trả `avatar_secure_url` từ bản sao `TaiKhoan`; trường có thể `null`. Tài khoản có role `nhan_vien`; hồ sơ là `Admin.loai_admin = admin_small` tại site được gán, không phải `NhanVien.chuc_vu`. Request tạo dùng `full_name`, `email`, `site_code` (username/slug tùy chọn). |
 | `DELETE /api/v1/admin/admin-smalls/{account_id}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Xóa vật lý hồ sơ `Admin`, các bản sao `TaiKhoan`, phiên/token đặt lại mật khẩu và ảnh Cloudinary; giữ `Logs`, điểm danh, lịch sử chuyển cơ sở và chứng từ. Từ chối trước khi ghi nếu còn hồ sơ nghiệp vụ, yêu cầu thanh toán hoặc giao dịch chuyển cơ sở đang mở. Có dấu tiến trình/retry; không bảo đảm ACID xuyên CSDL |
 | `PATCH /api/v1/admin/admin-smalls/{slug}/status/` | Admin Big | `REPLICATED-WRITE` | Chỉ đổi trạng thái `active`/`inactive`; không xóa hồ sơ hoặc dữ liệu. Đây là thao tác riêng với DELETE |
 | `GET /api/v1/admin/accounts` | Admin Big | `GLOBAL`/bản sao tài khoản | Danh sách tài khoản nội bộ, trạng thái và phạm vi; không trả hash mật khẩu |
@@ -366,15 +366,22 @@ Create trả `201`; GET/PATCH/DELETE và gửi email thành công trả `200`; l
 
 API không nhận `ma_giao_vien` từ body để quyết định quyền. Người ghi lấy từ phiên đã xác thực; API xác nhận giáo viên thuộc cùng site và được phân công vào đúng lớp/buổi.
 
-## API học viên có trong source — chưa được duyệt phạm vi
+## Quản lý hồ sơ học viên và phạm vi portal
 
-Schema, API và UI hiện có tài khoản học viên, portal đọc hồ sơ/đăng ký/lịch/học phí/điểm, cấp tài khoản bởi Admin và route tạo/tra cứu yêu cầu SePay. Đây là code trong repo, chưa phải quyết định đưa portal vào đồ án; các API này không được coi là phạm vi đã duyệt cho tới khi nhóm thống nhất và cập nhật README, FS, schema, API/UI spec.
+Admin CRUD hồ sơ học viên tại một site và thao tác riêng để cấp tài khoản được đưa vào phạm vi theo FS-STU-01. Tạo hồ sơ chỉ ghi `HocVien` tại site được xác thực; không tạo `TaiKhoan` hoặc gửi mật khẩu. Admin Big chọn `site_code`; Admin Small dùng site trong phiên và không thể gửi site khác. Admin có thể cấp tài khoản cho hồ sơ đang `dang_hoc` có email hợp lệ, kể cả khi chưa có `DangKy`; API thực hiện `REPLICATED-WRITE` cho `TaiKhoan`, ghi liên kết `HocVien.ma_tai_khoan` cục bộ và chỉ gửi mật khẩu tạm lúc đó. Email cấp tài khoản ghi email làm thông tin đăng nhập chính.
+
+Portal đọc hồ sơ/đăng ký/lịch/học phí/điểm và SePay có code/schema/UI trong source nhưng vẫn chưa được duyệt phạm vi môn học. Việc cấp tài khoản không đồng nghĩa portal hoặc thanh toán trực tuyến đã được đưa vào phạm vi.
 
 Các đường dẫn thực tế được khai báo trong `src/api/core/urls.py`:
 
 | Route source | Hành vi | Trạng thái phạm vi |
 |---|---|---|
-| `/api/v1/admin/students/{slug}/account/` | Admin cấp tài khoản học viên | Có code; portal chưa được duyệt |
+| `GET /api/v1/admin/students/` | Liệt kê học viên tại site | `LOCAL`; Admin Big chọn site, Admin Small dùng site phiên, Tư vấn chỉ đọc danh sách site được giao; trả `avatar_secure_url`, cờ đã cấp và đủ điều kiện cấp tài khoản |
+| `POST /api/v1/admin/students/` | Tạo hồ sơ học viên | Trong phạm vi; `LOCAL` trên `HocVien`, sinh mã từ `Seq_HV`; slug tùy chọn mặc định theo họ tên, được chuẩn hóa và thêm hậu tố số nếu trùng tại site; giới tính tùy chọn chỉ nhận `Nam`, `Nữ`, `Khác`; chưa tạo tài khoản/mật khẩu |
+| `GET/PATCH/DELETE /api/v1/admin/students/{slug}/` | Xem/sửa/xóa hồ sơ | Trong phạm vi; `LOCAL`. Chỉ Admin Big/Admin Small đúng site; PATCH giới tính chỉ nhận `Nam`, `Nữ`, `Khác`; chỉ xóa nếu chưa có tài khoản, đăng ký hoặc lịch sử chuyển; `Logs` và dữ liệu học tập không bị xóa |
+| `POST /api/v1/admin/students/{slug}/avatar/upload-intents/?site_code=...` | Admin Big chọn site; Admin Small đúng site | `LOCAL` đọc `HocVien`; cấp intent ngắn hạn gắn với người gọi, hồ sơ và site; trình duyệt tải trực tiếp JPG/PNG/WebP tối đa 5 MB lên Cloudinary |
+| `POST /api/v1/admin/students/{slug}/avatar/complete/?site_code=...` | Admin Big chọn site; Admin Small đúng site | `LOCAL` đọc/ghi `HocVien` và `Logs`; API xác minh asset Cloudinary rồi cập nhật metadata ảnh trong transaction site-local; lỗi lưu sau upload chưa được báo thành công và có thể retry cùng token/public ID |
+| `POST /api/v1/admin/students/{slug}/account/` | Admin chủ động cấp tài khoản sau khi tạo hồ sơ | Trong phạm vi riêng; hồ sơ phải `dang_hoc` và email hợp lệ, không yêu cầu có `DangKy`; `REPLICATED-WRITE` cho `TaiKhoan` và liên kết cục bộ |
 | `/api/v1/students/profile/{slug}/` và các route con `/enrollments/`, `/schedule/`, `/tuition/`, `/grades/` | Đọc hồ sơ/portal theo tài khoản đã xác thực | Có code; chỉ trả dữ liệu theo hồ sơ hiện hành; phạm vi chưa được duyệt |
 | `/api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/` | Tạo yêu cầu thanh toán SePay | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
 | `/api/v1/students/profile/{slug}/payments/{attempt_id}/` | Đọc trạng thái lượt thanh toán | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
@@ -447,7 +454,7 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 | Quản lý điểm | `PUT /api/v1/enrollments/{ma_dang_ky}/grades/{loai_diem}` | Giáo viên được phân công; quản lý theo quyền | `LOCAL` | Site của lớp/đăng ký; đọc phân công và đăng ký; ghi `Diem`, nhật ký chỉnh sửa |
 | Tạo đề nghị chuyển | `POST /api/v1/transfers` | Admin Small | `LOCAL` | Nguồn lấy từ tài khoản; ghi `GiaoDichChuyenCoSo`, thêm `LichSuChuyenCoSo`; chưa ghi site đích |
 | Hộp thư đề nghị | `GET /api/v1/transfers/inbox` | Admin Big | `GLOBAL` | Đọc riêng các site đang hoạt động; gộp kết quả trong API; trả trạng thái đầy đủ/thiếu site |
-| Duyệt đề nghị | `POST /api/v1/transfers/{ma_chuyen}/approve` | Admin Big | `LOCAL` ghi quyết định, rồi `DISTRIBUTED-TX` | Quyết định ghi tại nguồn; Coordinator mới phối hợp nguồn/đích sau khi duyệt |
+| Duyệt đề nghị | `POST /api/v1/transfers/{ma_chuyen}/approve` | Admin Big | `LOCAL` ghi quyết định, rồi `DISTRIBUTED-TX` | Quyết định ghi tại nguồn; Coordinator tạo hồ sơ đích và sao chép metadata ảnh Cloudinary của `HocVien` nếu có, đồng thời giữ hồ sơ/metadata nguồn làm lịch sử |
 | Từ chối đề nghị | `POST /api/v1/transfers/{ma_chuyen}/reject` | Admin Big | `LOCAL` | Ghi `tu_choi`, người duyệt, thời điểm, lý do và sự kiện tại nguồn; hồ sơ học viên không đổi |
 | Xem trạng thái chuyển | `GET /api/v1/transfers/{ma_chuyen}` | Admin Big; Admin Small trong phạm vi được phép | Admin Big: `GLOBAL` để định vị nguồn; Admin Small: `LOCAL` tại site được gán | Đọc trạng thái tại nguồn; không suy ra site từ tiền tố mã học viên |
 | Thống kê học viên theo cơ sở | `GET /api/v1/reports/students-by-site` | Admin Big toàn hệ thống; Admin Small site mình | `LOCAL` hoặc `GLOBAL` tùy phạm vi | Đọc `HocVien` và trạng thái chuyển liên quan; gộp tại API khi nhiều site |
@@ -469,7 +476,7 @@ Các trường dưới đây là phần nghiệp vụ tối thiểu để đặc
 }
 ```
 
-`identifier` có thể là email hoặc tên đăng nhập. API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
+Web form yêu cầu email làm định danh đăng nhập. API vẫn nhận `identifier` là email hoặc tên đăng nhập để tương thích; API tra cứu bản `TaiKhoan` nhân bản, so sánh với hash mật khẩu, kiểm tra `trang_thai`, rồi dựng quyền từ tài khoản và hồ sơ tương ứng. Không nhận `vai_tro`, `ma_co_so` hoặc danh sách lớp từ body. Đăng nhập sai, tài khoản bị khóa và tài khoản không tồn tại dùng thông báo chung; ghi kết quả vào nhật ký nhưng không ghi tên đăng nhập nhạy cảm, mật khẩu hay token.
 
 Khuyến nghị phiên trình duyệt dùng cookie `HttpOnly`, `Secure`, `SameSite` và cơ chế CSRF phù hợp; không lưu access token/mật khẩu trong `localStorage`. Nếu nhóm chọn cơ chế bearer token khác, phải đặc tả thời hạn, thu hồi, refresh và nơi lưu trước khi code.
 
@@ -662,7 +669,7 @@ Request tối thiểu gồm `diem_so` trong khoảng 0–10. API xác định si
 
 Tạo đề nghị nhận tối thiểu `ma_hoc_vien`, `ma_co_so_dich`, `ly_do_de_nghi`. Không nhận `ma_co_so_nguon` như một giá trị đáng tin từ client; API lấy nguồn từ tài khoản Admin Small. Kiểm tra học viên hiện hành, nợ học phí, đích đang hoạt động, đích khác nguồn và không có giao dịch mở. Lưu trạng thái `cho_duyet` cùng sự kiện `de_nghi` tại nguồn; khi tạo đề nghị chưa được ghi hồ sơ đích.
 
-Hộp thư Admin Big là `GLOBAL`: hỏi các site độc lập và gộp tại API. Duyệt/từ chối định tuyến về CSDL nguồn và ghi quyết định/sự kiện tại nguồn. Khi từ chối, cần `ly_do_tu_choi`; khi duyệt, kiểm tra lại điều kiện rồi mới giao Coordinator chạy `DISTRIBUTED-TX`. Giao dịch phải hỗ trợ trạng thái và phục hồi theo [README mục 5.5](../README.md#55-chuyển-học-viên-sang-cơ-sở-khác); không tuyên bố ACID nguyên tử xuyên hai CSDL.
+Hộp thư Admin Big là `GLOBAL`: hỏi các site độc lập và gộp tại API. Duyệt/từ chối định tuyến về CSDL nguồn và ghi quyết định/sự kiện tại nguồn. Khi từ chối, cần `ly_do_tu_choi`; khi duyệt, kiểm tra lại điều kiện rồi mới giao Coordinator chạy `DISTRIBUTED-TX`. Tại site đích, giữ slug nguồn nếu chưa được dùng; nếu trùng thì thêm hậu tố số trong transaction đích và retry giữ nguyên slug đã tạo. Giao dịch phải hỗ trợ trạng thái và phục hồi theo [README mục 5.5](../README.md#55-chuyển-học-viên-sang-cơ-sở-khác); không tuyên bố ACID nguyên tử xuyên hai CSDL.
 
 ## Thống kê học viên theo cơ sở
 
@@ -670,7 +677,7 @@ Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm
 
 ## Gửi lặp, cập nhật đồng thời và lỗi site
 
-- Mọi thao tác tạo/sửa kiểm tra quyền, phạm vi site và điều kiện nghiệp vụ trước khi ghi; API không dùng `DELETE` để xóa học viên, phiếu thu, điểm danh hoặc nhật ký đã phát sinh.
+- Mọi thao tác tạo/sửa kiểm tra quyền, phạm vi site và điều kiện nghiệp vụ trước khi ghi. DELETE hồ sơ học viên chỉ được xóa bản chưa có tài khoản, đăng ký hoặc lịch sử chuyển; không xóa học phí, phiếu thu, điểm, điểm danh, lịch sử hoặc nhật ký đã phát sinh.
 - Ràng buộc duy nhất hiện có giúp chặn một số thao tác trùng: `DangKy(ma_hoc_vien, ma_lop)`, `Diem(ma_dang_ky, loai_diem)`, `DiemDanh(ma_buoi, ma_dang_ky)`, và `GiaoDichChuyenCoSo.khoa_chong_lap`. Khi nhận lại cùng thao tác hợp lệ, API nên trả kết quả cũ thay vì tạo thêm nghiệp vụ.
 - Thu/hoàn tại quầy phải chống gửi lại request sau timeout bằng khóa idempotency lưu bền vững và ghi cùng transaction với `PhieuThu`/`HocPhi`; hiện schema chưa có khóa hoặc request ledger.
 - SePay hiện có `YeuCauThanhToan`/`SuKienThanhToan` tại database site và API callback; tích hợp mặc định tắt, chưa có bằng chứng giao dịch thật. Khi được nhóm duyệt, cần kiểm chứng callback lặp, timeout, retry và đối soát; không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
@@ -772,7 +779,7 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 
 ## Các điểm còn phải thống nhất hoặc kiểm chứng
 
-1. Tài khoản/portal học viên và SePay có code/schema/UI nhưng chưa được nhóm duyệt vào phạm vi đồ án; không bật các luồng này trước khi đồng bộ README, FS, schema, API và UI spec.
+1. CRUD hồ sơ và cấp tài khoản học viên theo thao tác Admin riêng nằm trong FS-STU-01. Portal học viên và SePay có code/schema/UI nhưng vẫn chưa được duyệt phạm vi; không coi việc cấp tài khoản là quyết định bật portal hoặc thanh toán online.
 2. Thu/hoàn tại quầy chưa có request ledger bền vững riêng cho chống lặp sau timeout. Chốt hợp đồng idempotency và cập nhật schema/source nếu nhóm yêu cầu bảo đảm này.
 3. API quản lý `CoSo` chưa có; runtime replication cho `CoSo` còn thiếu. `MonHoc`/`KhoaHoc` có service ghi replication; một số luồng ghi `TaiKhoan` vẫn có cơ chế riêng, chưa gom về một điểm vào.
 4. Chạy đủ TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên các database SQL Server đang dùng. Còn thiếu outage/recovery, fault injection chuyển cơ sở, concurrency hai phiên và Global Query khi thiếu site; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).

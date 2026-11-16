@@ -185,6 +185,8 @@ BEGIN TRY
         sdt           VARCHAR(20)    NULL,
         email         NVARCHAR(254)  NULL,
         dia_chi       NVARCHAR(300)  NULL,
+        avatar_public_id  NVARCHAR(255)  NULL,
+        avatar_secure_url NVARCHAR(1024) NULL,
         ngay_nhap_hoc DATE           NOT NULL,
         trang_thai    VARCHAR(20)    NOT NULL CONSTRAINT DF_HocVien_trang_thai DEFAULT ('dang_hoc'),
         CONSTRAINT PK_HocVien PRIMARY KEY (ma_hoc_vien),

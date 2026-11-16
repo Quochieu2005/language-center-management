@@ -13,9 +13,11 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.mail import send_mail
+from django.core.validators import validate_email
 from django.db import DatabaseError, connections, transaction
+from django.utils import timezone
 
 from core.auth.account_state import account_is_active, account_status_bit
 from core.auth.service_common import (
@@ -26,6 +28,7 @@ from core.auth.service_common import (
 )
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
+from core.students.slugging import available_student_slug
 
 
 logger = logging.getLogger("core.students")
@@ -46,7 +49,7 @@ class StudentConflict(Exception):
 
 
 class StudentNotEligible(Exception):
-    """The student has no active enrollment eligible for account issuance."""
+    """The student is not active or has no valid email for account issuance."""
 
 
 class StudentSiteUnavailable(Exception):
@@ -160,8 +163,12 @@ def list_students(
             f"""
             SELECT h.ma_hoc_vien AS student_id, h.slug, h.ma_co_so AS site_code,
                    h.ho_ten AS full_name, h.sdt AS phone, h.email,
+                   h.avatar_secure_url AS avatar_secure_url,
                    h.trang_thai AS status,
-                   CONVERT(bit, CASE WHEN h.ma_tai_khoan IS NULL THEN 0 ELSE 1 END) AS account_issued
+                   CONVERT(bit, CASE WHEN h.ma_tai_khoan IS NULL THEN 0 ELSE 1 END) AS account_issued,
+                   CONVERT(bit, CASE WHEN h.ma_tai_khoan IS NULL AND h.trang_thai = 'dang_hoc'
+                       AND NULLIF(LTRIM(RTRIM(h.email)), N'') IS NOT NULL
+                       THEN 1 ELSE 0 END) AS account_issue_eligible
             FROM dbo.HocVien AS h
             WHERE {where_sql}
             ORDER BY h.ho_ten, h.ma_hoc_vien
@@ -170,6 +177,12 @@ def list_students(
             [*params, offset, limit],
         )
         rows = _dict_rows(cursor)
+    for row in rows:
+        if row["account_issue_eligible"]:
+            try:
+                validate_email(str(row["email"]).strip())
+            except ValidationError:
+                row["account_issue_eligible"] = False
     return {
         "site_code": site,
         "count": count,
@@ -250,14 +263,7 @@ def _create_or_load_student_account(
                 cursor.execute(
                     """
                     SELECT TOP (2) h.ma_hoc_vien, h.slug, h.ma_co_so, h.ho_ten,
-                           h.sdt, h.email, h.trang_thai, h.ma_tai_khoan,
-                           CASE WHEN EXISTS
-                           (
-                               SELECT 1 FROM dbo.DangKy AS d
-                               WHERE d.ma_hoc_vien = h.ma_hoc_vien
-                                 AND d.ma_co_so = h.ma_co_so
-                                 AND d.trang_thai IN ('da_dang_ky', 'dang_hoc')
-                           ) THEN 1 ELSE 0 END
+                           h.sdt, h.email, h.trang_thai, h.ma_tai_khoan
                     FROM dbo.HocVien AS h WITH (UPDLOCK, HOLDLOCK)
                     WHERE h.ma_hoc_vien = %s AND h.ma_co_so = %s
                     """,
@@ -267,10 +273,14 @@ def _create_or_load_student_account(
                 if len(rows) != 1:
                     raise StudentNotFound
                 current = tuple(rows[0])
-                if str(current[6]).lower() != "dang_hoc" or not bool(current[8]):
+                if str(current[6]).lower() != "dang_hoc":
                     raise StudentNotEligible
                 if str(current[5] or "").strip().casefold() != email:
                     raise StudentConflict
+                try:
+                    validate_email(email)
+                except ValidationError as exc:
+                    raise StudentNotEligible from exc
 
                 if current[7] is not None:
                     cursor.execute(
@@ -287,7 +297,7 @@ def _create_or_load_student_account(
                         raise StudentInfrastructureUnavailable
                     return tuple(account)
 
-                if not email or _replicated_account(email, sites) is not None:
+                if _replicated_account(email, sites) is not None:
                     raise StudentConflict
                 username = _username_candidate(email, site_code, sites)
                 account_slug = _account_slug_candidate(str(current[1]), sites)
@@ -376,6 +386,171 @@ def _append_audit(cursor, site_code: str, actor_id: str, action: str, table: str
     )
 
 
+_STUDENT_PROFILE_COLUMNS = {
+    "full_name": "ho_ten",
+    "birth_date": "ngay_sinh",
+    "gender": "gioi_tinh",
+    "phone": "sdt",
+    "email": "email",
+    "address": "dia_chi",
+}
+
+
+def _student_admin_profile(cursor, site_code: str, slug: str, *, lock: bool = False):
+    hint = " WITH (UPDLOCK, HOLDLOCK)" if lock else ""
+    cursor.execute(
+        """
+        SELECT TOP (2) ma_hoc_vien AS student_id, slug, ma_co_so AS site_code,
+               ho_ten AS full_name, ngay_sinh AS birth_date, gioi_tinh AS gender,
+               sdt AS phone, email, dia_chi AS address, ngay_nhap_hoc AS enrolled_on,
+               trang_thai AS status, ma_tai_khoan AS account_id,
+               avatar_secure_url
+        FROM dbo.HocVien AS h""" + hint + " WHERE slug = %s AND ma_co_so = %s",
+        [slug, site_code],
+    )
+    rows = _dict_rows(cursor)
+    if len(rows) > 1:
+        raise StudentInfrastructureUnavailable
+    if not rows:
+        raise StudentNotFound
+    return rows[0]
+
+
+@_translate_infrastructure_errors
+def get_admin_student_profile(*, site_code: str, student_slug: str) -> dict[str, Any]:
+    site = _site_code(site_code)
+    _verify_active_site(site, active_site_codes())
+    alias = get_site_database_alias(site)
+    with connections[alias].cursor() as cursor:
+        profile = _student_admin_profile(cursor, site, student_slug)
+    profile.pop("account_id", None)
+    return profile
+
+
+@_translate_infrastructure_errors
+def create_student_profile(
+    *, site_code: str, fields: dict[str, Any], actor_id: str, remote_ip: str,
+) -> dict[str, Any]:
+    site = _site_code(site_code)
+    _verify_active_site(site, active_site_codes())
+    alias = get_site_database_alias(site)
+    student_id = f"{site}-HV-{_next_sequence_number(site, 'Seq_HV'):06d}"
+    values = {name: fields.get(name) for name in _STUDENT_PROFILE_COLUMNS}
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            slug = available_student_slug(cursor, values["full_name"], fields.get("slug"))
+            cursor.execute(
+                """
+                INSERT INTO dbo.HocVien
+                    (ma_hoc_vien, slug, ma_co_so, co_so_goc, ho_ten, ngay_sinh,
+                     gioi_tinh, sdt, email, dia_chi, ngay_nhap_hoc, trang_thai)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'dang_hoc')
+                """,
+                [student_id, slug, site, site, values["full_name"], values["birth_date"],
+                 values["gender"], values["phone"], values["email"], values["address"],
+                 timezone.localdate()],
+            )
+            _append_audit(
+                cursor, site, actor_id, "tao_ho_so_hoc_vien", "HocVien", student_id,
+                remote_ip, uuid.uuid4().hex, {"fields": sorted(fields)},
+            )
+    return get_admin_student_profile(site_code=site, student_slug=slug)
+
+
+@_translate_infrastructure_errors
+def update_student_profile(
+    *, site_code: str, student_slug: str, fields: dict[str, Any],
+    actor_id: str, remote_ip: str,
+) -> dict[str, Any]:
+    site = _site_code(site_code)
+    _verify_active_site(site, active_site_codes())
+    alias = get_site_database_alias(site)
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            profile = _student_admin_profile(cursor, site, student_slug, lock=True)
+            if str(profile["status"]).lower() == "da_chuyen_di":
+                raise StudentConflict
+            cursor.execute(
+                "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.GiaoDichChuyenCoSo "
+                "WHERE ma_hoc_vien = %s AND co_so_nguon = %s AND trang_thai = 'dang_xu_ly') "
+                "THEN 1 ELSE 0 END",
+                [profile["student_id"], site],
+            )
+            if cursor.fetchone()[0]:
+                raise StudentConflict
+            current_email = (profile["email"] or "").casefold()
+            requested_email = fields.get("email", profile["email"])
+            if profile["account_id"] is not None and (
+                (requested_email or "").casefold() != current_email
+            ):
+                raise StudentConflict
+
+            changes = {
+                name: value for name, value in fields.items()
+                if value != profile[name]
+            }
+            if changes:
+                assignments = ", ".join(
+                    f"{_STUDENT_PROFILE_COLUMNS[name]} = %s" for name in changes
+                )
+                cursor.execute(
+                    f"UPDATE dbo.HocVien SET {assignments} "
+                    "WHERE ma_hoc_vien = %s AND ma_co_so = %s AND slug = %s",
+                    [*changes.values(), profile["student_id"], site, student_slug],
+                )
+                if cursor.rowcount != 1:
+                    raise StudentConflict
+                _append_audit(
+                    cursor, site, actor_id, "sua_ho_so_hoc_vien", "HocVien",
+                    profile["student_id"], remote_ip, uuid.uuid4().hex,
+                    {"fields": sorted(changes)},
+                )
+    return get_admin_student_profile(site_code=site, student_slug=student_slug)
+
+
+@_translate_infrastructure_errors
+def delete_student_profile(
+    *, site_code: str, student_slug: str, actor_id: str, remote_ip: str,
+) -> dict[str, Any]:
+    site = _site_code(site_code)
+    _verify_active_site(site, active_site_codes())
+    alias = get_site_database_alias(site)
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            profile = _student_admin_profile(cursor, site, student_slug, lock=True)
+            if profile["account_id"] is not None or str(profile["status"]).lower() == "da_chuyen_di":
+                raise StudentConflict
+            cursor.execute(
+                """
+                SELECT CASE WHEN
+                    EXISTS (SELECT 1 FROM dbo.DangKy WHERE ma_hoc_vien = %s AND ma_co_so = %s)
+                    OR EXISTS (SELECT 1 FROM dbo.GiaoDichChuyenCoSo WHERE ma_hoc_vien = %s)
+                    OR EXISTS (SELECT 1 FROM dbo.LichSuChuyenCoSo WHERE ma_hoc_vien = %s)
+                THEN 1 ELSE 0 END
+                """,
+                [profile["student_id"], site, profile["student_id"], profile["student_id"]],
+            )
+            if cursor.fetchone()[0]:
+                raise StudentConflict
+            _append_audit(
+                cursor, site, actor_id, "xoa_ho_so_hoc_vien", "HocVien",
+                profile["student_id"], remote_ip, uuid.uuid4().hex, {},
+            )
+            cursor.execute(
+                "DELETE FROM dbo.HocVien "
+                "WHERE ma_hoc_vien = %s AND ma_co_so = %s AND slug = %s AND ma_tai_khoan IS NULL",
+                [profile["student_id"], site, student_slug],
+            )
+            if cursor.rowcount != 1:
+                raise StudentConflict
+    return {
+        "student_id": profile["student_id"],
+        "slug": student_slug,
+        "site_code": site,
+        "deleted": True,
+    }
+
+
 def _ensure_account_replica(site_code: str, expected: tuple[Any, ...]) -> None:
     alias = get_site_database_alias(site_code)
     account_id, slug, username, email, password_hash, role, account_site, status, forced, version = expected
@@ -431,14 +606,7 @@ def _ensure_student_link(site_code: str, student: tuple[Any, ...], account_id: s
             cursor.execute(
                 """
                 SELECT TOP (2) ma_hoc_vien, ma_co_so, ma_tai_khoan,
-                       trang_thai, email,
-                       CASE WHEN EXISTS
-                       (
-                           SELECT 1 FROM dbo.DangKy AS d
-                           WHERE d.ma_hoc_vien = h.ma_hoc_vien
-                             AND d.ma_co_so = h.ma_co_so
-                             AND d.trang_thai IN ('da_dang_ky', 'dang_hoc')
-                       ) THEN 1 ELSE 0 END
+                       trang_thai, email
                 FROM dbo.HocVien AS h WITH (UPDLOCK, HOLDLOCK)
                 WHERE slug = %s
                 """,
@@ -452,7 +620,7 @@ def _ensure_student_link(site_code: str, student: tuple[Any, ...], account_id: s
             row = rows[0]
             if str(row[0]) != student_id or _site_code(row[1]) != site_code:
                 raise StudentConflict
-            if str(row[3]).lower() != "dang_hoc" or not bool(row[5]):
+            if str(row[3]).lower() != "dang_hoc":
                 raise StudentNotEligible
             if str(row[4] or "").strip().casefold() != str(student[5] or "").strip().casefold():
                 raise StudentConflict
@@ -473,16 +641,16 @@ def _ensure_student_link(site_code: str, student: tuple[Any, ...], account_id: s
             )
 
 
-def _send_student_credentials(email: str, username: str, student_name: str, password: str) -> None:
+def _send_student_credentials(email: str, student_name: str, password: str) -> None:
     try:
         sent = send_mail(
             subject="Tài khoản học viên Trung tâm Ngoại ngữ",
             message=(
                 f"Chào {student_name},\n\n"
-                "Tài khoản học viên của bạn đã được cấp sau khi đăng ký khóa học.\n"
-                f"Tên đăng nhập: {username}\n"
+                "Tài khoản học viên của bạn đã được cấp.\n"
+                f"Email đăng nhập: {email}\n"
                 f"Mật khẩu tạm thời: {password}\n\n"
-                "Hãy đăng nhập bằng cổng học viên và đổi mật khẩu ngay lần đầu. "
+                "Hãy đăng nhập bằng email này trên cổng học viên và đổi mật khẩu ngay lần đầu. "
                 "Không chia sẻ mật khẩu này với người khác."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -544,7 +712,7 @@ def issue_student_account(
         if not check_password(initial_password, str(account[4])):
             raise StudentInfrastructureUnavailable
         _send_student_credentials(
-            str(account[3]), str(account[2]), str(student[3]), initial_password
+            str(account[3]), str(student[3]), initial_password
         )
         email_sent = True
     return _student_account_result(account, student, target_site, email_sent=email_sent)

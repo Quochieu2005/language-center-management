@@ -395,7 +395,7 @@ def _acquire_named_lock(cursor, resource: str) -> None:
         raise AuthInfrastructureUnavailable
 
 def _next_sequence_number(site_code: str, sequence_name: str) -> int:
-    allowed_sequences = {"Seq_TK", "Seq_NV", "Seq_GV", "Seq_AD", "Seq_DB", "Seq_NK"}
+    allowed_sequences = {"Seq_TK", "Seq_NV", "Seq_GV", "Seq_AD", "Seq_DB", "Seq_NK", "Seq_HV"}
     if sequence_name not in allowed_sequences:
         raise ValueError("Sequence không được phép.")
     try:

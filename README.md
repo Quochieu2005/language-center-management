@@ -107,6 +107,7 @@ Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sun
 | Nghiệp vụ được giao | Phần triển khai trong README | Dữ liệu cốt lõi liên quan | Cách thể hiện phân tán |
 |---|---|---|---|
 | Đăng ký khóa học | [5.1. Đăng ký khóa học](#51-đăng-ký-khóa-học) | `HocVien`, `LopHoc`, `DangKy`, `HocPhi`; đọc danh mục `MonHoc`/`KhoaHoc` | `LOCAL`: định tuyến tới cơ sở học viên/lớp; đăng ký và khoản học phí được lưu cùng site với lớp |
+| Quản lý hồ sơ học viên (hỗ trợ vận hành) | [FS-STU-01](fs/Functional-Specification.md#fs-stu-01--quản-lý-hồ-sơ-học-viên-tại-cơ-sở) | `HocVien`, `Logs`; khi cấp tài khoản thêm `TaiKhoan` | Tạo/sửa/xóa hồ sơ và metadata ảnh Cloudinary là `LOCAL` tại một site; slug tạo từ họ tên, chỉ duy nhất trong site; cấp tài khoản theo thao tác riêng là `REPLICATED-WRITE` cho `TaiKhoan` và ghi liên kết cục bộ; không xóa lịch sử đã phát sinh |
 | Xếp lớp | [5.2. Xếp hoặc đổi lớp](#52-xếp-hoặc-đổi-lớp) | `HocVien`, `LopHoc`, `DangKy` | `LOCAL`: kiểm tra học viên và lớp trong cùng site; không JOIN xuyên cơ sở |
 | Chuyển cơ sở | [5.5. Chuyển học viên sang cơ sở khác](#55-chuyển-học-viên-sang-cơ-sở-khác) | `GiaoDichChuyenCoSo`, `HocVien`, `DangKy`, `LichSuChuyenCoSo` | Admin Small đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; chỉ sau duyệt mới chạy `DISTRIBUTED-TX` giữa nguồn và đích |
 | Đóng học phí | [5.3. Thu hoặc hoàn học phí](#53-thu-hoặc-hoàn-học-phí) | `DangKy`, `HocPhi`, `PhieuThu` | `LOCAL`: ghi nhận khoản thu tại site chứa đăng ký; kiểm tra số dư và quyền trước khi ghi |
@@ -206,13 +207,13 @@ flowchart LR
 
 | Nhóm người dùng | Phạm vi | Quyền chính |
 |---|---|---|
-| Admin Big | Toàn hệ thống | Quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; xem thống kê/log toàn cục; xem hộp thư đề nghị toàn cục và duyệt/từ chối đề nghị chuyển |
-| Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo đề nghị chuyển học viên ra cơ sở khác và theo dõi đề nghị thuộc site mình; không duyệt đề nghị, không xem/sửa dữ liệu cơ sở khác |
+| Admin Big | Toàn hệ thống | Quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; tạo/sửa/xóa hồ sơ học viên tại site đã chọn theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; xem thống kê/log toàn cục; xem hộp thư đề nghị toàn cục và duyệt/từ chối đề nghị chuyển |
+| Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
 | Lễ tân | Một site | Tiếp nhận tại quầy; thao tác đăng ký/lớp; API có quyền kế hoạch học phí nhưng giao diện chưa có menu Học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
 | Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp tại cơ sở |
 | Kế toán | Một site | Thu/hoàn học phí, xem công nợ và biên nhận tại cơ sở |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
-| Học viên | Schema/API/UI có tài khoản và portal trong source; phạm vi này chưa được chốt cho đồ án | Chỉ đưa vào phạm vi sau khi nhóm duyệt và đồng bộ README, FS, schema, API và UI |
+| Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
 ### 3.2. Backend luôn kiểm tra quyền trước khi truy cập dữ liệu
 
@@ -396,7 +397,7 @@ flowchart TD
 3. Admin Big mở hộp thư đề nghị. Django dùng Global Query đọc các CSDL site riêng rồi gộp danh sách ở tầng ứng dụng; không có bảng hộp thư trung tâm. Nếu một site không truy cập được, hộp thư phải báo kết quả chưa đầy đủ; không thể duyệt đề nghị của site nguồn đang mất kết nối.
 4. Khi Admin Big duyệt, API định tuyến về CSDL nguồn theo mã đề nghị và kiểm tra lại học viên còn đang học, công nợ, trạng thái cơ sở đích, kết nối hai site và không có giao dịch đang mở khác. Trong transaction cục bộ tại nguồn, đổi trạng thái sang `dang_xu_ly`, bước `da_tiep_nhan`, ghi tài khoản/thời điểm quyết định và sự kiện `duyet`. Việc kiểm tra lại là bắt buộc vì dữ liệu có thể đổi trong lúc chờ.
 5. Nếu Admin Big từ chối, ghi `tu_choi`, tài khoản/thời điểm và lý do từ chối cùng sự kiện `tu_choi` tại nguồn. Hồ sơ học viên không đổi; đề nghị kết thúc và được giữ để tra cứu. Admin Small có thể gửi một đề nghị mới sau đó.
-6. Chỉ sau quyết định duyệt, Coordinator mới tạo hồ sơ cùng mã ở site đích và sự kiện `tao_ho_so_dich` trong cùng transaction cục bộ tại đích. Sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich` ở nguồn.
+6. Chỉ sau quyết định duyệt, Coordinator mới tạo hồ sơ cùng mã ở site đích và sự kiện `tao_ho_so_dich` trong cùng transaction cục bộ tại đích. Metadata avatar Cloudinary (nếu có) được sao chép cùng hồ sơ; file không di chuyển khỏi Cloudinary và bản metadata nguồn vẫn được giữ cho lịch sử. Sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich` ở nguồn.
 7. Trong một transaction cục bộ tại nguồn, đánh dấu học viên `da_chuyen_di`, đóng đăng ký/lớp cũ, cập nhật `buoc_cuoi = da_cap_nhat_nguon` và thêm sự kiện `cap_nhat_ho_so_nguon`. Sau khi đối chiếu hai site, cập nhật trạng thái giao dịch `hoan_tat` và ghi sự kiện cuối ở nguồn.
 
 Khi đề nghị còn `cho_duyet`, các nghiệp vụ tại nguồn vẫn có thể tiếp tục; vì vậy Admin Big phải kiểm tra lại điều kiện lúc duyệt. Sau khi đã duyệt và trạng thái là `dang_xu_ly`, API chặn đăng ký/thu phí/nhập điểm cho học viên ở cả hai site đến khi phục hồi hoàn tất. Không xóa bản nguồn. Vì hai CSDL commit riêng, sau khi tạo đích và trước khi cập nhật nguồn có thể tồn tại hai dòng vật lý `dang_hoc`; không tuyên bố đây là transaction ACID nguyên tử xuyên hai CSDL. Coordinator phục hồi tiến về phía trước sau khi đích đã commit. `LichSuChuyenCoSo` chỉ thêm sự kiện; chỉ `GiaoDichChuyenCoSo` là trạng thái hiện tại có thể cập nhật. Chi tiết lỗi, retry và kiểm chứng nằm trong [docs/QLTTNN-Giao-Dich-Phan-Tan.md](docs/QLTTNN-Giao-Dich-Phan-Tan.md).
@@ -460,7 +461,7 @@ flowchart LR
     DangNhap["Đăng nhập"] -->|ghi nhận đăng nhập| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Đăng nhập bằng tên đăng nhập/email và mật khẩu, phiên có thể thu hồi, idle timeout và các route OAuth Google/Facebook đã có code. OAuth hiện chỉ cho học viên có subject liên kết trước; cấu hình provider và kiểm thử với app thật còn phụ thuộc môi trường. Tra cứu tài khoản/subject đọc các CSDL site riêng, liên kết subject cập nhật bản sao `TaiKhoan`; không tự tạo tài khoản hoặc tự ghép qua email. Tài khoản học viên, portal và OAuth học viên đã có code nhưng chưa được tính là phạm vi đồ án đã duyệt cho tới khi nhóm thống nhất. Không có CSDL identity trung tâm hay JOIN xuyên site. Xem [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) và [API spec](specs/api.md).
+Đăng nhập bằng tên đăng nhập/email và mật khẩu, phiên có thể thu hồi, idle timeout và các route OAuth Google/Facebook đã có code. OAuth hiện chỉ cho học viên có subject liên kết trước; cấu hình provider và kiểm thử với app thật còn phụ thuộc môi trường. Tra cứu tài khoản/subject đọc các CSDL site riêng, liên kết subject cập nhật bản sao `TaiKhoan`; không tự tạo tài khoản hoặc tự ghép qua email. Admin có thể cấp tài khoản học viên theo thao tác riêng tại FS-STU-01; portal tự phục vụ và OAuth học viên vẫn chưa được tính là phạm vi đồ án. Không có CSDL identity trung tâm hay JOIN xuyên site. Xem [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) và [API spec](specs/api.md).
 
 Phiên đăng nhập hết hạn sau **60 phút không có hoạt động người dùng thật**. Backend kiểm tra hạn và thu hồi phiên; endpoint `/auth/activity/` là đường gia hạn tường minh, frontend không được gọi nó bằng polling/health check. Mỗi thiết bị có phiên riêng. Trạng thái phiên hiện được lưu tại CSDL site cấu hình `AUTH_SESSION_SITE_CODE`, không phải CSDL nghiệp vụ trung tâm; site này ngừng hoạt động có thể ảnh hưởng đăng nhập và xác thực phiên toàn hệ thống. Việc đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và chuyển hướng giao diện sau khi hết phiên cần được kiểm chứng/hoàn thiện ở frontend.
 

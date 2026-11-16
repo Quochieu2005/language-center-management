@@ -245,6 +245,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   };
 
   const adminColumns: ColumnsType<AdminSmall> = [
+    { title: "Ảnh", dataIndex: "avatar_secure_url", width: 72, render: (value: string | null, row) => <Avatar src={value || undefined} icon={<UserOutlined />} alt={`Ảnh đại diện ${row.full_name}`} /> },
     { title: "Tên", dataIndex: "full_name" },
     { title: "Email", dataIndex: "email" },
     { title: "Cơ sở", dataIndex: "site_code" },

@@ -13,6 +13,7 @@ export type SiteCounts = {
 export type AdminSmall = {
   admin_id: string; site_code: string; full_name: string; phone: string | null;
   account_id: string; slug: string; username: string; email: string;
+  avatar_secure_url: string | null;
   account_status: "active" | "inactive"; profile_status: "dang_lam" | "nghi_viec";
   credential_email_status: "ready" | "processing" | "sent" | "failed" | "unknown" | "changed";
 };
@@ -92,7 +93,18 @@ export type AdminAuditLogList = {
 };
 export type Student = {
   student_id: string; slug: string; site_code: string; full_name: string;
-  phone: string | null; email: string | null; status: string; account_issued: boolean;
+  phone: string | null; email: string | null; avatar_secure_url: string | null; status: string;
+  account_issued: boolean; account_issue_eligible: boolean;
+};
+export type StudentProfile = {
+  student_id: string; slug: string; site_code: string; full_name: string;
+  birth_date: string | null; gender: string | null; phone: string | null;
+  email: string | null; address: string | null; enrolled_on: string; status: string;
+  avatar_secure_url: string | null;
+};
+export type StudentProfileWrite = {
+  full_name: string; birth_date?: string | null; gender?: string | null;
+  phone?: string | null; email?: string | null; address?: string | null; slug?: string;
 };
 export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
 export type AdminAvatarUploadIntent = AvatarUploadIntent;
@@ -178,8 +190,21 @@ export const adminApi = {
     apiRequest<{ deleted: boolean; profile_retained: boolean; detail: string }>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   students: (options: { site_code?: string; status?: string; search?: string; account_issued?: boolean; limit?: number; offset?: number } = {}) =>
     apiRequest<ApiPage<Student>>(`/admin/students/${query(options)}`),
-  issueStudentAccount: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/students/${encodeURIComponent(slug)}/account/`, { method: "POST", body: "{}" }),
-  deleteStudent: (slug: string, site_code?: string) => apiRequest<Record<string, unknown>>(`/admin/students/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
+  createStudent: (body: StudentProfileWrite, site_code?: string) =>
+    apiRequest<StudentProfile>(`/admin/students/${query({ site_code })}`, { method: "POST", body: jsonBody(body) }),
+  student: (slug: string, site_code?: string) =>
+    apiRequest<StudentProfile>(`/admin/students/${encodeURIComponent(slug)}/${query({ site_code })}`),
+  updateStudent: (slug: string, body: Partial<StudentProfileWrite>, site_code?: string) =>
+    apiRequest<StudentProfile>(`/admin/students/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
+  createStudentAvatarUploadIntent: (slug: string, site_code?: string) =>
+    apiRequest<AdminAvatarUploadIntent>(`/admin/students/${encodeURIComponent(slug)}/avatar/upload-intents/${query({ site_code })}`, { method: "POST", body: "{}" }),
+  completeStudentAvatarUpload: (slug: string, body: { intent_token: string; public_id: string }, site_code?: string) =>
+    apiRequest<{ student_id: string; slug: string; site_code: string; avatar_secure_url: string; complete: boolean }>(
+      `/admin/students/${encodeURIComponent(slug)}/avatar/complete/${query({ site_code })}`, { method: "POST", body: jsonBody(body) },
+    ),
+  issueStudentAccount: (slug: string, site_code?: string) =>
+    apiRequest<{ username: string; email: string; email_sent: boolean; must_change_password: boolean }>(`/admin/students/${encodeURIComponent(slug)}/account/${query({ site_code })}`, { method: "POST", body: "{}" }),
+  deleteStudent: (slug: string, site_code?: string) => apiRequest<{ student_id: string; slug: string; site_code: string; deleted: boolean }>(`/admin/students/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   updateSubject: (slug: string, body: { ten_mon?: string; mo_ta?: string | null }) =>
     apiRequest<Record<string, unknown>>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
   notifications: (options: { site_code?: string; category?: string; limit?: number; offset?: number } = {}) =>
