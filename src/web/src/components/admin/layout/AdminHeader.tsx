@@ -7,7 +7,7 @@ import { BellOutlined, BulbOutlined, GlobalOutlined, MenuFoldOutlined, MenuUnfol
 import { adminApi } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session";
-import { useSiteScope } from "@/lib/auth/site-scope";
+import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import styles from "./AdminLayout.module.scss";
 
@@ -70,10 +70,11 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
     </div>
 
     <div className={styles.headerRight}>
-      {user?.role === "admin_big" && <div className={styles.campusSelector} title="Cơ sở mà API sẽ truy vấn">
+      {user?.role === "admin_big" && <div className={styles.campusSelector} title="Phạm vi dữ liệu cần xem">
         <GlobalOutlined aria-hidden="true" />
-        <span>Cơ sở:</span>
-        <select className={styles.campusSelect} value={selectedSite} onChange={(event) => onSelectSite(event.target.value)} disabled={loadingSites || !siteCodes.length}>
+        <span>Phạm vi:</span>
+        <select className={styles.campusSelect} value={selectedSite} onChange={(event) => onSelectSite(event.target.value)} disabled={loadingSites}>
+          <option value={ALL_SITES}>Toàn hệ thống</option>
           {siteCodes.map((site) => <option key={site} value={site}>{site}</option>)}
         </select>
       </div>}

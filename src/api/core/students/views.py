@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from core.academics.common import AcademicError, global_site_list
 from core.auth.authentication import AuthCookieAuthentication
 from core.auth.serializers import EmptyRequestSerializer
 from core.media.avatars import (
@@ -221,6 +222,19 @@ class StudentAdminCollectionView(APIView):
         query = StudentListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
+        if request.user.role == "admin_big" and not data.get("site_code"):
+            try:
+                result = global_site_list(
+                    lambda site, limit, offset: list_students(
+                        site_code=site, status_filter=data.get("status"), search=data.get("search"),
+                        account_issued=data.get("account_issued"), limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(StudentInfrastructureUnavailable, StudentSiteUnavailable),
+                )
+            except AcademicError as exc:
+                return _student_service_error(exc)
+            return Response(result)
         site_code, error = _resolve_student_list_site(request.user, data.get("site_code"))
         if error:
             return error

@@ -6,7 +6,7 @@ import { Alert, App, Avatar, Button, Card, Form, Input, Modal, Popconfirm, Selec
 import type { ColumnsType } from "antd/es/table";
 import { adminApi, type Teacher } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";
-import { useSiteScope } from "@/lib/auth/site-scope";
+import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 
 type PendingTeacherAvatarSync = {
   slug: string;
@@ -28,6 +28,7 @@ export default function TeachersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState("");
   const [error, setError] = useState("");
+  const [partial, setPartial] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<Teacher | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -55,7 +56,7 @@ export default function TeachersPage() {
   const openCreateForm = () => {
     slugEdited.current = false;
     form.resetFields();
-    form.setFieldsValue({ site_code: site || siteCodes[0], slug: "" });
+    form.setFieldsValue({ site_code: site && site !== ALL_SITES ? site : siteCodes[0], slug: "" });
     setAvatarFile(null);
     setAvatarPreview("");
     setOpen(true);
@@ -98,11 +99,13 @@ export default function TeachersPage() {
     if (!site) return;
     setLoading(true);
     try {
-      const data = await adminApi.teachers(site, { limit: 100 });
+      const data = await adminApi.teachers(site === ALL_SITES ? undefined : site, { limit: 100 });
       setRows(data.results);
+      setPartial(data.missing_sites || []);
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không tải được danh sách giáo viên.");
+      setPartial([]);
     } finally {
       setLoading(false);
     }
@@ -128,7 +131,7 @@ export default function TeachersPage() {
         avatar_requested: Boolean(avatarFile),
         site_code: user?.role === "admin_big" ? targetSite : undefined,
       });
-      if (user?.role === "admin_big" && created.site_code !== site) setSelectedSite(created.site_code);
+      if (user?.role === "admin_big" && site !== ALL_SITES && created.site_code !== site) setSelectedSite(created.site_code);
       if (avatarFile) {
         let retryData: PendingTeacherAvatarSync | null = null;
         try {
@@ -192,6 +195,7 @@ export default function TeachersPage() {
   const columns: ColumnsType<Teacher> = [
     { title: "Ảnh", dataIndex: "avatar_secure_url", width: 72, render: (url: string | null) => <Avatar src={url || undefined} icon={<UserOutlined />} /> },
     { title: "Họ tên", dataIndex: "full_name", render: (value: string, row) => <Button type="link" disabled={!row.slug} onClick={async () => { try { setDetail(await adminApi.teacher(row.slug!, row.site_code)); } catch (reason) { message.error(reason instanceof Error ? reason.message : "Không tải được hồ sơ giáo viên."); } }}>{value}</Button> },
+    { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Email", dataIndex: "email" },
     { title: "Điện thoại", dataIndex: "phone" },
     { title: "Trạng thái tài khoản", dataIndex: "account_status", render: (value: string | null) => <Tag color={value === "active" ? "green" : "default"}>{value || "Chưa cấp"}</Tag> },
@@ -223,9 +227,10 @@ export default function TeachersPage() {
 
   const canCreate = user?.role === "admin_big" ? siteCodes.length > 0 : Boolean(site);
 
-  return <Card title="Quản lý giáo viên" extra={<Button type="primary" disabled={!canCreate} onClick={openCreateForm}>Tạo giáo viên</Button>}>
-    {user?.role === "admin_big" && <Select value={site || undefined} onChange={setSelectedSite} options={siteCodes.map((value) => ({ value, label: value }))} style={{ width: 150, marginBottom: 16 }} />}
+  return <Card title={`Quản lý giáo viên · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Button type="primary" disabled={!canCreate} onClick={openCreateForm}>Tạo giáo viên</Button>}>
+    {user?.role === "admin_big" && <Select value={site || undefined} onChange={setSelectedSite} options={[{ value: ALL_SITES, label: "Toàn hệ thống" }, ...siteCodes.map((value) => ({ value, label: value }))]} style={{ width: 180, marginBottom: 16 }} />}
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
+    {partial.length > 0 && <Alert type="warning" showIcon title={`Global Query thiếu site: ${partial.join(", ")}; dữ liệu chưa đầy đủ.`} style={{ marginBottom: 16 }} />}
     {pendingAvatarSync && <Alert
       type="warning"
       showIcon

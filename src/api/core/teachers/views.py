@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from core.academics.common import AcademicError, global_site_list
 from core.auth.authentication import AuthCookieAuthentication
 from core.auth.account_status import (
     AccountStatusConflict,
@@ -109,11 +110,11 @@ class TeacherCollectionView(APIView):
     @extend_schema(
         operation_id="teacher_list",
         tags=["Quản lý giáo viên"],
-        summary="Liệt kê giáo viên trong một cơ sở",
+        summary="Liệt kê giáo viên theo site hoặc toàn hệ thống",
         description=(
-            "Admin Big phải truyền site_code; Admin Small dùng site từ phiên đăng nhập và không được "
-            "chọn site khác. Chỉ đọc CSDL riêng của site, không JOIN xuyên site. Hỗ trợ lọc status/search "
-            "và phân trang limit/offset."
+            "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn riêng từng CSDL site đang hoạt động rồi tổng hợp trong API; "
+            "nếu thiếu site trả complete=false và missing_sites. Admin Big truyền site_code để đọc LOCAL. Admin Small dùng site từ "
+            "phiên đăng nhập và không được chọn site khác. Không JOIN xuyên site. Hỗ trợ lọc status/search và phân trang limit/offset."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -124,7 +125,7 @@ class TeacherCollectionView(APIView):
         ],
         responses={
             200: TeacherListResponseSerializer,
-            400: OpenApiResponse(description="Tham số lọc không hợp lệ hoặc Admin Big chưa chọn cơ sở."),
+            400: OpenApiResponse(description="Tham số lọc hoặc site không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
             403: OpenApiResponse(description="Vai trò không được quản lý giáo viên hoặc vượt phạm vi site."),
             503: OpenApiResponse(description="Site/CSDL không sẵn sàng."),
@@ -134,6 +135,18 @@ class TeacherCollectionView(APIView):
         query = TeacherListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
+        if request.user.role == "admin_big" and not data.get("site_code"):
+            try:
+                return Response(global_site_list(
+                    lambda site, limit, offset: list_teachers(
+                        site_code=site, status_filter=data.get("status"), search=data.get("search"),
+                        limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(AcademicError, TeacherInfrastructureUnavailable, TeacherSiteUnavailable),
+                ))
+            except AcademicError as exc:
+                return _service_error(exc)
         site_code, error = _site_scope(request.user, data.get("site_code"))
         if error:
             return error

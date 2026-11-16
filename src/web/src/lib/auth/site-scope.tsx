@@ -5,6 +5,7 @@ import { adminApi } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "./session";
 
+export const ALL_SITES = "*";
 type SiteScope = { siteCodes: string[]; selectedSite: string | null; setSelectedSite: (site: string) => void; loadingSites: boolean };
 const SiteContext = createContext<SiteScope | null>(null);
 
@@ -23,20 +24,21 @@ export function SiteScopeProvider({ children }: { children: ReactNode }) {
     adminApi.studentCounts().then((result) => {
       if (cancelled) return;
       setBigSiteCodes(result.site_codes);
-      const saved = sessionStorage.getItem("qlttnn.selected-site");
-      setBigSelectedSite(saved && result.site_codes.includes(saved) ? saved : result.site_codes[0] || null);
+      const saved = sessionStorage.getItem("qlttnn.admin-site-scope.v2");
+      setBigSelectedSite(saved === ALL_SITES || (saved && result.site_codes.includes(saved)) ? saved : ALL_SITES);
     }).catch((error: unknown) => {
       if (cancelled) return;
       const partial = error instanceof ApiError && Array.isArray(error.payload.site_codes) ? error.payload.site_codes.filter((code): code is string => typeof code === "string") : [];
       setBigSiteCodes(partial);
-      setBigSelectedSite(partial[0] || null);
+      const saved = sessionStorage.getItem("qlttnn.admin-site-scope.v2");
+      setBigSelectedSite(saved === ALL_SITES || (saved && partial.includes(saved)) ? saved : ALL_SITES);
     })
       .finally(() => { if (!cancelled) setSitesLoaded(true); });
     return () => { cancelled = true; };
   }, [user?.role]);
   const setSelectedSite = useCallback((site: string) => {
-    if (user?.role !== "admin_big" || !siteCodes.includes(site)) return;
-    sessionStorage.setItem("qlttnn.selected-site", site);
+    if (user?.role !== "admin_big" || (site !== ALL_SITES && !siteCodes.includes(site))) return;
+    sessionStorage.setItem("qlttnn.admin-site-scope.v2", site);
     setBigSelectedSite(site);
   }, [siteCodes, user?.role]);
   const value = useMemo(() => ({ siteCodes, selectedSite, setSelectedSite, loadingSites }), [siteCodes, selectedSite, setSelectedSite, loadingSites]);

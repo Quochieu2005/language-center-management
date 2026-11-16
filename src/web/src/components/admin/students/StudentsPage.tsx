@@ -7,7 +7,7 @@ import type { ColumnsType } from "antd/es/table";
 import { adminApi, type Student, type StudentProfileWrite } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";
 import { ApiError } from "@/lib/api/client";
-import { useSiteScope } from "@/lib/auth/site-scope";
+import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 
 type PendingStudentAvatarSync = {
   slug: string;
@@ -50,6 +50,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   const isAdminBig = user?.role === "admin_big";
   const canManage = isAdminBig || user?.role === "admin_small";
   const site = isAdminBig ? selectedSite || undefined : user?.site_code || undefined;
+  const requestedSite = site === ALL_SITES ? undefined : site;
 
   useEffect(() => {
     if (!avatarPreview.startsWith("blob:")) return;
@@ -66,7 +67,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
     setLoading(true);
     try {
       const result = await adminApi.students({
-        site_code: isAdminBig ? site : undefined,
+        site_code: isAdminBig ? requestedSite : undefined,
         search: searchValue.trim() || undefined,
         status: statusValue === "all" ? undefined : statusValue,
         limit: 100,
@@ -79,7 +80,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
         setRows(payload.results); setPartial(payload.missing_sites || []);
       }
     } finally { setLoading(false); }
-  }, [isAdminBig, loadingSites, search, site, status]);
+  }, [isAdminBig, loadingSites, requestedSite, search, site, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +96,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   };
 
   const openCreate = () => {
+    if (!site || site === ALL_SITES) return;
     slugEdited.current = false;
     form.resetFields(); setEditingStudent(null); setAvatarFile(null); setAvatarPreview("");
     form.setFieldsValue({ slug: "" });
@@ -189,7 +191,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   };
 
   const submit = async (values: StudentProfileWrite) => {
-    if (!site) return;
+    if (!site || (editor === "create" && site === ALL_SITES)) return;
     setSaving(true);
     try {
       if (editor === "create") {
@@ -292,10 +294,10 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
     <Card title="Hồ sơ học viên" extra={<Space wrap>
       <Input allowClear value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} onPressEnter={() => setSearch(searchDraft)} placeholder="Tìm tên, email, mã..." prefix={<SearchOutlined />} style={{ width: 240 }} />
       <Button onClick={() => setSearch(searchDraft)}>Tìm kiếm</Button>
-      {canManage && <Button type="primary" disabled={!site} onClick={openCreate}>Tạo học viên</Button>}
+      {canManage && <Button type="primary" disabled={!site || site === ALL_SITES} title={site === ALL_SITES ? "Chọn một cơ sở cụ thể để tạo hồ sơ." : undefined} onClick={openCreate}>Tạo học viên</Button>}
     </Space>}>
       <Space style={{ marginBottom: 16 }} wrap>
-        {isAdminBig && <Select value={site} onChange={setSelectedSite} loading={loadingSites} disabled={loadingSites || !siteCodes.length} style={{ width: 180 }} options={siteCodes.map((value) => ({ value, label: value }))} placeholder="Chọn cơ sở" />}
+        {isAdminBig && <Select value={site} onChange={setSelectedSite} loading={loadingSites} disabled={loadingSites} style={{ width: 180 }} options={[{ value: ALL_SITES, label: "Toàn hệ thống" }, ...siteCodes.map((value) => ({ value, label: value }))]} placeholder="Chọn phạm vi" />}
         <Select value={status} onChange={setStatus} style={{ width: 170 }} options={[
           { value: "all", label: "Mọi trạng thái" }, { value: "dang_hoc", label: "Đang học" },
           { value: "bao_luu", label: "Bảo lưu" }, { value: "da_chuyen_di", label: "Đã chuyển đi" },

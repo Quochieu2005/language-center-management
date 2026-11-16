@@ -188,8 +188,12 @@ class ClassItemSerializer(serializers.Serializer):
 
 
 class ClassListResponseSerializer(serializers.Serializer):
-    site_code = serializers.CharField()
-    count = serializers.IntegerField()
+    scope = serializers.ChoiceField(choices=("LOCAL", "GLOBAL"), required=False)
+    complete = serializers.BooleanField(required=False)
+    site_codes = serializers.ListField(child=serializers.CharField(), required=False)
+    missing_sites = serializers.ListField(child=serializers.CharField(), required=False)
+    site_code = serializers.CharField(required=False)
+    count = serializers.IntegerField(allow_null=True)
     limit = serializers.IntegerField()
     offset = serializers.IntegerField()
     results = ClassItemSerializer(many=True)

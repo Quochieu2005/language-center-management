@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from core.academics.common import AcademicError, AcademicForbidden, AcademicInvalid, site_scope
+from core.academics.common import AcademicError, AcademicForbidden, AcademicInvalid, global_site_list, site_scope
 from core.auth.account_status import (
     AccountStatusConflict,
     AccountStatusTargetNotFound,
@@ -76,8 +76,9 @@ class EmployeeCollectionView(APIView):
         tags=["Quản lý nhân viên"],
         summary="Liệt kê nhân viên theo cơ sở và chức vụ",
         description=(
-            "LOCAL: Admin Big phải chỉ định một site; Admin Small chỉ đọc site trong phiên. "
-            "Kết quả chỉ lấy hồ sơ từ dbo.NhanVien tại CSDL site được phép."
+            "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn riêng từng CSDL site đang hoạt động rồi phân trang/tổng hợp trong API; "
+            "có site lỗi thì trả complete=false và missing_sites. Admin Big truyền site_code để đọc LOCAL. Admin Small chỉ đọc site trong phiên. "
+            "Hồ sơ lấy từ dbo.NhanVien tại các CSDL site; TaiKhoan được đọc theo bản tại cùng site."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -94,6 +95,15 @@ class EmployeeCollectionView(APIView):
         query.is_valid(raise_exception=True)
         data = query.validated_data
         try:
+            if request.user.role == "admin_big" and not data.get("site_code"):
+                return Response(global_site_list(
+                    lambda site, limit, offset: list_employees(
+                        site_code=site, job_title=data.get("job_title"), status=data.get("status"),
+                        search=data.get("search"), limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(AcademicError, EmployeeInfrastructureUnavailable),
+                ))
             site = site_scope(request.user, data.get("site_code"), roles={"admin_big", "admin_small"})
             return Response(list_employees(
                 site_code=site, job_title=data.get("job_title"), status=data.get("status"),

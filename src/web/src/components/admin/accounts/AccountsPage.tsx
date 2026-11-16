@@ -7,7 +7,7 @@ import type { ColumnsType } from "antd/es/table";
 import { adminApi, type AdminSmall, type Employee } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session";
-import { useSiteScope } from "@/lib/auth/site-scope";
+import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 
 type AccountsPageProps = { view: "admin-smalls" | "employees" };
 
@@ -60,7 +60,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
 
   const openCreateForm = () => {
     resetCreateForm();
-    form.setFieldsValue({ site_code: site || siteCodes[0] });
+    form.setFieldsValue({ site_code: site && site !== ALL_SITES ? site : siteCodes[0] });
     setCreating(true);
   };
 
@@ -88,10 +88,11 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           setError("Chọn cơ sở để tải danh sách nhân viên.");
           return;
         }
-        const result = await adminApi.employees(site);
+        const result = await adminApi.employees(site === ALL_SITES ? undefined : site, { limit: 100 });
         setEmployees(result.results);
+        if (result.complete === false) setError(`Danh sách chưa đầy đủ; thiếu site: ${(result.missing_sites || []).join(", ")}`);
       } else {
-        const result = await adminApi.adminSmalls();
+        const result = await adminApi.adminSmalls(site === ALL_SITES ? undefined : site);
         setAdmins(result.results);
         if (!result.complete) setError(`Danh sách chưa đầy đủ; thiếu site: ${result.missing_sites.join(", ")}`);
       }
@@ -200,7 +201,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
       }
       resetCreateForm();
       setCreating(false);
-      if (isEmployeeView && isAdminBig && createdEmployeeSite && createdEmployeeSite !== site) {
+      if (isEmployeeView && isAdminBig && site !== ALL_SITES && createdEmployeeSite && createdEmployeeSite !== site) {
         setSelectedSite(createdEmployeeSite);
       } else {
         void load();
@@ -363,7 +364,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
   ];
 
   return <Card
-    title={isEmployeeView ? "Quản lý nhân viên" : "Quản trị Admin Small"}
+    title={isEmployeeView ? `Quản lý nhân viên · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}` : "Quản trị Admin Small"}
     extra={<Button type="primary" onClick={openCreateForm}>{isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"}</Button>}
   >
     {error && <Alert type="warning" showIcon title={error} style={{ marginBottom: 16 }} />}
