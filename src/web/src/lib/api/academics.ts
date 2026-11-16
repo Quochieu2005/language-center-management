@@ -1,7 +1,10 @@
 import { apiRequest, jsonBody, query } from "./client";
 
 export type ApiRow = Record<string, unknown>;
-export type ApiList<T = ApiRow> = { count: number; limit: number; offset: number; site_code?: string; results: T[] };
+export type ApiList<T = ApiRow> = {
+  count: number | null; limit: number; offset: number; site_code?: string; results: T[];
+  scope?: "LOCAL" | "GLOBAL"; complete?: boolean; missing_sites?: string[]; site_codes?: string[];
+};
 export type ClassRow = {
   class_id: string; site_code: string; course_id: string; course_name: string; teacher_id: string;
   teacher_name: string; room_id: string; room_name: string; name: string; capacity: number;
@@ -17,7 +20,7 @@ export type StudentSePayPayment = { site_code: string; attempt_id: string; insta
 
 export const academicsApi = {
   health: () => apiRequest<{ status: string; service?: string }>("/health/"),
-  classes: (site_code: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) => apiRequest<ApiList<ClassRow>>(`/admin/classes/${query({ site_code, ...options })}`),
+  classes: (site_code?: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) => apiRequest<ApiList<ClassRow>>(`/admin/classes/${query({ site_code, ...options })}`),
   createClass: (body: { site_code?: string; course_id: string; teacher_id: string; room_id: string; name: string; capacity: number; start_date: string; end_date: string; weekdays: number[]; start_time: string; end_time: string }) => apiRequest<ClassRow & { session_count: number }>("/admin/classes/", { method: "POST", body: jsonBody(body) }),
   classDetail: (id: string, site_code: string) => apiRequest<ClassRow & { session_count: number }>(`/admin/classes/${encodeURIComponent(id)}/${query({ site_code })}`),
   roster: (id: string, site_code: string, offset = 0) => apiRequest<ApiList<EnrollmentRow>>(`/admin/classes/${encodeURIComponent(id)}/students/${query({ site_code, limit: 100, offset })}`),
@@ -27,7 +30,7 @@ export const academicsApi = {
   createRoom: (body: { site_code?: string; name: string; capacity: number }) => apiRequest<RoomRow>("/admin/rooms/", { method: "POST", body: jsonBody(body) }),
   enroll: (body: { site_code?: string; student_id: string; class_id: string }) => apiRequest<ApiRow>("/admin/enrollments/", { method: "POST", body: jsonBody(body) }),
   moveEnrollment: (id: string, site_code: string, target_class_id: string) => apiRequest<ApiRow>(`/admin/enrollments/${encodeURIComponent(id)}/class/${query({ site_code })}`, { method: "POST", body: jsonBody({ target_class_id }) }),
-  tuition: (site_code: string, options: { status?: string; student_slug?: string } = {}) => apiRequest<ApiList<TuitionRow>>(`/admin/tuition/${query({ site_code, limit: 100, ...options })}`),
+  tuition: (site_code?: string, options: { status?: string; student_slug?: string } = {}) => apiRequest<ApiList<TuitionRow>>(`/admin/tuition/${query({ site_code, limit: 100, ...options })}`),
   installments: (id: string, site_code: string) => apiRequest<ApiRow>(`/admin/tuition/${encodeURIComponent(id)}/installments/${query({ site_code })}`),
   saveInstallments: (id: string, site_code: string, body: { payment_mode: "full" | "monthly"; installment_count?: 3 | 6 | 9 | 12; first_due_date: string }) => apiRequest<ApiRow>(`/admin/tuition/${encodeURIComponent(id)}/installments/${query({ site_code })}`, { method: "PUT", body: jsonBody(body) }),
   collectTuition: (id: string, site_code: string, body: { idempotency_key: string; amount: number; payment_method: "tien_mat" | "chuyen_khoan" | "the"; note?: string }) => apiRequest<ApiRow>(`/admin/tuition/${encodeURIComponent(id)}/receipts/${query({ site_code })}`, { method: "POST", body: jsonBody(body) }),

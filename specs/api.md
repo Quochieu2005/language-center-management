@@ -273,6 +273,8 @@ Start/callback là redirect của trình duyệt, không nhận provider token t
 
 Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn menu. `GLOBAL` chỉ dành cho màn hình tổng hợp/tra cứu toàn cục; không có câu SQL JOIN tới database của site khác.
 
+Với các route collection `GET /api/v1/admin/students/`, `/employees/`, `/teachers/`, `/classes/` và `/tuition/`, Admin Big bỏ `site_code` để đọc `GLOBAL` mặc định; truyền một `site_code` hoạt động để giới hạn `LOCAL`. Mỗi dòng toàn cục có `site_code`. Nếu thiếu site, trả `complete=false`, liệt kê `missing_sites` và để `count=null`; không xem site lỗi như site không có dữ liệu. Admin Small/nhân viên vẫn bị giới hạn theo site trong phiên. Các thao tác ghi hoặc đọc chi tiết cần site cụ thể và được kiểm tra quyền ở server.
+
 | Method và path | Người gọi | Kiểu phân tán | Site và bảng chính |
 |---|---|---|---|
 | `GET /api/v1/admin/sites` | Admin Big | Đọc bản sao `CoSo`; tổng hợp trạng thái kết nối theo nhu cầu | `CoSo` ở bản sao tại site; không trả thông tin bí mật kết nối |
@@ -288,10 +290,13 @@ Các quyền dưới đây phải được kiểm tra ở API, không chỉ ẩn
 | `GET /api/v1/admin/accounts` | Admin Big | `GLOBAL`/bản sao tài khoản | Danh sách tài khoản nội bộ, trạng thái và phạm vi; không trả hash mật khẩu |
 | `GET /api/v1/admin/accounts/{ma_tai_khoan}` | Admin Big | Đọc bản sao tài khoản và tra cứu hồ sơ site cần thiết | Chi tiết tài khoản/phạm vi được phép; không trả hash hoặc secret |
 | `PATCH /api/v1/admin/accounts/{ma_tai_khoan}/status` | Admin Big | `REPLICATED-WRITE` | Khóa/mở tài khoản qua dịch vụ đồng bộ chung; không cho tự khóa tài khoản Admin Big cuối cùng nếu nhóm đặt quy tắc đó |
-| `GET, POST /api/v1/admin/teachers/` | Admin Big hoặc Admin Small theo quyền | Đọc theo site/phạm vi; tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: liệt kê/tạo hồ sơ giáo viên; site chọn qua quyền/`site_code`, không nhận role tùy ý |
+| `GET /api/v1/admin/teachers/?site_code=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; Admin Small: `LOCAL` | Đọc `GiaoVien`, `TaiKhoan`, `Logs` riêng tại từng site; mỗi dòng có `site_code`; kết quả một phần có `complete=false`/`missing_sites` và `count=null` |
+| `POST /api/v1/admin/teachers/` | Admin Big hoặc Admin Small theo quyền | Tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Tạo tại site được chỉ rõ/được cấp; không nhận role tùy ý |
 | `GET, DELETE /api/v1/admin/teachers/{slug}/?site_code=...` | Admin Big hoặc Admin Small đúng site | Đọc `LOCAL`; xóa mềm/tắt tài khoản theo các site và hồ sơ tại site | Route source: GET chi tiết; DELETE vô hiệu hóa tài khoản và chuyển hồ sơ sang nghỉ việc, giữ dữ liệu lịch sử |
 | `PATCH /api/v1/admin/teachers/{slug}/status/?site_code=...` | Admin Big hoặc Admin Small đúng site | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: đổi trạng thái tài khoản/hồ sơ giáo viên, thu hồi phiên; không phải endpoint cập nhật phân công lớp |
+| `GET /api/v1/admin/classes/?site_code=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small/lễ tân/Tư vấn & xếp lớp đúng site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `LopHoc` và đối chiếu `DangKy` tại từng CSDL site; mỗi dòng có `site_code`; site thiếu được nêu rõ |
 | `PUT /api/v1/admin/classes/{class_id}/teacher/` | Admin Big/Admin Small theo quyền lớp | `LOCAL` | Route source: gán giáo viên cho lớp tại site sở hữu lớp; kiểm tra giáo viên và lớp cùng site |
+| `GET /api/v1/admin/tuition/?site_code=...&status=...&student_slug=...&limit=...&offset=...` | Admin Big; Admin Small/kế toán theo quyền site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `HocPhi`, `DangKy`, `HocVien`, `LopHoc` riêng tại từng site; mỗi dòng có `site_code`; nếu site lỗi trả `complete=false`/`missing_sites`, `count=null` |
 | `GET /api/v1/admin/shared/subjects/` | Admin Big | `GLOBAL` chỉ đọc | Đọc `MonHoc` từ từng site đang hoạt động và tổng hợp danh sách ở API. Trả `complete`, `missing_sites`, `inconsistent_sites`; không cho chọn môn nếu danh mục chưa được đối chiếu đầy đủ |
 | `PATCH /api/v1/admin/shared/subjects/{slug}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Route đã có: cập nhật `MonHoc` trên mọi site hoạt động, ghi ACK vào `Logs`, bắt buộc `Idempotency-Key`; trả `200` khi đủ site, `202` khi còn site cần retry, `409` khi key/body hoặc bản sao xung đột. Không tạo môn mới |
 | `POST /api/v1/admin/courses/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Tạo `KhoaHoc` ở các site hoạt động; `ma_khoa_hoc` tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số và có thể chứa các đoạn bổ sung ngăn bằng dấu gạch nối đơn (ví dụ `FG`, `HK-TOEIC-450-550`); giao diện chuẩn hóa mã nhập thành chữ in hoa. API bắt buộc `ma_mon` tồn tại và có bản sao giống nhau tại mọi site; `so_buoi` là tổng số buổi theo chương trình và được nhập riêng, không suy ra từ số tháng; thời lượng tháng nhận số thập phân tối đa 2 chữ số, thời lượng ngày phải nguyên; ghi ACK `Logs`, retry bằng cùng `Idempotency-Key` |
@@ -327,11 +332,11 @@ Tạo thông báo nhận `category`, `severity`, `audience`, `title`, `message` 
 
 ### Nhân viên nghiệp vụ — đã có route trong source
 
-Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan`); giao diện hiển thị `tu_van` là “Tư vấn & xếp lớp”, gộp quyền tra cứu/tư vấn và quản lý lớp/đăng ký. Không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big phải chỉ định một `site_code` đang hoạt động cho mỗi request; Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body. Các endpoint hồ sơ thao tác một site, không phải Global Query.
+Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan`); giao diện hiển thị `tu_van` là “Tư vấn & xếp lớp”, gộp quyền tra cứu/tư vấn và quản lý lớp/đăng ký. Không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big được bỏ `site_code` trên GET danh sách nhân viên để đọc GLOBAL; nếu truyền site thì chỉ đọc LOCAL site đó. GET chi tiết và mọi thao tác ghi cần site cụ thể. Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body.
 
 | Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
 |---|---|---|---|
-| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc `NhanVien`, `TaiKhoan` và trạng thái email gần nhất từ `Logs` cục bộ; mỗi dòng gồm email, username, phone, `site_code`, `avatar_secure_url` và `credential_email_status`. Big phải chọn site, Small chỉ thấy site gắn phiên |
+| `GET /api/v1/admin/employees/?site_code=...&job_title=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; Admin Small: `LOCAL` | Đọc `NhanVien`, `TaiKhoan`, `Logs` riêng tại từng site; mỗi dòng gồm email, username, phone, `site_code`, `avatar_secure_url` và `credential_email_status`. Global Query báo site thiếu thay vì coi site đó rỗng |
 | `POST /api/v1/admin/employees/` | Admin Big; Admin Small đúng site | `LOCAL` + `REPLICATED-WRITE` | Tạo `NhanVien` ở site được chọn; tạo `TaiKhoan` và đồng bộ các site hoạt động theo service hiện có; body gồm `full_name`, `email`, `job_title`, tùy chọn `username`, `phone`, `site_code`, `avatar_requested`. Không gửi email khi tạo; ghi trạng thái chờ gửi vào `Logs` tại site và trả `credential_email_status`. Khi yêu cầu ảnh, response cấp `avatar_setup_token` ngắn hạn |
 | `POST /api/v1/admin/employees/{account_id}/credential-email/?site_code=...` | Admin Big; Admin Small đúng site | `GLOBAL` đọc bản sao + `LOCAL` + SMTP | Xác minh các bản sao `TaiKhoan` và hồ sơ `NhanVien` tại site; chỉ Admin Big/Admin Small bấm gửi mới gọi SMTP. Ghi `employee_credential_email_*` vào `Logs` của site; chỉ `ready`/`failed` được gửi, còn `sent`/`processing`/`unknown`/`changed` khóa gửi lại |
 | `GET /api/v1/admin/employees/{slug}/?site_code=...` | Admin Big; Admin Small đúng site | `LOCAL` | Đọc chi tiết `NhanVien` và bản `TaiKhoan` tại CSDL site được chọn, gồm `avatar_secure_url`; không dò hoặc JOIN qua site khác |
@@ -376,7 +381,7 @@ Các đường dẫn thực tế được khai báo trong `src/api/core/urls.py`
 
 | Route source | Hành vi | Trạng thái phạm vi |
 |---|---|---|
-| `GET /api/v1/admin/students/` | Liệt kê học viên tại site | `LOCAL`; Admin Big chọn site, Admin Small dùng site phiên, Tư vấn chỉ đọc danh sách site được giao; trả `avatar_secure_url`, cờ đã cấp và đủ điều kiện cấp tài khoản |
+| `GET /api/v1/admin/students/?site_code=...&status=...&search=...&account_issued=...&limit=...&offset=...` | Liệt kê học viên | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; Admin Small/Tư vấn chỉ đọc site phiên. Trả `avatar_secure_url`, cờ cấp tài khoản và `site_code` từng dòng; kết quả thiếu site có `complete=false`, `missing_sites`, `count=null` |
 | `POST /api/v1/admin/students/` | Tạo hồ sơ học viên | Trong phạm vi; `LOCAL` trên `HocVien`, sinh mã từ `Seq_HV`; slug tùy chọn mặc định theo họ tên, được chuẩn hóa và thêm hậu tố số nếu trùng tại site; giới tính tùy chọn chỉ nhận `Nam`, `Nữ`, `Khác`; chưa tạo tài khoản/mật khẩu |
 | `GET/PATCH/DELETE /api/v1/admin/students/{slug}/` | Xem/sửa/xóa hồ sơ | Trong phạm vi; `LOCAL`. Chỉ Admin Big/Admin Small đúng site; PATCH giới tính chỉ nhận `Nam`, `Nữ`, `Khác`; chỉ xóa nếu chưa có tài khoản, đăng ký hoặc lịch sử chuyển; `Logs` và dữ liệu học tập không bị xóa |
 | `POST /api/v1/admin/students/{slug}/avatar/upload-intents/?site_code=...` | Admin Big chọn site; Admin Small đúng site | `LOCAL` đọc `HocVien`; cấp intent ngắn hạn gắn với người gọi, hồ sơ và site; trình duyệt tải trực tiếp JPG/PNG/WebP tối đa 5 MB lên Cloudinary |
@@ -403,7 +408,7 @@ Nhóm nên thống nhất một cấu trúc response dùng chung. Mẫu dưới 
 }
 ```
 
-`meta` có thể bỏ với response `LOCAL`; mọi response `GLOBAL` bắt buộc có `complete` và `missing_sites`. Response phân trang thêm thông tin phân trang, không được trả số lượng toàn cục nếu chỉ đọc được một phần.
+`meta` có thể bỏ với response `LOCAL`; mọi response `GLOBAL` bắt buộc có `complete` và `missing_sites`. Response phân trang thêm thông tin phân trang; nếu chỉ đọc được một phần thì không được đưa ra tổng số toàn cục (có thể trả `count: null`). Global Query đọc từng site độc lập và không tạo snapshot/transaction nguyên tử xuyên các CSDL.
 
 Với lỗi:
 

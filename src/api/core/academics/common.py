@@ -1,4 +1,4 @@
-"""Shared primitives for site-scoped academic APIs."""
+"""Shared primitives for APIs that access site databases."""
 
 from __future__ import annotations
 
@@ -162,6 +162,53 @@ def active_site_state() -> tuple[tuple[str, ...], tuple[str, ...]]:
         except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
             missing.append(site)
     return tuple(available), tuple(sorted(set(missing)))
+
+
+def global_site_list(
+    reader,
+    *,
+    limit: int,
+    offset: int,
+    unavailable_exceptions: tuple[type[Exception], ...],
+) -> dict[str, Any]:
+    """Read a globally paginated list by querying each active site independently."""
+    available, initially_missing = active_site_state()
+    site_codes = tuple(sorted(set(available) | set(initially_missing)))
+    missing = set(initially_missing)
+    counts: dict[str, int] = {}
+    for site in available:
+        try:
+            counts[site] = int(reader(site, 1, 0)["count"])
+        except unavailable_exceptions:
+            missing.add(site)
+
+    total = sum(counts.values())
+    results: list[dict[str, Any]] = []
+    site_start = 0
+    for site, count in sorted(counts.items()):
+        page_start = max(offset, site_start)
+        page_end = min(offset + limit, site_start + count)
+        if page_start < page_end:
+            try:
+                page = reader(site, page_end - page_start, page_start - site_start)
+            except unavailable_exceptions:
+                missing.add(site)
+            else:
+                for row in page["results"]:
+                    row.setdefault("site_code", site)
+                    results.append(row)
+        site_start += count
+
+    return {
+        "scope": "GLOBAL",
+        "complete": not missing,
+        "site_codes": list(site_codes),
+        "missing_sites": sorted(missing),
+        "count": total if not missing else None,
+        "limit": limit,
+        "offset": offset,
+        "results": results,
+    }
 
 
 def site_scope(user, requested_site: str | None, *, roles: set[str]):

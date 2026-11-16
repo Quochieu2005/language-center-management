@@ -1,7 +1,10 @@
 import { apiRequest, jsonBody, query } from "./client";
 import type { AvatarUploadIntent } from "./auth";
 
-export type PageResult<T> = { count: number; limit: number; offset: number; results: T[]; site_code?: string };
+export type PageResult<T> = {
+  count: number | null; limit: number; offset: number; results: T[]; site_code?: string;
+  scope?: "LOCAL" | "GLOBAL"; complete?: boolean; missing_sites?: string[]; site_codes?: string[];
+};
 export type SiteCounts = {
   scope: "LOCAL" | "GLOBAL";
   complete: boolean;
@@ -139,7 +142,7 @@ export const adminApi = {
     apiRequest<{ account_id: string; role: "admin_small"; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
       `/admin/admin-smalls/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
-  teachers: (site_code: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
+  teachers: (site_code?: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Teacher>>(`/admin/teachers/${query({ site_code, ...options })}`),
   createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; slug?: string; phone?: string; avatar_requested?: boolean }) =>
     apiRequest<Teacher & { must_change_password: boolean; avatar_setup_token: string | null }>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
@@ -163,7 +166,7 @@ export const adminApi = {
   teacherProfile: (slug: string) => apiRequest<Teacher>(`/teachers/profile/${encodeURIComponent(slug)}/`),
   updateTeacherProfile: (slug: string, body: { full_name?: string; phone?: string | null }) =>
     apiRequest<Teacher>(`/teachers/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
-  employees: (site_code: string, options: { job_title?: string; status?: string; search?: string; limit?: number; offset?: number } = {}) =>
+  employees: (site_code?: string, options: { job_title?: string; status?: string; search?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Employee>>(`/admin/employees/${query({ site_code, ...options })}`),
   createEmployee: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; job_title: Employee["job_title"]; avatar_requested?: boolean }) =>
     apiRequest<Employee & { must_change_password: boolean; credential_email_status: NonNullable<Employee["credential_email_status"]>; avatar_setup_token: string | null }>("/admin/employees/", { method: "POST", body: jsonBody(body) }),

@@ -92,9 +92,12 @@ def list_tuition(
             """,
             [*params, offset, limit],
         )
+        results = _dict_rows(cursor)
+        for row in results:
+            row["site_code"] = site_code
         return {
             "site_code": site_code, "count": count, "limit": limit,
-            "offset": offset, "results": _dict_rows(cursor),
+            "offset": offset, "results": results,
         }
 
 

@@ -111,7 +111,7 @@ function AdminSmallDashboard({ siteCode }: { siteCode: string | null }) {
         adminApi.studentCounts(siteCode),
         Promise.all(classStatusOptions.map(async (item) => {
           const result = await academicsApi.classes(siteCode, { status: item.status, limit: 1, offset: 0 });
-          return { ...item, count: result.count };
+          return { ...item, count: result.count ?? 0 };
         })),
       ]).then(([studentsResult, classesResult]) => {
         if (!active) return;

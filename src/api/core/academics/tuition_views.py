@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from core.academics.common import AcademicError, site_scope
+from core.academics.common import AcademicError, global_site_list, site_scope
 from core.academics.http import academic_error, remote_ip, validate_record_id
 from core.academics.serializers import (
     TuitionInvoiceSerializer,
@@ -38,8 +38,12 @@ class AdminTuitionListView(_TuitionApiView):
     @extend_schema(
         operation_id="admin_tuition_list",
         tags=["Học phí"],
-        summary="Tra cứu học phí tại một cơ sở",
-        description="LOCAL: Admin Big chọn site; Admin Small và kế toán chỉ truy cập site trong phiên. Không gộp dữ liệu học phí giữa các CSDL.",
+        summary="Tra cứu học phí theo site hoặc toàn hệ thống",
+        description=(
+            "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn từng CSDL site hoạt động rồi tổng hợp/phân trang trong API; "
+            "site lỗi được nêu trong complete=false/missing_sites. Admin Big truyền site_code để đọc LOCAL. Admin Small và kế toán "
+            "chỉ truy cập site trong phiên. Các thao tác thu/hoàn/kế hoạch vẫn ghi LOCAL tại site của khoản học phí."
+        ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
             OpenApiParameter("status", str, OpenApiParameter.QUERY),
@@ -54,6 +58,15 @@ class AdminTuitionListView(_TuitionApiView):
         query.is_valid(raise_exception=True)
         data = query.validated_data
         try:
+            if request.user.role == "admin_big" and not data.get("site_code"):
+                return Response(global_site_list(
+                    lambda site, limit, offset: list_tuition(
+                        site_code=site, status_filter=data.get("status"),
+                        student_slug=data.get("student_slug"), limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(AcademicError,),
+                ))
             site = _tuition_site(request, data.get("site_code"))
             return Response(list_tuition(
                 site_code=site, status_filter=data.get("status"),

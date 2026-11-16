@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from core.academics.common import AcademicError, global_site_list
 from core.auth.authentication import AuthCookieAuthentication
 from core.classes.serializers import (
     ClassCreateSerializer,
@@ -269,11 +270,12 @@ class ClassCollectionView(_ClassApiView):
     @extend_schema(
         operation_id="class_list",
         tags=["Xếp lớp"],
-        summary="Liệt kê lớp và sĩ số tại một cơ sở",
+        summary="Liệt kê lớp và sĩ số theo site hoặc toàn hệ thống",
         description=(
-            "Đọc đúng một CSDL site. Admin Big phải chọn site_code; Admin Small/lễ tân/tư vấn & xếp lớp chỉ dùng site "
-            "trong phiên đăng nhập. current_count là bộ đếm LopHoc; registered_count được tính từ "
-            "DangKy đang hoạt động để phát hiện lệch sĩ số. Không truy vấn xuyên site."
+            "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn từng CSDL site đang hoạt động và tổng hợp/phân trang trong API; "
+            "site lỗi được nêu trong complete=false/missing_sites. Admin Big truyền site_code để đọc LOCAL. "
+            "Admin Small/lễ tân/tư vấn & xếp lớp chỉ dùng site trong phiên đăng nhập. current_count là bộ đếm LopHoc; "
+            "registered_count được tính từ DangKy đang hoạt động để phát hiện lệch sĩ số. Không JOIN xuyên site."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -284,7 +286,7 @@ class ClassCollectionView(_ClassApiView):
         ],
         responses={
             200: ClassListResponseSerializer,
-            400: OpenApiResponse(description="Tham số không hợp lệ hoặc thiếu site_code."),
+            400: OpenApiResponse(description="Tham số hoặc site không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
             403: OpenApiResponse(description="Vai trò không có quyền hoặc vượt phạm vi site."),
             503: OpenApiResponse(description="CSDL site không sẵn sàng."),
@@ -294,6 +296,18 @@ class ClassCollectionView(_ClassApiView):
         query = ClassListQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         data = query.validated_data
+        if request.user.role == "admin_big" and not data.get("site_code"):
+            try:
+                return Response(global_site_list(
+                    lambda site, limit, offset: list_classes(
+                        site_code=site, status_filter=data.get("status"), search=data.get("search"),
+                        limit=limit, offset=offset,
+                    ),
+                    limit=data["limit"], offset=data["offset"],
+                    unavailable_exceptions=(ClassInfrastructureUnavailable, ClassSiteUnavailable),
+                ))
+            except AcademicError as exc:
+                return _error_response(exc)
         site_code, error = _site_scope(
             request.user, data.get("site_code"), allowed_roles=_CLASS_READ_ROLES
         )

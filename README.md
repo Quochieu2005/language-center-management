@@ -207,13 +207,15 @@ flowchart LR
 
 | Nhóm người dùng | Phạm vi | Quyền chính |
 |---|---|---|
-| Admin Big | Toàn hệ thống | Quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; tạo/sửa/xóa hồ sơ học viên tại site đã chọn theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; xem thống kê/log toàn cục; xem hộp thư đề nghị toàn cục và duyệt/từ chối đề nghị chuyển |
+| Admin Big | Toàn hệ thống | Mặc định xem danh sách học viên, nhân viên, giáo viên, lớp và học phí qua Global Query; mỗi dòng nêu site và kết quả phải cảnh báo site thiếu. Có thể lọc về một site. Thao tác ghi hồ sơ/lớp chọn site cụ thể hoặc dùng site của bản ghi; quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; cấp tài khoản học viên theo thao tác riêng; xem thống kê/log và hộp thư đề nghị toàn cục, duyệt/từ chối đề nghị chuyển |
 | Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
 | Lễ tân | Một site | Tiếp nhận tại quầy; thao tác đăng ký/lớp; API có quyền kế hoạch học phí nhưng giao diện chưa có menu Học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
 | Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp tại cơ sở |
 | Kế toán | Một site | Thu/hoàn học phí, xem công nợ và biên nhận tại cơ sở |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
+
+Các danh sách toàn hệ thống của Admin Big là Global Query tại Django: API hỏi riêng từng CSDL site đang hoạt động rồi gộp kết quả trong bộ nhớ, không tạo database nghiệp vụ trung tâm hoặc JOIN xuyên site. Bộ chọn cơ sở mặc định là `Toàn hệ thống`; lọc một cơ sở chỉ đổi phạm vi đọc. Các thao tác ghi cần một site hợp lệ và quyền vẫn được xác thực ở API. Nếu một site không đọc được, response/giao diện phải nêu `complete=false` và `missing_sites`, không báo danh sách là đầy đủ.
 
 ### 3.2. Backend luôn kiểm tra quyền trước khi truy cập dữ liệu
 
