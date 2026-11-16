@@ -13,6 +13,7 @@ export type SiteCounts = {
 export type AdminSmall = {
   admin_id: string; site_code: string; full_name: string; phone: string | null;
   account_id: string; slug: string; username: string; email: string;
+  avatar_secure_url: string | null;
   account_status: "active" | "inactive"; profile_status: "dang_lam" | "nghi_viec";
   credential_email_status: "ready" | "processing" | "sent" | "failed" | "unknown" | "changed";
 };

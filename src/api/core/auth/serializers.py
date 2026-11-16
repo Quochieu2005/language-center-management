@@ -251,6 +251,7 @@ class AdminSmallListItemSerializer(serializers.Serializer):
     slug = serializers.CharField()
     username = serializers.CharField()
     email = serializers.EmailField()
+    avatar_secure_url = serializers.URLField(allow_null=True)
     account_status = serializers.ChoiceField(choices=("active", "inactive"))
     profile_status = serializers.ChoiceField(choices=("dang_lam", "nghi_viec"))
     credential_email_status = serializers.ChoiceField(

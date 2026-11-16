@@ -43,7 +43,8 @@ def list_admin_small_accounts(
                     """
                     SELECT n.ma_admin, n.ma_co_so, n.ho_ten, n.sdt,
                            t.ma_tai_khoan, t.slug, t.ten_dang_nhap, t.email,
-                           t.trang_thai, n.trang_thai, email_state.hanh_dong
+                           t.trang_thai, n.trang_thai, email_state.hanh_dong,
+                           t.avatar_secure_url
                     FROM dbo.Admin AS n
                     INNER JOIN dbo.TaiKhoan AS t ON t.ma_tai_khoan = n.ma_tai_khoan
                     OUTER APPLY
@@ -84,6 +85,7 @@ def list_admin_small_accounts(
                     "slug": str(row[5]),
                     "username": str(row[6]),
                     "email": str(row[7]),
+                    "avatar_secure_url": str(row[11]) if row[11] is not None else None,
                     "account_status": account_status,
                     "profile_status": "dang_lam" if bool(row[9]) else "nghi_viec",
                     "credential_email_status": credential_email_status(str(row[10]) if row[10] else None),
