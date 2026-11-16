@@ -1,0 +1,35 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.helpText {
+  display: block;
+  line-height: 1.5;
+}
+
+.contentColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.source {
+  min-height: 400px;
+  resize: vertical;
+}
+
+.previewCard { min-width: 0; }
+
+.previewBody {
+  max-height: 370px;
+  overflow: auto;
+}
+
+@media (max-width: 760px) {
+  .contentColumns { grid-template-columns: minmax(0, 1fr); }
+  .source { min-height: 260px; }
+  .previewBody { max-height: 300px; }
+}

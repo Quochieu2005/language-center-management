@@ -218,7 +218,7 @@ API không có endpoint đăng ký tài khoản công khai; source có `POST /ap
 Hai route chỉ đọc và cho phép khách chưa đăng nhập:
 
 - `GET /api/v1/blog/categories/` trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`. Mỗi danh mục có `slug`, `name`, `description`, `post_count`. `post_count` chỉ tính bài `da_xuat_ban` đã tới thời điểm xuất bản.
-- `GET /api/v1/blog/{slug}/` trả `{scope, complete, site_codes, result}`. `result` có `slug`, `title`, `excerpt`, `content` dạng văn bản thường, `reading_time_minutes`, `published_at` và `category: {slug, name}`.
+- `GET /api/v1/blog/{slug}/` trả `{scope, complete, site_codes, result}`. `result` có `slug`, `title`, `excerpt`, `content` là chuỗi Markdown giới hạn, `reading_time_minutes`, `published_at` và `category: {slug, name}`. Hỗ trợ đoạn văn, tiêu đề `##`/`###`, danh sách đánh số và bảng Markdown; các khối này có thể bỏ qua.
 
 Admin Big dùng các route sau; phiên và vai trò phải được xác thực ở server, không nhận site hoặc role từ client:
 
@@ -230,10 +230,12 @@ Admin Big dùng các route sau; phiên và vai trò phải được xác thực 
 | `PATCH /api/v1/admin/blog/categories/{slug}/` | Sửa một phần `slug`, `name`, `description`, `status`. |
 | `DELETE /api/v1/admin/blog/categories/{slug}/` | Xóa danh mục chỉ khi không có bài viết tham chiếu. |
 | `GET /api/v1/admin/blog/articles/` | Đọc metadata bài viết mọi trạng thái (không tải toàn bộ `content` cho danh sách); dùng route chi tiết để lấy nội dung. |
-| `POST /api/v1/admin/blog/articles/` | Tạo `{slug, category_slug, title, excerpt, content, reading_time_minutes, status?, published_at?}`. `content` là văn bản thường; `published_at` nhận thời điểm ISO có offset và lưu UTC tới giây. |
+| `POST /api/v1/admin/blog/articles/` | Tạo `{slug, category_slug, title, excerpt, content, reading_time_minutes, status?, published_at?}`. `content` là chuỗi Markdown giới hạn tối đa 20.000 ký tự, không phải HTML; `published_at` nhận thời điểm ISO có offset và lưu UTC tới giây. |
 | `GET /api/v1/admin/blog/articles/{slug}/` | Đọc một bài ở mọi trạng thái. |
-| `PATCH /api/v1/admin/blog/articles/{slug}/` | Sửa một phần các trường của bài viết, gồm `category_slug` và thời điểm ISO có offset `published_at` (lưu UTC tới giây). |
+| `PATCH /api/v1/admin/blog/articles/{slug}/` | Sửa một phần các trường của bài viết, gồm `category_slug`, nội dung Markdown giới hạn và thời điểm ISO có offset `published_at` (lưu UTC tới giây). |
 | `DELETE /api/v1/admin/blog/articles/{slug}/` | Xóa bài viết và ghi ảnh chụp trước thao tác vào ACK đồng bộ tại từng site. |
+
+Trường `published_at` vẫn nhận ISO timestamp có offset; CMS chỉ cho chọn ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh`, rồi gửi thời điểm 00:00 tại múi giờ này. Để trống ngày gửi `null` để xuất bản ngay khi trạng thái cho phép.
 
 Mọi request ghi yêu cầu `Idempotency-Key` hợp lệ. Tất cả thao tác CMS thuộc `REPLICATED-WRITE`, chỉ Admin Big được dùng; Coordinator lấy các site hoạt động từ dữ liệu/cấu hình, dùng transaction cục bộ trên từng database và ghi ACK `Logs` cùng dữ liệu. Không có DB trung tâm hoặc khóa ngoại/JOIN xuyên site và không tuyên bố ACID nguyên tử xuyên database. Retry phải dùng lại cùng key, cùng route/path và cùng payload; key đã dùng cho nội dung khác trả `409`. Site thiếu trước khi bắt đầu ghi trả `503`; lỗi site sau khi một phần đã commit trả `202`, `complete=false`, `missing_sites` để retry. Bản sao Blog khác nhau trả `409`; slug sai/trùng và danh mục bài viết không tồn tại/đang ngừng được từ chối. Danh mục đang được bài viết dùng không thể xóa.
 
@@ -241,7 +243,7 @@ Site tham gia là mọi cơ sở `hoat_dong` có cấu hình Site Router. Ghi đ
 
 Hai route GET collection trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`; GET detail trả `{scope, complete, site_codes, result}`. Collection danh mục có `post_count` mọi trạng thái; collection bài viết trả metadata, không tải `content` toàn bộ. Nếu thiếu site, collection vẫn trả danh sách canonical kèm `complete=false`; detail cần xác nhận đủ site và trả `503` khi thiếu.
 
-Các route đọc công khai và CMS đọc từng CSDL site riêng qua Site Router. Migration 36 tạo dữ liệu mẫu ban đầu, không phải writer replication. Public list có thể trả `200` cùng `complete=false` và site thiếu/lệch; public detail trả `404` nếu không có slug, `409` nếu bản sao khác nhau, `503` nếu không đọc đủ site. Nội dung phải được frontend render như text đã escape. Có API CMS không đồng nghĩa đã chạy TC-REP-01/TC-SYNC-01; cần kiểm chứng thay đổi thật, lỗi site, retry và đối soát trên SQL Server thật.
+Các route đọc công khai và CMS đọc từng CSDL site riêng qua Site Router. Migration 36 tạo dữ liệu mẫu ban đầu, không phải writer replication. Public list có thể trả `200` cùng `complete=false` và site thiếu/lệch; public detail trả `404` nếu không có slug, `409` nếu bản sao khác nhau, `503` nếu không đọc đủ site. Frontend chỉ chuyển các khối Markdown được hỗ trợ thành phần tử React; HTML thô không được render hoặc thực thi. Có API CMS không đồng nghĩa đã chạy TC-REP-01/TC-SYNC-01; cần kiểm chứng thay đổi thật, lỗi site, retry và đối soát trên SQL Server thật.
 
 ### Đăng nhập và liên kết tài khoản Google/Facebook — đã có code, cần cấu hình môi trường
 

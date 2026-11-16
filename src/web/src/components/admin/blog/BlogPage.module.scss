@@ -1,0 +1,22 @@
+.articleIdentityFields,
+.articleMetaFields {
+  display: grid;
+  gap: 16px;
+}
+
+.articleIdentityFields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.articleMetaFields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .articleMetaFields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .articleIdentityFields,
+  .articleMetaFields { grid-template-columns: minmax(0, 1fr); }
+}

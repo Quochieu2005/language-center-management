@@ -127,7 +127,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
 | Trang chủ | Điều hướng chung tới Chương trình, Khóa học, Blog, Liên hệ và Đăng nhập; Hero, định hướng học, lợi ích, trạng thái khóa học, bài viết, FAQ, liên hệ, CTA, footer | Giúp người xem hiểu hướng học và tìm bước tiếp theo; nội dung động chỉ hiển thị khi API xác nhận; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
 | Chương trình | Hero định hướng, nhóm mục tiêu học tập, câu hỏi xác định nhu cầu, trạng thái danh mục, FAQ | Nhóm mục tiêu và ví dụ chỉ mang tính định hướng; không mô tả như khóa/lớp đang tuyển sinh khi chưa có API |
-| Blog | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc công khai và API CMS Admin Big đã có; Next.js vẫn dùng nội dung tĩnh, chưa nối API công khai hoặc có form CMS. Khi tích hợp, chỉ hiển thị dữ liệu API, giữ cảnh báo thiếu site và render nội dung dưới dạng text đã escape |
+| Blog công khai | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc công khai đã có; Next.js vẫn dùng nội dung tĩnh, chưa nối API công khai. Nội dung phải được render dưới dạng text đã escape |
 | Liên hệ | Lối tắt khóa học/cơ sở, các bước tra cứu, trạng thái kênh liên hệ và FAQ | Không tự tạo email, số điện thoại, địa chỉ hoặc form gửi thành công khi API chưa có |
 | Danh sách khóa học | Trạng thái danh mục, hướng dẫn chọn khóa, các trường thông tin cần xem, FAQ | So sánh khóa học/lớp đang được API trả về; khi API chưa có thì hiển thị trạng thái và hướng dẫn, không dựng bộ lọc/lớp giả |
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
@@ -363,7 +363,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 |---|---|
 | Công khai | `/`, `/programs`, `/branches`, `/contact`, `/courses`, `/courses/[slug]`, `/blog`, `/blog/[slug]` |
 | Xác thực/hồ sơ | `/login`, `/forgot-password`, `/password/change`, `/profile` |
-| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/teacher`, `/student` |
+| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/admin/blog`, `/teacher`, `/student` |
 
 #### Trang công khai và xác thực
 
@@ -384,7 +384,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 
 #### Điều hướng Admin đang có trong source
 
-Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang công khai trong tab mới, không phải màn hình CMS. API Blog Admin Big chưa có giao diện quản trị tương ứng.
+Sidebar Blog mở CMS tại `/admin/blog` cho Admin Big; Liên hệ vẫn mở trang công khai trong tab mới. CMS đọc đối chiếu danh mục và bài viết trên các site, cung cấp CRUD, hiển thị site thiếu/lệch và giữ cùng `Idempotency-Key` khi retry. Không bật thao tác ghi nếu dữ liệu chưa được đối chiếu đầy đủ.
 
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
@@ -393,7 +393,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 | `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn Admin Small. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
-| `/blog`, `/contact` | Blog, Liên hệ | Mở trang công khai trong tab mới. CMS Blog hiện chỉ có API Admin Big; chưa có màn hình tạo/sửa/xóa. Chưa có xử lý yêu cầu liên hệ. |
+| `/contact` | Liên hệ | Mở trang công khai trong tab mới. Chưa có xử lý yêu cầu liên hệ. |
 
 #### Admin Big — các trang toàn hệ thống
 
@@ -410,6 +410,7 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 | `/portal/admin-big/reports` | Báo cáo toàn hệ thống | Lọc theo cơ sở/khoảng ngày, có thống kê học phí/thu/hoàn theo site, kết quả từng site và cảnh báo kết quả chưa đủ |
 | `/portal/admin-big/audit-logs` | Nhật ký toàn hệ thống | Tìm sự kiện theo người dùng/site/thời gian; không lộ secret hoặc dữ liệu xác thực |
 | `/admin/notifications` | Thông báo quản trị | Danh sách theo site, lọc nhóm/mức độ, nút tạo và form thông báo; Admin Big ghi tới site hoạt động, thấy cảnh báo site thiếu và có thể retry cùng nội dung |
+| `/admin/blog` | CMS Blog | Chỉ Admin Big. Hai tab quản lý danh mục và bài viết; tạo/sửa/xóa danh mục, tạo/sửa/xóa bài theo slug, chọn danh mục đang hoạt động; slug bài viết mới tự tạo từ tiêu đề nhưng vẫn cho sửa tay; bài cũ giữ slug đã tùy chỉnh khi đổi tiêu đề. Form bài viết xếp tiêu đề/slug và metadata theo hàng ngang trên màn hình rộng, phần soạn Markdown và xem trước đặt cạnh nhau, tự xếp dọc trên màn hình hẹp. Nội dung Markdown giới hạn gồm đoạn văn, tiêu đề, danh sách đánh số và bảng tùy chọn; có nút chèn bảng mẫu, thêm hàng theo số cột tại vị trí con trỏ và chèn danh sách đánh số; HTML thô không được thực thi. Trang chi tiết `/blog/{slug}` đọc bài đã xuất bản qua API và hiển thị cùng định dạng. Trạng thái nháp/đã xuất bản/đã ẩn; ngày xuất bản mặc định là ngày tạo theo `Asia/Ho_Chi_Minh`, chỉ chọn ngày và gửi tới API thành timestamp lúc 00:00 có offset; có thể để trống để xuất bản ngay. Hiện site thiếu/lệch; khóa thao tác ghi khi chưa đối chiếu đủ; retry dùng lại cùng mã yêu cầu/payload và giữ qua reload trong tab hiện tại. Ghi `REPLICATED-WRITE` qua API, không khẳng định ACID xuyên database. Danh sách `/blog` vẫn là nội dung tĩnh. |
 
 #### Admin Small, lễ tân, tư vấn & xếp lớp và kế toán — các trang tại cơ sở
 
