@@ -110,7 +110,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Quản lý hồ sơ/cấp tài khoản học viên | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không | Không |
 | Tra cứu danh sách học viên tại cơ sở | Toàn hệ thống theo quyền | Site được giao | Không | Site làm việc | Đọc tối thiểu theo nghiệp vụ | Học viên thuộc lớp được giao | Không |
 | Đăng ký và xếp lớp | Giám sát/toàn hệ thống | Site được giao | Site làm việc | Site làm việc | Không | Không | Không |
-| Thu/hoàn học phí | Giám sát theo quyền | Site được giao | Không | Không | Site làm việc | Không | Không |
+| Thu/hoàn học phí | Giám sát theo quyền | Giám sát tại site được giao | Không | Không | Site làm việc | Không | Không |
 | Điểm danh và điểm | Giám sát/đọc theo quyền | Site được giao | Không | Không | Không | Chỉ lớp được phân công | Không |
 | Tạo đề nghị chuyển | Có thể theo quy trình được duyệt | Chỉ học viên ở site mình | Không mặc định | Không | Không | Không | Không |
 | Duyệt/từ chối đề nghị chuyển | Có | Không | Không | Không | Không | Không | Không |
@@ -418,7 +418,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-TUI-01 — Thu học phí tại cơ sở
 
-**Người dùng:** Admin Big xem danh sách toàn hệ thống; kế toán và Admin Small thao tác theo quyền tại site được cấp. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; thu/hoàn/kế hoạch và nhắc học phí là `LOCAL` tại site của khoản phí/lớp. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, NhanVien, Logs.
+**Người dùng:** Admin Big xem danh sách toàn hệ thống; kế toán ghi nhận thu/hoàn tại site được cấp; Admin Small giám sát theo quyền tại site. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; thu/hoàn/kế hoạch và nhắc học phí là `LOCAL` tại site của khoản phí/lớp. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
 1. Kế toán mở khoản phải thu theo đăng ký; API tự xác định site, số phải thu, tổng đã thu/hoàn và số còn lại.
 2. Người dùng nhập số tiền dương không vượt quá số còn nợ, phương thức hợp lệ và ghi chú không chứa dữ liệu thanh toán nhạy cảm.
@@ -428,18 +428,28 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 **Nghiệm thu:** gửi lại cùng idempotency key và payload trả cùng kết quả; cùng key nhưng payload khác bị conflict; hai request cạnh tranh không thể thu vượt số dư; lỗi DB không để phiếu thu và HocPhi lệch nhau.
 
-**Khoảng trống:** schema hiện chưa có request ledger/khóa bền vững cho idempotency thu-quầy. Phải bổ sung trước khi khẳng định chống gửi lặp sau timeout đã được bảo đảm.
+**Giới hạn triển khai:** thu tại quầy dùng mã phiếu site-prefixed tạo từ idempotency key để nhận diện retry; chưa có request ledger riêng. Hoàn tiền dùng cột UUID idempotency mới trong `PhieuThu` sau migration 40. Cần kiểm chứng retry sau timeout trên SQL Server của từng site trước khi kết luận nghiệm thu.
 
 ### FS-TUI-02 — Hoàn hoặc điều chỉnh học phí
 
-**Người dùng:** kế toán có quyền hoàn; Admin Small giám sát theo phân quyền. **Kiểu:** LOCAL. **Bảng:** HocPhi, PhieuThu, Logs.
+**Người dùng:** kế toán có quyền hoàn; Admin Small giám sát theo phân quyền. **Kiểu:** LOCAL. **Bảng:** HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
 1. Người dùng chọn phiếu thu gốc và lý do hoàn/điều chỉnh.
 2. API xác định site và số tiền có thể hoàn từ dữ liệu lưu; không cho hoàn vượt tổng số đã thu trừ số đã hoàn.
 3. Trong transaction, thêm bút toán loại hoan tham chiếu phiếu gốc, cập nhật trạng thái HocPhi và audit.
 4. Phiếu gốc giữ nguyên; không xóa hoặc ghi đè lịch sử.
 
-**Nghiệm thu:** hoàn vượt mức bị từ chối; hoàn lặp được chặn bằng idempotency; tổng thu-trừ-hoàn khớp số dư; người không có quyền không thể hoàn.
+**Nghiệm thu:** hoàn vượt mức bị từ chối; gửi lại cùng idempotency key và nội dung trả cùng phiếu, key dùng cho nội dung khác bị từ chối; tổng thu-trừ-hoàn khớp số dư và các kỳ học phí; người không có quyền không thể hoàn.
+
+### FS-TUI-03 — Báo cáo tài chính học phí
+
+**Người dùng:** Kế toán tại site được giao; Admin Small tại site được giao; Admin Big theo site hoặc toàn hệ thống. **Kiểu:** `LOCAL` hoặc `GLOBAL`. **Bảng:** `HocPhi`, `PhieuThu`.
+
+1. Kế toán và Admin Small chỉ đọc CSDL site trong phiên; Admin Big chọn một site hoặc để trống để đọc toàn bộ site hoạt động.
+2. API truy vấn độc lập từng CSDL rồi tổng hợp tại ứng dụng, trả số khoản, tổng phải thu, đã thu ròng, còn nợ, tổng phiếu thu và tổng phiếu hoàn.
+3. Nếu thiếu site trong Global Query, trả `complete=false` cùng `missing_sites`, không trình bày phần đã đọc như tổng đầy đủ.
+
+**Nghiệm thu:** số liệu từng site khớp `HocPhi`/`PhieuThu` tại site đó; vai trò bị giới hạn đúng phạm vi; khi một site lỗi, API và giao diện chỉ rõ kết quả chưa đầy đủ. Báo cáo hiện là snapshot tổng hợp, chưa lọc theo khoảng ngày.
 
 ### FS-PAY-01 — Thanh toán trực tuyến học phí
 

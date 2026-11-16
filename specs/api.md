@@ -337,7 +337,7 @@ Với các route collection `GET /api/v1/admin/students/`, `/employees/`, `/teac
 | `GET /api/v1/tuition-receipts?ma_hoc_phi=...&ma_hoc_vien=...&ma_phieu=...&tu_ngay=...&den_ngay=...&loai=...&cursor=...&limit=...` | Kế toán; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi | Tìm/lọc biên nhận theo học phí, học viên, mã phiếu, khoảng ngày và loại thu/hoàn; phân trang, giới hạn site và quyền tài chính |
 | `GET /api/v1/tuition-receipts/{ma_phieu}` | Kế toán; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết biên nhận/hoàn tiền; không trả dữ liệu thẻ hoặc bí mật cổng |
 | `GET /api/v1/reports/site-summary?ma_co_so=...&tu_ngay=...&den_ngay=...` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`, hoặc `LOCAL` khi lọc một site; Admin Small: `LOCAL` | Tổng hợp số học viên/lớp và chỉ số vận hành trong phạm vi được cấp; nêu site thiếu |
-| `GET /api/v1/reports/tuition-by-site?ma_co_so=...&tu_ngay=...&den_ngay=...` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`, hoặc `LOCAL` khi lọc một site; Admin Small: `LOCAL` | Tổng hợp phải thu/đã thu/còn nợ/hoàn theo kỳ và site từ `HocPhi`, `PhieuThu`; không trả PII không cần thiết |
+| `GET /api/v1/admin/reports/tuition-by-site/?site_code=...` | Admin Big; Admin Small; Kế toán tại site | Admin Big: `GLOBAL` khi bỏ `site_code`, `LOCAL` khi chọn site; Admin Small/Kế toán: `LOCAL` | Đã triển khai snapshot từ `HocPhi`, `PhieuThu`: số khoản, phải thu, đã thu ròng, đã thu, đã hoàn và còn nợ; báo `complete`/`missing_sites`; chưa lọc theo ngày |
 | `GET /api/v1/reports/audit-logs/?ma_co_so=...&ma_tai_khoan=...&loai_log=...&tu_ngay=...&den_ngay=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`, hoặc `LOCAL` khi lọc một site; Admin Small: `LOCAL` | Đã triển khai: đọc `dbo.Logs` độc lập tại từng site, lọc tài khoản/loại/ngày Việt Nam và phân trang ở API. Trả `complete`/`missing_sites`; 503 nếu thiếu site. Không trả IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
 | `GET /api/v1/admin/notifications/` | Admin Big; Admin Small | Admin Big: `GLOBAL` hoặc `LOCAL` khi lọc site; Admin Small: `LOCAL` | Đã triển khai: đọc `dbo.ThongBao`; không lưu trạng thái đã đọc. |
 | `POST /api/v1/admin/notifications/` | Admin Big; Admin Small | Admin Big: `REPLICATED-WRITE` tới site hoạt động; Admin Small: `LOCAL` | Đã triển khai: tạo thông báo Admin Big/Admin Small trong `dbo.ThongBao`, ghi audit `dbo.Logs` tại mỗi site được ghi. Bắt buộc `Idempotency-Key`; trả `200` khi đủ site hoặc `202 complete=false` với `missing_sites` để retry cùng key/body. Không có transaction ACID xuyên site. |
@@ -466,7 +466,9 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 |---|---|---|---|---|
 | Đăng ký khóa học | `POST /api/v1/enrollments` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site học viên/lớp; đọc `HocVien`, `LopHoc`; ghi `DangKy`, `HocPhi`, cập nhật sĩ số `LopHoc` |
 | Xếp/đổi lớp | `PATCH /api/v1/enrollments/{ma_dang_ky}/class` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site của đăng ký; đọc lớp và sĩ số; cập nhật `DangKy`, sĩ số hai lớp |
-| Thu/hoàn học phí tại quầy | `POST /api/v1/tuition-receipts` | Kế toán; Admin Small theo quyền | `LOCAL` | Site chứa `HocPhi`; ghi `PhieuThu`, cập nhật số đã thu/trạng thái `HocPhi`; bắt buộc idempotency key |
+| Liệt kê phiếu thu/hoàn | `GET /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán tại site | `LOCAL` | Đọc `HocPhi`, `PhieuThu`; trả từng phiếu gốc và số còn có thể hoàn |
+| Thu học phí tại quầy | `POST /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán tại site | `LOCAL` | Ghi `PhieuThu`, cập nhật `HocPhi` và các kỳ; chống gửi lặp bằng mã phiếu site-prefixed |
+| Hoàn học phí | `POST /api/v1/admin/tuition/{tuition_id}/receipts/{receipt_id}/refund/` | Kế toán tại site | `LOCAL` | Ghi phiếu `hoan` tham chiếu phiếu thu gốc, cập nhật `HocPhi`/`DotHocPhi`, audit; idempotency lưu tại site |
 | Tạo/tiếp tục yêu cầu thanh toán trực tuyến (nếu nhóm chọn tích hợp cổng) | `POST /api/v1/tuition-payment-attempts` | Vai trò thanh toán đã được nhóm duyệt | `LOCAL` | Lưu yêu cầu tại đúng site của `HocPhi`; chưa ghi `PhieuThu` hay tăng số đã thu khi chưa xác minh thành công |
 | Tra cứu trạng thái thanh toán | `GET /api/v1/tuition-payment-attempts/{ma_yeu_cau}` | Người tạo và nhân viên có quyền tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` định vị rồi `LOCAL` | Đọc trạng thái bền vững tại site chứa khoản học phí; không suy site từ tiền tố mã |
 | Tiếp tục yêu cầu còn mở | `GET /api/v1/tuition/{ma_hoc_phi}/payment-attempts?active=true` | Người học đã được liên kết (chỉ khi portal được duyệt); nhân viên có quyền tại site | `LOCAL` sau khi định vị site nếu cần | Tìm yêu cầu còn mở sau khi đóng tab, đổi thiết bị hoặc mất mã yêu cầu |
@@ -480,7 +482,7 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 | Xem trạng thái chuyển | `GET /api/v1/transfers/{ma_chuyen}` | Admin Big; Admin Small trong phạm vi được phép | Admin Big: `GLOBAL` để định vị nguồn; Admin Small: `LOCAL` tại site được gán | Đọc trạng thái tại nguồn; không suy ra site từ tiền tố mã học viên |
 | Thống kê học viên theo cơ sở | `GET /api/v1/reports/students-by-site` | Admin Big toàn hệ thống; Admin Small site mình | `LOCAL` hoặc `GLOBAL` tùy phạm vi | Đọc `HocVien` và trạng thái chuyển liên quan; gộp tại API khi nhiều site |
 | Tổng quan vận hành cơ sở | `GET /api/v1/reports/site-summary` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`; Admin Small: `LOCAL` | Tổng hợp số học viên/lớp và chỉ số vận hành; gộp ở API, báo site thiếu |
-| Thống kê học phí | `GET /api/v1/reports/tuition-by-site` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`; Admin Small: `LOCAL` | Đọc `HocPhi`, `PhieuThu`; tổng hợp phải thu/đã thu/còn nợ/hoàn theo kỳ và site |
+| Báo cáo tài chính học phí | `GET /api/v1/admin/reports/tuition-by-site/` | Admin Big; Admin Small; Kế toán tại site | Admin Big: `GLOBAL` hoặc chọn site; Admin Small/Kế toán: `LOCAL` | Đọc `HocPhi`, `PhieuThu`; tổng hợp phải thu/đã thu/đã hoàn/còn nợ; nếu thiếu site thì trả `complete=false` và `missing_sites` |
 
 ## Request và quy tắc kiểm tra chính
 
@@ -586,7 +588,7 @@ Request tối thiểu gồm `ma_lop_moi`. API lấy site từ đăng ký hiện 
 
 ## Thanh toán học phí
 
-Phần này mô tả yêu cầu API thu, hoàn và theo dõi học phí. Thu/hoàn tại quầy là thao tác `LOCAL` tại site giữ `HocPhi`; schema hiện chưa lưu idempotency bền vững cho thu/hoàn. Source có tích hợp SePay nhưng portal học viên/thanh toán online chưa được duyệt vào phạm vi và `SEPAY_ENABLED=false` mặc định. Không dùng trạng thái frontend thay cho trạng thái SQL Server.
+Thu/hoàn tại quầy là thao tác `LOCAL` tại site giữ `HocPhi`. Thu tiền hiện dùng mã phiếu site-prefixed để đọc lại yêu cầu lặp; hoàn tiền lưu UUID idempotency và liên kết phiếu gốc tại cùng CSDL site. Source có tích hợp SePay nhưng portal học viên/thanh toán online chưa được duyệt vào phạm vi và `SEPAY_ENABLED=false` mặc định. Không dùng trạng thái frontend thay cho trạng thái SQL Server.
 
 ### Thu hoặc hoàn học phí tại quầy
 
@@ -602,9 +604,22 @@ Phần này mô tả yêu cầu API thu, hoàn và theo dõi học phí. Thu/ho�
 
 Endpoint này dùng cho nhân viên ghi nhận khoản tiền đã thu/xác minh tại quầy; `hinh_thuc = chuyen_khoan` không tự chứng minh rằng ngân hàng đã chuyển tiền. Nếu có thanh toán trực tuyến qua nhà cung cấp, phải dùng luồng yêu cầu thanh toán ở phần tiếp theo, không gọi endpoint này từ trang quay về của cổng để tự khai báo thành công.
 
-Client gửi `Idempotency-Key: <UUID>` cho mỗi thao tác thu/hoàn. API tự lấy site từ khoản học phí, xác thực quyền và kiểm tra số tiền dương, số dư, trạng thái khoản phí. Trong một transaction `LOCAL`, API khóa/đọc lại `HocPhi`, kiểm tra yêu cầu trùng, tạo `PhieuThu`, cập nhật `HocPhi`, lưu kết quả yêu cầu idempotency và ghi nhật ký. Cùng người gọi + cùng site + cùng endpoint + cùng khóa và cùng nội dung trả lại đúng kết quả/phiếu ban đầu; cùng khóa nhưng nội dung khác trả `409 IDEMPOTENCY_KEY_REUSED`. Nếu transaction rollback thì không phiếu nào được ghi và có thể gửi lại cùng khóa. Nếu transaction đã commit nhưng response bị mất, gửi lại cùng khóa hoặc đọc trạng thái yêu cầu sẽ lấy lại kết quả đã commit, không thu lần hai. Không xóa phiếu đã phát sinh; hoàn tiền tạo dòng `PhieuThu` loại `hoan` với khóa idempotency riêng.
+Request thu tại quầy có `idempotency_key` trong body; request hoàn có UUID `idempotency_key` cùng số tiền, phương thức và lý do. API tự lấy site từ phiên và khoản học phí, xác thực quyền và kiểm tra số tiền dương, số dư, trạng thái khoản phí. Trong một transaction `LOCAL`, API khóa/đọc lại `HocPhi`, tạo `PhieuThu`, cập nhật `HocPhi`/`DotHocPhi` và ghi nhật ký. Khi hoàn, cùng người gọi + cùng site + cùng key và nội dung trả lại cùng phiếu; cùng key nhưng nội dung khác trả `409`. Nếu transaction rollback thì có thể gửi lại cùng key. Không xóa phiếu đã phát sinh; hoàn tiền tạo dòng `PhieuThu` loại `hoan` với mã `ma_phieu_goc` và khóa idempotency riêng.
 
-Với `loai = hoan`, request phải tham chiếu `ma_phieu_goc`; API kiểm tra số đã hoàn trước đó và không cho tổng hoàn vượt số tiền thu còn có thể hoàn. Phiếu gốc được giữ nguyên. Hợp đồng hiện tại cho phép người có quyền hoàn tiền ghi nhận trực tiếp; **chưa có** quy trình đề nghị/duyệt hoàn tiền riêng. Nếu nhóm muốn bắt buộc duyệt, cần thêm trạng thái và endpoint duyệt trước khi giao diện hiển thị nút đó.
+Với hoàn tiền, `receipt_id` trong URL là phiếu gốc; API kiểm tra số đã hoàn trước đó và không cho tổng hoàn vượt số tiền thu còn có thể hoàn hoặc tổng đã thu ròng. Phiếu gốc được giữ nguyên. Hợp đồng hiện tại cho phép Kế toán ghi nhận trực tiếp; **chưa có** quy trình đề nghị/duyệt hoàn tiền riêng. Admin Small giám sát theo quyền, không ghi phiếu hoàn bằng API này.
+
+`GET /api/v1/admin/tuition/{tuition_id}/receipts/?site_code=Q1` liệt kê phiếu của một khoản tại site; mỗi phiếu thu có `refunded_amount` và `refundable_amount`. `POST /api/v1/admin/tuition/{tuition_id}/receipts/{receipt_id}/refund/?site_code=Q1` nhận:
+
+```json
+{
+  "idempotency_key": "<UUID>",
+  "amount": 500000,
+  "payment_method": "chuyen_khoan",
+  "reason": "Điều chỉnh khoản thu theo yêu cầu"
+}
+```
+
+`GET /api/v1/admin/reports/tuition-by-site/` trả số khoản học phí, tổng phải thu, đã thu, đã hoàn, thu ròng và còn nợ theo site. Kế toán chỉ nhận báo cáo `LOCAL` của site trong phiên; Admin Small cũng chỉ đọc site được giao; Admin Big có thể đọc `GLOBAL` hoặc chọn một site. `GLOBAL` truy vấn riêng từng DB và đánh dấu site thiếu.
 
 ### SePay — code có trong source, phạm vi và vận hành chưa được duyệt
 
@@ -680,7 +695,7 @@ Schema hiện tại cho `YeuCauThanhToan.trang_thai` các giá trị `cho_thanh_
 
 `db/01_create_schema.sql` đã có `YeuCauThanhToan` và `SuKienThanhToan`, đặt cục bộ tại từng database site; `PhieuThu` có liên kết tới yêu cầu. `YeuCauThanhToan` giữ khoản học phí, kỳ, tài khoản, số tiền, mã tham chiếu, khóa idempotency, trạng thái và thời hạn; `SuKienThanhToan` lưu ID giao dịch SePay duy nhất cùng metadata đã lọc và kết quả nhận. Không có database thanh toán trung tâm. Đối chiếu đủ cột/ràng buộc trong [`DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).
 
-Thu/hoàn tại quầy chưa có request ledger bền vững riêng theo `Idempotency-Key`; không khẳng định request lặp sau timeout luôn lấy lại phiếu cũ. SePay có code/schema nhưng mặc định tắt và chưa được kiểm chứng merchant/webhook thật. Chốt phạm vi với nhóm trước khi bật portal/payment; nếu thay đổi schema hoặc hợp đồng API, cập nhật schema/script trong cùng thay đổi.
+Thu tại quầy dùng mã phiếu để nhận diện yêu cầu lặp; hoàn tiền dùng `khoa_idempotency` bền vững trong `PhieuThu`. Refund API cần migration `40_enable_tuition_refunds.sql` trên từng site trước khi triển khai. SePay có code/schema nhưng mặc định tắt và chưa được kiểm chứng merchant/webhook thật. Chốt phạm vi với nhóm trước khi bật portal/payment; nếu thay đổi schema hoặc hợp đồng API, cập nhật schema/script trong cùng thay đổi.
 
 ## Quản lý điểm
 
@@ -700,7 +715,7 @@ Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm
 
 - Mọi thao tác tạo/sửa kiểm tra quyền, phạm vi site và điều kiện nghiệp vụ trước khi ghi. DELETE hồ sơ học viên chỉ được xóa bản chưa có tài khoản, đăng ký hoặc lịch sử chuyển; không xóa học phí, phiếu thu, điểm, điểm danh, lịch sử hoặc nhật ký đã phát sinh.
 - Ràng buộc duy nhất hiện có giúp chặn một số thao tác trùng: `DangKy(ma_hoc_vien, ma_lop)`, `Diem(ma_dang_ky, loai_diem)`, `DiemDanh(ma_buoi, ma_dang_ky)`, và `GiaoDichChuyenCoSo.khoa_chong_lap`. Khi nhận lại cùng thao tác hợp lệ, API nên trả kết quả cũ thay vì tạo thêm nghiệp vụ.
-- Thu/hoàn tại quầy phải chống gửi lại request sau timeout bằng khóa idempotency lưu bền vững và ghi cùng transaction với `PhieuThu`/`HocPhi`; hiện schema chưa có khóa hoặc request ledger.
+- Thu tại quầy dùng mã phiếu site-prefixed; hoàn tại quầy lưu UUID idempotency trong `PhieuThu` cùng transaction với `HocPhi`/`DotHocPhi`. Xác nhận migration 40 đã áp dụng lên từng site trước khi triển khai.
 - SePay hiện có `YeuCauThanhToan`/`SuKienThanhToan` tại database site và API callback; tích hợp mặc định tắt, chưa có bằng chứng giao dịch thật. Khi được nhóm duyệt, cần kiểm chứng callback lặp, timeout, retry và đối soát; không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
 - Tạo tài khoản nội bộ vừa ghi bản sao `TaiKhoan` vừa tạo hồ sơ site. API phải lưu đủ tiến trình để tiếp tục hoặc vô hiệu hóa an toàn nếu một chặng lỗi; không tuyên bố transaction ACID xuyên site.
 - Giao dịch chuyển dùng `GiaoDichChuyenCoSo.khoa_chong_lap` và trạng thái Coordinator trong CSDL nguồn. Nếu site đích đã commit hồ sơ, phục hồi phải tiến về phía trước theo README mục 5.5.
@@ -801,7 +816,7 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 ## Các điểm còn phải thống nhất hoặc kiểm chứng
 
 1. CRUD hồ sơ và cấp tài khoản học viên theo thao tác Admin riêng nằm trong FS-STU-01. Portal học viên và SePay có code/schema/UI nhưng vẫn chưa được duyệt phạm vi; không coi việc cấp tài khoản là quyết định bật portal hoặc thanh toán online.
-2. Thu/hoàn tại quầy chưa có request ledger bền vững riêng cho chống lặp sau timeout. Chốt hợp đồng idempotency và cập nhật schema/source nếu nhóm yêu cầu bảo đảm này.
+2. Refund API yêu cầu chạy migration `40_enable_tuition_refunds.sql` riêng trên mỗi site. Chưa kiểm chứng migration và API với SQL Server đang dùng; đối chiếu cấu trúc Q1/Q7/TD trước khi bật.
 3. API quản lý `CoSo` chưa có; runtime replication cho `CoSo` còn thiếu. `MonHoc`/`KhoaHoc` có service ghi replication; một số luồng ghi `TaiKhoan` vẫn có cơ chế riêng, chưa gom về một điểm vào.
 4. Chạy đủ TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên các database SQL Server đang dùng. Còn thiếu outage/recovery, fault injection chuyển cơ sở, concurrency hai phiên và Global Query khi thiếu site; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
 5. Xác nhận với giảng viên mức bảo đảm của Coordinator chuyển cơ sở. Cơ chế hiện tại dùng transaction cục bộ và phục hồi tiến về phía trước; không phải ACID nguyên tử xuyên database, MSDTC hoặc 2PC.

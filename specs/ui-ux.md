@@ -144,7 +144,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Trang tổng quan | Tiêu đề/ngữ cảnh cơ sở, công việc cần xử lý, chỉ số nghiệp vụ, cảnh báo site | Admin Big xem toàn hệ thống; Admin Small xem site được gán; các chức vụ khác chỉ thấy thông tin cần cho công việc được giao; thiếu site phải báo rõ |
 | Học viên | Tìm kiếm/bộ lọc, danh sách, thông tin hồ sơ, lịch sử liên quan | Admin Small quản lý theo site; Tư vấn & xếp lớp được tra cứu danh sách theo site; Lễ tân không có quyền tra cứu; không suy site chỉ từ tiền tố mã |
 | Đăng ký và xếp lớp | Chọn học viên/lớp, danh sách đăng ký, chi tiết đăng ký, đổi lớp | `LOCAL`; kiểm tra học viên và lớp cùng cơ sở, chỗ còn lại và trạng thái lớp |
-| Học phí và thanh toán | Danh sách khoản phải thu, chi tiết công nợ, ghi nhận thu tại quầy, lịch sử/chi tiết biên nhận, ghi nhận hoàn tiền và trạng thái thanh toán | `LOCAL`; phiếu đã phát sinh không có nút xóa; Admin Small/kế toán chỉ thao tác theo quyền được API cấp |
+| Học phí và thanh toán | Danh sách khoản phải thu, chi tiết công nợ, ghi nhận thu tại quầy, lịch sử/chi tiết biên nhận, chọn phiếu gốc để hoàn một phần/toàn phần | `LOCAL`; phiếu gốc không sửa/xóa; Kế toán ghi thu/hoàn, Admin Small giám sát theo quyền API |
 | Trạng thái thanh toán trực tuyến | Màn hình đang chờ/xác minh/thành công/thất bại/đang đối soát sau khi quay về từ cổng; đường dẫn tới biên nhận nếu đã thu | Chỉ hiển thị trạng thái lấy từ API; không suy ra thành công từ URL redirect. Chỉ bật khi nhóm chốt cổng và quyền tài khoản thanh toán |
 | Điểm | Chọn lớp, danh sách học viên, nhập/sửa điểm, lịch sử thay đổi | `LOCAL`; giáo viên chỉ thấy lớp được phân công |
 | Chuyển cơ sở | Form đề nghị cho Admin Small; hộp thư/chi tiết/duyệt/từ chối cho Admin Big; theo dõi trạng thái | Đề nghị `LOCAL` ở nguồn, hộp thư `GLOBAL`, giao dịch nguồn-đích chỉ chạy sau duyệt |
@@ -161,7 +161,7 @@ Trong **Quản lý Admin Small**, Admin Big có thao tác riêng để kích ho�
 | Admin Small | Khu vực quản trị site được giao: quản lý roster giáo viên và phân công tại site theo quyền API; nghiệp vụ cơ sở; tạo đề nghị chuyển học viên và theo dõi đề nghị; không tự tạo Admin Big, không duyệt đề nghị và không truy cập site khác |
 | Lễ tân | Tiếp nhận tại quầy, thao tác đăng ký/lớp trong một site; API có quyền kế hoạch học phí nhưng giao diện chưa có menu Học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
 | Tư vấn & xếp lớp | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp trong một site được giao |
-| Kế toán | Học phí, phiếu thu/hoàn và công nợ trong một site được giao |
+| Kế toán | Học phí, phiếu thu/hoàn, công nợ và báo cáo tài chính trong một site được giao |
 | Giáo viên | Các lớp/buổi được phân công; điểm danh và nhập/sửa điểm theo quyền |
 | Học viên | Source có tài khoản/portal và route `/student`; chỉ tính vào phạm vi đồ án sau khi nhóm thống nhất quyết định phạm vi và đồng bộ tài liệu |
 
@@ -200,7 +200,7 @@ flowchart TD
 | Tài khoản và nhân sự | Tạo tài khoản nội bộ; tạo hồ sơ nhân viên/giáo viên tại cơ sở; xem trạng thái | Ghi tài khoản dùng chung qua `REPLICATED-WRITE`, hồ sơ làm việc qua `LOCAL` tới site đích; không để tài khoản hoạt động nếu hồ sơ/phạm vi cần thiết chưa được tạo |
 | Danh mục dùng chung | Quản lý môn học và khóa học | `REPLICATED-WRITE`; chỉ báo thành công khi chính sách đồng bộ tới các site hoạt động được thỏa mãn |
 | Hộp thư chuyển cơ sở | Lọc đề nghị, xem chi tiết, duyệt hoặc từ chối, theo dõi kết quả | Hộp thư `GLOBAL`; quyết định được ghi về CSDL nguồn; chuyển học viên chỉ bắt đầu sau khi duyệt |
-| Báo cáo / nhật ký | Lọc và xem thống kê hoặc sự kiện theo cơ sở/thời gian | `GLOBAL`; phải hiển thị site không truy cập được và đánh dấu kết quả chưa đầy đủ |
+| Báo cáo / nhật ký | Admin xem thống kê theo phạm vi; Kế toán xem báo cáo thu/hoàn/công nợ tại site | Báo cáo tài chính Kế toán là `LOCAL`; báo cáo Admin Big có thể `GLOBAL`, nêu site thiếu thay vì coi dữ liệu một phần là đầy đủ |
 
 #### Admin Small — quản lý một cơ sở được phân công
 

@@ -295,3 +295,43 @@ def allocate_payment_to_installments(
         unallocated -= allocated
     if unallocated != 0:
         raise AcademicConflict("Số tiền thu vượt tổng số dư các kỳ học phí.")
+
+
+def reverse_payment_from_installments(
+    cursor, *, site_code: str, tuition_id: str, amount: int, expected_paid: int,
+) -> None:
+    """Reverse the newest paid installments first while preserving the schedule total."""
+    cursor.execute(
+        """
+        SELECT ma_dot_hoc_phi, so_tien_phai_dong, so_tien_da_dong
+        FROM dbo.DotHocPhi WITH (UPDLOCK, HOLDLOCK)
+        WHERE ma_co_so = %s AND ma_hoc_phi = %s
+        ORDER BY so_thu_tu DESC
+        """,
+        [site_code, tuition_id],
+    )
+    rows = cursor.fetchall()
+    if not rows or sum(int(row[2]) for row in rows) != expected_paid:
+        raise AcademicConflict("Lịch các kỳ không khớp số đã thu; không thể ghi nhận hoàn tiền.")
+
+    remaining = amount
+    for installment_id, due, paid in rows:
+        reversed_amount = min(int(paid), remaining)
+        if not reversed_amount:
+            continue
+        updated_paid = int(paid) - reversed_amount
+        state = "chua_dong" if updated_paid == 0 else "dong_mot_phan" if updated_paid < int(due) else "da_dong"
+        cursor.execute(
+            """
+            UPDATE dbo.DotHocPhi
+            SET so_tien_da_dong = %s, trang_thai = %s
+            WHERE ma_co_so = %s AND ma_hoc_phi = %s AND ma_dot_hoc_phi = %s
+              AND so_tien_da_dong = %s
+            """,
+            [updated_paid, state, site_code, tuition_id, str(installment_id), int(paid)],
+        )
+        if cursor.rowcount != 1:
+            raise AcademicConflict("Kỳ học phí vừa thay đổi; tải lại lịch trước khi hoàn.")
+        remaining -= reversed_amount
+    if remaining:
+        raise AcademicConflict("Số tiền hoàn vượt tổng số đã thu theo các kỳ học phí.")

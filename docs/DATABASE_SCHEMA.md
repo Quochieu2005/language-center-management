@@ -400,6 +400,8 @@ Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site c
 | `ma_phieu` | PK | |
 | `ma_co_so` | FK → `CoSo` | Site lấy từ học phí cha; người thu phải thuộc site này |
 | `ma_hoc_phi` | FK → `HocPhi` | |
+| `ma_phieu_goc` | FK ghép → `PhieuThu` cùng site, *null* | Phiếu thu gốc của bút toán `hoan`; phiếu gốc không bị sửa |
+| `khoa_idempotency` | UQ có lọc, *null* | UUID chống ghi lặp bút toán hoàn; lưu cùng transaction |
 | `loai` | | `thu` · `hoan` |
 | `so_tien` | | Luôn > 0; dấu do `loai` quyết định |
 | `hinh_thuc` | | `tien_mat` · `chuyen_khoan` · `the` |
@@ -407,6 +409,8 @@ Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site c
 | `ma_nhan_vien` | FK → `NhanVien` | Người thu |
 | `ma_yeu_cau` | FK ghép, *null* → `YeuCauThanhToan` | Chỉ có khi phiếu được tạo từ thanh toán SePay; thu tại quầy để trống |
 | `ghi_chu` | | |
+
+`ma_phieu_goc` tham chiếu `(ma_phieu, ma_co_so)` nên SQL Server chặn liên kết phiếu hoàn sang site khác. API chỉ tạo `loai='hoan'` sau khi kiểm tra số còn có thể hoàn; `khoa_idempotency` có unique index lọc trên từng CSDL site. Phiếu hoàn lịch sử chưa gắn phiếu gốc được giữ nguyên; API chặn hoàn tiếp cho khoản đó đến khi đối soát.
 
 **`DotHocPhi`** (cha: `HocPhi`) là các kỳ thu phí được lưu cùng site với khoản học phí. Có mã kỳ, mã site, thứ tự kỳ, ngày đến hạn, số phải thu, số đã thu và trạng thái `chua_dong`/`dong_mot_phan`/`da_dong`.
 

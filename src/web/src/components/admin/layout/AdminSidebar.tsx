@@ -58,7 +58,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
         { label: "Quản lý Admin Small", href: "/admin/accounts", icon: <IdcardOutlined />, roles: ["admin_big"] },
         { label: "Chuyển cơ sở", href: "/admin/transfers", icon: <SwapOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Học phí & Thu tiền", href: "/admin/tuition", icon: <DollarCircleOutlined />, roles: ["admin_big", "admin_small", "ke_toan"] },
-        { label: "Thống kê theo cơ sở", href: "/admin/reports", icon: <BarChartOutlined />, roles: ["admin_big", "admin_small"] },
+        { label: user?.role === "ke_toan" ? "Báo cáo tài chính" : "Thống kê theo cơ sở", href: "/admin/reports", icon: <BarChartOutlined />, roles: ["admin_big", "admin_small", "ke_toan"] },
       ],
     },
     {

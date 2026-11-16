@@ -340,7 +340,7 @@ Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại c
 
 ### 5.3. Thu hoặc hoàn học phí
 
-**Loại:** `LOCAL` · **Ai làm:** Kế toán; Admin Small có quyền giám sát/hoàn theo phân quyền.
+**Loại:** `LOCAL` · **Ai làm:** Kế toán ghi nhận thu/hoàn; Admin Small giám sát theo quyền tại site được giao.
 
 ```mermaid
 flowchart LR
@@ -349,11 +349,13 @@ flowchart LR
     API["API"] -->|điều phối nghiệp vụ| ThuHoanHocPhi["Thu và hoàn học phí"]
     ThuHoanHocPhi["Thu và hoàn học phí"] -->|chọn cơ sở của học viên| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter["Bộ định tuyến cơ sở"] -->|ghi phiếu thu và công nợ| SQLServer_CSDL_Site["SQL Server của cơ sở"]
-    Admin_Small["Admin Small"] -->|hoàn tiền| GiaoDienWeb["GiaoDienWeb"]
+    Admin_Small["Admin Small"] -->|giám sát theo quyền| GiaoDienWeb["GiaoDienWeb"]
     ThuHoanHocPhi["Thu và hoàn học phí"] -->|ghi nhật ký| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Trước khi thu, kiểm tra đăng ký, khoản phải thu, tổng đã thu/đã hoàn và số dư. Ghi phiếu thu hoặc hoàn, cập nhật trạng thái `HocPhi` và ghi nhật ký trong cùng giao dịch. Không xóa phiếu đã phát sinh; khi sửa sai, dùng nghiệp vụ hoàn/điều chỉnh để giữ lịch sử.
+Trước khi thu hoặc hoàn, kiểm tra khoản phải thu, tổng đã thu/đã hoàn và số dư. Hoàn phải trỏ tới phiếu thu gốc; trong cùng transaction tại site, API tạo phiếu hoàn mới, đảo số tiền các kỳ, cập nhật trạng thái `HocPhi` và ghi nhật ký. Idempotency key ngăn ghi trùng khi retry. Không xóa hoặc sửa phiếu đã phát sinh; Admin Small giám sát, còn thao tác thu/hoàn do Kế toán thực hiện.
+
+Báo cáo tài chính học phí cho Kế toán xem dữ liệu `LOCAL` tại cơ sở được phân công; Admin Small chỉ xem site của mình, còn Admin Big có thể xem một site hoặc dùng Global Query. API hỏi từng CSDL site riêng và nêu site thiếu; các số liệu là tổng hiện tại từ `HocPhi`/`PhieuThu`, không phải báo cáo lọc theo kỳ ngày.
 
 ### 5.4. Nhập và sửa điểm
 
@@ -693,7 +695,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Tài khoản | Đăng nhập, đăng xuất, quên/đặt lại mật khẩu | `GLOBAL`, `REPLICATED-WRITE` | Người dùng nội bộ |
 | Quản trị | Tạo tài khoản, khóa/mở tài khoản, phân công Admin Small | `REPLICATED-WRITE` + `LOCAL` | Admin Big |
 | Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu, Lễ tân thao tác đăng ký/lớp theo quyền API |
-| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán, Admin Small |
+| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán; Admin Small giám sát theo quyền |
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
 | Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX` | Admin Small đề nghị; Admin Big duyệt/từ chối |
 | Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
