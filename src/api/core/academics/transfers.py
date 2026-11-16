@@ -20,6 +20,7 @@ from core.academics.common import (
     translate_database_errors,
 )
 from core.sites.connections import get_site_database_alias
+from core.students.slugging import available_student_slug
 
 
 def _rows(cursor) -> list[dict[str, Any]]:
@@ -367,7 +368,8 @@ def _transfer_snapshot(source_site: str, transfer_id: str) -> dict[str, Any]:
             SELECT g.ma_chuyen, g.ma_hoc_vien, g.co_so_nguon, g.co_so_dich,
                    g.trang_thai, g.buoc_cuoi, g.ma_tai_khoan_quyet_dinh,
                    h.slug, h.co_so_goc, h.ma_tai_khoan, h.ho_ten, h.ngay_sinh,
-                   h.gioi_tinh, h.sdt, h.email, h.dia_chi, h.ngay_nhap_hoc, h.trang_thai
+                   h.gioi_tinh, h.sdt, h.email, h.dia_chi, h.ngay_nhap_hoc, h.trang_thai,
+                   h.avatar_public_id, h.avatar_secure_url
             FROM dbo.GiaoDichChuyenCoSo AS g
             INNER JOIN dbo.HocVien AS h
                 ON h.ma_hoc_vien = g.ma_hoc_vien AND h.ma_co_so = g.co_so_nguon
@@ -382,8 +384,12 @@ def _transfer_snapshot(source_site: str, transfer_id: str) -> dict[str, Any]:
         "transfer_id", "student_id", "source_site", "target_site", "status", "step",
         "decided_by", "slug", "origin_site", "account_id", "full_name", "birth_date",
         "gender", "phone", "email", "address", "enrolled_on", "student_status",
+        "avatar_public_id", "avatar_secure_url",
     )
-    return dict(zip(keys, row))
+    snapshot = dict(zip(keys, row))
+    if bool(snapshot["avatar_public_id"]) != bool(snapshot["avatar_secure_url"]):
+        raise AcademicConflict("Metadata ảnh học viên chưa đầy đủ; cần đối soát trước khi chuyển.")
+    return snapshot
 
 
 def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None:
@@ -403,7 +409,8 @@ def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None
             cursor.execute(
                 """
                 SELECT slug, co_so_goc, ma_tai_khoan, ho_ten, ngay_sinh, gioi_tinh,
-                       sdt, email, dia_chi, ngay_nhap_hoc, trang_thai
+                       sdt, email, dia_chi, ngay_nhap_hoc, avatar_public_id,
+                       avatar_secure_url, trang_thai
                 FROM dbo.HocVien WITH (UPDLOCK, HOLDLOCK)
                 WHERE ma_hoc_vien = %s AND ma_co_so = %s
                 """,
@@ -412,28 +419,32 @@ def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None
             current = cursor.fetchone()
             created = current is None
             expected = (
-                snapshot["slug"], snapshot["origin_site"], snapshot["account_id"],
-                snapshot["full_name"], snapshot["birth_date"], snapshot["gender"],
+                snapshot["origin_site"], snapshot["account_id"], snapshot["full_name"],
+                snapshot["birth_date"], snapshot["gender"],
                 snapshot["phone"], snapshot["email"], snapshot["address"],
-                snapshot["enrolled_on"],
+                snapshot["enrolled_on"], snapshot["avatar_public_id"],
+                snapshot["avatar_secure_url"],
             )
             if current is None:
                 if event_exists:
                     raise AcademicConflict("Sự kiện đã tồn tại nhưng thiếu hồ sơ đích; cần đối soát.")
+                target_slug = available_student_slug(cursor, snapshot["full_name"], snapshot["slug"])
                 cursor.execute(
                     """
                     INSERT INTO dbo.HocVien
                         (ma_hoc_vien, slug, ma_co_so, co_so_goc, ma_tai_khoan, ho_ten,
-                         ngay_sinh, gioi_tinh, sdt, email, dia_chi, ngay_nhap_hoc, trang_thai)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'bao_luu')
+                         ngay_sinh, gioi_tinh, sdt, email, dia_chi, ngay_nhap_hoc,
+                         avatar_public_id, avatar_secure_url, trang_thai)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'bao_luu')
                     """,
-                    [snapshot["student_id"], snapshot["slug"], target_site,
+                    [snapshot["student_id"], target_slug, target_site,
                      snapshot["origin_site"], snapshot["account_id"], snapshot["full_name"],
                      snapshot["birth_date"], snapshot["gender"], snapshot["phone"],
-                     snapshot["email"], snapshot["address"], snapshot["enrolled_on"]],
+                     snapshot["email"], snapshot["address"], snapshot["enrolled_on"],
+                     snapshot["avatar_public_id"], snapshot["avatar_secure_url"]],
                 )
             else:
-                actual = tuple(current[:-1])
+                actual = tuple(current[1:-1])
                 if not event_exists or actual != expected or str(current[-1]).lower() not in {"bao_luu", "dang_hoc"}:
                     raise AcademicConflict("Đã tồn tại hồ sơ khác tại cơ sở đích; cần đối soát trước khi chuyển.")
             _append_event(

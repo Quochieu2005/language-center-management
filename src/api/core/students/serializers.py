@@ -1,4 +1,7 @@
+from django.utils import timezone
 from rest_framework import serializers
+
+from core.slug_utils import make_slug
 
 
 _SITE_CODE = r"^[A-Za-z0-9_-]{2,10}$"
@@ -34,6 +37,78 @@ class StudentListQuerySerializer(StrictInputSerializer):
         return value
 
 
+class StudentSiteQuerySerializer(StrictInputSerializer):
+    site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
+    allowed_fields = {"site_code"}
+
+    def validate_site_code(self, value):
+        return value.strip().upper()
+
+
+class StudentProfileWriteSerializer(StrictInputSerializer):
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True, required=False)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.ChoiceField(
+        choices=("Nam", "Nữ", "Khác"), required=False, allow_blank=True, allow_null=True
+    )
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    email = serializers.EmailField(max_length=254, required=False, allow_blank=True, allow_null=True)
+    address = serializers.CharField(max_length=300, required=False, allow_blank=True, allow_null=True)
+    allowed_fields = {"full_name", "birth_date", "gender", "phone", "email", "address"}
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value or any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Họ tên không hợp lệ.")
+        return value
+
+    def validate_birth_date(self, value):
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError("Ngày sinh không được ở tương lai.")
+        return value
+
+    def validate_gender(self, value):
+        return value or None
+
+    def validate_phone(self, value):
+        value = (value or "").strip()
+        if value and (len(value) < 6 or any(char not in "+0123456789(). -" for char in value)):
+            raise serializers.ValidationError("Số điện thoại không hợp lệ.")
+        return value or None
+
+    def validate_email(self, value):
+        return value.strip().casefold() if value and value.strip() else None
+
+    def validate_address(self, value):
+        value = (value or "").strip()
+        if any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Địa chỉ không hợp lệ.")
+        return value or None
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError({"detail": "Cần cung cấp ít nhất một trường để cập nhật."})
+        return attrs
+
+
+class StudentCreateSerializer(StudentProfileWriteSerializer):
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True)
+    slug = serializers.CharField(max_length=160, required=False, allow_blank=True, trim_whitespace=True)
+    allowed_fields = StudentProfileWriteSerializer.allowed_fields | {"slug"}
+
+    def validate_slug(self, value):
+        if not value:
+            return ""
+        try:
+            return make_slug(value, max_length=160)
+        except ValueError as exc:
+            raise serializers.ValidationError("Slug không hợp lệ.") from exc
+
+
+class StudentUpdateSerializer(StudentProfileWriteSerializer):
+    pass
+
+
 class StudentListItemSerializer(serializers.Serializer):
     student_id = serializers.CharField()
     slug = serializers.CharField()
@@ -41,8 +116,10 @@ class StudentListItemSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     phone = serializers.CharField(allow_null=True)
     email = serializers.EmailField(allow_null=True)
+    avatar_secure_url = serializers.URLField(allow_null=True)
     status = serializers.CharField()
     account_issued = serializers.BooleanField()
+    account_issue_eligible = serializers.BooleanField()
 
 
 class StudentListResponseSerializer(serializers.Serializer):
@@ -67,11 +144,10 @@ class StudentAccountProvisionResponseSerializer(serializers.Serializer):
 
 
 class StudentDeleteResponseSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
     slug = serializers.CharField()
     site_code = serializers.CharField()
     deleted = serializers.BooleanField()
-    deleted_site_count = serializers.IntegerField(min_value=1)
-    account_deleted = serializers.BooleanField()
 
 
 class StudentProfileSerializer(serializers.Serializer):
@@ -86,6 +162,18 @@ class StudentProfileSerializer(serializers.Serializer):
     address = serializers.CharField(allow_null=True)
     enrolled_on = serializers.DateField()
     status = serializers.CharField()
+
+
+class StudentAdminProfileSerializer(StudentProfileSerializer):
+    avatar_secure_url = serializers.URLField(allow_null=True)
+
+
+class StudentAvatarResponseSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    slug = serializers.CharField()
+    site_code = serializers.CharField()
+    avatar_secure_url = serializers.URLField()
+    complete = serializers.BooleanField()
 
 
 class StudentProfileUpdateSerializer(StrictInputSerializer):

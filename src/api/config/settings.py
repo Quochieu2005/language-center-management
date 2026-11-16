@@ -208,7 +208,7 @@ SPECTACULAR_SETTINGS = {
     "TAGS": [
         {"name": "Hệ thống", "description": "Kiểm tra tiến trình API."},
         {"name": "Xác thực", "description": "Đăng nhập và quản lý phiên theo vai trò được cấp."},
-        {"name": "Quản lý học viên", "description": "Tìm học viên theo site và cấp tài khoản sau đăng ký."},
+        {"name": "Quản lý học viên", "description": "Tìm hồ sơ theo site và cấp tài khoản theo thao tác Admin."},
         {"name": "Cổng học viên", "description": "Hồ sơ, đăng ký, lịch, học phí và điểm của chính học viên."},
         {"name": "Xếp lớp", "description": "Mở lớp, tạo lịch, phân công giáo viên và xếp đăng ký trong một cơ sở."},
         {"name": "Đăng ký khóa học", "description": "Đăng ký học viên vào lớp và khởi tạo học phí tại site sở hữu dữ liệu."},

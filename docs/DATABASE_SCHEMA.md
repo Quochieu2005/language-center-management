@@ -107,7 +107,7 @@ flowchart LR
 | `GiaoDichChuyenCoSo` | Cục bộ | trạng thái hiện tại của một lần chuyển | Chỉ CSDL site nguồn; Coordinator cập nhật để phục hồi |
 | `LichSuChuyenCoSo` | Cục bộ | sự kiện append-only của lần chuyển | Site thực hiện sự kiện (thường nguồn và đích) |
 | `PhienDangNhap`, `TokenDatLaiMatKhau`, `GiaoDichDatLaiMatKhau` | Cục bộ kỹ thuật | session/OTP/ledger xác thực | Database site cấu hình `AUTH_SESSION_SITE_CODE` |
-| `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, tùy migration/portal | điều phối xóa học viên nhiều site | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22 |
+| `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, legacy | dấu tiến trình cho luồng purge học viên cũ | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22. DELETE hiện hành không dùng bảng này và không purge lịch sử |
 | `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
 | `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
 
@@ -278,12 +278,18 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | Cột | Ràng buộc | Mô tả |
 |-----|-----------|-------|
 | `ma_hoc_vien` | PK | |
+| `slug` | UQ trong từng site | Định danh hồ sơ dùng trong API; mặc định chuẩn hóa từ họ tên, cho phép chỉnh khi tạo và thêm hậu tố số nếu trùng trong site; không dùng để suy site |
 | `ma_co_so` | FK | **Site chứa** bản ghi (quyết định phân mảnh) |
 | `co_so_goc` | FK | Cơ sở đăng ký lần đầu, **không đổi** |
-| `ho_ten`, `ngay_sinh`, `gioi_tinh` | | |
+| `ma_tai_khoan` | FK, UQ có lọc, *null* | Liên kết tài khoản học viên được cấp riêng sau khi hồ sơ đủ điều kiện |
+| `ho_ten`, `ngay_sinh` | | |
+| `gioi_tinh` | NULL | API chuẩn hóa giá trị và chỉ chấp nhận `Nam`, `Nữ` hoặc `Khác`; trường có thể để trống |
 | `sdt`, `email`, `dia_chi` | | |
+| `avatar_public_id`, `avatar_secure_url` | *null* được phép | Metadata ảnh Cloudinary riêng tại site chứa hồ sơ; bytes không lưu trong SQL Server |
 | `ngay_nhap_hoc` | | |
 | `trang_thai` | | `dang_hoc` · `bao_luu` · `da_chuyen_di` · `nghi_hoc` |
+
+Ảnh học viên là metadata site-local, không phải bản sao tài khoản. Luồng chuyển cơ sở chép hai trường avatar vào hồ sơ đích trong transaction cục bộ tại đích và giữ nguyên metadata nguồn. Hai hồ sơ có thể cùng tham chiếu asset Cloudinary; vì chưa có sổ tham chiếu toàn site, thay ảnh hoặc xóa hồ sơ không tự xóa asset cũ.
 
 **`GiaoVien`**
 
@@ -537,7 +543,7 @@ Source dùng bảng này cho OTP reset mật khẩu quản trị: mã 6 số ch�
 | Nghiệp vụ | `dang_ky_khoa_hoc` `xep_lop` `huy_dang_ky` `dong_hoc_phi` `hoan_hoc_phi` `nhap_diem` `sua_diem` `diem_danh` `mo_lop` `doi_lich_buoi_hoc` |
 | Hệ thống | `chuyen_co_so` `sua_danh_muc` |
 
-`db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng xóa dữ liệu học viên đã bật cờ phiên theo quy trình.
+`db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng purge legacy có bật cờ phiên. CRUD học viên hiện hành không xóa `Logs`.
 
 **Xóa vĩnh viễn Admin Small:** Admin Big có thể xóa vật lý dòng `Admin`, các bản sao `TaiKhoan`, phiên, token/giao dịch đặt lại mật khẩu còn gắn tài khoản và ảnh Cloudinary. Chạy `db/32_allow_admin_small_hard_delete.sql` riêng tại từng site trước khi bật thao tác này. Migration bỏ FK tới `TaiKhoan` ở các cột người thao tác của `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `DiemDanh` và bảng log cũ để giữ nguyên mã người thao tác trong lịch sử; không xóa các dòng lịch sử. FK `YeuCauThanhToan_TaiKhoan` vẫn được giữ; nếu còn yêu cầu thanh toán tham chiếu tài khoản thì API từ chối xóa. Hồ sơ `HocVien`/`GiaoVien`/`NhanVien` hoặc giao dịch chuyển cơ sở đang mở cũng khiến thao tác bị từ chối. Mỗi site commit độc lập, có dấu retry trong `Logs`; đây là `REPLICATED-WRITE`, không phải ACID xuyên CSDL.
 

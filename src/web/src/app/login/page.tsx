@@ -66,12 +66,12 @@ export default function LoginPage() {
     <div className={styles.heading}>
       <span className={styles.kicker}>TÀI KHOẢN NỘI BỘ</span>
       <Typography.Title level={2}>Đăng nhập</Typography.Title>
-      <Typography.Paragraph>Dùng email hoặc tên đăng nhập đã được cấp.</Typography.Paragraph>
+      <Typography.Paragraph>Dùng email đã được cấp để đăng nhập.</Typography.Paragraph>
     </div>
     {error && <Alert className={styles.error} type="error" showIcon title={error} />}
     <Form className={styles.form} layout="vertical" onFinish={submit} requiredMark={false} disabled={Boolean(socialBusy)}>
-      <Form.Item name="identifier" label="Email hoặc tên đăng nhập" rules={[{ required: true, whitespace: true, message: "Nhập email hoặc tên đăng nhập." }]}>
-        <Input autoComplete="username" prefix={<UserOutlined />} maxLength={254} size="large" />
+      <Form.Item name="identifier" label="Email đăng nhập" rules={[{ required: true, type: "email", message: "Nhập email hợp lệ." }]}>
+        <Input type="email" autoComplete="username" prefix={<UserOutlined />} maxLength={254} size="large" placeholder="Nhập email" />
       </Form.Item>
       <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: "Nhập mật khẩu." }]}>
         <Input.Password autoComplete="current-password" prefix={<LockOutlined />} maxLength={128} size="large" />

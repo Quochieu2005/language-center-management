@@ -54,6 +54,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `35_allow_optional_course_session_count.sql` | Cho phép `KhoaHoc.so_buoi` để trống đến khi lịch được xếp; chạy sau 33–34. |
 | `36_add_blog_tables.sql` | Tạo `DanhMucBlog`/`BaiVietBlog` và nạp ba bài mẫu ban đầu; chạy riêng trên từng database site trước khi dùng API Blog công khai hoặc CMS Admin Big. |
 | `37_merge_consultant_and_placement_roles.sql` | Gộp hồ sơ `xep_lop` cũ vào chức vụ `tu_van` và bỏ giá trị `xep_lop` khỏi CHECK; chạy riêng trên từng site trước khi triển khai phiên bản API mới. |
+| `38_add_student_avatar_metadata.sql` | Thêm metadata ảnh Cloudinary vào `HocVien`; chạy riêng trên mọi site trước khi triển khai API mới (luồng upload ảnh và chuyển cơ sở đều đọc các cột này). |
 
 ## Chạy bằng SSMS
 
@@ -67,6 +68,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 8. Chạy `05_database_roles.sql` trong từng database. DBA tạo SQL login/user theo cấu hình môi trường rồi thêm database user vào `qlttnn_api` hoặc `qlttnn_readonly`. Không đưa mật khẩu vào script hoặc repository.
 9. Để bật API Blog, chạy `36_add_blog_tables.sql` riêng trên Q1, Q7, TD và mọi site mới sau khi sao lưu; script tạo bảng cùng seed giống nhau và dừng nếu chỉ có một trong hai bảng đã tồn tại. Nếu cả hai bảng đã có, script không thay đổi dữ liệu.
 10. Trước khi triển khai phiên bản gộp chức vụ, tạm dừng API/ghi nhân viên, sao lưu rồi chạy `37_merge_consultant_and_placement_roles.sql` trên **mọi** database site; script đổi `NhanVien.chuc_vu='xep_lop'` thành `'tu_van'` và cập nhật CHECK trong transaction cục bộ. Chỉ bật lại ứng dụng sau khi tất cả site hoàn tất migration.
+11. Trước khi triển khai API có upload ảnh học viên/chuyển cơ sở cập nhật, chạy `38_add_student_avatar_metadata.sql` riêng trên Q1, Q7, TD và mọi site mới; script có thể chạy lại an toàn và chỉ thêm cột còn thiếu.
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 

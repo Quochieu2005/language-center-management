@@ -105,7 +105,7 @@ Nếu CSDL nguồn không truy cập được hoặc transaction quyết định
 Chỉ trạng thái `dang_xu_ly` mới đủ điều kiện để Coordinator chuyển cơ sở xử lý; source cho phép Admin Big gọi lại route retry. Các transaction là transaction cục bộ riêng, không tuyên bố atomic ACID xuyên hai CSDL.
 
 1. **Tại nguồn**, tạo trạng thái `dang_xu_ly / da_tiep_nhan` khi Admin Big duyệt; sự kiện `duyet` ghi cùng transaction này.
-2. **Tại đích**, trong một transaction cục bộ, tạo `HocVien` cùng mã với trạng thái `dang_hoc` và sự kiện `tao_ho_so_dich`. Kiểm tra `ma_chuyen` để không tạo lặp.
+2. **Tại đích**, trong một transaction cục bộ, tạo `HocVien` cùng mã với trạng thái `dang_hoc` và sự kiện `tao_ho_so_dich`. Giữ slug nguồn nếu chưa được dùng tại site đích; nếu trùng, thêm hậu tố số để thỏa unique constraint site-local. Kiểm tra `ma_chuyen` để không tạo lặp; retry nhận diện hồ sơ theo mã học viên và sự kiện, không đổi slug đích đã ghi.
 3. **Tại nguồn**, sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich`.
 4. **Tại nguồn**, trong một transaction cục bộ, đánh dấu học viên `da_chuyen_di`, đóng đăng ký/lớp cũ, cập nhật `buoc_cuoi = da_cap_nhat_nguon`, thêm sự kiện `cap_nhat_ho_so_nguon`.
 5. Đối chiếu trạng thái và sự kiện ở cả hai site; tại nguồn đặt `trang_thai = hoan_tat`, `buoc_cuoi = hoan_tat` và thêm sự kiện cuối.

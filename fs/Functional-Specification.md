@@ -49,9 +49,9 @@ Danh sách site không được đóng cứng trong code. Khi có thêm cơ sở
 
 ### 2.2. Ngoài phạm vi hiện được chốt
 
-- Portal/tài khoản học viên và thanh toán online chưa được duyệt vào phạm vi môn học. Source hiện có portal và tích hợp SePay; không bật/công nhận phạm vi nghiệp vụ này trước khi nhóm thống nhất và cập nhật các tài liệu liên quan.
+- Portal tự phục vụ của học viên và thanh toán online chưa được duyệt vào phạm vi môn học. Source hiện có portal và tích hợp SePay. Admin quản lý hồ sơ và cấp tài khoản học viên theo thao tác riêng thuộc FS-STU-01; việc này không bật portal hoặc thanh toán online.
 - Khẳng định transaction ACID nguyên tử xuyên hai SQL Server độc lập cho chuyển cơ sở. Thiết kế hiện tại là điều phối có trạng thái, idempotency và phục hồi tiến về phía trước.
-- Xóa cứng học viên, phiếu thu, điểm, điểm danh hoặc lịch sử nghiệp vụ đã phát sinh.
+- Xóa cứng học viên đã có tài khoản, đăng ký hoặc lịch sử nghiệp vụ; với hồ sơ chưa phát sinh dữ liệu liên quan, FS-STU-01 cho phép xóa tại site sở hữu hồ sơ. Không xóa cứng phiếu thu, điểm, điểm danh hoặc lịch sử nghiệp vụ.
 
 ## 3. Thuật ngữ và quy tắc phân tán
 
@@ -97,7 +97,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp tại site |
 | Kế toán | Tài khoản nhân viên, chức vụ kế toán | Công nợ, thu/hoàn và phiếu thu tại site |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
-| Học viên | Schema/API/UI có tài khoản và portal; chưa được duyệt vào phạm vi đã chốt | Chỉ mở cho đồ án sau khi nhóm thống nhất phạm vi |
+| Học viên | Admin có thể cấp tài khoản theo FS-STU-01; portal tự phục vụ chưa được duyệt | Không đưa các trang portal/SePay vào phạm vi đã chốt |
 | Khách | Chưa xác thực | Chỉ xem nội dung công khai được phép |
 
 ### 4.1. Ma trận quyền chức năng
@@ -107,6 +107,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Quản lý cơ sở và danh mục dùng chung | Có | Đọc theo nhu cầu | Không | Không | Không | Không | Không |
 | Quản lý Admin Small/tài khoản nội bộ | Có | Không | Không | Không | Không | Không | Không |
 | Quản lý nhân viên nghiệp vụ | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không | Không |
+| Quản lý hồ sơ/cấp tài khoản học viên | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không | Không |
 | Tra cứu danh sách học viên tại cơ sở | Toàn hệ thống theo quyền | Site được giao | Không | Site làm việc | Đọc tối thiểu theo nghiệp vụ | Học viên thuộc lớp được giao | Không |
 | Đăng ký và xếp lớp | Giám sát/toàn hệ thống | Site được giao | Site làm việc | Site làm việc | Không | Không | Không |
 | Thu/hoàn học phí | Giám sát theo quyền | Site được giao | Không | Không | Site làm việc | Không | Không |
@@ -125,7 +126,7 @@ Không dùng vai trò do client gửi để cấp quyền. Không cho Admin Smal
 - Kiểm tra kiểu, độ dài, miền giá trị, quan hệ giữa trường, trạng thái bản ghi và quyền sở hữu/site tại API. Validation ở giao diện không thay thế validation server.
 - Mật khẩu lưu bằng hash bcrypt qua cấu hình Django phù hợp; không lưu/ghi log mật khẩu gốc, hash, token, cookie, khóa ký hay secret.
 - Phản hồi login, đăng ký và quên mật khẩu không tiết lộ tài khoản/email có tồn tại. Áp dụng rate limit theo IP và định danh; trả 429 cùng Retry-After.
-- Ảnh nhị phân chỉ được đưa lên Cloudinary; không commit ảnh tải lên vào source hoặc thư mục media. Source có upload ảnh đại diện và metadata tài khoản; chưa có MediaAsset tổng quát hoặc bằng chứng upload thật.
+- Ảnh nhị phân chỉ được đưa lên Cloudinary; không commit ảnh tải lên vào source hoặc thư mục media. Ảnh tài khoản lưu metadata trong `TaiKhoan` theo `REPLICATED-WRITE`; ảnh hồ sơ học viên lưu metadata trong `HocVien` tại site sở hữu theo `LOCAL`. Chưa có MediaAsset tổng quát hoặc bằng chứng upload thật.
 - Lỗi API không trả SQL, stack trace, connection string hoặc secret. Có mã request để truy vết.
 
 ### 5.2. Thời gian, tiền và định dạng
@@ -195,8 +196,8 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 **Điều kiện:** tài khoản tồn tại, mật khẩu khớp, trạng thái hoat_dong; Admin Big có ma_co_so NULL; nhân viên/giáo viên có site và hồ sơ hợp lệ.
 
-1. Người dùng nhập tên đăng nhập hoặc email và mật khẩu trên một cửa đăng nhập chung.
-2. API chuẩn hóa định danh, áp rate limit, tìm tài khoản trên các site theo cơ chế Global/định vị đã thống nhất, xác minh hash bcrypt.
+1. Người dùng nhập email và mật khẩu trên một cửa đăng nhập chung. API vẫn nhận tên đăng nhập như định danh tương thích cho tài khoản cũ.
+2. API chuẩn hóa định danh, áp rate limit, tìm tài khoản theo email hoặc tên đăng nhập trên các site theo cơ chế Global/định vị đã thống nhất, xác minh hash bcrypt.
 3. API kiểm tra trạng thái tài khoản, vai trò, site và hồ sơ nhân sự. Không cho client chọn vai trò.
 4. API tạo phiên đăng nhập an toàn; frontend chuyển người dùng đến workspace phù hợp.
 5. Ghi sự kiện đăng nhập thành công/thất bại ở nơi quy định, không ghi mật khẩu hoặc token.
@@ -207,7 +208,7 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 ### FS-AUTH-02 — Đăng nhập Google/Facebook
 
-**Trạng thái source:** Có route OAuth start/callback và code liên kết subject cho tài khoản học viên. Tích hợp provider thật chưa được kiểm chứng; tài khoản/portal học viên chưa được duyệt phạm vi. **Phân tán:** Global đọc các bản `TaiKhoan`; liên kết/thu hồi cập nhật subject theo luồng nhân bản.
+**Trạng thái source:** Có route OAuth start/callback và code liên kết subject cho tài khoản học viên. Tích hợp provider thật chưa được kiểm chứng và OAuth học viên chưa thuộc phạm vi; việc Admin cấp tài khoản cho học viên được mô tả riêng tại FS-STU-01. **Phân tán:** Global đọc các bản `TaiKhoan`; liên kết/thu hồi cập nhật subject theo luồng nhân bản.
 
 1. Người dùng chọn Google hoặc Facebook.
 2. Backend tạo state/nonce chống CSRF/replay và khởi tạo OAuth Authorization Code flow.
@@ -317,15 +318,18 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 ### FS-STU-01 — Quản lý hồ sơ học viên tại cơ sở
 
-**Người dùng:** Admin Small quản lý hồ sơ tại site; Tư vấn & xếp lớp được tra cứu danh sách tại site; Admin Big theo phạm vi được cấp. Lễ tân không tra cứu danh sách/hồ sơ học viên. **Phân tán:** Local trên HocVien.
+**Người dùng:** Admin Big chọn site; Admin Small quản lý tại site được gán; Tư vấn & xếp lớp chỉ tra cứu danh sách tại site; Lễ tân không tra cứu danh sách/hồ sơ học viên. **Phân tán:** CRUD hồ sơ là `LOCAL` trên `HocVien`.
 
-1. Admin Small tạo/cập nhật thông tin định danh/liên hệ học viên tại site được phép; Tư vấn & xếp lớp chỉ tra cứu danh sách theo quyền API.
-2. API tạo mã theo quy ước site tạo bản ghi; ghi ma_co_so hiện tại, co_so_goc và trạng thái.
-3. Trước khi sửa, kiểm tra bản ghi thuộc site trong quyền người gọi. Từ chối sửa hồ sơ đang bị khóa bởi giao dịch chuyển đã duyệt/đang xử lý, trừ thao tác phục hồi.
-4. Lưu thay đổi và `Logs` trong transaction site.
-5. Hồ sơ đã có đăng ký/thu/điểm không được xóa cứng; dùng trạng thái nghiệp vụ phù hợp.
+1. Admin Big chọn một cơ sở đang hoạt động; Admin Small lấy cơ sở từ phiên. API không tin `site_code` do Admin Small gửi lên.
+2. Tạo hồ sơ với mã `Seq_HV` của site, `ma_co_so` và `co_so_goc` bằng site được chọn, trạng thái `dang_hoc`, `ma_tai_khoan = NULL`. Slug mặc định được chuẩn hóa từ họ tên; người tạo có thể chỉnh slug trước khi lưu. API bảo đảm slug duy nhất trong CSDL site bằng hậu tố số khi trùng. Tạo hồ sơ không tạo tài khoản hay gửi mật khẩu.
+3. Admin Big/Admin Small được xem chi tiết và sửa họ tên, ngày sinh, giới tính (chỉ `Nam`, `Nữ`, `Khác`), điện thoại, email, địa chỉ tại đúng site. Slug đã tạo được giữ nguyên; không đổi mã, slug, site hoặc trạng thái qua form sửa; email đã liên kết tài khoản không được sửa.
+4. Ảnh đại diện là tùy chọn. Sau khi lưu hồ sơ, giao diện xin upload intent có chữ ký, gửi ảnh trực tiếp lên Cloudinary rồi gọi API hoàn tất. API ràng buộc intent với người dùng, site và hồ sơ; xác minh asset, loại ảnh, dung lượng và kích thước; chỉ ghi `avatar_public_id`, `avatar_secure_url` cùng `Logs` vào `HocVien` tại site hồ sơ trong một transaction `LOCAL`. Ảnh không tạo tài khoản. Nếu lưu ảnh lỗi, hồ sơ vẫn được giữ và giao diện cho thử lại bước xác nhận khi đã tải ảnh lên.
+5. Trước khi sửa hồ sơ hoặc ảnh, kiểm tra bản ghi thuộc site trong quyền người gọi. Từ chối sửa hồ sơ `da_chuyen_di` hoặc đang bị khóa bởi giao dịch chuyển `dang_xu_ly`.
+6. Ghi thay đổi và `Logs` trong cùng transaction site-local. Tư vấn chỉ nhận các trường cần cho danh sách, không được gọi API chi tiết hoặc ghi.
+7. DELETE chỉ xóa hồ sơ chưa liên kết tài khoản, chưa có `DangKy` và chưa có lịch sử/giao dịch chuyển. Nếu có dữ liệu học tập, điểm danh, học phí hoặc lịch sử cần giữ, trả conflict; không xóa hồ sơ, bản sao tài khoản, chứng từ hay `Logs`.
+8. Admin Big/Admin Small chủ động bấm `Cấp tài khoản` sau khi tạo hồ sơ. Chỉ hồ sơ đang `dang_hoc` và có email hợp lệ mới đủ điều kiện; không bắt buộc phải có `DangKy` trước khi cấp. `TaiKhoan` được ghi theo chính sách replication hiện có, `HocVien.ma_tai_khoan` ghi tại site hồ sơ, mật khẩu tạm chỉ được gửi qua email sau thao tác này. Thư ghi email làm thông tin đăng nhập chính; API vẫn chấp nhận username tương thích.
 
-**Nghiệm thu:** Admin Small không đọc/sửa hồ sơ site khác; Lễ tân không có quyền tra cứu danh sách học viên; Tư vấn & xếp lớp chỉ tra cứu tại site được giao; mã có tiền tố không được dùng để suy site hiện tại; email/điện thoại được validate ở server.
+**Nghiệm thu:** Admin Big chỉ CRUD tại site đã chọn và Admin Small không truy cập site khác; Lễ tân không có quyền tra cứu danh sách; Tư vấn chỉ tra cứu danh sách tại site được giao; mã có tiền tố không được dùng để suy site hiện tại; slug tạo theo họ tên, chuẩn hóa và duy nhất trong site; giới tính chỉ nhận `Nam`, `Nữ`, `Khác` ở API; email/ngày sinh/điện thoại được validate ở server; tạo hồ sơ không cấp tài khoản; ảnh tùy chọn chỉ cập nhật metadata tại CSDL site hồ sơ sau khi API xác minh Cloudinary; lỗi upload không làm mất hồ sơ; xóa hồ sơ có lịch sử bị từ chối mà không mất dữ liệu; Admin có thể cấp tài khoản cho hồ sơ đang học có email hợp lệ trước khi tạo đăng ký khóa học, chỉ qua thao tác riêng và API không trả mật khẩu.
 
 ### FS-ENR-01 — Đăng ký khóa học
 
@@ -475,7 +479,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 **Người dùng:** Coordinator chạy sau khi Admin Big duyệt; Admin Big được gọi route retry cho giao dịch chưa hoàn tất. Đây không phải thao tác tự do của Admin Small. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien tại đích; LichSuChuyenCoSo tại site phát sinh.
 
 1. Coordinator chỉ nhận giao dịch đã duyệt. Tải trạng thái nguồn, khóa chống lặp và bước cuối đã commit.
-2. Tạo hồ sơ HocVien cùng mã ở đích trong transaction đích; ghi sự kiện tao_ho_so_dich. Bản đích phải duy nhất theo mã và ma_chuyen.
+2. Tạo hồ sơ HocVien cùng mã ở đích trong transaction đích; giữ slug nguồn nếu chưa được dùng tại site đích, nếu trùng thì thêm hậu tố số; sao chép `avatar_public_id`/`avatar_secure_url` nếu có để ảnh tiếp tục hiển thị; ghi sự kiện tao_ho_so_dich. Bản đích phải duy nhất theo mã và ma_chuyen. Hai hồ sơ site-local có thể cùng tham chiếu một asset Cloudinary; metadata nguồn vẫn được giữ làm lịch sử.
 3. Sau khi xác nhận đích commit, lưu bước da_tao_ho_so_dich tại nguồn.
 4. Cập nhật nguồn: HocVien thành da_chuyen_di; đóng/đánh dấu các DangKy cũ theo trạng thái chuyen_di; cập nhật bước da_cap_nhat_nguon và ghi sự kiện.
 5. Đối soát hai site; đánh dấu giao dịch hoan_tat và ghi sự kiện kết thúc. Bản nguồn được giữ lại làm lịch sử.
@@ -489,7 +493,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 | Nguồn đã cập nhật, giao dịch chưa hoàn tất | Tính bản đích theo bước đã lưu; đối soát và hoàn thành trạng thái |
 | Đích hoặc nguồn không phản hồi | Không báo hoàn tất; lưu trạng thái cần retry/đối soát và không xóa bản ghi đã commit |
 
-**Nghiệm thu:** retry không tạo hồ sơ đích thứ hai; sau hoàn tất chỉ bản đích có trạng thái dang_hoc; bản nguồn da_chuyen_di còn nguyên; không tuyên bố ACID nguyên tử xuyên hai CSDL.
+**Nghiệm thu:** retry không tạo hồ sơ đích thứ hai; nếu hồ sơ có ảnh thì metadata được giữ tại nguồn và sao chép sang đích; sau hoàn tất chỉ bản đích có trạng thái dang_hoc; bản nguồn da_chuyen_di còn nguyên; không tuyên bố ACID nguyên tử xuyên hai CSDL.
 
 ### FS-REPORT-01 — Thống kê học viên theo cơ sở
 
@@ -605,9 +609,9 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 | OPEN-01 | Chuẩn hóa response lỗi, pagination/filter/sort và idempotency thu/hoàn tại quầy; schema chưa có request ledger bền vững cho phiếu thu | `specs/api.md`, `PhieuThu`, giao diện thu phí |
 | OPEN-02 | Rate limit bền vững khi chạy nhiều worker và ngưỡng bcrypt theo benchmark | API settings/deployment |
 | OPEN-03 | Tiến trình/retry khi tạo tài khoản và hồ sơ site lỗi một phần; cần thống nhất cách vận hành, email và đối soát | `TaiKhoan`, hồ sơ site, Coordinator |
-| OPEN-04 | Có đưa portal/tài khoản học viên vào phạm vi đồ án hay không; code/schema hiện có nhưng chưa được duyệt | README, schema, API, UI |
+| OPEN-04 | Có đưa portal tự phục vụ học viên vào phạm vi đồ án hay không; code/schema hiện có nhưng chưa được duyệt. Admin CRUD/cấp tài khoản đã tách riêng tại FS-STU-01 | README, schema, API, UI |
 | OPEN-05 | Phạm vi vận hành SePay, merchant/webhook/HTTPS và đối soát; schema/API đã có nhưng tích hợp mặc định tắt | `YeuCauThanhToan`, `SuKienThanhToan`, API/UI |
-| OPEN-06 | Cấu hình/tích hợp thật và chính sách dọn asset mồ côi cho Cloudinary; metadata avatar nằm trong bản `TaiKhoan`, không có `MediaAsset` | API media, `TaiKhoan`, môi trường |
+| OPEN-06 | Cấu hình/tích hợp thật và chính sách dọn asset mồ côi cho Cloudinary; metadata avatar nằm trong `TaiKhoan` (nhân bản) và `HocVien` (site-local). Ảnh học viên có thể được cùng tham chiếu ở nguồn/đích sau chuyển nên chưa tự xóa asset cũ; không có `MediaAsset` | API media, `TaiKhoan`, `HocVien`, môi trường |
 | OPEN-07 | Bổ sung runtime replication cho `CoSo` và thống nhất một điểm vào cho mọi luồng ghi `TaiKhoan`; `MonHoc`/`KhoaHoc` đã có service | README, schema, service dùng chung |
 | OPEN-08 | Xác nhận với giảng viên mức bảo đảm của Coordinator chuyển cơ sở; nếu cần DBMS-managed transaction thì triển khai và kiểm thử bổ sung | README, tài liệu giao dịch, YC-04 |
 | OPEN-09 | Chạy TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên SQL Server site và lưu bằng chứng; còn thiếu outage/recovery, lỗi trước/sau commit đích, concurrency hai phiên và site thiếu | Ma trận trạng thái, YC/TC, evidence |

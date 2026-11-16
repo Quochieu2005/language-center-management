@@ -1,4 +1,4 @@
-"""Retryable, site-by-site permanent deletion of a student and linked data."""
+"""Legacy retryable cross-site purge; the admin DELETE endpoint uses guarded local deletion."""
 
 from __future__ import annotations
 
