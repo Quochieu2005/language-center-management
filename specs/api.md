@@ -54,6 +54,7 @@ Prefix thực tế là `/api/v1/`; bảng dưới tóm tắt các path nghiệp 
 | Lớp, đăng ký | `/admin/classes/`, `/admin/classes/{class_id}/`, `/admin/classes/{class_id}/students/`, `/admin/classes/{class_id}/sessions/`, `/admin/classes/{class_id}/teacher/`, `/admin/enrollments/`, `/admin/enrollments/{enrollment_id}/class/`, `/admin/rooms/`, `/admin/rooms/{room_id}/` |
 | Học phí, chuyển cơ sở | `/admin/tuition/`, `/admin/tuition/{tuition_id}/installments/`, `/admin/tuition/{tuition_id}/receipts/`, `/admin/tuition/{tuition_id}/receipts/{receipt_id}/invoice/`, `/admin/classes/{class_id}/tuition-reminders/`, `/admin/transfers/`, `/admin/transfers/{source_site}/{transfer_id}/decision/`, `/admin/transfers/{source_site}/{transfer_id}/retry/` |
 | Giáo viên | `/teacher/classes/`, `/teacher/classes/{class_id}/sessions/`, `/teacher/sessions/{session_id}/attendance/`, `/teacher/enrollments/{enrollment_id}/grades/`, `/teacher/enrollments/{enrollment_id}/grades/{grade_type}/`, `/teacher/enrollments/{enrollment_id}/grades/history/` |
+| Liên hệ | `/contact/sites/`, `/contact/`, `/admin/contacts/`, `/admin/contacts/{site_code}/{request_id}/reply/` |
 | Báo cáo và thông báo | `/admin/reports/students-by-site/`, `/admin/notifications/`, `/reports/audit-logs/` |
 | Thanh toán SePay | `/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/`, `/students/profile/{slug}/payments/{attempt_id}/`, `/webhooks/sepay/` |
 
@@ -193,6 +194,8 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 
 | Method và path | Người gọi | Kiểu truy cập | Dữ liệu đọc/ghi và hành vi |
 |---|---|---|---|
+| `GET /api/v1/contact/sites/` | Khách chưa đăng nhập | Đọc danh mục `CoSo` từ registry và kiểm tra site hoạt động | Trả site sẵn sàng để form chọn; có `complete`, `site_codes`, `missing_sites`; không trả hồ sơ nội bộ |
+| `POST /api/v1/contact/` | Khách chưa đăng nhập | Kiểm tra site hoạt động, ghi `LOCAL` | Nhận họ tên, email, cơ sở, tiêu đề, nội dung và số điện thoại tùy chọn; ghi `YeuCauLienHe` + `Logs` tại site đã chọn trong một transaction cục bộ. Bắt buộc `Idempotency-Key`; rate limit 5/IP/giờ và 3 theo IP+email/giờ; không gửi email tự động khi nhận form |
 | `GET /api/v1/public/sites` | Khách chưa đăng nhập | Đề xuất, chưa có route tương ứng trong source | Nếu nhóm cần API danh sách cơ sở công khai, phải bổ sung route theo schema; không giả định endpoint đang chạy |
 | `GET /api/v1/courses/` | Khách chưa đăng nhập | `GLOBAL` đọc từng CSDL site riêng | Đọc danh mục `KhoaHoc`/`MonHoc` và số lớp đang mở theo site; trả `scope`, `complete`, `site_codes`, `missing_sites`, `inconsistent_sites`, `count`, `results`; nếu thiếu site, kết quả đánh dấu chưa đầy đủ |
 | `GET /api/v1/blog/categories/` | Khách chưa đăng nhập | `GLOBAL` đọc và đối chiếu các bản Blog ở từng site | Đọc `DanhMucBlog`/`BaiVietBlog`; trả danh mục hoạt động, `post_count`, `complete`, `missing_sites`, `inconsistent_sites`; `503` nếu không đọc được site nào |
@@ -212,6 +215,17 @@ Các method/path được ghi là “đã có trong source” phải khớp `src
 | `POST /api/v1/auth/account-activations` | Người có liên kết mời hợp lệ | Đề xuất; chưa có route/schema token kích hoạt trong source | Không dùng như endpoint đang hoạt động; quy trình source hiện cấp mật khẩu khởi tạo theo cấu hình và email thông tin tài khoản |
 
 API không có endpoint đăng ký tài khoản công khai; source có `POST /api/v1/public/enrollments/` để gửi đăng ký khóa học, không phải tạo tài khoản. Admin Big tạo tài khoản nội bộ. Portal học viên có code/schema nhưng chưa được duyệt vào phạm vi đồ án; không bật public signup.
+
+### Liên hệ website — form công khai và hộp thư quản trị
+
+`GET /api/v1/contact/sites/` trả các site đang hoạt động và có kết nối để form công khai cho khách chọn. `POST /api/v1/contact/` ghi yêu cầu vào đúng CSDL site được chọn sau khi kiểm tra danh mục `CoSo`/trạng thái site; dữ liệu `YeuCauLienHe`, `Logs` không được lưu ở database trung tâm. API chuẩn hóa email, kiểm tra độ dài/định dạng, giới hạn gửi theo IP và IP+email; frontend giữ nguyên `Idempotency-Key` cùng body khi retry. Throttle dùng Django cache; cache mặc định `LocMemCache` giới hạn riêng theo worker, nên cần shared cache nếu chạy nhiều worker. Form gửi chỉ tạo yêu cầu `cho_xu_ly`, không tự gửi thư.
+
+| Route | Người gọi | Kiểu | Hành vi |
+|---|---|---|---|
+| `GET /api/v1/admin/contacts/?site_code=...&status=...&search=...&limit=...&offset=...` | Admin Big/Admin Small | Admin Big bỏ `site_code`: `GLOBAL`; chọn site: `LOCAL`; Admin Small: `LOCAL` | Đọc riêng `YeuCauLienHe` tại từng site rồi tổng hợp trong API; Admin Small không được vượt site. Nếu thiếu site, response `503` có `complete=false`/`missing_sites` và phần kết quả đọc được |
+| `POST /api/v1/admin/contacts/{site_code}/{request_id}/reply/` | Admin Big/Admin Small đúng site | `LOCAL` | Lấy email từ bản ghi, gửi phản hồi plain text qua SMTP; khi SMTP chấp nhận, cập nhật trạng thái/nội dung phản hồi và `Logs` trong transaction tại site đó. Không ghi nội dung/email vào nhật ký; mỗi yêu cầu chỉ phản hồi một lần |
+
+API gọi SMTP trong khi transaction tại site sở hữu đang mở, sau đó cập nhật dữ liệu; hai hệ thống không có commit nguyên tử. Nếu SMTP chấp nhận thư nhưng commit SQL lỗi, yêu cầu có thể còn `cho_xu_ly` và lần gửi lại có thể gửi trùng; transactional outbox là hướng nâng cấp nếu cần đóng khoảng hở này. Nếu SMTP chưa cấu hình hoặc báo lỗi trước khi chấp nhận, yêu cầu giữ `cho_xu_ly`. SMTP trả chấp nhận không chứng minh email đã đến inbox. Site được xác thực từ danh mục `CoSo` và Site Router; API không nhận email đích, tài khoản Admin hoặc site được phân quyền từ nội dung body reply.
 
 ### Blog — đọc công khai và CMS Admin Big đã có trong source
 

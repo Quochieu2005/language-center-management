@@ -103,6 +103,12 @@ from core.blog.views import (
     PublicBlogCategoriesView,
     PublicBlogDetailView,
 )
+from core.contacts.views import (
+    AdminContactListView,
+    AdminContactReplyView,
+    PublicContactCreateView,
+    PublicContactSiteListView,
+)
 from core.media.views import (
     AdminAvatarCompleteView,
     AdminAvatarUploadIntentView,
@@ -162,6 +168,10 @@ urlpatterns = [
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
     path("blog/categories/", PublicBlogCategoriesView.as_view(), name="public-blog-categories"),
     path("blog/<slug:slug>/", PublicBlogDetailView.as_view(), name="public-blog-detail"),
+    path("contact/sites/", PublicContactSiteListView.as_view(), name="public-contact-sites"),
+    path("contact/", PublicContactCreateView.as_view(), name="public-contact-create"),
+    path("admin/contacts/", AdminContactListView.as_view(), name="admin-contact-list"),
+    path("admin/contacts/<str:site_code>/<str:request_id>/reply/", AdminContactReplyView.as_view(), name="admin-contact-reply"),
     path("admin/blog/categories/", AdminBlogCategoryCollectionView.as_view(), name="admin-blog-categories"),
     path("admin/blog/categories/<slug:slug>/", AdminBlogCategoryDetailView.as_view(), name="admin-blog-category-detail"),
     path("admin/blog/articles/", AdminBlogArticleCollectionView.as_view(), name="admin-blog-articles"),

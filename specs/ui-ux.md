@@ -128,7 +128,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Trang chủ | Điều hướng chung tới Chương trình, Khóa học, Blog, Liên hệ và Đăng nhập; Hero, định hướng học, lợi ích, trạng thái khóa học, bài viết, FAQ, liên hệ, CTA, footer | Giúp người xem hiểu hướng học và tìm bước tiếp theo; nội dung động chỉ hiển thị khi API xác nhận; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
 | Chương trình | Hero định hướng, nhóm mục tiêu học tập, câu hỏi xác định nhu cầu, trạng thái danh mục, FAQ | Nhóm mục tiêu và ví dụ chỉ mang tính định hướng; không mô tả như khóa/lớp đang tuyển sinh khi chưa có API |
 | Blog công khai | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc công khai đã có; Next.js vẫn dùng nội dung tĩnh, chưa nối API công khai. Nội dung phải được render dưới dạng text đã escape |
-| Liên hệ | Lối tắt khóa học/cơ sở, các bước tra cứu, trạng thái kênh liên hệ và FAQ | Không tự tạo email, số điện thoại, địa chỉ hoặc form gửi thành công khi API chưa có |
+| Liên hệ | Form họ tên, email, cơ sở đang hoạt động, số điện thoại tùy chọn, tiêu đề và nội dung; trạng thái tải, lỗi, site thiếu và gửi thành công | Gửi tới API, giữ cùng `Idempotency-Key` khi retry cùng nội dung; chỉ báo đã nhận khi API xác nhận ghi tại site đã chọn |
 | Danh sách khóa học | Trạng thái danh mục, hướng dẫn chọn khóa, các trường thông tin cần xem, FAQ | So sánh khóa học/lớp đang được API trả về; khi API chưa có thì hiển thị trạng thái và hướng dẫn, không dựng bộ lọc/lớp giả |
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
 | Cơ sở | Danh sách cơ sở, địa chỉ/liên hệ nếu có dữ liệu được duyệt, hướng dẫn xem lớp tại cơ sở | Chọn địa điểm học từ dữ liệu cơ sở đang hoạt động |
@@ -364,7 +364,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 |---|---|
 | Công khai | `/`, `/programs`, `/branches`, `/contact`, `/courses`, `/courses/[slug]`, `/blog`, `/blog/[slug]` |
 | Xác thực/hồ sơ | `/login`, `/forgot-password`, `/password/change`, `/profile` |
-| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/rooms`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/admin/blog`, `/teacher`, `/student` |
+| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/rooms`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/admin/blog`, `/admin/contacts`, `/teacher`, `/student` |
 
 #### Trang công khai và xác thực
 
@@ -376,7 +376,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 | `/courses/[slug]` | Chi tiết khóa học | Môn, trình độ, số buổi, học phí chuẩn, cơ sở/lớp đang mở và trạng thái danh mục | Tìm trong danh mục API; không tuyên bố đã đăng ký lớp |
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
 | `/blog` và `/blog/[slug]` | Bài viết học tập | Danh mục, danh sách/chi tiết và hướng dẫn áp dụng | API đã có `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`; giao diện hiện chưa nối API và còn dùng dữ liệu tĩnh |
-| `/contact` | Liên hệ và hướng dẫn | Lối tắt khóa học/cơ sở, chuẩn bị trao đổi, FAQ và trạng thái kênh liên hệ | Không bịa địa chỉ/điện thoại hoặc giả vờ gửi form |
+| `/contact` | Gửi yêu cầu liên hệ | Form gửi họ tên, email, cơ sở đang hoạt động, điện thoại tùy chọn, tiêu đề và nội dung; báo lỗi/site thiếu và xác nhận sau khi API nhận | `GET /api/v1/contact/sites/` lấy site có thể nhận; `POST /api/v1/contact/` ghi `LOCAL` tại site khách chọn. Giữ dữ liệu khi lỗi và dùng lại `Idempotency-Key` khi retry cùng nội dung |
 | `/login` | Đăng nhập dùng chung | Form mật khẩu, lỗi và trạng thái gửi; OAuth chỉ khi provider được cấu hình | Route có trong source; API dựng role từ tài khoản, OAuth chỉ dành cho học viên đã liên kết; không tự đăng ký/chọn role |
 | — (chưa có route kích hoạt) | Kích hoạt tài khoản nội bộ | Không hiển thị luồng mở liên kết/mời trong UI hiện tại | Admin chủ động gửi mật khẩu khởi tạo qua thao tác cấp tài khoản; không có token activation route |
 | `/forgot-password` | Quên/đặt lại mật khẩu | Nhập định danh, OTP và mật khẩu mới theo các bước của API; thông báo chung, lỗi/hết hạn/đã dùng | Route có trong source; OTP 6 số, hash ở DB, mặc định hết hạn sau 120 giây |
@@ -385,7 +385,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 
 #### Điều hướng Admin đang có trong source
 
-Sidebar Blog mở CMS tại `/admin/blog` cho Admin Big; Liên hệ vẫn mở trang công khai trong tab mới. CMS đọc đối chiếu danh mục và bài viết trên các site, cung cấp CRUD, hiển thị site thiếu/lệch và giữ cùng `Idempotency-Key` khi retry. Không bật thao tác ghi nếu dữ liệu chưa được đối chiếu đầy đủ.
+Sidebar Blog mở CMS tại `/admin/blog` cho Admin Big; mục Liên hệ mở hộp thư quản trị tại `/admin/contacts` cho Admin Big/Admin Small. CMS Blog đọc đối chiếu danh mục và bài viết trên các site, cung cấp CRUD, hiển thị site thiếu/lệch và giữ cùng `Idempotency-Key` khi retry. Không bật thao tác ghi nếu dữ liệu chưa được đối chiếu đầy đủ.
 
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
@@ -399,7 +399,7 @@ Sidebar Blog mở CMS tại `/admin/blog` cho Admin Big; Liên hệ vẫn mở t
 | `/admin/accounts` | Quản trị Admin Small | Admin Big mặc định xem danh sách toàn hệ thống, có thể lọc một site; mỗi dòng có cơ sở. Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn. Các thao tác của dòng dùng site gắn với hồ sơ. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
-| `/contact` | Liên hệ | Mở trang công khai trong tab mới. Chưa có xử lý yêu cầu liên hệ. |
+| `/admin/contacts` | Liên hệ | Admin Big xem `GLOBAL`, lọc site hoặc chọn một site; Admin Small chỉ xem site được giao (`LOCAL`). Hiện người gửi, email, nội dung và trạng thái; cho Admin gửi phản hồi plain text tới email trên yêu cầu qua SMTP đã cấu hình. Site thiếu phải cảnh báo và không trình bày kết quả một phần như đầy đủ. SMTP chấp nhận không chứng minh thư đã tới inbox; nếu commit SQL lỗi sau khi SMTP nhận thư, lần thử lại có thể gửi trùng. |
 
 #### Admin Big — các trang toàn hệ thống
 

@@ -98,7 +98,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Kế toán | Tài khoản nhân viên, chức vụ kế toán | Công nợ, thu/hoàn và phiếu thu tại site |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
 | Học viên | Admin có thể cấp tài khoản theo FS-STU-01; portal tự phục vụ chưa được duyệt | Không đưa các trang portal/SePay vào phạm vi đã chốt |
-| Khách | Chưa xác thực | Chỉ xem nội dung công khai được phép |
+| Khách | Chưa xác thực | Xem nội dung công khai và gửi yêu cầu liên hệ tới cơ sở đang hoạt động |
 
 ### 4.1. Ma trận quyền chức năng
 
@@ -115,6 +115,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Tạo đề nghị chuyển | Có thể theo quy trình được duyệt | Chỉ học viên ở site mình | Không mặc định | Không | Không | Không | Không |
 | Duyệt/từ chối đề nghị chuyển | Có | Không | Không | Không | Không | Không | Không |
 | Thống kê | Toàn hệ thống | Site được giao | Không mặc định | Không mặc định | Báo cáo tài chính được cấp | Lớp được giao nếu có | Không |
+| Hộp thư liên hệ | GLOBAL hoặc chọn một site | Chỉ site được giao | Không | Không | Không | Không | Không |
 
 Không dùng vai trò do client gửi để cấp quyền. Không cho Admin Small truy cập dữ liệu site khác bằng cách đổi mã site trong URL/body. Không để giáo viên đọc/ghi lớp chưa được phân công.
 
@@ -170,6 +171,20 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 3. Nếu một nguồn dữ liệu công khai lỗi, giao diện hiển thị trạng thái lỗi có thể thử lại, không giả lập dữ liệu thành công.
 
 **Nghiệm thu:** trang công khai không yêu cầu đăng nhập; API không trả hồ sơ học viên, thông tin tài khoản hoặc dữ liệu nội bộ.
+
+### FS-CONTACT-01 — Tiếp nhận và phản hồi yêu cầu liên hệ
+
+**Người dùng:** khách chưa đăng nhập gửi form; Admin Big/Admin Small tiếp nhận và phản hồi. **Phân tán:** khách chọn một site đang hoạt động; API kiểm tra danh mục `CoSo` rồi ghi `LOCAL` trong CSDL site được chọn. Admin Big xem hộp thư `GLOBAL` hoặc lọc một site; Admin Small chỉ xem và phản hồi `LOCAL` tại site được giao. **Bảng:** `CoSo`, `YeuCauLienHe`, `Logs`.
+
+1. Trang `/contact` tải danh sách cơ sở đang hoạt động từ API. Nếu một site chưa sẵn sàng, trang nêu rõ site thiếu và không đưa site lỗi vào lựa chọn gửi.
+2. Khách nhập họ tên, email, cơ sở muốn liên hệ, tiêu đề và nội dung; số điện thoại không bắt buộc. API xác thực lại dữ liệu, giới hạn nội dung, giới hạn gửi theo IP/email và yêu cầu `Idempotency-Key` để retry không tạo yêu cầu trùng.
+3. API chỉ ghi `YeuCauLienHe` và `Logs` vào CSDL site được chọn, trong một transaction cục bộ. Form gửi chưa tự phát email; yêu cầu mới ở trạng thái `cho_xu_ly` và xuất hiện tại trang `/admin/contacts`.
+4. Admin Big đọc yêu cầu từ từng CSDL site riêng qua Global Query; Admin Small chỉ đọc site được phân công. Kết quả thiếu site phải có `complete=false`/`missing_sites`, không được trình bày như hộp thư đầy đủ.
+5. Admin xem người gửi, địa chỉ email, tiêu đề và nội dung rồi nhập phản hồi. API chỉ lấy email nhận từ bản ghi, gửi nội dung plain text qua SMTP và cập nhật trạng thái, nội dung phản hồi cùng `Logs` tại site sở hữu. Mỗi yêu cầu chỉ được phản hồi một lần theo trạng thái đã lưu.
+
+**Lỗi và giới hạn:** dữ liệu sai không được ghi; site không hoạt động hoặc database lỗi không được báo đã nhận; gửi lại cùng key/body trả cùng yêu cầu, cùng key với body khác trả xung đột. Nếu SMTP chưa cấu hình hoặc từ chối thư thì yêu cầu vẫn ở `cho_xu_ly` để admin xử lý lại. SMTP và commit SQL không phải một giao dịch nguyên tử: nếu SMTP đã chấp nhận thư nhưng commit site lỗi, yêu cầu có thể vẫn ở `cho_xu_ly` và lần gửi lại có thể gửi trùng; cần transactional outbox nếu cần loại bỏ khoảng hở này. Rate limit dùng Django cache; cache mặc định giới hạn theo từng worker, cần cache dùng chung nếu chạy nhiều worker. Không trả stack trace/SQL, không ghi email hay nội dung form vào log. SMTP chấp nhận thư không chứng minh thư đã đến inbox người nhận.
+
+**Nghiệm thu:** form khách chưa đăng nhập gửi được vào đúng site; Admin Big xem toàn hệ thống với cảnh báo site thiếu; Admin Small không thể đọc/phản hồi yêu cầu site khác dù sửa URL; reply gửi đúng email bằng SMTP và lưu được lịch sử phản hồi; kiểm tra idempotency, rate limit, validation và lỗi database/SMTP. Các kiểm tra trên SQL Server thật, SMTP thật và kết quả site lỗi phải được ghi riêng; source không được tính là bằng chứng runtime.
 
 ### FS-BLOG-01 — Danh mục, bài viết công khai và quản trị Blog
 

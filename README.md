@@ -636,6 +636,14 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 
 Blog là chức năng hỗ trợ, không thay thế sáu nghiệp vụ bắt buộc của đề tài. Xem [hợp đồng API](specs/api.md), [schema](docs/DATABASE_SCHEMA.md) và [ma trận trạng thái](docs/Trang-Thai-Trien-Khai.md).
 
+### 5.16. Tiếp nhận và phản hồi liên hệ website
+
+Khách gửi form tại `/contact`, chọn một cơ sở đang hoạt động và nhập tên, email, tiêu đề, nội dung cùng số điện thoại tùy chọn. API kiểm tra site và ghi `YeuCauLienHe` cùng `Logs` trong một transaction `LOCAL` tại CSDL của cơ sở đó; gửi form không tự gửi email. `Idempotency-Key` chống ghi trùng; rate limit theo IP/email dùng Django cache, mặc định là LocMemCache theo worker.
+
+Admin Big xem hộp thư toàn hệ thống bằng `GLOBAL` qua truy vấn riêng từng CSDL site; có thể lọc một site. Admin Small chỉ xem yêu cầu tại cơ sở được phân công. Cả hai phản hồi bằng thao tác trong `/admin/contacts`; API gửi plain-text email đến địa chỉ trong yêu cầu rồi cập nhật trạng thái, nội dung phản hồi và nhật ký tại site sở hữu. Hộp thư cảnh báo rõ site thiếu; không có CSDL trung tâm, JOIN xuyên site hoặc cam kết giao thư chỉ từ phản hồi SMTP. SMTP và commit SQL không nguyên tử: nếu SMTP chấp nhận thư nhưng commit lỗi, trạng thái có thể còn chờ xử lý và lần gửi lại có thể gửi trùng; dùng transactional outbox nếu cần loại bỏ khoảng hở này. Trước khi chạy, áp dụng `db/39_add_contact_inbox.sql` riêng cho mỗi database site và cấu hình SMTP.
+
+Đây là nghiệp vụ hỗ trợ website, không thay thế sáu nghiệp vụ bắt buộc hoặc được tính là minh chứng replication/distributed transaction. Xem [FS-CONTACT-01](fs/Functional-Specification.md#fs-contact-01--tiếp-nhận-và-phản-hồi-yêu-cầu-liên-hệ), [API spec](specs/api.md) và [schema](docs/DATABASE_SCHEMA.md).
+
 ## 6. Kịch bản demo
 
 | # | Kịch bản | Điều cần kiểm chứng |
