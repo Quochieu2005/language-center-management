@@ -37,7 +37,6 @@ export default function ContactsPage() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replying, setReplying] = useState(false);
   const [replyError, setReplyError] = useState("");
-  const [replyForm] = Form.useForm<{ reply_body: string }>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,7 +68,6 @@ export default function ContactsPage() {
   const openRequest = (item: ContactRequest) => {
     setSelected(item);
     setReplyError("");
-    replyForm.resetFields();
     setReplyOpen(true);
   };
 
@@ -176,7 +174,7 @@ export default function ContactsPage() {
       destroyOnHidden
     >
       {selected && <>
-        <Space direction="vertical" size={4} style={{ width: "100%", marginBottom: 18 }}>
+        <Space orientation="vertical" size={4} style={{ width: "100%", marginBottom: 18 }}>
           <Typography.Text strong>{selected.subject}</Typography.Text>
           <Typography.Text>{selected.full_name} · {selected.email}{selected.phone ? ` · ${selected.phone}` : ""}</Typography.Text>
           <Typography.Text type="secondary">Cơ sở {selected.site_code} · {formatDate(selected.received_at)}</Typography.Text>
@@ -192,7 +190,7 @@ export default function ContactsPage() {
         {selected.status === "cho_xu_ly" ? <>
           <Typography.Paragraph type="secondary">Phản hồi sẽ được gửi đến email người gửi qua SMTP đã cấu hình.</Typography.Paragraph>
           {replyError && <Alert type="error" showIcon title={replyError} style={{ marginBottom: 12 }} />}
-          <Form form={replyForm} layout="vertical" onFinish={sendReply}>
+          <Form layout="vertical" onFinish={sendReply}>
             <Form.Item name="reply_body" label="Nội dung phản hồi" rules={[{ required: true, whitespace: true }, { max: 5000 }]}>
               <Input.TextArea rows={6} maxLength={5000} showCount />
             </Form.Item>

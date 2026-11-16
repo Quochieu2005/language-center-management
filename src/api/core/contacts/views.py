@@ -31,6 +31,7 @@ from core.contacts.serializers import (
     ContactSubmissionSerializer,
 )
 from core.contacts.services import (
+    ContactEmailUnavailable,
     create_contact_request,
     list_admin_contact_requests,
     list_contact_sites,
@@ -55,6 +56,14 @@ class PublicContactEmailThrottle(SimpleRateThrottle):
 
 
 def _contact_error(exc):
+    if isinstance(exc, ContactEmailUnavailable):
+        return Response(
+            {
+                "code": "smtp_unavailable",
+                "detail": "SMTP không chấp nhận email phản hồi; yêu cầu vẫn chờ xử lý. Kiểm tra cấu hình và log API.",
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     if isinstance(exc, AcademicNotFound):
         return Response({"detail": "Không tìm thấy yêu cầu liên hệ trong cơ sở đã chọn."}, status=404)
     if isinstance(exc, AcademicForbidden):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import timezone as datetime_timezone
 from typing import Any
 
@@ -28,6 +29,9 @@ from core.academics.common import (
     translate_database_errors,
 )
 from core.sites.connections import get_site_connection, get_site_database_alias
+
+
+logger = logging.getLogger(__name__)
 
 
 class ContactEmailUnavailable(AcademicInfrastructureUnavailable):
@@ -242,6 +246,12 @@ def send_contact_reply(
                     reply_to=[str(contact[0])],
                 )
             except Exception as exc:
+                logger.warning(
+                    "Contact reply SMTP failed (site=%s request=%s error=%s)",
+                    site_code,
+                    request_id,
+                    type(exc).__name__,
+                )
                 raise ContactEmailUnavailable from exc
             if sent != 1:
                 raise ContactEmailUnavailable
