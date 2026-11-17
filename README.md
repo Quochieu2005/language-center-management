@@ -542,7 +542,7 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Admin Small và Tư vấn mở lớp tại site được giao. Kế toán & Lễ tân chỉ xem lớp và roster. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Admin Small và Tư vấn mở lớp tại site được giao; danh sách giáo viên phân công đọc `LOCAL` tại site trong phiên qua `/api/v1/admin/teachers/assignment-options/` và chỉ trả mã, họ tên, trạng thái đang dạy. Kế toán & Lễ tân chỉ xem lớp và roster. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
 
 Tư vấn được sửa tên lớp hoặc sĩ số tối đa tại đúng site; API từ chối lớp đã kết thúc/hủy, sĩ số thấp hơn số đăng ký, hoặc vượt sức chứa phòng. Tư vấn có thể hủy mềm lớp `sap_mo` khi chưa có đăng ký và mọi buổi vẫn ở tương lai, trạng thái `du_kien`; `LopHoc`, `BuoiHoc` và `Logs` được giữ lại. Kế toán & Lễ tân chỉ đọc và không dùng các thao tác lớp/đăng ký.
 

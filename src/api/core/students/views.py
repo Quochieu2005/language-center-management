@@ -76,11 +76,11 @@ def _resolve_admin_site(user, requested_site: str | None, *, allowed_roles=None)
             {"detail": "Tài khoản không có quyền thao tác hồ sơ học viên tại cơ sở này."},
             status=status.HTTP_403_FORBIDDEN,
         )
-    if user.role == "admin_small":
+    if user.role != "admin_big":
         own_site = str(user.site_code or "").upper()
         if not own_site or requested_site:
             return None, Response(
-                {"detail": "Admin Small chỉ được thao tác tại cơ sở trong phiên đăng nhập."},
+                {"detail": "Tài khoản chỉ được thao tác tại cơ sở trong phiên đăng nhập."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return own_site, None

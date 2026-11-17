@@ -22,7 +22,7 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [operationClasses, setOperationClasses] = useState<ClassRow[]>([]);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teachers, setTeachers] = useState<Array<Pick<Teacher, "teacher_id" | "full_name" | "status">>>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [operationSite, setOperationSite] = useState("");
   const [operationLoading, setOperationLoading] = useState(false);
@@ -67,10 +67,10 @@ export default function ClassesPage() {
       const requests: Promise<unknown>[] = [];
       if (modal === "class" && !editingClass) {
         requests.push(academicsApi.rooms(actionSite).then((result) => { if (!cancelled) setRooms(result.results); }));
-        requests.push(adminApi.teachers(actionSite, { limit: 100 }).then((result) => { if (!cancelled) setTeachers(result.results); }));
+        requests.push(adminApi.teacherAssignmentOptions(isAdminBig ? actionSite : undefined, { limit: 100 }).then((result) => { if (!cancelled) setTeachers(result.results); }));
       }
       if (modal === "teacher") {
-        requests.push(adminApi.teachers(actionSite, { limit: 100 }).then((result) => { if (!cancelled) setTeachers(result.results); }));
+        requests.push(adminApi.teacherAssignmentOptions(isAdminBig ? actionSite : undefined, { limit: 100 }).then((result) => { if (!cancelled) setTeachers(result.results); }));
       }
       if (modal === "enroll") {
         requests.push(adminApi.students({ ...(isAdminBig ? { site_code: actionSite } : {}), limit: 100 }).then((result) => { if (!cancelled) setStudents(result.results); }));

@@ -26,6 +26,8 @@ from core.teachers.serializers import (
     TeacherCreateSerializer,
     TeacherCredentialEmailResponseSerializer,
     TeacherDeleteResponseSerializer,
+    TeacherAssignmentOptionsQuerySerializer,
+    TeacherAssignmentOptionsResponseSerializer,
     TeacherListQuerySerializer,
     TeacherListResponseSerializer,
     TeacherProfileUpdateSerializer,
@@ -53,6 +55,80 @@ from core.teachers.credential_email import (
 
 
 _ADMIN_ROLES = {"admin_big", "admin_small"}
+
+
+class TeacherAssignmentOptionsView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "teacher_management"
+
+    @extend_schema(
+        operation_id="teacher_assignment_options",
+        tags=["Quản lý lớp học"],
+        summary="Danh sách giáo viên đang dạy để phân công vào lớp",
+        description=(
+            "LOCAL tại một site. Admin Big phải chọn site_code; Admin Small và Tư vấn & xếp lớp "
+            "dùng site trong phiên đăng nhập và không được gửi site_code. Chỉ trả mã, họ tên và "
+            "trạng thái giáo viên đang dạy; không trả thông tin liên hệ hoặc đăng nhập."
+        ),
+        parameters=[
+            OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
+            OpenApiParameter("search", str, OpenApiParameter.QUERY),
+            OpenApiParameter("limit", int, OpenApiParameter.QUERY),
+            OpenApiParameter("offset", int, OpenApiParameter.QUERY),
+        ],
+        responses={
+            200: TeacherAssignmentOptionsResponseSerializer,
+            400: OpenApiResponse(description="Thiếu site_code của Admin Big hoặc tham số không hợp lệ."),
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Vai trò không được phân công giáo viên hoặc gửi site ngoài phiên."),
+            503: OpenApiResponse(description="Site/CSDL không sẵn sàng."),
+        },
+    )
+    def get(self, request):
+        query = TeacherAssignmentOptionsQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        if request.user.role not in _ADMIN_ROLES | {"tu_van"}:
+            return Response(
+                {"detail": "Tài khoản không có quyền phân công giáo viên."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if request.user.role == "admin_big":
+            site_code = data.get("site_code")
+            if not site_code:
+                return Response(
+                    {"detail": "Admin Big cần chọn site_code để phân công giáo viên."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            site_code = str(request.user.site_code or "").strip().upper()
+            if not site_code or data.get("site_code"):
+                return Response(
+                    {"detail": "Chỉ được phân công giáo viên tại cơ sở trong phiên đăng nhập."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        try:
+            result = list_teachers(
+                site_code=site_code,
+                status_filter="dang_day",
+                search=data.get("search"),
+                limit=data["limit"],
+                offset=data["offset"],
+            )
+        except (TeacherInfrastructureUnavailable, TeacherSiteUnavailable) as exc:
+            return _service_error(exc)
+        return Response({
+            "site_code": site_code,
+            "count": result["count"],
+            "limit": result["limit"],
+            "offset": result["offset"],
+            "results": [
+                {"teacher_id": row["teacher_id"], "full_name": row["full_name"], "status": row["status"]}
+                for row in result["results"]
+            ],
+        })
 
 
 def _site_scope(user, requested_site: str | None):

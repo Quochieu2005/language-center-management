@@ -153,6 +153,10 @@ export const adminApi = {
     ),
   teachers: (site_code?: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Teacher>>(`/admin/teachers/${query({ site_code, ...options })}`),
+  teacherAssignmentOptions: (site_code?: string, options: { search?: string; limit?: number; offset?: number } = {}) =>
+    apiRequest<PageResult<Pick<Teacher, "teacher_id" | "full_name" | "status">> & { site_code: string }>(
+      `/admin/teachers/assignment-options/${query({ site_code, ...options })}`,
+    ),
   createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; slug?: string; phone?: string; avatar_requested?: boolean }) =>
     apiRequest<Teacher & { must_change_password: boolean; avatar_setup_token: string | null }>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
   sendTeacherCredentials: (slug: string, site_code: string) =>
