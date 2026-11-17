@@ -53,7 +53,7 @@ from core.classes.services import (
 )
 
 
-_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "tu_van"}
+_MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"}
 _CLASS_READ_ROLES = _MANAGEMENT_ROLES | {"ke_toan"}
 _ENROLLMENT_ROLES = _CLASS_READ_ROLES
 _SITE_RECORD_ID = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
@@ -331,7 +331,7 @@ class ClassCollectionView(_ClassApiView):
         description=(
             "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn từng CSDL site đang hoạt động và tổng hợp/phân trang trong API; "
             "site lỗi được nêu trong complete=false/missing_sites. Admin Big truyền site_code để đọc LOCAL. "
-            "Admin Small/lễ tân/tư vấn & xếp lớp/kế toán chỉ dùng site trong phiên đăng nhập. current_count là bộ đếm LopHoc; "
+            "Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp chỉ dùng site trong phiên đăng nhập. current_count là bộ đếm LopHoc; "
             "registered_count được tính từ DangKy đang hoạt động để phát hiện lệch sĩ số. Không JOIN xuyên site."
         ),
         parameters=[
@@ -386,7 +386,7 @@ class ClassCollectionView(_ClassApiView):
         description=(
             "Tạo LopHoc cùng BuoiHoc trong một transaction cục bộ. Nếu khóa học chưa chốt số buổi, số buổi được xác định từ khoảng ngày và các thứ đã chọn. "
             "Kiểm tra khóa học, giáo viên đang dạy, phòng hoạt động/sức chứa, ngày giờ và xung đột "
-            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/lễ tân/tư vấn & xếp lớp dùng site phiên đăng nhập."
+            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp dùng site phiên đăng nhập."
         ),
         request=ClassCreateSerializer,
         responses={
@@ -574,8 +574,8 @@ class EnrollmentClassAssignView(_ClassApiView):
         description=(
             "Di chuyển DangKy hiện có trong cùng CSDL site. Khóa hai lớp theo thứ tự ổn định, kiểm tra "
             "sức chứa, khớp khóa học, trùng lịch và tính đúng của bộ đếm; cập nhật đăng ký, sĩ số hai "
-            "lớp và nhật ký trong một transaction cục bộ. Admin Big chọn site; Admin Small, Lễ tân, "
-            "Tư vấn & xếp lớp và Kế toán chỉ thao tác tại site trong phiên. Không tạo học phí mới và không chuyển site."
+            "lớp và nhật ký trong một transaction cục bộ. Admin Big chọn site; Admin Small, Kế toán & Lễ tân "
+            "và Tư vấn & xếp lớp chỉ thao tác tại site trong phiên. Không tạo học phí mới và không chuyển site."
         ),
         request=EnrollmentClassAssignSerializer,
         responses={

@@ -322,8 +322,8 @@ function formatProfileValue(key: string, value: unknown): string {
 
 function roleName(role?: string) {
   return ({
-    admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Lễ tân",
-    tu_van: "Tư vấn & xếp lớp", ke_toan: "Kế toán",
+    admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Kế toán & Lễ tân",
+    tu_van: "Tư vấn & xếp lớp", ke_toan: "Kế toán & Lễ tân",
     giao_vien: "Giáo viên", hoc_vien: "Học viên",
   } as Record<string, string>)[role || ""] || "Tài khoản";
 }

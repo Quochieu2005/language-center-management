@@ -79,14 +79,18 @@ def _blog_idempotency_key(request):
     return key
 
 
-def _admin_big_only(request):
-    if request.user.role != "admin_big":
-        return Response({"detail": "Chỉ Admin Big được quản lý Blog dùng chung."}, status=status.HTTP_403_FORBIDDEN)
+def _blog_roles_only(request, roles=("admin_big",)):
+    if request.user.role not in roles:
+        return Response({"detail": "Bạn không có quyền thao tác CMS Blog này."}, status=status.HTTP_403_FORBIDDEN)
     return None
 
 
-def _write_blog_response(request, serializer_class, operation, *, slug=None, created=False):
-    denied = _admin_big_only(request)
+def _admin_big_only(request):
+    return _blog_roles_only(request)
+
+
+def _write_blog_response(request, serializer_class, operation, *, slug=None, created=False, roles=("admin_big",)):
+    denied = _blog_roles_only(request, roles)
     if denied:
         return denied
     key = _blog_idempotency_key(request)
@@ -106,8 +110,8 @@ def _write_blog_response(request, serializer_class, operation, *, slug=None, cre
                     else status.HTTP_202_ACCEPTED if not result["complete"] else status.HTTP_200_OK)
 
 
-def _read_admin_blog(request, reader):
-    denied = _admin_big_only(request)
+def _read_admin_blog(request, reader, *, roles=("admin_big",)):
+    denied = _blog_roles_only(request, roles)
     if denied:
         return denied
     try:
@@ -179,9 +183,9 @@ class _AdminBlogView(APIView):
 
 
 class AdminBlogCategoryCollectionView(_AdminBlogView):
-    @extend_schema(operation_id="admin_blog_categories_list", tags=["Blog"], summary="Liệt kê danh mục Blog cho Admin Big", responses={200: AdminBlogListResponseSerializer})
+    @extend_schema(operation_id="admin_blog_categories_list", tags=["Blog"], summary="Liệt kê danh mục Blog cho Admin Big và Tư vấn & xếp lớp", responses={200: AdminBlogListResponseSerializer})
     def get(self, request):
-        return _read_admin_blog(request, list_admin_blog_categories)
+        return _read_admin_blog(request, list_admin_blog_categories, roles=("admin_big", "tu_van"))
 
     @extend_schema(operation_id="admin_blog_category_create", tags=["Blog"], summary="Tạo danh mục Blog trên mọi site hoạt động", request=BlogCategoryCreateSerializer, responses={201: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})
     def post(self, request):
@@ -225,22 +229,23 @@ class AdminBlogCategoryDetailView(_AdminBlogView):
 
 
 class AdminBlogArticleCollectionView(_AdminBlogView):
-    @extend_schema(operation_id="admin_blog_articles_list", tags=["Blog"], summary="Liệt kê bài Blog mọi trạng thái cho Admin Big", responses={200: AdminBlogListResponseSerializer})
+    @extend_schema(operation_id="admin_blog_articles_list", tags=["Blog"], summary="Liệt kê bài Blog mọi trạng thái cho Admin Big và Tư vấn & xếp lớp", responses={200: AdminBlogListResponseSerializer})
     def get(self, request):
-        return _read_admin_blog(request, list_admin_blog_articles)
+        return _read_admin_blog(request, list_admin_blog_articles, roles=("admin_big", "tu_van"))
 
-    @extend_schema(operation_id="admin_blog_article_create", tags=["Blog"], summary="Tạo bài Blog trên mọi site hoạt động", request=BlogArticleCreateSerializer, responses={201: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})
+    @extend_schema(operation_id="admin_blog_article_create", tags=["Blog"], summary="Admin Big hoặc Tư vấn & xếp lớp tạo bài Blog trên mọi site hoạt động", request=BlogArticleCreateSerializer, responses={201: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})
     def post(self, request):
         return _write_blog_response(
             request, BlogArticleCreateSerializer,
             lambda *, payload, **kwargs: create_blog_article(article=payload, **kwargs), created=True,
+            roles=("admin_big", "tu_van"),
         )
 
 
 class AdminBlogArticleDetailView(_AdminBlogView):
-    @extend_schema(operation_id="admin_blog_article_detail", tags=["Blog"], summary="Đọc bài Blog mọi trạng thái cho Admin Big", responses={200: AdminBlogArticleDetailResponseSerializer, 404: OpenApiResponse(description="Không tìm thấy bài viết."), 409: OpenApiResponse(description="Bản sao bài viết lệch."), 503: OpenApiResponse(description="Thiếu site hoạt động.")})
+    @extend_schema(operation_id="admin_blog_article_detail", tags=["Blog"], summary="Đọc bài Blog mọi trạng thái cho Admin Big và Tư vấn & xếp lớp", responses={200: AdminBlogArticleDetailResponseSerializer, 404: OpenApiResponse(description="Không tìm thấy bài viết."), 409: OpenApiResponse(description="Bản sao bài viết lệch."), 503: OpenApiResponse(description="Thiếu site hoạt động.")})
     def get(self, request, slug):
-        denied = _admin_big_only(request)
+        denied = _blog_roles_only(request, ("admin_big", "tu_van"))
         if denied:
             return denied
         try:
@@ -248,11 +253,12 @@ class AdminBlogArticleDetailView(_AdminBlogView):
         except (PublicBlogConflict, PublicBlogNotFound, PublicBlogUnavailable) as exc:
             return _admin_blog_error(exc, scope="GLOBAL")
 
-    @extend_schema(operation_id="admin_blog_article_update", tags=["Blog"], summary="Sửa bài Blog trên mọi site hoạt động", request=BlogArticlePatchSerializer, responses={200: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})
+    @extend_schema(operation_id="admin_blog_article_update", tags=["Blog"], summary="Admin Big hoặc Tư vấn & xếp lớp sửa bài Blog trên mọi site hoạt động", request=BlogArticlePatchSerializer, responses={200: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})
     def patch(self, request, slug):
         return _write_blog_response(
             request, BlogArticlePatchSerializer,
             lambda *, payload, **kwargs: update_blog_article(patch=payload, **kwargs), slug=slug,
+            roles=("admin_big", "tu_van"),
         )
 
     @extend_schema(operation_id="admin_blog_article_delete", tags=["Blog"], summary="Xóa bài Blog trên mọi site hoạt động", responses={200: BlogWriteResponseSerializer, 202: BlogWriteResponseSerializer})

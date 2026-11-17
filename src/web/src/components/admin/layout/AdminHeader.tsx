@@ -103,5 +103,5 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
 }
 
 function roleTitle(role?: string) {
-  return ({ admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Lễ tân", tu_van: "Tư vấn & xếp lớp", ke_toan: "Kế toán" } as Record<string, string>)[role || ""] || "Tài khoản";
+  return ({ admin_big: "Admin Big", admin_small: "Admin Small", le_tan: "Kế toán & Lễ tân", tu_van: "Tư vấn & xếp lớp", ke_toan: "Kế toán & Lễ tân" } as Record<string, string>)[role || ""] || "Tài khoản";
 }

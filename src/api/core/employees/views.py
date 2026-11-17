@@ -116,7 +116,7 @@ class EmployeeCollectionView(APIView):
     @extend_schema(
         operation_id="employee_create",
         tags=["Quản lý nhân viên"],
-        summary="Tạo tài khoản nhân viên lễ tân, tư vấn/xếp lớp hoặc kế toán",
+        summary="Tạo nhân viên Kế toán & Lễ tân hoặc Tư vấn & xếp lớp",
         description=(
             "LOCAL cho hồ sơ dbo.NhanVien tại site đã chọn; bản ghi TaiKhoan nhan_vien được nhân bản "
             "đến các site hoạt động theo chính sách tài khoản hiện có. Admin Big chọn site; Admin Small "
