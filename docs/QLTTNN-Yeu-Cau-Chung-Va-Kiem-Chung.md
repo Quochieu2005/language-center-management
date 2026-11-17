@@ -72,7 +72,7 @@ Chạy trên dữ liệu kiểm thử riêng, không thử lỗi trên dữ li�
 ### TC-DTX-01 — Chuyển cơ sở và phục hồi
 
 1. Chuẩn bị học viên Q1 đủ điều kiện chuyển sang Q7; lưu trạng thái nguồn/đích, công nợ và đăng ký liên quan.
-2. Admin Small Q1 tạo đề nghị `cho_duyet`; xác nhận chưa tạo hồ sơ đích. Admin Big duyệt; Coordinator mới thực hiện chuyển.
+2. Admin Small hoặc Tư vấn Q1 tạo đề nghị `cho_duyet`; xác nhận chưa tạo hồ sơ đích. Admin Big duyệt; Coordinator mới thực hiện chuyển.
 3. Trường hợp thành công: kiểm tra nguồn `da_chuyen_di`, đích `dang_hoc`, cùng mã học viên; lịch sử ở nguồn được giữ; trạng thái giao dịch `hoan_tat` và sự kiện từng site khớp.
 4. Thử riêng lỗi trước commit đích: nguồn giữ nguyên; retry hoặc kết thúc thất bại theo loại lỗi. Thử riêng dừng tiến trình sau commit đích: khởi động lại và recovery làm nốt nguồn; không xóa đích hoặc tạo hồ sơ thứ hai.
 5. Kiểm tra Global Query trong khi đang xử lý và sau phục hồi theo quy tắc chọn bản hiện hành; không đếm cả hai bản vật lý.

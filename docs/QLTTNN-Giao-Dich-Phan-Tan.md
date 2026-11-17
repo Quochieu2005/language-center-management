@@ -4,7 +4,7 @@ Tài liệu này mô tả hai bước riêng của nghiệp vụ chuyển học 
 
 Luồng có ba kiểu thao tác theo thứ tự:
 
-1. Admin Small tạo đề nghị tại CSDL nguồn: `LOCAL`.
+1. Admin Small hoặc Tư vấn & xếp lớp tạo đề nghị tại CSDL nguồn: `LOCAL`.
 2. Admin Big đọc hộp thư các site: `GLOBAL`; khi quyết định, API ghi trạng thái và sự kiện tại CSDL nguồn bằng một transaction cục bộ.
 3. Chỉ đề nghị đã duyệt mới chạy việc chuyển hồ sơ giữa nguồn và đích: `DISTRIBUTED-TX`.
 
@@ -20,7 +20,7 @@ Trong source hiện tại, Coordinator chạy sau quyết định duyệt và Ad
 
 | Thao tác | Kiểu | Nơi đọc/ghi | Kết quả |
 |---|---|---|---|
-| Admin Small gửi đề nghị | `LOCAL` | Ghi `GiaoDichChuyenCoSo` và `LichSuChuyenCoSo` tại nguồn | Tạo trạng thái `cho_duyet`; hồ sơ học viên chưa đổi |
+| Admin Small/Tư vấn gửi đề nghị | `LOCAL` | Ghi `GiaoDichChuyenCoSo` và `LichSuChuyenCoSo` tại nguồn | Tạo trạng thái `cho_duyet`; hồ sơ học viên chưa đổi |
 | Admin Big xem hộp thư | `GLOBAL` | Đọc từng CSDL site trong phạm vi hệ thống; gộp kết quả tại Django | Danh sách đề nghị; không sao chép đề nghị sang DB tập trung |
 | Admin Big duyệt/từ chối | Đọc nhiều site để chọn đề nghị, sau đó ghi tại đúng nguồn | `GLOBAL` để định vị; transaction `LOCAL` tại nguồn để quyết định | Lưu người quyết định, thời điểm, trạng thái và sự kiện |
 | Chuyển hồ sơ sau khi duyệt | `DISTRIBUTED-TX` | Chính xác hai CSDL: nguồn và đích | Tạo bản đích, giữ lịch sử ở nguồn, cập nhật nguồn và phục hồi được |
@@ -43,12 +43,14 @@ Các bước trên là hợp đồng cần áp dụng cho luồng replication. �
 | Vai trò | Được phép | Không được phép |
 |---|---|---|
 | Admin Small | Tạo đề nghị từ cơ sở mình phụ trách; xem trạng thái các đề nghị của cơ sở mình | Duyệt/từ chối đề nghị; tự chọn hoặc giả mạo cơ sở nguồn khác |
+| Tư vấn & xếp lớp | Tạo đề nghị từ site được giao; xem đề nghị và công nợ lịch sử tại nguồn | Duyệt/từ chối/retry; tự chọn hoặc giả mạo cơ sở nguồn khác |
+| Kế toán & Lễ tân | Xem đề nghị và công nợ lịch sử tại site được giao | Tạo/duyệt/từ chối/retry; tự chọn hoặc giả mạo cơ sở nguồn khác |
 | Admin Big | Xem hộp thư toàn cục; duyệt hoặc từ chối một đề nghị; xem kết quả và lịch sử | Thay đổi dữ liệu quyết định bằng cách gọi trực tiếp SQL; duyệt khi không kết nối được site nguồn |
 | Coordinator trong Django | Xác minh vai trò, định tuyến, kiểm tra quy tắc, ghi quyết định, thực hiện và phục hồi chuyển | Tin mã site do trình duyệt gửi; tạo DB trung tâm; JOIN xuyên site |
 
 Trong schema hiện tại, Admin Big là tài khoản `TaiKhoan.vai_tro = 'admin_big'` có `ma_co_so IS NULL`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, có hồ sơ `Admin.loai_admin = 'admin_small'` và site được gán. `NhanVien.chuc_vu` chỉ mô tả nhân viên nghiệp vụ. API phải kiểm tra tài khoản còn hoạt động, vai trò/hồ sơ và phạm vi cơ sở ở mọi endpoint; ẩn nút trên giao diện không phải là phân quyền.
 
-Đề nghị gồm mã học viên, site nguồn, site đích, lý do, tài khoản gửi và thời điểm gửi. API lấy site nguồn từ tài khoản Admin Small, không chấp nhận nguồn do client tự gửi. Một dòng `GiaoDichChuyenCoSo` được tạo tại CSDL nguồn với `trang_thai = 'cho_duyet'`, `buoc_cuoi = 'cho_duyet'`. Sự kiện `de_nghi` được ghi trong `LichSuChuyenCoSo` cùng transaction cục bộ đó.
+Đề nghị gồm mã học viên, site nguồn, site đích, lý do, tài khoản gửi và thời điểm gửi. API lấy site nguồn từ phiên Admin Small hoặc Tư vấn & xếp lớp đã xác thực, không chấp nhận nguồn do client tự gửi. Một dòng `GiaoDichChuyenCoSo` được tạo tại CSDL nguồn với `trang_thai = 'cho_duyet'`, `buoc_cuoi = 'cho_duyet'`. Sự kiện `de_nghi` được ghi trong `LichSuChuyenCoSo` cùng transaction cục bộ đó.
 
 Khi chờ duyệt, hồ sơ học viên vẫn `dang_hoc` tại nguồn, chưa có bản sao tại đích và tiếp tục được tính ở thống kê nguồn. Các nghiệp vụ bình thường tại nguồn được tiếp tục. Do dữ liệu có thể đổi trong lúc chờ, Admin Big và API phải kiểm tra lại các điều kiện lúc duyệt.
 
@@ -56,7 +58,7 @@ Khi chờ duyệt, hồ sơ học viên vẫn `dang_hoc` tại nguồn, chưa c�
 
 ```mermaid
 flowchart TD
-    Small["Admin Small tại cơ sở nguồn"] -->|chọn học viên, site đích, nhập lý do| API["Django API"]
+    Requester["Admin Small hoặc Tư vấn tại cơ sở nguồn"] -->|chọn học viên, site đích, nhập lý do| API["Django API"]
     API -->|lấy site từ tài khoản, kiểm tra quyền| Permission["Phân quyền và phạm vi"]
     Permission -->|đọc học viên, công nợ, site đích| Router["Site Router"]
     Router -->|xác nhận điều kiện ban đầu| Source["CSDL nguồn"]
@@ -72,15 +74,15 @@ flowchart TD
     Approved -->|chỉ sau khi duyệt| Distributed["Giao dịch phân tán nguồn ↔ đích"]
 ```
 
-### 4.1. Admin Small tạo đề nghị
+### 4.1. Admin Small hoặc Tư vấn tạo đề nghị
 
 API thực hiện các kiểm tra sau trước khi ghi:
 
-1. Tài khoản đang hoạt động và là Admin Small của đúng site nguồn.
+1. Tài khoản đang hoạt động và là Admin Small hoặc Tư vấn & xếp lớp của đúng site nguồn.
 2. Học viên tồn tại duy nhất tại nguồn và có `HocVien.trang_thai = 'dang_hoc'`.
 3. Học viên không còn công nợ đến hạn theo quy tắc học phí đã chốt.
 4. Site đích khác site nguồn, đang `hoat_dong`, có cấu hình kết nối hợp lệ.
-5. Global Query xác nhận bản `dang_hoc` hiện hành đang ở đúng site Admin Small phụ trách; không tồn tại đề nghị `cho_duyet` hoặc giao dịch `dang_xu_ly` khác tại site hiện hành.
+5. Global Query xác nhận bản `dang_hoc` hiện hành đang ở đúng site của người đề nghị; không tồn tại đề nghị `cho_duyet` hoặc giao dịch `dang_xu_ly` khác tại site hiện hành.
 
 Trong transaction cục bộ tại nguồn, API tạo trạng thái `cho_duyet` cùng sự kiện `de_nghi`. Nếu client gửi lại cùng idempotency key, trả về đề nghị đã tạo thay vì tạo dòng mới. Chỉ trả thành công sau khi cả trạng thái và sự kiện đã commit ở nguồn. Không ghi sang site đích ở giai đoạn này.
 
@@ -156,8 +158,8 @@ Nếu không đọc được CSDL nguồn để biết trạng thái giao dịch
 
 ## 8. Kịch bản cần kiểm thử
 
-1. Admin Small đúng site tạo đề nghị: có trạng thái `cho_duyet` và sự kiện `de_nghi` tại nguồn; chưa có hồ sơ đích.
-2. Admin Small gọi endpoint duyệt hoặc gửi mã site ngoài phạm vi: bị từ chối ở backend và có log phù hợp.
+1. Admin Small hoặc Tư vấn đúng site tạo đề nghị: có trạng thái `cho_duyet` và sự kiện `de_nghi` tại nguồn; chưa có hồ sơ đích.
+2. Admin Small/Tư vấn gọi endpoint duyệt hoặc gửi mã site ngoài phạm vi: bị từ chối ở backend và có log phù hợp.
 3. Admin Big đọc hộp thư từ nhiều site; khi một site không truy cập được, API/UI báo danh sách chưa đầy đủ.
 4. Admin Big duyệt: lưu quyết định ở nguồn, thực hiện chuyển đúng hai site và không đếm trùng.
 5. Admin Big từ chối: lưu lý do/sự kiện; hồ sơ học viên vẫn `dang_hoc` ở nguồn.

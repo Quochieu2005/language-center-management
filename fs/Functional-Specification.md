@@ -94,7 +94,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Admin Big | `TaiKhoan.vai_tro=admin_big`, `ma_co_so=NULL` | Toàn hệ thống |
 | Admin Small | `TaiKhoan.vai_tro=nhan_vien`, hồ sơ `Admin.loai_admin=admin_small`, có site được giao | Một site được giao |
 | Kế toán & Lễ tân | Tài khoản nhân viên, chức vụ `ke_toan` (hồ sơ `le_tan` cũ được chuyển bằng migration 41) | Tại site được giao: chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ; gửi email nhắc phí; xem đề nghị chuyển cùng công nợ lịch sử tại nguồn. Kế toán được xem phiếu thu và ghi nhận thu/hoàn; không CRUD phòng/lớp/học viên, không đăng ký/xếp lớp hoặc sửa kế hoạch đóng |
-| Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tại site được giao: CRUD hồ sơ học viên và phòng; tạo lớp, đăng ký/xếp lớp, phân công giáo viên, sửa tên/sĩ số lớp và hủy mềm lớp đủ điều kiện; xem công nợ, gửi email nhắc phí, chỉ sửa kế hoạch đóng; xem đề nghị chuyển và công nợ lịch sử read-only. Tiếp nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung; không cấp tài khoản học viên |
+| Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tại site được giao: CRUD hồ sơ học viên và phòng; tạo lớp, đăng ký/xếp lớp, phân công giáo viên, sửa tên/sĩ số lớp và hủy mềm lớp đủ điều kiện; xem công nợ, gửi email nhắc phí, chỉ sửa kế hoạch đóng; tạo đề nghị chuyển và xem đề nghị/công nợ lịch sử tại nguồn. Tiếp nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung; không cấp tài khoản học viên, không duyệt/từ chối/retry chuyển cơ sở |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
 | Học viên | Admin có thể cấp tài khoản theo FS-STU-01; portal tự phục vụ chưa được duyệt | Không đưa các trang portal/SePay vào phạm vi đã chốt |
 | Khách | Chưa xác thực | Xem nội dung công khai và gửi yêu cầu liên hệ tới cơ sở đang hoạt động |
@@ -117,7 +117,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Xem đề nghị chuyển và công nợ tại nguồn | Toàn hệ thống | Site được giao | Site làm việc, read-only | Site làm việc, read-only | Không | Không |
 | Thu/hoàn học phí | Giám sát theo quyền | Giám sát tại site được giao | Site làm việc | Không | Không | Không |
 | Điểm danh và điểm | Giám sát/đọc theo quyền | Site được giao | Không | Không | Chỉ lớp được phân công | Không |
-| Tạo đề nghị chuyển | Có thể theo quy trình được duyệt | Chỉ học viên ở site mình | Không mặc định | Không | Không | Không |
+| Tạo đề nghị chuyển | Không | Chỉ học viên ở site mình | Không | Chỉ học viên ở site mình | Không | Không |
 | Duyệt/từ chối đề nghị chuyển | Có | Không | Không | Không | Không | Không |
 | Thống kê | Toàn hệ thống | Site được giao | Báo cáo tài chính được cấp | Không mặc định | Lớp được giao nếu có | Không |
 | Hộp thư liên hệ | GLOBAL hoặc chọn một site | Chỉ site được giao | Không | Site làm việc | Không | Không |
@@ -489,23 +489,23 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Nghiệm thu:** giáo viên ngoài lớp bị từ chối; điểm ngoài khoảng hoặc loại lạ bị từ chối; mỗi đăng ký không có hai điểm cùng loại; lỗi log/ghi theo thiết kế không làm mất tính nhất quán.
 
-### FS-TRF-01 — Admin Small tạo đề nghị chuyển cơ sở
+### FS-TRF-01 — Admin Small hoặc Tư vấn tạo đề nghị chuyển cơ sở
 
-**Người dùng:** Admin Small tại site nguồn. **Kiểu:** LOCAL tạo đề nghị; có thể dùng Global để xác định bản HocVien hiện hành. **Bảng nguồn:** HocVien, HocPhi/DangKy để kiểm tra điều kiện, GiaoDichChuyenCoSo, LichSuChuyenCoSo.
+**Người dùng:** Admin Small hoặc Tư vấn & xếp lớp tại site nguồn. **Kiểu:** LOCAL tạo đề nghị; có thể dùng Global để xác định bản HocVien hiện hành. **Bảng nguồn:** HocVien, HocPhi/DangKy để kiểm tra điều kiện, GiaoDichChuyenCoSo, LichSuChuyenCoSo.
 
-1. Admin Small chọn học viên, site đích đang hoạt động và nhập lý do. Không có bước Admin Small tự xác nhận chuyển hoàn tất.
-2. API lấy site nguồn từ tài khoản Admin Small, xác định bản HocVien dang_hoc hiện hành bằng định vị site; không nhận nguồn tin cậy từ client và không suy từ prefix ID.
+1. Admin Small hoặc Tư vấn & xếp lớp chọn học viên, site đích đang hoạt động và nhập lý do. Không có bước người đề nghị tự xác nhận chuyển hoàn tất.
+2. API lấy site nguồn từ tài khoản đã xác thực, xác định bản HocVien dang_hoc hiện hành bằng định vị site; không nhận nguồn tin cậy từ client và không suy từ prefix ID.
 3. Kiểm tra học viên thuộc nguồn; không có đề nghị/giao dịch mở; không còn công nợ theo quy tắc nghiệp vụ hiện hành; site đích khác nguồn và hoạt động.
 4. Trong transaction nguồn, tạo GiaoDichChuyenCoSo trạng thái cho_duyet và sự kiện append-only de_nghi. Chưa tạo hồ sơ đích, chưa đánh dấu nguồn da_chuyen_di.
-5. Trả mã đề nghị và trạng thái chờ duyệt để Admin Small theo dõi tại site mình.
+5. Trả mã đề nghị và trạng thái chờ duyệt để người đề nghị theo dõi tại site mình.
 
 **Lỗi:** hồ sơ không thuộc quyền, site đích không khả dụng, còn nợ, request trùng hoặc site nguồn lỗi thì không tạo đề nghị; lịch sử không bị sửa/xóa.
 
-**Nghiệm thu:** đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; Admin Small không thể gọi API duyệt.
+**Nghiệm thu:** đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; Admin Small/Tư vấn không thể gọi API duyệt, từ chối hoặc retry.
 
 ### FS-TRF-02 — Admin Big xem, duyệt hoặc từ chối đề nghị
 
-**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp chỉ đọc đề nghị tại site được giao. **Kiểu:** hộp thư `GLOBAL`; đọc của nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
+**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối; Admin Small/Tư vấn & xếp lớp đọc đề nghị tại site được giao và có thể gửi đề nghị; Kế toán & Lễ tân chỉ đọc tại site được giao. **Kiểu:** hộp thư `GLOBAL`; đọc/tạo đề nghị của nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
 
 1. API truy vấn riêng các site hoạt động để tạo hộp thư; kết quả ghi rõ complete và missing_sites.
 2. Admin Big đọc site hoạt động toàn cục; nhân viên cơ sở chỉ đọc nguồn trong phiên và không thể gửi site khác.
@@ -516,7 +516,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 7. Từ chối: ghi tu_choi, người/thời điểm/lý do và sự kiện tu_choi tại nguồn; hồ sơ học viên không đổi.
 8. Duyệt: ghi trạng thái dang_xu_ly, bước da_tiep_nhan, người/thời điểm quyết định và sự kiện duyet tại nguồn. Chỉ sau commit quyết định mới giao Coordinator chạy distributed transfer.
 
-**Nghiệm thu:** Kế toán & Lễ tân/Tư vấn đọc được đề nghị và công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; Admin Small/giáo viên không được quyết định; hai Admin Big duyệt đồng thời chỉ một quyết định thắng; quyết định idempotent; không gọi coordinator chuyển nếu quyết định chưa commit.
+**Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; Admin Small/Tư vấn tạo được đề nghị nhưng không thể quyết định/retry; giáo viên không được gửi hoặc quyết định; hai Admin Big duyệt đồng thời chỉ một quyết định thắng; quyết định idempotent; không gọi coordinator chuyển nếu quyết định chưa commit.
 
 ### FS-TRF-03 — Thực hiện và phục hồi giao dịch chuyển
 
