@@ -389,6 +389,7 @@ class AdminSmallCredentialEmailView(APIView):
         operation_id="admin_small_send_credentials_once",
         tags=["Quản lý tài khoản"],
         summary="Admin Big gửi mật khẩu tạm cho Admin Small một lần",
+        request=EmptyRequestSerializer,
         description=(
             "Chỉ Admin Big được gọi. API chỉ cho gửi khi Logs ở CSDL của cơ sở ghi nhận tài khoản "
             "đang chờ gửi; khóa ứng dụng SQL Server ngăn hai yêu cầu gửi đồng thời. Gửi thành công "

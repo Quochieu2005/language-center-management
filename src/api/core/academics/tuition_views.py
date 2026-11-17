@@ -12,10 +12,16 @@ from core.academics.http import academic_error, remote_ip, validate_record_id
 from core.academics.serializers import (
     TuitionInvoiceSerializer,
     TuitionQuerySerializer,
+    TuitionRefundSerializer,
     TuitionReceiptSerializer,
     TuitionReceiptResponseSerializer,
 )
-from core.academics.tuition import collect_tuition, list_tuition
+from core.academics.tuition import (
+    collect_tuition,
+    list_tuition,
+    list_tuition_receipts,
+    refund_tuition,
+)
 from core.academics.tuition_invoices import get_tuition_invoice, send_tuition_invoice_email
 from core.auth.authentication import AuthCookieAuthentication
 
@@ -48,6 +54,7 @@ class AdminTuitionListView(_TuitionApiView):
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
             OpenApiParameter("status", str, OpenApiParameter.QUERY),
             OpenApiParameter("student_slug", str, OpenApiParameter.QUERY),
+            OpenApiParameter("search", str, OpenApiParameter.QUERY),
             OpenApiParameter("limit", int, OpenApiParameter.QUERY),
             OpenApiParameter("offset", int, OpenApiParameter.QUERY),
         ],
@@ -62,7 +69,8 @@ class AdminTuitionListView(_TuitionApiView):
                 return Response(global_site_list(
                     lambda site, limit, offset: list_tuition(
                         site_code=site, status_filter=data.get("status"),
-                        student_slug=data.get("student_slug"), limit=limit, offset=offset,
+                        student_slug=data.get("student_slug"), search=data.get("search"),
+                        limit=limit, offset=offset,
                     ),
                     limit=data["limit"], offset=data["offset"],
                     unavailable_exceptions=(AcademicError,),
@@ -70,13 +78,39 @@ class AdminTuitionListView(_TuitionApiView):
             site = _tuition_site(request, data.get("site_code"))
             return Response(list_tuition(
                 site_code=site, status_filter=data.get("status"),
-                student_slug=data.get("student_slug"), limit=data["limit"], offset=data["offset"],
+                student_slug=data.get("student_slug"), search=data.get("search"),
+                limit=data["limit"], offset=data["offset"],
             ))
         except AcademicError as exc:
             return academic_error(exc)
 
 
 class TuitionReceiptCreateView(_TuitionApiView):
+    @extend_schema(
+        operation_id="tuition_receipt_list",
+        tags=["Học phí"],
+        summary="Liệt kê phiếu thu và hoàn của một khoản học phí",
+        description="LOCAL: kế toán có hồ sơ nhân viên đang làm tại site được xem lịch sử phiếu và số tiền còn có thể hoàn.",
+        parameters=[OpenApiParameter("tuition_id", str, OpenApiParameter.PATH), OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={200: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def get(self, request, tuition_id):
+        invalid = validate_record_id(tuition_id)
+        if invalid:
+            return invalid
+        try:
+            site = _tuition_site(request, request.query_params.get("site_code"))
+            if request.user.role != "ke_toan":
+                return Response({"detail": "Chỉ kế toán tại cơ sở được xem lịch sử phiếu thu."}, status=403)
+            result = list_tuition_receipts(
+                site_code=site, tuition_id=tuition_id,
+                actor_id=request.user.account_id, employee_id=str(request.user.profile_id or ""),
+                role=request.user.role,
+            )
+            return Response(result)
+        except AcademicError as exc:
+            return academic_error(exc)
+
     @extend_schema(
         operation_id="tuition_receipt_create",
         tags=["Học phí"],
@@ -119,6 +153,50 @@ class TuitionReceiptCreateView(_TuitionApiView):
             result["invoice_email"] = send_tuition_invoice_email(
                 site_code=site, tuition_id=tuition_id,
                 receipt_id=result["receipt_id"], actor_id=request.user.account_id,
+            )
+            response_status = status.HTTP_200_OK if result["replayed"] else status.HTTP_201_CREATED
+            return Response(result, status=response_status)
+        except AcademicError as exc:
+            return academic_error(exc)
+
+
+class TuitionRefundView(_TuitionApiView):
+    @extend_schema(
+        operation_id="tuition_refund_create",
+        tags=["Học phí"],
+        summary="Hoàn một phần hoặc toàn phần từ phiếu thu gốc",
+        description=(
+            "Chỉ kế toán đang làm việc tại site được ghi hoàn. API khóa khoản phí trong transaction LOCAL, "
+            "giới hạn số tiền theo phiếu gốc và số đã thu, tạo bút toán hoàn mới, cập nhật HocPhi/các kỳ và audit. "
+            "Idempotency key trả lại cùng phiếu khi request được gửi lại."
+        ),
+        parameters=[
+            OpenApiParameter("tuition_id", str, OpenApiParameter.PATH),
+            OpenApiParameter("receipt_id", str, OpenApiParameter.PATH),
+            OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
+        ],
+        request=TuitionRefundSerializer,
+        responses={201: OpenApiResponse(), 200: OpenApiResponse(), 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def post(self, request, tuition_id, receipt_id):
+        for record_id in (tuition_id, receipt_id):
+            invalid = validate_record_id(record_id)
+            if invalid:
+                return invalid
+        serializer = TuitionRefundSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            site = _tuition_site(request, request.query_params.get("site_code"))
+            if request.user.role != "ke_toan":
+                return Response({"detail": "Chỉ kế toán tại cơ sở được ghi phiếu hoàn."}, status=403)
+            result = refund_tuition(
+                site_code=site, tuition_id=tuition_id, receipt_id=receipt_id,
+                actor_id=request.user.account_id, employee_id=str(request.user.profile_id or ""),
+                role=request.user.role,
+                idempotency_key=str(serializer.validated_data["idempotency_key"]),
+                amount=serializer.validated_data["amount"],
+                payment_method=serializer.validated_data["payment_method"],
+                reason=serializer.validated_data["reason"], remote_ip=remote_ip(request),
             )
             response_status = status.HTTP_200_OK if result["replayed"] else status.HTTP_201_CREATED
             return Response(result, status=response_status)

@@ -9,12 +9,16 @@ from core.academics.common import (
     AcademicForbidden,
     AcademicInvalid,
     AcademicNotFound,
+    acquire_record_lock,
     append_audit,
     next_id,
     require_active_site,
     translate_database_errors,
 )
-from core.academics.tuition_installments import allocate_payment_to_installments
+from core.academics.tuition_installments import (
+    allocate_payment_to_installments,
+    reverse_payment_from_installments,
+)
 
 
 def _dict_rows(cursor) -> list[dict[str, Any]]:
@@ -42,17 +46,28 @@ def _verify_cashier(cursor, site_code: str, actor_id: str, employee_id: str, rol
 @translate_database_errors
 def list_tuition(
     *, site_code: str, status_filter: str | None, student_slug: str | None,
+    search: str | None,
     limit: int, offset: int,
 ) -> dict[str, Any]:
     alias = require_active_site(site_code)
     where: list[str] = ["hp.ma_co_so = %s"]
     params: list[Any] = [site_code]
     if status_filter:
-        where.append("hp.trang_thai = %s")
-        params.append(status_filter)
+        if status_filter == "con_no":
+            where.append("hp.so_tien_phai_dong - hp.giam_gia - hp.so_tien_da_dong > 0")
+        else:
+            where.append("hp.trang_thai = %s")
+            params.append(status_filter)
     if student_slug:
         where.append("hv.slug = %s")
         params.append(student_slug)
+    if search:
+        where.append(
+            "(CHARINDEX(%s, hv.ho_ten) > 0 OR CHARINDEX(%s, hv.ma_hoc_vien) > 0 "
+            "OR CHARINDEX(%s, hv.slug) > 0 OR CHARINDEX(%s, lh.ten_lop) > 0 "
+            "OR CHARINDEX(%s, lh.ma_lop) > 0)"
+        )
+        params.extend([search] * 5)
     clause = " AND ".join(where)
     with connections[alias].cursor() as cursor:
         cursor.execute(
@@ -199,4 +214,190 @@ def collect_tuition(
         "payment_method": payment_method, "amount_paid": new_paid,
         "balance": new_balance, "tuition_status": new_status,
         "site_code": site_code, "replayed": False,
+    }
+
+
+@translate_database_errors
+def list_tuition_receipts(
+    *, site_code: str, tuition_id: str, actor_id: str, employee_id: str, role: str,
+) -> dict[str, Any]:
+    site_code = str(site_code).strip().upper()
+    alias = require_active_site(site_code)
+    with connections[alias].cursor() as cursor:
+        _verify_cashier(cursor, site_code, actor_id, employee_id, role)
+        cursor.execute(
+            "SELECT 1 FROM dbo.HocPhi WHERE ma_co_so = %s AND ma_hoc_phi = %s",
+            [site_code, tuition_id],
+        )
+        if cursor.fetchone() is None:
+            raise AcademicNotFound
+        cursor.execute(
+            """
+            SELECT p.ma_phieu, p.loai, p.so_tien, p.hinh_thuc, p.ngay_thu,
+                   p.ma_phieu_goc, p.ghi_chu,
+                   COALESCE((
+                       SELECT SUM(r.so_tien)
+                       FROM dbo.PhieuThu AS r
+                       WHERE r.ma_co_so = p.ma_co_so AND r.ma_phieu_goc = p.ma_phieu
+                   ), 0) AS refunded_amount
+            FROM dbo.PhieuThu AS p
+            WHERE p.ma_co_so = %s AND p.ma_hoc_phi = %s
+            ORDER BY p.ngay_thu DESC, p.ma_phieu DESC
+            """,
+            [site_code, tuition_id],
+        )
+        rows = _dict_rows(cursor)
+        for row in rows:
+            row["receipt_id"] = str(row.pop("ma_phieu"))
+            row["type"] = str(row.pop("loai"))
+            row["amount"] = int(row.pop("so_tien"))
+            row["payment_method"] = str(row.pop("hinh_thuc"))
+            row["paid_at"] = row.pop("ngay_thu").isoformat()
+            row["original_receipt_id"] = row.pop("ma_phieu_goc")
+            row["note"] = row.pop("ghi_chu")
+            row["refunded_amount"] = int(row["refunded_amount"])
+            row["refundable_amount"] = (
+                max(0, row["amount"] - row["refunded_amount"])
+                if row["type"] == "thu" else 0
+            )
+        return {"site_code": site_code, "tuition_id": tuition_id, "count": len(rows), "results": rows}
+
+
+@translate_database_errors
+def refund_tuition(
+    *, site_code: str, tuition_id: str, receipt_id: str, actor_id: str,
+    employee_id: str, role: str, idempotency_key: str, amount: int,
+    payment_method: str, reason: str, remote_ip: str,
+) -> dict[str, Any]:
+    site_code = str(site_code).strip().upper()
+    if amount <= 0 or payment_method not in {"tien_mat", "chuyen_khoan", "the"}:
+        raise AcademicInvalid("Số tiền hoặc phương thức hoàn không hợp lệ.")
+    alias = require_active_site(site_code)
+    with transaction.atomic(using=alias):
+        with connections[alias].cursor() as cursor:
+            _verify_cashier(cursor, site_code, actor_id, employee_id, role)
+            acquire_record_lock(cursor, f"tuition-refund-idempotency:{site_code}:{idempotency_key}")
+            cursor.execute(
+                """
+                SELECT so_tien_phai_dong, giam_gia, so_tien_da_dong, trang_thai
+                FROM dbo.HocPhi WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_co_so = %s AND ma_hoc_phi = %s
+                """,
+                [site_code, tuition_id],
+            )
+            fee = cursor.fetchone()
+            if fee is None:
+                raise AcademicNotFound
+
+            cursor.execute(
+                """
+                SELECT ma_phieu, ma_hoc_phi, ma_phieu_goc, so_tien, hinh_thuc, ma_nhan_vien, ghi_chu
+                FROM dbo.PhieuThu WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_co_so = %s AND khoa_idempotency = %s
+                """,
+                [site_code, idempotency_key],
+            )
+            prior = cursor.fetchone()
+            if prior is not None:
+                same_request = (
+                    str(prior[1]) == tuition_id and str(prior[2]) == receipt_id
+                    and int(prior[3]) == amount and str(prior[4]) == payment_method
+                    and str(prior[5]) == employee_id and (prior[6] or None) == reason
+                )
+                if not same_request:
+                    raise AcademicConflict("Idempotency key đã được dùng cho nội dung khác.")
+                cursor.execute(
+                    "SELECT COALESCE(SUM(so_tien), 0) FROM dbo.PhieuThu WHERE ma_co_so = %s AND ma_phieu_goc = %s",
+                    [site_code, receipt_id],
+                )
+                refunded = int(cursor.fetchone()[0])
+                amount_paid = int(fee[2])
+                balance = int(fee[0]) - int(fee[1]) - amount_paid
+                return {
+                    "receipt_id": str(prior[0]), "original_receipt_id": receipt_id,
+                    "tuition_id": tuition_id, "amount": amount,
+                    "refunded_amount": refunded, "refundable_amount": max(0, int(prior[3]) - refunded),
+                    "amount_paid": amount_paid, "balance": balance,
+                    "tuition_status": str(fee[3]), "site_code": site_code, "replayed": True,
+                }
+
+            cursor.execute(
+                """
+                SELECT so_tien, hinh_thuc
+                FROM dbo.PhieuThu WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_phieu = %s AND ma_co_so = %s AND ma_hoc_phi = %s AND loai = 'thu'
+                """,
+                [receipt_id, site_code, tuition_id],
+            )
+            original = cursor.fetchone()
+            if original is None:
+                raise AcademicNotFound
+            cursor.execute(
+                """
+                SELECT TOP (1) ma_phieu
+                FROM dbo.PhieuThu WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_co_so = %s AND ma_hoc_phi = %s
+                  AND loai = 'hoan' AND ma_phieu_goc IS NULL
+                """,
+                [site_code, tuition_id],
+            )
+            if cursor.fetchone() is not None:
+                raise AcademicConflict("Khoản học phí có phiếu hoàn cũ chưa gắn phiếu gốc; cần đối soát trước khi hoàn tiếp.")
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(so_tien), 0)
+                FROM dbo.PhieuThu WITH (UPDLOCK, HOLDLOCK)
+                WHERE ma_co_so = %s AND ma_phieu_goc = %s
+                """,
+                [site_code, receipt_id],
+            )
+            refunded = int(cursor.fetchone()[0])
+            refundable = min(int(original[0]) - refunded, int(fee[2]))
+            if amount > refundable:
+                raise AcademicConflict("Số tiền hoàn vượt khoản còn có thể hoàn.")
+
+            new_paid = int(fee[2]) - amount
+            new_balance = int(fee[0]) - int(fee[1]) - new_paid
+            new_status = "hoan_tien" if new_paid == 0 else "da_dong" if new_balance == 0 else "dong_mot_phan"
+            refund_id = next_id(cursor, site_code, "receipt")
+            cursor.execute(
+                """
+                INSERT INTO dbo.PhieuThu
+                    (ma_phieu, ma_co_so, ma_hoc_phi, ma_phieu_goc, khoa_idempotency,
+                     loai, so_tien, hinh_thuc, ma_nhan_vien, ghi_chu)
+                VALUES (%s, %s, %s, %s, %s, 'hoan', %s, %s, %s, %s)
+                """,
+                [refund_id, site_code, tuition_id, receipt_id, idempotency_key,
+                 amount, payment_method, employee_id, reason],
+            )
+            cursor.execute(
+                """
+                UPDATE dbo.HocPhi
+                SET so_tien_da_dong = %s, trang_thai = %s
+                WHERE ma_co_so = %s AND ma_hoc_phi = %s AND so_tien_da_dong >= %s
+                """,
+                [new_paid, new_status, site_code, tuition_id, amount],
+            )
+            if cursor.rowcount != 1:
+                raise AcademicConflict("Số đã thu vừa thay đổi; tải lại khoản học phí trước khi hoàn.")
+            reverse_payment_from_installments(
+                cursor, site_code=site_code, tuition_id=tuition_id,
+                amount=amount, expected_paid=int(fee[2]),
+            )
+            append_audit(
+                cursor, site_code=site_code, actor_id=actor_id,
+                action="hoan_hoc_phi", table_name="PhieuThu", record_id=refund_id,
+                remote_ip=remote_ip,
+                before={"original_receipt_id": receipt_id, "amount_paid": int(fee[2])},
+                after={"amount": amount, "payment_method": payment_method,
+                       "amount_paid": new_paid, "balance": new_balance},
+                note=reason,
+            )
+    return {
+        "receipt_id": refund_id, "original_receipt_id": receipt_id,
+        "tuition_id": tuition_id, "amount": amount,
+        "refunded_amount": refunded + amount,
+        "refundable_amount": int(original[0]) - refunded - amount,
+        "amount_paid": new_paid, "balance": new_balance,
+        "tuition_status": new_status, "site_code": site_code, "replayed": False,
     }

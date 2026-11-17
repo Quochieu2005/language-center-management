@@ -68,10 +68,11 @@ class GradeWriteSerializer(StrictSerializer):
 
 class TuitionQuerySerializer(PaginationQuerySerializer):
     status = serializers.ChoiceField(
-        choices=("chua_dong", "dong_mot_phan", "da_dong", "hoan_tien"), required=False
+        choices=("con_no", "chua_dong", "dong_mot_phan", "da_dong", "hoan_tien"), required=False
     )
     student_slug = serializers.RegexField(regex=_SLUG, max_length=160, required=False)
-    allowed_fields = {"site_code", "limit", "offset", "status", "student_slug"}
+    search = serializers.CharField(max_length=100, trim_whitespace=True, required=False)
+    allowed_fields = {"site_code", "limit", "offset", "status", "student_slug", "search"}
 
 
 class TuitionReceiptSerializer(StrictSerializer):
@@ -87,6 +88,21 @@ class TuitionReceiptSerializer(StrictSerializer):
         if any(ord(char) < 32 and char not in "\t\n\r" for char in value):
             raise serializers.ValidationError("Ghi chú chứa ký tự điều khiển không hợp lệ.")
         return value.strip() or None
+
+
+class TuitionRefundSerializer(StrictSerializer):
+    idempotency_key = serializers.UUIDField()
+    amount = serializers.IntegerField(min_value=1, max_value=999999999999999999)
+    payment_method = serializers.ChoiceField(choices=("tien_mat", "chuyen_khoan", "the"))
+    reason = serializers.CharField(max_length=500, trim_whitespace=True)
+    allowed_fields = {"idempotency_key", "amount", "payment_method", "reason"}
+
+    def validate_reason(self, value):
+        if re.search(r"(?:\d[ -]?){13,19}", value):
+            raise serializers.ValidationError("Không nhập dữ liệu thẻ hoặc thông tin thanh toán nhạy cảm vào lý do.")
+        if any(ord(char) < 32 and char not in "\t\n\r" for char in value):
+            raise serializers.ValidationError("Lý do chứa ký tự điều khiển không hợp lệ.")
+        return value.strip()
 
 
 class TuitionInvoiceSerializer(serializers.Serializer):

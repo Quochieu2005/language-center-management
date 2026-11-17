@@ -36,6 +36,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 | `DK` | Đăng ký | `CC` | Chuyển cơ sở |
 | `TOKEN` | Token đặt lại mật khẩu | `DB` | Nhật ký đồng bộ |
 | `LS` | Sự kiện lịch sử chuyển cơ sở | | |
+| `LH` | Yêu cầu liên hệ | | |
 
 > ⚠️ **Tiền tố là nơi TẠO, không phải nơi HIỆN TẠI.**
 > Các bản ghi không bao giờ di chuyển (lớp, đăng ký, học phí, điểm...) thì tiền tố luôn trùng site chứa nó.
@@ -109,6 +110,7 @@ flowchart LR
 | `PhienDangNhap`, `TokenDatLaiMatKhau`, `GiaoDichDatLaiMatKhau` | Cục bộ kỹ thuật | session/OTP/ledger xác thực | Database site cấu hình `AUTH_SESSION_SITE_CODE` |
 | `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, legacy | dấu tiến trình cho luồng purge học viên cũ | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22. DELETE hiện hành không dùng bảng này và không purge lịch sử |
 | `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
+| `YeuCauLienHe` | Phân mảnh ngang theo yêu cầu | `ma_co_so` do khách chọn và API xác nhận | Chỉ CSDL của site được chọn; Admin Big đọc GLOBAL bằng cách hỏi từng site, Admin Small chỉ đọc site được giao |
 | `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
 
 ---
@@ -398,6 +400,8 @@ Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site c
 | `ma_phieu` | PK | |
 | `ma_co_so` | FK → `CoSo` | Site lấy từ học phí cha; người thu phải thuộc site này |
 | `ma_hoc_phi` | FK → `HocPhi` | |
+| `ma_phieu_goc` | FK ghép → `PhieuThu` cùng site, *null* | Phiếu thu gốc của bút toán `hoan`; phiếu gốc không bị sửa |
+| `khoa_idempotency` | UQ có lọc, *null* | UUID chống ghi lặp bút toán hoàn; lưu cùng transaction |
 | `loai` | | `thu` · `hoan` |
 | `so_tien` | | Luôn > 0; dấu do `loai` quyết định |
 | `hinh_thuc` | | `tien_mat` · `chuyen_khoan` · `the` |
@@ -405,6 +409,8 @@ Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site c
 | `ma_nhan_vien` | FK → `NhanVien` | Người thu |
 | `ma_yeu_cau` | FK ghép, *null* → `YeuCauThanhToan` | Chỉ có khi phiếu được tạo từ thanh toán SePay; thu tại quầy để trống |
 | `ghi_chu` | | |
+
+`ma_phieu_goc` tham chiếu `(ma_phieu, ma_co_so)` nên SQL Server chặn liên kết phiếu hoàn sang site khác. API chỉ tạo `loai='hoan'` sau khi kiểm tra số còn có thể hoàn; `khoa_idempotency` có unique index lọc trên từng CSDL site. Phiếu hoàn lịch sử chưa gắn phiếu gốc được giữ nguyên; API chặn hoàn tiếp cho khoản đó đến khi đối soát.
 
 **`DotHocPhi`** (cha: `HocPhi`) là các kỳ thu phí được lưu cùng site với khoản học phí. Có mã kỳ, mã site, thứ tự kỳ, ngày đến hạn, số phải thu, số đã thu và trạng thái `chua_dong`/`dong_mot_phan`/`da_dong`.
 
@@ -550,6 +556,26 @@ Source dùng bảng này cho OTP reset mật khẩu quản trị: mã 6 số ch�
 Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_tac_dong='MonHoc'`, `ma_ban_ghi`, `site_dich`, `ket_qua='thanh_cong'`, JSON trước/sau và tài khoản Admin Big. `ma_log` xác định theo khóa idempotency và site. Dòng ACK và cập nhật `MonHoc` nằm trong cùng transaction cục bộ, nên một site không thể có ACK thành công nếu update ở site đó rollback. `Logs` là nơi ghi ACK của từng bản sao, không phải database trung tâm.
 
 ---
+
+### 6.7. Yêu cầu liên hệ website (phân mảnh ngang theo cơ sở)
+
+`YeuCauLienHe` lưu trong CSDL của site mà người gửi chọn; không nhân bản và không có database inbox trung tâm. API kiểm tra site có trong danh sách hoạt động, ghi yêu cầu và log tại cùng site trong một transaction cục bộ. Admin Big dùng Global Query để tổng hợp kết quả từ từng CSDL; Admin Small chỉ đọc site được phân công. Site lỗi phải xuất hiện trong `missing_sites`.
+
+| Cột | Ràng buộc | Mô tả |
+|-----|-----------|-------|
+| `ma_yeu_cau` | PK | Mã dạng `<SITE>-LH-000001`; sequence `Seq_LH` riêng tại từng site |
+| `ma_co_so` | FK → `CoSo` cục bộ | Site sở hữu và nhận yêu cầu |
+| `ho_ten`, `email` | Bắt buộc | Thông tin để quản trị viên liên hệ lại; email được chuẩn hóa chữ thường |
+| `so_dien_thoai` | *null* được phép | Kênh liên hệ thêm do người gửi cung cấp |
+| `tieu_de`, `noi_dung` | Bắt buộc | Nội dung form; tối đa 160 và 5.000 ký tự |
+| `trang_thai` | CHECK | `cho_xu_ly` hoặc `da_phan_hoi` |
+| `khoa_chong_lap`, `payload_hash` | UQ (`ma_co_so`, `khoa_chong_lap`) | Chống ghi trùng khi khách retry; key dùng lại với body khác bị từ chối |
+| `noi_dung_phan_hoi` | *null* khi chưa phản hồi | Phản hồi plain text đã gửi qua SMTP |
+| `ma_nguoi_phan_hoi` | Mã tài khoản lịch sử, không FK | Quản trị viên đã phản hồi; giữ dấu vết kể cả khi tài khoản bị xóa |
+| `phan_hoi_luc_utc` | *null* khi chưa phản hồi | Thời điểm SMTP chấp nhận email phản hồi |
+| `tao_luc_utc`, `cap_nhat_luc_utc` | Mặc định UTC | Thời điểm nhận yêu cầu và cập nhật trạng thái |
+
+Migration `db/39_add_contact_inbox.sql` cần chạy riêng tại từng CSDL site trước khi bật form/API. `Logs` chỉ lưu mã yêu cầu, site, hành động và trạng thái; không lưu email hoặc nội dung liên hệ. API gọi SMTP khi transaction site đang mở rồi cập nhật bản ghi; SMTP không tham gia transaction SQL. Nếu SMTP đã nhận thư nhưng commit DB lỗi, bản ghi có thể còn `cho_xu_ly` và lần gửi lại có thể gửi trùng; cần transactional outbox để loại bỏ khoảng hở. SMTP chấp nhận thư cũng chưa bảo đảm thư đã tới inbox.
 
 ## 7. Dữ liệu mẫu cho các ví dụ
 

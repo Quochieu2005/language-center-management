@@ -411,7 +411,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
             <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true }]}><Select options={siteCodes.map((value) => ({ value, label: value }))} /></Form.Item>
           </Col>}
           {isEmployeeView && <Col xs={24} md={isAdminBig ? 12 : 24}>
-            <Form.Item name="job_title" label="Chức vụ" extra="Lễ tân tiếp nhận và thao tác đăng ký/lớp; Tư vấn & xếp lớp tra cứu học viên; Kế toán ghi phiếu thu." rules={[{ required: true }]}><Select options={[
+            <Form.Item name="job_title" label="Chức vụ" extra="Lễ tân thao tác đăng ký/lớp; Tư vấn tra cứu học viên và xử lý liên hệ; Kế toán có thêm quyền lớp/đăng ký và quản lý học phí." rules={[{ required: true }]}><Select options={[
               { value: "le_tan", label: "Lễ tân" },
               { value: "tu_van", label: "Tư vấn & xếp lớp" },
               { value: "ke_toan", label: "Kế toán" },

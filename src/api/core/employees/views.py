@@ -16,6 +16,7 @@ from core.auth.account_status import (
     change_account_status,
 )
 from core.auth.authentication import AuthCookieAuthentication
+from core.auth.serializers import EmptyRequestSerializer
 from core.auth.admin_small_email import send_employee_credentials
 from core.auth.service_common import (
     AdminSmallCredentialEmailConflict,
@@ -177,6 +178,7 @@ class EmployeeCredentialEmailView(APIView):
         operation_id="employee_send_credentials_once",
         tags=["Quản lý nhân viên"],
         summary="Admin Big/Admin Small gửi mật khẩu tạm cho nhân viên một lần",
+        request=EmptyRequestSerializer,
         description=(
             "Chỉ gửi khi Logs tại site ghi nhận trạng thái chờ gửi hoặc lần gửi trước được SMTP xác nhận thất bại. "
             "Gửi thành công, đổi mật khẩu, hoặc kết quả SMTP chưa rõ sẽ khóa gửi lại. Khóa SQL Server ngăn gửi đồng thời. "

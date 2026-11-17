@@ -13,6 +13,14 @@ export type SiteCounts = {
   total_active_students: number;
   results: { site_code: string; active_students: number }[];
 };
+export type TuitionFinancialReport = {
+  scope: "LOCAL" | "GLOBAL";
+  complete: boolean;
+  missing_sites: string[];
+  site_codes: string[];
+  totals: { tuition_accounts: number; accounts_with_balance: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number };
+  results: { site_code: string; tuition_accounts: number; accounts_with_balance: number; total_due: number; net_collected: number; outstanding: number; total_collected: number; total_refunded: number }[];
+};
 export type AdminSmall = {
   admin_id: string; site_code: string; full_name: string; phone: string | null;
   account_id: string; slug: string; username: string; email: string;
@@ -114,6 +122,7 @@ export type AdminAvatarUploadIntent = AvatarUploadIntent;
 
 export const adminApi = {
   studentCounts: (site_code?: string) => apiRequest<SiteCounts>(`/admin/reports/students-by-site/${query({ site_code })}`),
+  tuitionFinancialSummary: (site_code?: string) => apiRequest<TuitionFinancialReport>(`/admin/reports/tuition-by-site/${query({ site_code })}`),
   adminSmalls: (site_code?: string, limit = 100, offset = 0) =>
     apiRequest<PageResult<AdminSmall> & { complete: boolean; missing_sites: string[]; site_codes: string[] }>(
       `/admin/admin-smalls/${query({ site_code, limit, offset })}`,

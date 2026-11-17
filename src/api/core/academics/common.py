@@ -49,6 +49,7 @@ _SEQUENCES = {
     "receipt": ("PT", "Seq_PT"),
     "sepay": ("SP", "Seq_SP"),
     "installment": ("DH", "Seq_DH"),
+    "contact": ("LH", "Seq_LH"),
     "transfer": ("CC", "Seq_CC"),
     "transfer_event": ("LS", "Seq_LS"),
     "audit": ("NK", "Seq_NK"),

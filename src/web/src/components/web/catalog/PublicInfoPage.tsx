@@ -2,6 +2,7 @@ import Link from "next/link";
 import WebFooter from "@/components/web/layout/WebFooter";
 import WebHeader from "@/components/web/layout/WebHeader";
 import BlogContent from "@/components/web/blog/BlogContent";
+import ContactRequestForm from "@/components/web/contact/ContactRequestForm";
 import { articles } from "@/lib/content/articles";
 import type { PublicBlogArticle } from "@/lib/api/blog";
 import styles from "./PublicInfoPage.module.scss";
@@ -31,5 +32,21 @@ export function ArticlePage({ article }: { article: PublicBlogArticle | null }) 
 }
 
 export function ContactPage() {
-  return <Shell title="Liên hệ"><section className={styles.hero}><p className={styles.eyebrow}>LIÊN HỆ TRUNG TÂM</p><h1>Mình có thể<br /><span>giúp bạn tìm gì?</span></h1><p className={styles.lead}>Hãy xem các thông tin công khai trên website. Kênh tư vấn trực tiếp sẽ được bổ sung khi trung tâm xác nhận thông tin liên hệ.</p></section><div className={styles.contactGrid}><article><span className={styles.contactNumber}>01 / KHÓA HỌC</span><h2>Tìm chương trình phù hợp</h2><p>Danh mục khóa học công khai hiện chưa có dữ liệu từ API.</p><Link href="/courses">Xem trạng thái khóa học ↗</Link></article><article><span className={styles.contactNumber}>02 / ĐỊA ĐIỂM</span><h2>Tìm cơ sở</h2><p>Địa chỉ và giờ hoạt động sẽ hiển thị sau khi có dữ liệu cơ sở được xác nhận.</p><Link href="/branches">Xem trạng thái cơ sở ↗</Link></article></div><section className={styles.contactSteps}><p className={styles.eyebrow}>ĐỂ TÌM THÔNG TIN NHANH</p><div><article><b>01</b><h3>Chọn nội dung</h3><p>Khóa học, chương trình hay địa điểm bạn đang quan tâm.</p></article><article><b>02</b><h3>Kiểm tra dữ liệu</h3><p>Trang sẽ hiển thị thông tin khi được hệ thống xác nhận.</p></article><article><b>03</b><h3>Liên hệ chính thức</h3><p>Kênh tư vấn sẽ được bổ sung sau khi trung tâm công bố.</p></article></div></section><aside className={styles.notice}><span aria-hidden="true">i</span><div><strong>Thông tin liên hệ chưa được công bố trong hệ thống</strong><p>Chưa có email, số điện thoại, địa chỉ hoặc biểu mẫu được kết nối. Trang này không gửi yêu cầu tư vấn.</p></div></aside><section className={styles.contactFaq}><p className={styles.eyebrow}>THÔNG TIN TRÊN WEBSITE</p><details><summary>Tôi có thể gửi yêu cầu tư vấn tại đây không?</summary><p>Chưa. Biểu mẫu chưa kết nối API, vì vậy trang không thu thập hoặc gửi thông tin cá nhân.</p></details><details><summary>Làm sao biết địa chỉ cơ sở nào đang hoạt động?</summary><p>Danh sách cơ sở sẽ được hiển thị khi dữ liệu cơ sở công khai sẵn sàng; hiện trang không tự ghi địa chỉ.</p></details><details><summary>Tôi có thể xem nội dung học tập ở đâu?</summary><p>Bạn có thể xem các bài viết tham khảo ở mục Blog hoặc khám phá các nhóm mục tiêu học tập.</p></details></section><div className={styles.contactClosing}><h2>Trong lúc chờ cập nhật, bạn có thể đọc thêm.</h2><Link href="/blog">Ghé thăm Blog <span aria-hidden="true">↗</span></Link></div></Shell>;
+  return <Shell title="Liên hệ">
+    <section className={styles.hero}>
+      <p className={styles.eyebrow}>LIÊN HỆ TRUNG TÂM</p>
+      <h1>Mình có thể<br /><span>giúp bạn tìm gì?</span></h1>
+      <p className={styles.lead}>Gửi câu hỏi đến cơ sở bạn muốn trao đổi. Trung tâm sẽ xem yêu cầu và phản hồi qua email.</p>
+    </section>
+    <ContactRequestForm />
+    <div className={styles.contactGrid}>
+      <article><span className={styles.contactNumber}>01 / KHÓA HỌC</span><h2>Tìm chương trình phù hợp</h2><p>Khám phá nội dung khóa học trước khi gửi yêu cầu tư vấn.</p><Link href="/courses">Xem khóa học ↗</Link></article>
+      <article><span className={styles.contactNumber}>02 / ĐỊA ĐIỂM</span><h2>Chọn cơ sở phụ trách</h2><p>Yêu cầu được lưu tại cơ sở bạn chọn để đội ngũ tại đó phản hồi.</p><Link href="/branches">Xem cơ sở ↗</Link></article>
+    </div>
+    <section className={styles.contactFaq}>
+      <p className={styles.eyebrow}>THÔNG TIN TRÊN WEBSITE</p>
+      <details><summary>Yêu cầu được gửi đến đâu?</summary><p>Yêu cầu được lưu trong CSDL riêng của cơ sở bạn chọn và hiển thị trong mục Liên hệ của trang quản trị.</p></details>
+      <details><summary>Trung tâm sẽ phản hồi bằng cách nào?</summary><p>Quản trị viên gửi phản hồi từ hộp thư quản trị đến email bạn cung cấp.</p></details>
+    </section>
+  </Shell>;
 }

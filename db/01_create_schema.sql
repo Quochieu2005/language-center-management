@@ -460,6 +460,8 @@ BEGIN TRY
         ma_co_so       VARCHAR(10)    NOT NULL,
         ma_hoc_phi     VARCHAR(24)    NOT NULL,
         ma_yeu_cau     VARCHAR(24)    NULL,
+        ma_phieu_goc   VARCHAR(24)    NULL,
+        khoa_idempotency CHAR(36)    NULL,
         loai           VARCHAR(10)    NOT NULL,
         so_tien        DECIMAL(18, 0) NOT NULL,
         hinh_thuc      VARCHAR(20)    NOT NULL,
@@ -467,14 +469,21 @@ BEGIN TRY
         ma_nhan_vien   VARCHAR(24)    NULL,
         ghi_chu        NVARCHAR(500)  NULL,
         CONSTRAINT PK_PhieuThu PRIMARY KEY (ma_phieu),
+        CONSTRAINT UQ_PhieuThu_ma_phieu_site UNIQUE (ma_phieu, ma_co_so),
         CONSTRAINT FK_PhieuThu_HocPhiCungCoSo FOREIGN KEY (ma_hoc_phi, ma_co_so)
             REFERENCES dbo.HocPhi(ma_hoc_phi, ma_co_so),
+        CONSTRAINT FK_PhieuThu_PhieuGocCungCoSo FOREIGN KEY (ma_phieu_goc, ma_co_so)
+            REFERENCES dbo.PhieuThu(ma_phieu, ma_co_so),
         CONSTRAINT FK_PhieuThu_NhanVienCungCoSo FOREIGN KEY (ma_nhan_vien, ma_co_so)
             REFERENCES dbo.NhanVien(ma_nhan_vien, ma_co_so),
         CONSTRAINT CK_PhieuThu_loai CHECK (loai IN ('thu', 'hoan')),
         CONSTRAINT CK_PhieuThu_so_tien CHECK (so_tien > 0),
         CONSTRAINT CK_PhieuThu_hinh_thuc CHECK (hinh_thuc IN ('tien_mat', 'chuyen_khoan', 'the'))
     );
+
+    CREATE UNIQUE INDEX UX_PhieuThu_khoa_idempotency
+        ON dbo.PhieuThu (khoa_idempotency)
+        WHERE khoa_idempotency IS NOT NULL;
 
     CREATE TABLE dbo.YeuCauThanhToan
     (

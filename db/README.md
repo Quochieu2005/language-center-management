@@ -55,6 +55,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `36_add_blog_tables.sql` | Tạo `DanhMucBlog`/`BaiVietBlog` và nạp ba bài mẫu ban đầu; chạy riêng trên từng database site trước khi dùng API Blog công khai hoặc CMS Admin Big. |
 | `37_merge_consultant_and_placement_roles.sql` | Gộp hồ sơ `xep_lop` cũ vào chức vụ `tu_van` và bỏ giá trị `xep_lop` khỏi CHECK; chạy riêng trên từng site trước khi triển khai phiên bản API mới. |
 | `38_add_student_avatar_metadata.sql` | Thêm metadata ảnh Cloudinary vào `HocVien`; chạy riêng trên mọi site trước khi triển khai API mới (luồng upload ảnh và chuyển cơ sở đều đọc các cột này). |
+| `39_add_contact_inbox.sql` | Thêm `YeuCauLienHe` để nhận form liên hệ tại từng site; cần `CoSo` và `Logs` có sẵn, chạy riêng trên mọi site trước khi bật form/API. Không tạo database trung tâm. |
+| `40_enable_tuition_refunds.sql` | Thêm tham chiếu phiếu thu gốc và UUID idempotency vào `PhieuThu`; chạy riêng trên mọi site trước khi triển khai API hoàn học phí. Phiếu hoàn cũ không bị sửa; khoản có phiếu hoàn chưa đối chiếu sẽ bị API chặn hoàn tiếp. |
 
 ## Chạy bằng SSMS
 
@@ -69,6 +71,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 9. Để bật API Blog, chạy `36_add_blog_tables.sql` riêng trên Q1, Q7, TD và mọi site mới sau khi sao lưu; script tạo bảng cùng seed giống nhau và dừng nếu chỉ có một trong hai bảng đã tồn tại. Nếu cả hai bảng đã có, script không thay đổi dữ liệu.
 10. Trước khi triển khai phiên bản gộp chức vụ, tạm dừng API/ghi nhân viên, sao lưu rồi chạy `37_merge_consultant_and_placement_roles.sql` trên **mọi** database site; script đổi `NhanVien.chuc_vu='xep_lop'` thành `'tu_van'` và cập nhật CHECK trong transaction cục bộ. Chỉ bật lại ứng dụng sau khi tất cả site hoàn tất migration.
 11. Trước khi triển khai API có upload ảnh học viên/chuyển cơ sở cập nhật, chạy `38_add_student_avatar_metadata.sql` riêng trên Q1, Q7, TD và mọi site mới; script có thể chạy lại an toàn và chỉ thêm cột còn thiếu.
+12. Trước khi bật form liên hệ/hộp thư quản trị, sao lưu rồi chạy `39_add_contact_inbox.sql` riêng trên Q1, Q7, TD và mọi site đang hoạt động; script cần `dbo.CoSo`/`dbo.Logs`, tạo bảng tại database đang chọn và không chuyển dữ liệu qua site khác. Cấu hình SMTP trong môi trường API để Admin gửi phản hồi; không đưa thông tin SMTP vào Git.
+13. Trước khi triển khai API hoàn học phí, sao lưu rồi chạy `40_enable_tuition_refunds.sql` riêng trên từng database site đang hoạt động. Migration chỉ thêm cột/ràng buộc/index tại DB đang chọn, không thay đổi phiếu đã ghi; xác nhận thành công trên đủ site trước khi bật thao tác hoàn. Đối chiếu thủ công các phiếu `loai='hoan'` cũ chưa có `ma_phieu_goc`; API sẽ từ chối hoàn tiếp cho khoản có các phiếu này đến khi được gắn đúng phiếu gốc.
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 

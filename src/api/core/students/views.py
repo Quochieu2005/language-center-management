@@ -91,10 +91,10 @@ def _resolve_admin_site(user, requested_site: str | None):
 
 def _resolve_student_list_site(user, requested_site: str | None):
     """Allow consultants to search local student profiles without provisioning or deleting."""
-    allowed_roles = {"admin_big", "admin_small", "tu_van"}
+    allowed_roles = {"admin_big", "admin_small", "tu_van", "ke_toan"}
     if user.role not in allowed_roles:
         return None, Response(
-            {"detail": "Chỉ Admin Big, Admin Small hoặc nhân viên tư vấn được tra cứu học viên."},
+            {"detail": "Tài khoản không được phép tra cứu học viên tại cơ sở."},
             status=status.HTTP_403_FORBIDDEN,
         )
     if user.role == "admin_big":
@@ -197,8 +197,9 @@ class StudentAdminCollectionView(APIView):
         tags=["Quản lý học viên"],
         summary="Liệt kê hồ sơ học viên tại một cơ sở",
         description=(
-            "Đọc LOCAL từ đúng CSDL site. Admin Big phải chọn site_code; Admin Small và tư vấn dùng site trong "
-            "phiên đăng nhập và không được chọn site khác. Tư vấn chỉ tra cứu, không cấp tài khoản hay xóa học viên. "
+            "Đọc LOCAL từ đúng CSDL site. Admin Big phải chọn site_code; Admin Small, tư vấn và kế toán dùng site trong "
+            "phiên đăng nhập và không được chọn site khác. Tư vấn chỉ tra cứu; kế toán chỉ dùng danh sách để chọn học viên khi đăng ký lớp. "
+            "Các vai trò này không cấp tài khoản hay xóa học viên. "
             "Trả slug, trạng thái, cờ đã cấp tài khoản và điều kiện hiện tại để cấp tài khoản; "
             "không đọc hoặc nối dữ liệu giữa các CSDL site."
         ),

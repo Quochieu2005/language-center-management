@@ -68,12 +68,13 @@ from core.academics.grade_views import (
     TeacherEnrollmentGradeItemView,
     TeacherEnrollmentGradesView,
 )
-from core.academics.report_views import StudentCountsBySiteView
+from core.academics.report_views import StudentCountsBySiteView, TuitionFinancialReportView
 from core.academics.transfer_views import TransferCollectionView, TransferDecisionView, TransferRetryView
 from core.academics.installment_views import TuitionInstallmentPlanView
 from core.academics.tuition_views import (
     AdminTuitionListView,
     TuitionInvoiceView,
+    TuitionRefundView,
     TuitionReceiptCreateView,
 )
 from core.academics.reminder_views import ClassTuitionReminderView
@@ -102,6 +103,12 @@ from core.blog.views import (
     AdminBlogCategoryDetailView,
     PublicBlogCategoriesView,
     PublicBlogDetailView,
+)
+from core.contacts.views import (
+    AdminContactListView,
+    AdminContactReplyView,
+    PublicContactCreateView,
+    PublicContactSiteListView,
 )
 from core.media.views import (
     AdminAvatarCompleteView,
@@ -162,6 +169,10 @@ urlpatterns = [
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),
     path("blog/categories/", PublicBlogCategoriesView.as_view(), name="public-blog-categories"),
     path("blog/<slug:slug>/", PublicBlogDetailView.as_view(), name="public-blog-detail"),
+    path("contact/sites/", PublicContactSiteListView.as_view(), name="public-contact-sites"),
+    path("contact/", PublicContactCreateView.as_view(), name="public-contact-create"),
+    path("admin/contacts/", AdminContactListView.as_view(), name="admin-contact-list"),
+    path("admin/contacts/<str:site_code>/<str:request_id>/reply/", AdminContactReplyView.as_view(), name="admin-contact-reply"),
     path("admin/blog/categories/", AdminBlogCategoryCollectionView.as_view(), name="admin-blog-categories"),
     path("admin/blog/categories/<slug:slug>/", AdminBlogCategoryDetailView.as_view(), name="admin-blog-category-detail"),
     path("admin/blog/articles/", AdminBlogArticleCollectionView.as_view(), name="admin-blog-articles"),
@@ -185,12 +196,14 @@ urlpatterns = [
     path("admin/tuition/", AdminTuitionListView.as_view(), name="tuition-list"),
     path("admin/tuition/<str:tuition_id>/installments/", TuitionInstallmentPlanView.as_view(), name="tuition-installments"),
     path("admin/tuition/<str:tuition_id>/receipts/", TuitionReceiptCreateView.as_view(), name="tuition-receipt-create"),
+    path("admin/tuition/<str:tuition_id>/receipts/<str:receipt_id>/refund/", TuitionRefundView.as_view(), name="tuition-refund-create"),
     path("admin/tuition/<str:tuition_id>/receipts/<str:receipt_id>/invoice/", TuitionInvoiceView.as_view(), name="tuition-invoice"),
     path("admin/classes/<str:class_id>/tuition-reminders/", ClassTuitionReminderView.as_view(), name="class-tuition-reminders"),
     path("admin/transfers/", TransferCollectionView.as_view(), name="transfer-request-list-create"),
     path("admin/transfers/<str:source_site>/<str:transfer_id>/decision/", TransferDecisionView.as_view(), name="transfer-request-decision"),
     path("admin/transfers/<str:source_site>/<str:transfer_id>/retry/", TransferRetryView.as_view(), name="transfer-retry"),
     path("admin/reports/students-by-site/", StudentCountsBySiteView.as_view(), name="student-counts-by-site"),
+    path("admin/reports/tuition-by-site/", TuitionFinancialReportView.as_view(), name="tuition-financial-report"),
     path("teacher/classes/", TeacherClassListView.as_view(), name="teacher-classes"),
     path("teacher/classes/<str:class_id>/sessions/", TeacherSessionListView.as_view(), name="teacher-class-sessions"),
     path("teacher/sessions/<str:session_id>/attendance/", TeacherSessionAttendanceView.as_view(), name="teacher-session-attendance"),

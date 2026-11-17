@@ -215,7 +215,7 @@ function StaffDashboard({ role }: { role?: Role }) {
 function SpaceLinks({ role }: { role?: Role }) {
   const links: { label: string; href: string; roles: Role[] }[] = [
     { label: "Học viên", href: "/admin/students", roles: ["admin_big", "admin_small", "tu_van"] },
-    { label: "Lớp và đăng ký", href: "/admin/classes", roles: ["admin_big", "admin_small", "le_tan", "tu_van"] },
+    { label: "Lớp và đăng ký", href: "/admin/classes", roles: ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"] },
     { label: "Học phí", href: "/admin/tuition", roles: ["admin_big", "admin_small", "ke_toan"] },
     { label: "Chuyển cơ sở", href: "/admin/transfers", roles: ["admin_big", "admin_small"] },
     { label: "Giáo viên", href: "/admin/teachers", roles: ["admin_big", "admin_small"] },
