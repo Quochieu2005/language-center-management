@@ -165,18 +165,21 @@ def send_class_unpaid_tuition_reminders(
     if not _smtp_ready():
         raise ReminderInfrastructureUnavailable("SMTP chưa được cấu hình.")
     alias = require_active_site(site_code)
-    if actor_role == "ke_toan":
+    employee_job = {"ke_toan": "ke_toan", "tu_van": "tu_van"}.get(actor_role)
+    if actor_role not in {"admin_big", "admin_small", "ke_toan", "tu_van"}:
+        raise PermissionError("Vai trò không được gửi nhắc học phí.")
+    if employee_job:
         with connections[alias].cursor() as cursor:
             cursor.execute(
                 """
                 SELECT TOP (1) 1 FROM dbo.NhanVien
                 WHERE ma_nhan_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
-                  AND chuc_vu = 'ke_toan' AND trang_thai = 'dang_lam'
+                  AND chuc_vu = %s AND trang_thai = 'dang_lam'
                 """,
-                [employee_id, site_code, actor_id],
+                [employee_id, site_code, actor_id, employee_job],
             )
             if cursor.fetchone() is None:
-                raise PermissionError("Tài khoản kế toán không còn hồ sơ đang làm tại site này.")
+                raise PermissionError("Tài khoản nhân viên không còn hồ sơ phù hợp tại site này.")
 
     with connections[alias].cursor() as cursor:
         cursor.execute(

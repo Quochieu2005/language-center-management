@@ -24,8 +24,8 @@ class ClassTuitionReminderView(APIView):
         tags=["Học phí - Nhắc nhở"],
         summary="Gửi email nhắc học phí còn thiếu của học viên trong lớp",
         description=(
-            "LOCAL tại CSDL của một lớp. Admin Big/Admin Small/kế toán được gọi; kế toán phải có "
-            "hồ sơ NhanVien đang làm tại site. API tính số dư từ HocPhi, gửi email cho học viên có "
+            "LOCAL tại CSDL của một lớp. Admin Big/Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp được gọi; "
+            "nhân viên phải có hồ sơ NhanVien đang làm đúng chức vụ tại site. API tính số dư từ HocPhi, gửi email cho học viên có "
             "dư nợ dương và có email, dùng Logs để không gửi lặp trong cùng ngày Việt Nam. "
             "Không đọc hoặc ghi CSDL của site khác."
         ),
@@ -45,14 +45,14 @@ class ClassTuitionReminderView(APIView):
         try:
             site = site_scope(
                 request.user, request.query_params.get("site_code"),
-                roles={"admin_big", "admin_small", "ke_toan"},
+                roles={"admin_big", "admin_small", "ke_toan", "tu_van"},
             )
             result = send_class_unpaid_tuition_reminders(
                 site_code=site, class_id=class_id, actor_id=request.user.account_id,
                 actor_role=request.user.role, employee_id=request.user.profile_id,
             )
         except PermissionError:
-            return Response({"detail": "Kế toán không còn hồ sơ đang làm tại cơ sở này."}, status=403)
+            return Response({"detail": "Tài khoản nhân viên không còn hồ sơ phù hợp tại cơ sở này."}, status=403)
         except AcademicError as exc:
             if isinstance(exc, AcademicForbidden):
                 return Response({"detail": "Bạn không có quyền truy cập cơ sở này."}, status=403)

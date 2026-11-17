@@ -11,12 +11,15 @@ export type ClassRow = {
   current_count: number; registered_count: number; remaining_seats: number; capacity_consistent: boolean;
   start_date: string; end_date: string | null; schedule: string; start_time: string; end_time: string; status: string;
 };
-export type RoomRow = { room_id: string; site_code: string; name: string; capacity: number; status: string };
+export type RoomRow = { room_id: string; site_code: string; name: string; capacity: number; status: string; class_count: number; student_count: number };
+export type RoomRosterStudent = { student_id: string; student_slug: string; student_name: string; total_due: number; amount_paid: number; balance: number; tuition_status: "chua_co_khoan_phi" | "chua_dong" | "dong_mot_phan" | "da_dong" };
+export type RoomRosterClass = { class_id: string; class_name: string; status: string; student_count: number; students: RoomRosterStudent[] };
+export type RoomRoster = { room_id: string; site_code: string; room_name: string; class_count: number; student_count: number; classes: RoomRosterClass[] };
 export type EnrollmentRow = { enrollment_id: string; student_id: string; student_slug: string; full_name: string; enrollment_status: string; student_status: string };
 export type SessionRow = { session_id: string; session_number: number; date: string; start_time: string; end_time: string; room_id: string; room_name: string; teacher_id: string; teacher_name: string; status: string; note: string | null };
 export type TuitionRow = { tuition_id: string; site_code: string; enrollment_id: string; student_id: string; student_slug: string; student_name: string; student_email: string | null; class_id: string; class_name: string; course_name: string; total_due: number; amount_paid: number; balance: number; status: string; due_date: string | null };
 export type TuitionReceipt = { receipt_id: string; type: "thu" | "hoan"; amount: number; payment_method: "tien_mat" | "chuyen_khoan" | "the"; paid_at: string; original_receipt_id: string | null; note: string | null; refunded_amount: number; refundable_amount: number };
-export type TransferRow = { transfer_id: string; source_site: string; target_site: string; student_slug: string; student_id: string; student_name: string; status: string; reason: string; requested_at: string; decision_reason?: string | null };
+export type TransferRow = { transfer_id: string; source_site: string; target_site: string; student_slug: string; student_id: string; student_name: string; status: string; reason: string; requested_at: string; decision_reason?: string | null; tuition_count: number; tuition_total_due: number; tuition_amount_paid: number; tuition_balance: number; tuition_status: "chua_co_khoan_phi" | "chua_dong" | "dong_mot_phan" | "da_dong" };
 export type StudentSePayPayment = { site_code: string; attempt_id: string; installment_id: string; amount: number; payment_code: string; bank_code: string; bank_account: string; qr_url: string; status: "cho_thanh_toan" | "da_thanh_toan" | "het_han" | "can_doi_soat" | "da_huy"; expires_at: string };
 
 export const academicsApi = {
@@ -28,6 +31,7 @@ export const academicsApi = {
   classSessions: (id: string, site_code: string) => apiRequest<ApiList<SessionRow>>(`/admin/classes/${encodeURIComponent(id)}/sessions/${query({ site_code, limit: 100 })}`),
   assignTeacher: (id: string, site_code: string, teacher_id: string) => apiRequest<ClassRow>(`/admin/classes/${encodeURIComponent(id)}/teacher/${query({ site_code })}`, { method: "PUT", body: jsonBody({ teacher_id }) }),
   rooms: (site_code?: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) => apiRequest<ApiList<RoomRow>>(`/admin/rooms/${query({ site_code, limit: 100, ...options })}`),
+  roomRoster: (id: string, site_code: string) => apiRequest<RoomRoster>(`/admin/rooms/${encodeURIComponent(id)}/${query({ site_code })}`),
   createRoom: (body: { site_code?: string; name: string; capacity: number }) => apiRequest<RoomRow>("/admin/rooms/", { method: "POST", body: jsonBody(body) }),
   updateRoom: (id: string, site_code: string, body: { name: string; capacity: number; status: string }) => apiRequest<RoomRow>(`/admin/rooms/${encodeURIComponent(id)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
   deleteRoom: (id: string, site_code: string) => apiRequest<{ room_id: string; site_code: string; deleted: boolean }>(`/admin/rooms/${encodeURIComponent(id)}/${query({ site_code })}`, { method: "DELETE" }),

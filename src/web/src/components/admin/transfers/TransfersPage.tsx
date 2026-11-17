@@ -19,6 +19,7 @@ export default function TransfersPage() {
   const [form] = Form.useForm();
   const [decisionForm] = Form.useForm();
   const isBig = user?.role === "admin_big";
+  const isSmall = user?.role === "admin_small";
   const load = useCallback(async () => {
     try {
       const result = await academicsApi.transfers();
@@ -48,11 +49,12 @@ export default function TransfersPage() {
   };
   const columns = [
     { title: "Mã", dataIndex: "transfer_id" }, { title: "Học viên", dataIndex: "student_name" }, { title: "Từ", dataIndex: "source_site" }, { title: "Đến", dataIndex: "target_site" },
+    { title: "Học phí tại cơ sở nguồn", render: (_: unknown, row: TransferRow) => <Space orientation="vertical" size={0}><Tag color={tuitionColor(row.tuition_status)}>{tuitionLabel(row.tuition_status)}</Tag><span>Phải đóng {formatMoney(row.tuition_total_due)} · đã thu {formatMoney(row.tuition_amount_paid)} · còn nợ {formatMoney(row.tuition_balance)}</span></Space> },
     { title: "Lý do", dataIndex: "reason" }, { title: "Trạng thái", dataIndex: "status", render: (value: string) => <Tag color={value === "hoan_tat" ? "green" : value === "that_bai" ? "red" : "gold"}>{value}</Tag> },
-    { title: "Thao tác", render: (_: unknown, row: TransferRow) => <Space wrap>{isBig && row.status === "cho_duyet" && <><Button size="small" type="primary" onClick={() => setDecision({ row, value: "approve" })}>Duyệt</Button><Button size="small" danger onClick={() => setDecision({ row, value: "reject" })}>Từ chối</Button></>}{isBig && ["dang_xu_ly", "that_bai"].includes(row.status) && <Popconfirm title="Tiếp tục tiến trình đã duyệt?" onConfirm={() => void retry(row)}><Button size="small">Thử phục hồi</Button></Popconfirm>}</Space> },
+    ...(isBig ? [{ title: "Thao tác", render: (_: unknown, row: TransferRow) => <Space wrap>{row.status === "cho_duyet" && <><Button size="small" type="primary" onClick={() => setDecision({ row, value: "approve" })}>Duyệt</Button><Button size="small" danger onClick={() => setDecision({ row, value: "reject" })}>Từ chối</Button></>}{["dang_xu_ly", "that_bai"].includes(row.status) && <Popconfirm title="Tiếp tục tiến trình đã duyệt?" onConfirm={() => void retry(row)}><Button size="small">Thử phục hồi</Button></Popconfirm>}</Space> }] : []),
   ];
-  return <Card title="Chuyển cơ sở" extra={!isBig && user?.role === "admin_small" ? <Button type="primary" onClick={() => setRequestOpen(true)}>Tạo đề nghị</Button> : null}>
-    <Alert type="info" showIcon title={isBig ? "Admin Big xem đề nghị bằng Global Query; duyệt/từ chối được ghi tại site nguồn. Chuyển hồ sơ chạy qua Coordinator và có thể cần phục hồi." : "Admin Small chỉ tạo đề nghị cho học viên ở cơ sở mình; chưa có dữ liệu nào chuyển đi trước khi Admin Big duyệt."} style={{ marginBottom: 16 }} />
+  return <Card title="Chuyển cơ sở" extra={isSmall ? <Button type="primary" onClick={() => setRequestOpen(true)}>Tạo đề nghị</Button> : null}>
+    <Alert type="info" showIcon title={isBig ? "Admin Big xem toàn hệ thống; quyết định được ghi tại site nguồn. Học phí hiển thị là lịch sử tại nguồn." : isSmall ? "Admin Small tạo đề nghị tại cơ sở mình. Học phí hiển thị theo dữ liệu lưu tại site nguồn." : "Chỉ xem các đề nghị tại cơ sở được phân công; không thể duyệt, từ chối hoặc retry. Học phí hiển thị theo dữ liệu lưu tại site nguồn."} style={{ marginBottom: 16 }} />
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     {!complete && <Alert type="warning" showIcon title={`Dữ liệu chưa đầy đủ. Site không phản hồi: ${missing.join(", ") || "không rõ"}`} style={{ marginBottom: 16 }} />}
     <Table rowKey={(row) => `${row.source_site}:${row.transfer_id}`} loading={loading} columns={columns} dataSource={rows} scroll={{ x: 950 }} />
@@ -62,3 +64,10 @@ export default function TransfersPage() {
 }
 
 function asMessage(error: unknown) { return error instanceof Error ? error.message : "Yêu cầu API thất bại."; }
+function formatMoney(value: number) { return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value)} đ`; }
+function tuitionLabel(status: TransferRow["tuition_status"]) {
+  return ({ chua_co_khoan_phi: "Chưa có khoản phí", chua_dong: "Chưa đóng", dong_mot_phan: "Đóng một phần", da_dong: "Đã đóng" })[status];
+}
+function tuitionColor(status: TransferRow["tuition_status"]) {
+  return ({ chua_co_khoan_phi: "default", chua_dong: "red", dong_mot_phan: "orange", da_dong: "green" })[status];
+}

@@ -209,8 +209,8 @@ flowchart LR
 |---|---|---|
 | Admin Big | Toàn hệ thống | Mặc định xem danh sách học viên, nhân viên, giáo viên, lớp và học phí qua Global Query; mỗi dòng nêu site và kết quả phải cảnh báo site thiếu. Có thể lọc về một site. Thao tác ghi hồ sơ/lớp chọn site cụ thể hoặc dùng site của bản ghi; quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; cấp tài khoản học viên theo thao tác riêng; xem thống kê/log và hộp thư đề nghị toàn cục, duyệt/từ chối đề nghị chuyển |
 | Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
-| Kế toán & Lễ tân | Một site | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/lớp; thu/hoàn học phí, xem công nợ/biên nhận; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ/phòng |
-| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, mở lớp, phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
+| Kế toán & Lễ tân | Một site | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/lớp; thu/hoàn học phí, xem công nợ/biên nhận; xem phòng, học viên theo lớp và công nợ read-only; gửi email nhắc học phí; xem đề nghị chuyển và học phí tại site nguồn, không duyệt hay quản lý phòng |
+| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, mở lớp, phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ, tạo/sửa/xuất bản bài Blog dùng chung; xem phòng/roster/công nợ, gửi email nhắc học phí và xem chuyển cơ sở read-only |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
@@ -376,7 +376,9 @@ Django xác nhận giáo viên được dạy lớp đó, học viên có đăng
 
 ### 5.5. Chuyển học viên sang cơ sở khác
 
-**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư và quyết định `GLOBAL` → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Admin Small đề nghị; Admin Big duyệt hoặc từ chối.
+**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư và quyết định `GLOBAL` → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Admin Small đề nghị; Admin Big duyệt hoặc từ chối; Kế toán & Lễ tân/Tư vấn & xếp lớp chỉ xem đề nghị tại site được giao.
+
+Kế toán & Lễ tân và Tư vấn & xếp lớp có quyền đọc-only tại site được giao để xem học viên đã chuyển, cơ sở nguồn/đích, trạng thái và tổng phải thu/đã thu/còn nợ tại CSDL nguồn. Không có quyền tạo, duyệt, từ chối hoặc retry giao dịch. Số liệu học phí lấy cùng CSDL nguồn từ `DangKy`/`HocPhi`; không JOIN sang DB đích.
 
 ```mermaid
 flowchart TD
@@ -544,7 +546,9 @@ Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ th
 
 ### 5.10.1. Quản lý phòng học
 
-**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small chỉ đọc site được phân công (`LOCAL`). Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
+**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc site được phân công (`LOCAL`). Danh sách có số lớp đang mở và số học viên duy nhất; mở rộng một phòng để xem roster theo lớp, trạng thái học phí (chưa có khoản phí/chưa đóng/đóng một phần/đã đóng) và số phải thu/đã thu/còn nợ. Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
+
+Từ roster, người có quyền gửi email nhắc học phí theo lớp cho các học viên còn nợ. API tính dư nợ tại site, yêu cầu SMTP và dùng `Logs` để không gửi lặp cùng lớp/học viên trong ngày Việt Nam. SMTP chấp nhận không chứng minh thư đã tới inbox.
 
 **Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
 
@@ -696,9 +700,10 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Tài khoản | Đăng nhập, đăng xuất, quên/đặt lại mật khẩu | `GLOBAL`, `REPLICATED-WRITE` | Người dùng nội bộ |
 | Quản trị | Tạo tài khoản, khóa/mở tài khoản, phân công Admin Small | `REPLICATED-WRITE` + `LOCAL` | Admin Big |
 | Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu; Kế toán & Lễ tân thao tác đăng ký/lớp theo quyền API và chỉ đọc danh sách trong form đăng ký |
+| Phòng học và roster | Xem phòng, lớp/học viên và trạng thái công nợ; gửi email nhắc phí | `LOCAL` đọc tại site; email ghi `Logs` tại site | Admin Big/Small, Kế toán & Lễ tân, Tư vấn & xếp lớp; chỉ Admin Big/Small CRUD phòng |
 | Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán & Lễ tân; Admin Small giám sát theo quyền |
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
-| Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX` | Admin Small đề nghị; Admin Big duyệt/từ chối |
+| Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX`; Kế toán/Tư vấn chỉ đọc tại site nguồn kèm công nợ lịch sử | Admin Small đề nghị; Admin Big duyệt/từ chối; Kế toán/Tư vấn xem read-only |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |
 | Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
 | Báo cáo | Thống kê theo site/toàn trung tâm, tra cứu log | `GLOBAL` | Admin Small, Admin Big |

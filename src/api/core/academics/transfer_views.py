@@ -38,7 +38,9 @@ class TransferCollectionView(_TransferApiView):
         summary="Liệt kê đề nghị chuyển cơ sở",
         description=(
             "Admin Big đọc hộp thư GLOBAL qua từng site; response có complete/missing_sites. "
-            "Admin Small chỉ đọc đề nghị của site trong phiên."
+            "Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc tại site trong phiên. "
+            "Mỗi dòng kèm tổng phải thu/đã thu/còn nợ được tính riêng từ DangKy/HocPhi tại site nguồn; "
+            "quyền quyết định và retry vẫn chỉ thuộc Admin Big."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),

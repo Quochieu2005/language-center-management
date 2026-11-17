@@ -31,10 +31,11 @@ from core.classes.serializers import (
     RoomDeleteResponseSerializer,
     RoomListQuerySerializer,
     RoomListResponseSerializer,
+    RoomRosterResponseSerializer,
     RoomUpdateResponseSerializer,
     RoomUpdateSerializer,
 )
-from core.classes.room_services import create_room, list_rooms, update_room
+from core.classes.room_services import create_room, list_room_rosters, list_rooms, update_room
 from core.classes.services import (
     ClassConflict,
     ClassInfrastructureUnavailable,
@@ -186,6 +187,39 @@ class RoomCollectionView(_ClassApiView):
 
 class RoomDetailView(_ClassApiView):
     throttle_scope = "class_management"
+
+    @extend_schema(
+        operation_id="room_roster",
+        tags=["Phòng học"],
+        summary="Xem lớp, học viên và công nợ theo phòng tại một cơ sở",
+        description=(
+            "Đọc LOCAL trong đúng một CSDL site. Admin Big phải chọn site_code; Admin Small, Kế toán & Lễ tân "
+            "và Tư vấn & xếp lớp chỉ xem site trong phiên. Trả các lớp sắp mở/đang học, roster hiện hành "
+            "và tổng học phí theo từng học viên; không cho sửa dữ liệu phòng hoặc hồ sơ."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={
+            200: RoomRosterResponseSerializer,
+            400: OpenApiResponse(description="Thiếu hoặc sai site_code."),
+            403: OpenApiResponse(description="Không có quyền xem site này."),
+            404: OpenApiResponse(description="Không tìm thấy phòng tại site."),
+            503: OpenApiResponse(description="CSDL site không sẵn sàng."),
+        },
+    )
+    def get(self, request, room_id: str):
+        invalid_id = _validate_record_id(room_id)
+        if invalid_id:
+            return invalid_id
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        site_code, error = _site_scope(request.user, query.validated_data.get("site_code"))
+        if error:
+            return error
+        try:
+            result = list_room_rosters(site_code=site_code, room_id=room_id)
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
 
     @extend_schema(
         operation_id="room_update",
