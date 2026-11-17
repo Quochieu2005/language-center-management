@@ -170,6 +170,23 @@ class ClassTeacherAssignSerializer(StrictInputSerializer):
         return value.strip()
 
 
+class ClassUpdateSerializer(StrictInputSerializer):
+    name = serializers.CharField(max_length=120, trim_whitespace=True, required=False)
+    capacity = serializers.IntegerField(min_value=1, max_value=300, required=False)
+    allowed_fields = {"name", "capacity"}
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value or any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Tên lớp không hợp lệ.")
+        return value
+
+    def validate(self, attrs):
+        if not (set(attrs) & {"name", "capacity"}):
+            raise serializers.ValidationError("Cần nhập tên lớp hoặc sĩ số tối đa để cập nhật.")
+        return attrs
+
+
 class EnrollmentClassAssignSerializer(StrictInputSerializer):
     site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
     target_class_id = serializers.CharField(max_length=24, trim_whitespace=True)
@@ -275,6 +292,40 @@ class RoomItemSerializer(serializers.Serializer):
     status = serializers.CharField()
 
 
+class RoomListItemSerializer(RoomItemSerializer):
+    class_count = serializers.IntegerField()
+    student_count = serializers.IntegerField()
+
+
+class RoomRosterStudentSerializer(serializers.Serializer):
+    student_id = serializers.CharField()
+    student_slug = serializers.CharField()
+    student_name = serializers.CharField()
+    total_due = serializers.IntegerField()
+    amount_paid = serializers.IntegerField()
+    balance = serializers.IntegerField()
+    tuition_status = serializers.ChoiceField(
+        choices=("chua_co_khoan_phi", "chua_dong", "dong_mot_phan", "da_dong")
+    )
+
+
+class RoomRosterClassSerializer(serializers.Serializer):
+    class_id = serializers.CharField()
+    class_name = serializers.CharField()
+    status = serializers.CharField()
+    student_count = serializers.IntegerField()
+    students = RoomRosterStudentSerializer(many=True)
+
+
+class RoomRosterResponseSerializer(serializers.Serializer):
+    room_id = serializers.CharField()
+    site_code = serializers.CharField()
+    room_name = serializers.CharField()
+    class_count = serializers.IntegerField()
+    student_count = serializers.IntegerField()
+    classes = RoomRosterClassSerializer(many=True)
+
+
 class RoomListResponseSerializer(serializers.Serializer):
     site_code = serializers.CharField(required=False)
     scope = serializers.ChoiceField(choices=("LOCAL", "GLOBAL"), required=False)
@@ -284,7 +335,7 @@ class RoomListResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField(allow_null=True)
     limit = serializers.IntegerField()
     offset = serializers.IntegerField()
-    results = RoomItemSerializer(many=True)
+    results = RoomListItemSerializer(many=True)
 
 
 class RoomCreateResponseSerializer(RoomItemSerializer):
@@ -299,6 +350,12 @@ class RoomDeleteResponseSerializer(serializers.Serializer):
     room_id = serializers.CharField()
     site_code = serializers.CharField()
     deleted = serializers.BooleanField()
+
+
+class ClassDeleteResponseSerializer(serializers.Serializer):
+    class_id = serializers.CharField()
+    site_code = serializers.CharField()
+    cancelled = serializers.BooleanField()
 
 
 class EnrollmentCreateResponseSerializer(serializers.Serializer):

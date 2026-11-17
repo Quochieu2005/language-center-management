@@ -18,8 +18,9 @@ export default function TuitionPage() {
   const site = user?.role === "admin_big" ? selectedSite : user?.site_code || null;
   const canCollect = user?.role === "ke_toan";
   const canRefund = canCollect;
-  const canManagePlan = ["admin_big", "admin_small", "ke_toan"].includes(user?.role || "");
-  const canSendReminder = canManagePlan;
+  const canViewReceipts = user?.role !== "tu_van";
+  const canManagePlan = ["admin_big", "admin_small", "tu_van"].includes(user?.role || "");
+  const canSendReminder = ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user?.role || "");
   const [rows, setRows] = useState<TuitionRow[]>([]);
   const [active, setActive] = useState<TuitionRow | null>(null);
   const [modal, setModal] = useState<"receipt" | "plan" | "refund" | null>(null);
@@ -144,7 +145,7 @@ export default function TuitionPage() {
     { title: "Học viên", dataIndex: "student_name" }, { title: "Lớp", dataIndex: "class_name" }, { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Tổng học phí", dataIndex: "total_due", render: (v: number) => money(v) }, { title: "Đã thu", dataIndex: "amount_paid", render: (v: number) => money(v) }, { title: "Còn lại", dataIndex: "balance", render: (v: number) => money(v) },
     { title: "Trạng thái", dataIndex: "status", render: (v: string) => <Tag color={v === "da_dong" ? "green" : v === "dong_mot_phan" ? "gold" : "red"}>{v}</Tag> },
-    { title: "Thao tác", render: (_: unknown, row: TuitionRow) => <Space wrap>{canCollect && <Button size="small" onClick={() => { setActive(row); setModal("receipt"); }}>Thu tiền</Button>}{canRefund && row.amount_paid > 0 && <Button size="small" danger disabled={refundLoading || refundSubmitting} onClick={() => void openRefund(row)}>Hoàn tiền</Button>}{canManagePlan && <Button size="small" onClick={() => { setActive(row); setModal("plan"); void academicsApi.installments(row.tuition_id, row.site_code).then((data) => planForm.setFieldsValue(data)).catch((e) => message.error(toMessage(e))); }}>Kế hoạch</Button>}<Button size="small" onClick={() => void openInvoice(row)}>Hóa đơn</Button>{canSendReminder && <Button size="small" onClick={() => void sendReminder(row)}>Nhắc học phí</Button>}</Space> },
+    { title: "Thao tác", render: (_: unknown, row: TuitionRow) => <Space wrap>{canCollect && <Button size="small" onClick={() => { setActive(row); setModal("receipt"); }}>Thu tiền</Button>}{canRefund && row.amount_paid > 0 && <Button size="small" danger disabled={refundLoading || refundSubmitting} onClick={() => void openRefund(row)}>Hoàn tiền</Button>}{canManagePlan && <Button size="small" onClick={() => { setActive(row); setModal("plan"); void academicsApi.installments(row.tuition_id, row.site_code).then((data) => planForm.setFieldsValue(data)).catch((e) => message.error(toMessage(e))); }}>Kế hoạch đóng</Button>}{canViewReceipts && <Button size="small" onClick={() => void openInvoice(row)}>Hóa đơn</Button>}{canSendReminder && <Button size="small" onClick={() => void sendReminder(row)}>Nhắc học phí</Button>}</Space> },
   ];
   return <Card title={`Học phí · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Button onClick={() => { void load(); void loadSummary(); }}>Tải lại</Button>}>
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}

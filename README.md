@@ -209,8 +209,8 @@ flowchart LR
 |---|---|---|
 | Admin Big | Toàn hệ thống | Mặc định xem danh sách học viên, nhân viên, giáo viên, lớp và học phí qua Global Query; mỗi dòng nêu site và kết quả phải cảnh báo site thiếu. Có thể lọc về một site. Thao tác ghi hồ sơ/lớp chọn site cụ thể hoặc dùng site của bản ghi; quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; cấp tài khoản học viên theo thao tác riêng; xem thống kê/log và hộp thư đề nghị toàn cục, duyệt/từ chối đề nghị chuyển |
 | Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
-| Kế toán & Lễ tân | Một site | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/lớp; thu/hoàn học phí, xem công nợ/biên nhận; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ/phòng |
-| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, mở lớp, phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
+| Kế toán & Lễ tân | Một site | Chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ tại site; gửi email nhắc phí; xem đề nghị chuyển cùng công nợ lịch sử ở nguồn. Kế toán vẫn xem phiếu thu và thu/hoàn; không tạo/sửa/hủy phòng/lớp/hồ sơ, đăng ký/xếp lớp hoặc sửa kế hoạch đóng |
+| Tư vấn & xếp lớp | Một site | Tra cứu hồ sơ học viên read-only; mở lớp, phân công giáo viên, đăng ký/xếp lớp; sửa tên/sĩ số lớp và hủy mềm lớp đủ điều kiện; CRUD phòng; xem công nợ, gửi nhắc phí và sửa kế hoạch đóng; xem đề nghị chuyển cùng công nợ nguồn read-only; nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
@@ -302,7 +302,7 @@ Mọi luồng bắt đầu ở giao diện web, gửi yêu cầu tới API, qua 
 
 ### 5.1. Đăng ký khóa học
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp tại site của học viên.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small hoặc Tư vấn & xếp lớp tại site của học viên. Kế toán & Lễ tân chỉ tra cứu, không đăng ký.
 
 ```mermaid
 flowchart LR
@@ -324,7 +324,7 @@ Không gửi học viên sang site khác để đăng ký lớp; nếu học ở
 
 ### 5.2. Xếp hoặc đổi lớp
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small hoặc Tư vấn & xếp lớp. Kế toán & Lễ tân chỉ xem lớp và roster.
 
 ```mermaid
 flowchart LR
@@ -376,7 +376,9 @@ Django xác nhận giáo viên được dạy lớp đó, học viên có đăng
 
 ### 5.5. Chuyển học viên sang cơ sở khác
 
-**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư và quyết định `GLOBAL` → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Admin Small đề nghị; Admin Big duyệt hoặc từ chối.
+**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư và quyết định `GLOBAL` → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Admin Small đề nghị; Admin Big duyệt hoặc từ chối; Kế toán & Lễ tân/Tư vấn & xếp lớp chỉ xem đề nghị tại site được giao.
+
+Kế toán & Lễ tân và Tư vấn & xếp lớp có quyền đọc-only tại site được giao để xem học viên đã chuyển, cơ sở nguồn/đích, trạng thái và tổng phải thu/đã thu/còn nợ tại CSDL nguồn. Không có quyền tạo, duyệt, từ chối hoặc retry giao dịch. Số liệu học phí lấy cùng CSDL nguồn từ `DangKy`/`HocPhi`; không JOIN sang DB đích.
 
 ```mermaid
 flowchart TD
@@ -521,7 +523,7 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên có hai chức vụ `ke_toan` (“Kế toán & Lễ tân”) và `tu_van` (“Tư vấn & xếp lớp”); migration 41 chuyển các hồ sơ `le_tan` hiện có sang `ke_toan`. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Kế toán & Lễ tân dùng quyền mở lớp, phân công giáo viên, đăng ký/lớp và học phí/thu/hoàn; chỉ tra cứu học viên trong form đăng ký, không mở trang quản lý hồ sơ hoặc phòng. Tư vấn có hộp thư liên hệ và được tạo/sửa/xuất bản bài Blog dùng chung, nhưng không xóa bài hoặc sửa danh mục. Blog article write là `REPLICATED-WRITE` đến mọi site hoạt động, không giới hạn theo cơ sở nhân viên.
+Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên có hai chức vụ `ke_toan` (“Kế toán & Lễ tân”) và `tu_van` (“Tư vấn & xếp lớp”); migration 41 chuyển các hồ sơ `le_tan` hiện có sang `ke_toan`. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Kế toán & Lễ tân chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ tại site; có thể gửi nhắc phí, xem báo cáo tài chính/phiếu thu và thu/hoàn; không ghi phòng/lớp/hồ sơ, không đăng ký/xếp lớp hoặc đổi kế hoạch đóng. Tư vấn đọc hồ sơ học viên, có quyền CRUD phòng; mở lớp, phân công giáo viên, đăng ký/xếp lớp; sửa tên/sĩ số và hủy mềm lớp đủ điều kiện; xem/nhắc công nợ và chỉ đổi kế hoạch đóng; xem đề nghị chuyển với công nợ lịch sử tại nguồn. Cả hai vai trò chỉ dùng dữ liệu của site được giao cho nghiệp vụ cục bộ. Tư vấn có hộp thư liên hệ và được tạo/sửa/xuất bản bài Blog dùng chung, nhưng không xóa bài hoặc sửa danh mục. Blog article write là `REPLICATED-WRITE` đến mọi site hoạt động, không giới hạn theo cơ sở nhân viên.
 
 Tạo nhân viên ghi `NhanVien` ở site công tác và nhân bản `TaiKhoan`; ảnh tùy chọn được tải trực tiếp lên Cloudinary, còn metadata ảnh cập nhật trong các bản sao `TaiKhoan`. Email cấp tài khoản dùng email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động, dù API vẫn nhận username thay thế. Danh sách nhân viên là `LOCAL` theo cơ sở đang chọn và hiển thị email, username, số điện thoại cùng `site_code`; sau khi tạo, giao diện chọn đúng site vừa tạo và tải lại danh sách. API dùng mật khẩu khởi tạo trong cấu hình backend, chỉ lưu hash, không trả mật khẩu và buộc đổi ở lần đăng nhập đầu; tạo nhân viên chỉ ghi trạng thái chờ gửi vào `Logs`, còn Admin Big/Admin Small bấm `Gửi mật khẩu` để chủ động gửi email một lần. Gửi thành công hoặc kết quả SMTP chưa rõ thì khóa gửi lại; chỉ SMTP xác nhận thất bại mới cho thử lại. Sửa chỉ cập nhật họ tên, điện thoại, chức vụ và audit trong transaction cục bộ; email/tên đăng nhập thuộc danh tính tài khoản nhân bản, còn site là vị trí phân mảnh nên không đổi tại đây. Nút trạng thái chỉ cho `active` → `inactive`; thao tác `Ngưng` thu hồi phiên nhưng không đổi tình trạng làm việc `NhanVien`, và không có nút kích hoạt lại. Nút `Xóa vĩnh viễn` xóa tài khoản, phiên, token reset và ảnh ở các bản sao; nếu hồ sơ đã được phiếu thu tham chiếu thì gỡ liên kết tài khoản, giữ hồ sơ nghỉ việc để bảo toàn chứng từ, còn hồ sơ chưa có phiếu thu được xóa vật lý. Logs và phiếu thu được giữ; site lỗi thì không báo hoàn tất và gọi lại cùng slug để tiếp tục. Các CSDL commit riêng, không phải ACID xuyên site. Chi tiết hợp đồng nằm trong [FS](fs/Functional-Specification.md), [API spec](specs/api.md) và [schema](docs/DATABASE_SCHEMA.md).
 
@@ -540,13 +542,17 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Admin Small và Tư vấn mở lớp tại site được giao. Kế toán & Lễ tân chỉ xem lớp và roster. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
+
+Tư vấn được sửa tên lớp hoặc sĩ số tối đa tại đúng site; API từ chối lớp đã kết thúc/hủy, sĩ số thấp hơn số đăng ký, hoặc vượt sức chứa phòng. Tư vấn có thể hủy mềm lớp `sap_mo` khi chưa có đăng ký và mọi buổi vẫn ở tương lai, trạng thái `du_kien`; `LopHoc`, `BuoiHoc` và `Logs` được giữ lại. Kế toán & Lễ tân chỉ đọc và không dùng các thao tác lớp/đăng ký.
 
 ### 5.10.1. Quản lý phòng học
 
-**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small chỉ đọc site được phân công (`LOCAL`). Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
+**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc site được phân công (`LOCAL`). Danh sách có số lớp đang mở và số học viên duy nhất; mở rộng một phòng để xem roster theo lớp, trạng thái học phí (chưa có khoản phí/chưa đóng/đóng một phần/đã đóng) và số phải thu/đã thu/còn nợ. Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
 
-**Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
+Từ roster, người có quyền gửi email nhắc học phí theo lớp cho các học viên còn nợ. API tính dư nợ tại site, yêu cầu SMTP và dùng `Logs` để không gửi lặp cùng lớp/học viên trong ngày Việt Nam. SMTP chấp nhận không chứng minh thư đã tới inbox.
+
+**Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small và Tư vấn & xếp lớp thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). Kế toán & Lễ tân chỉ xem. `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
 
 ### 5.11. Điểm danh buổi học
 
@@ -695,10 +701,11 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 |---|---|---|---|
 | Tài khoản | Đăng nhập, đăng xuất, quên/đặt lại mật khẩu | `GLOBAL`, `REPLICATED-WRITE` | Người dùng nội bộ |
 | Quản trị | Tạo tài khoản, khóa/mở tài khoản, phân công Admin Small | `REPLICATED-WRITE` + `LOCAL` | Admin Big |
-| Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu; Kế toán & Lễ tân thao tác đăng ký/lớp theo quyền API và chỉ đọc danh sách trong form đăng ký |
-| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán & Lễ tân; Admin Small giám sát theo quyền |
+| Học viên | Tra cứu hồ sơ, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small quản lý; Kế toán & Lễ tân/Tư vấn chỉ đọc hồ sơ; Tư vấn đăng ký/xếp lớp, Kế toán không đăng ký |
+| Phòng, lớp và roster | Xem phòng/lớp/học viên/công nợ; quản lý phòng; sửa/hủy lớp an toàn; gửi nhắc phí | `LOCAL` đọc/ghi đúng site; email ghi `Logs` tại site | Kế toán & Lễ tân chỉ đọc; Tư vấn CRUD phòng, mở/sửa/hủy lớp theo điều kiện, xem roster/công nợ |
+| Học phí | Xem công nợ, nhắc phí, kế hoạch đóng; thu/hoàn | `LOCAL` | Kế toán thu/hoàn và xem phiếu; Tư vấn chỉ xem/nhắc và sửa kế hoạch đóng |
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
-| Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX` | Admin Small đề nghị; Admin Big duyệt/từ chối |
+| Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX`; Kế toán/Tư vấn chỉ đọc tại site nguồn kèm công nợ lịch sử | Admin Small đề nghị; Admin Big duyệt/từ chối; Kế toán/Tư vấn xem read-only |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |
 | Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
 | Báo cáo | Thống kê theo site/toàn trung tâm, tra cứu log | `GLOBAL` | Admin Small, Admin Big |

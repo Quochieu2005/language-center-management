@@ -343,6 +343,8 @@ Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site c
 | `gio_bat_dau`, `gio_ket_thuc` | | |
 | `trang_thai` | | `sap_mo` · `dang_hoc` · `ket_thuc` · `huy` |
 
+Hủy lớp là hủy mềm: chỉ cho phép lớp `sap_mo` chưa có đăng ký và mọi buổi còn ở tương lai với trạng thái `du_kien`; cập nhật `trang_thai='huy'`, giữ `LopHoc`, `BuoiHoc` và `Logs`. Không xóa dữ liệu lớp hoặc lịch sử học tập.
+
 > `lich_hoc` + giờ chỉ là **mẫu** để sinh ra các dòng `BuoiHoc` khi mở lớp.
 
 **`BuoiHoc`** (dẫn xuất, cha: `LopHoc`)

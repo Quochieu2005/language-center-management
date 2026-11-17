@@ -60,7 +60,8 @@ class TuitionFinancialReportView(APIView):
         tags=["Báo cáo phân tán"],
         summary="Báo cáo công nợ, thu và hoàn học phí",
         description=(
-            "Kế toán và Admin Small chỉ đọc site trong phiên đăng nhập; Kế toán phải có hồ sơ nhân viên còn làm việc. "
+            "Admin Small và Kế toán & Lễ tân chỉ đọc site trong phiên đăng nhập; "
+            "nhân viên phải có hồ sơ còn làm việc đúng chức vụ. "
             "Admin Big có thể chọn một site hoặc đọc GLOBAL. Mỗi site được truy vấn riêng; kết quả toàn hệ thống được "
             "tổng hợp tại API gồm tổng số khoản học phí, số khoản còn nợ, phải thu, đã thu ròng, thu, hoàn và dư nợ; "
             "nêu missing_sites khi thiếu dữ liệu."

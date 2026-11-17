@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, App, Avatar, Button, Card, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Alert, App, Avatar, Button, Card, Col, Descriptions, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { SearchOutlined, UploadOutlined, UserOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { adminApi, type Student, type StudentProfileWrite } from "@/lib/api/admin";
+import { adminApi, type Student, type StudentProfile, type StudentProfileWrite } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";
 import { ApiError } from "@/lib/api/client";
 import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
@@ -42,6 +42,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   const [avatarPreview, setAvatarPreview] = useState("");
   const [pendingAvatarSync, setPendingAvatarSync] = useState<PendingStudentAvatarSync | null>(null);
   const [retryingAvatarSync, setRetryingAvatarSync] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState<StudentProfile | null>(null);
   const [loadingDetail, setLoadingDetail] = useState("");
   const [issuingSlug, setIssuingSlug] = useState("");
   const avatarInput = useRef<HTMLInputElement>(null);
@@ -49,6 +50,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   const [form] = Form.useForm<StudentProfileWrite>();
   const isAdminBig = user?.role === "admin_big";
   const canManage = isAdminBig || user?.role === "admin_small";
+  const canIssueAccount = isAdminBig || user?.role === "admin_small";
   const site = isAdminBig ? selectedSite || undefined : user?.site_code || undefined;
   const requestedSite = site === ALL_SITES ? undefined : site;
 
@@ -190,6 +192,15 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
     } finally { setLoadingDetail(""); }
   };
 
+  const openView = async (row: Student) => {
+    setLoadingDetail(row.slug);
+    try {
+      setViewingStudent(await adminApi.student(row.slug, isAdminBig ? row.site_code : undefined));
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Không tải được hồ sơ học viên.");
+    } finally { setLoadingDetail(""); }
+  };
+
   const submit = async (values: StudentProfileWrite) => {
     if (!site || (editor === "create" && site === ALL_SITES)) return;
     setSaving(true);
@@ -277,7 +288,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
       title: "Tài khoản", dataIndex: "account_issued",
       render: (issued: boolean, row: Student) => issued
         ? <Tag color="green">Đã cấp</Tag>
-        : canManage
+        : canIssueAccount
           ? <Tooltip title={row.account_issue_eligible ? undefined : "Chỉ cấp tài khoản cho hồ sơ đang học có email hợp lệ."}><span><Button size="small" disabled={!row.account_issue_eligible} loading={issuingSlug === row.slug} onClick={() => void issueAccount(row)}>Cấp tài khoản</Button></span></Tooltip>
           : <Tag>Chưa cấp</Tag>,
     },
@@ -287,7 +298,10 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
         <Button size="small" loading={loadingDetail === row.slug} onClick={() => void openEdit(row)}>Sửa</Button>
         <Button danger size="small" onClick={() => removeStudent(row)}>Xóa</Button>
       </Space>,
-    }] : []),
+    }] : [{
+      title: "Thao tác",
+      render: (_: unknown, row: Student) => <Button size="small" loading={loadingDetail === row.slug} onClick={() => void openView(row)}>Xem</Button>,
+    }]),
   ];
 
   return <>
@@ -345,6 +359,22 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
         </Row>
         <Button type="primary" htmlType="submit" block loading={saving}>{editor === "create" ? "Tạo hồ sơ" : "Lưu thay đổi"}</Button>
       </Form>
+    </Modal>
+    <Modal title="Thông tin học viên" open={Boolean(viewingStudent)} onCancel={() => setViewingStudent(null)} footer={null}>
+      {viewingStudent && <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+        <Space><Avatar size={56} src={viewingStudent.avatar_secure_url || undefined} icon={<UserOutlined />} /><Typography.Text strong>{viewingStudent.full_name}</Typography.Text></Space>
+        <Descriptions bordered size="small" column={2}>
+          <Descriptions.Item label="Mã học viên">{viewingStudent.student_id}</Descriptions.Item>
+          <Descriptions.Item label="Cơ sở">{viewingStudent.site_code}</Descriptions.Item>
+          <Descriptions.Item label="Email">{viewingStudent.email || "—"}</Descriptions.Item>
+          <Descriptions.Item label="Điện thoại">{viewingStudent.phone || "—"}</Descriptions.Item>
+          <Descriptions.Item label="Ngày sinh">{viewingStudent.birth_date || "—"}</Descriptions.Item>
+          <Descriptions.Item label="Giới tính">{viewingStudent.gender || "—"}</Descriptions.Item>
+          <Descriptions.Item label="Trạng thái">{viewingStudent.status}</Descriptions.Item>
+          <Descriptions.Item label="Ngày tạo hồ sơ">{viewingStudent.enrolled_on}</Descriptions.Item>
+          <Descriptions.Item label="Địa chỉ" span={2}>{viewingStudent.address || "—"}</Descriptions.Item>
+        </Descriptions>
+      </Space>}
     </Modal>
   </>;
 }

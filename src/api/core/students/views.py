@@ -65,12 +65,15 @@ from core.students.avatars import (
 
 
 _ADMIN_ROLES = {"admin_big", "admin_small"}
+_PROFILE_READ_ROLES = _ADMIN_ROLES | {"tu_van", "ke_toan"}
+_PROFILE_WRITE_ROLES = _ADMIN_ROLES
 
 
-def _resolve_admin_site(user, requested_site: str | None):
-    if user.role not in _ADMIN_ROLES:
+def _resolve_admin_site(user, requested_site: str | None, *, allowed_roles=None):
+    roles = _ADMIN_ROLES if allowed_roles is None else allowed_roles
+    if user.role not in roles:
         return None, Response(
-            {"detail": "Chỉ Admin Big hoặc Admin Small được quản lý hồ sơ học viên."},
+            {"detail": "Tài khoản không có quyền thao tác hồ sơ học viên tại cơ sở này."},
             status=status.HTTP_403_FORBIDDEN,
         )
     if user.role == "admin_small":
@@ -90,32 +93,16 @@ def _resolve_admin_site(user, requested_site: str | None):
 
 
 def _resolve_student_list_site(user, requested_site: str | None):
-    """Allow consultants to search local student profiles without provisioning or deleting."""
-    allowed_roles = {"admin_big", "admin_small", "tu_van", "ke_toan"}
-    if user.role not in allowed_roles:
-        return None, Response(
-            {"detail": "Tài khoản không được phép tra cứu học viên tại cơ sở."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-    if user.role == "admin_big":
-        if not requested_site:
-            return None, Response(
-                {"detail": "Admin Big cần chọn site_code."}, status=status.HTTP_400_BAD_REQUEST,
-            )
-        return requested_site, None
-    own_site = str(user.site_code or "").upper()
-    if not own_site or requested_site:
-        return None, Response(
-            {"detail": "Tài khoản chỉ được tra cứu tại cơ sở trong phiên đăng nhập."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-    return own_site, None
+    """Keep student reads and writes inside the authenticated site's scope."""
+    return _resolve_admin_site(user, requested_site, allowed_roles=_PROFILE_READ_ROLES)
 
 
-def _resolve_request_admin_site(request):
+def _resolve_request_admin_site(request, *, allowed_roles=None):
     query = StudentSiteQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
-    return _resolve_admin_site(request.user, query.validated_data.get("site_code"))
+    return _resolve_admin_site(
+        request.user, query.validated_data.get("site_code"), allowed_roles=allowed_roles
+    )
 
 
 def _student_service_error(exc):
@@ -268,12 +255,12 @@ class StudentAdminCollectionView(APIView):
             201: StudentAdminProfileSerializer,
             400: OpenApiResponse(description="Site hoặc dữ liệu hồ sơ không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng phạm vi được tạo hồ sơ."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small/Tư vấn đúng phạm vi được tạo hồ sơ."),
             503: OpenApiResponse(description="Site/CSDL chưa sẵn sàng."),
         },
     )
     def post(self, request):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_WRITE_ROLES)
         if error:
             return error
         serializer = StudentCreateSerializer(data=request.data)
@@ -374,9 +361,9 @@ class StudentAdminDetailView(APIView):
         tags=["Quản lý học viên"],
         summary="Xem và cập nhật hồ sơ học viên tại một cơ sở",
         description=(
-            "Đọc/sửa LOCAL trong HocVien của site được xác thực. Chỉ Admin Big hoặc Admin Small được phép; "
-            "Admin Big chọn site_code, Admin Small dùng site trong phiên. Không sửa hồ sơ đã chuyển đi, "
-            "đang được giao dịch chuyển xử lý, hoặc email đã gắn với tài khoản. Tư vấn chỉ đọc danh sách."
+            "Đọc LOCAL trong HocVien của site được xác thực. Admin Big chọn site_code; Admin Small, Tư vấn & xếp lớp "
+            "và Kế toán & Lễ tân dùng site trong phiên. Chỉ Admin Big/Admin Small được sửa; nhân viên chỉ đọc. "
+            "Không sửa hồ sơ đã chuyển đi, đang được giao dịch chuyển xử lý, hoặc email đã gắn với tài khoản."
         ),
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH),
                     OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
@@ -384,14 +371,14 @@ class StudentAdminDetailView(APIView):
             200: StudentAdminProfileSerializer,
             400: OpenApiResponse(description="Admin Big chưa chọn site_code hoặc site không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng phạm vi được xem hồ sơ."),
+            403: OpenApiResponse(description="Không có quyền xem hồ sơ hoặc vượt phạm vi site."),
             404: OpenApiResponse(description="Không tìm thấy hồ sơ học viên."),
             409: OpenApiResponse(description="Hồ sơ đang bị khóa bởi giao dịch chuyển hoặc tài khoản."),
             503: OpenApiResponse(description="Site/CSDL chưa sẵn sàng."),
         },
     )
     def get(self, request, slug: str):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_READ_ROLES)
         if error:
             return error
         try:
@@ -415,14 +402,14 @@ class StudentAdminDetailView(APIView):
             200: StudentAdminProfileSerializer,
             400: OpenApiResponse(description="Site hoặc dữ liệu hồ sơ không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng phạm vi được sửa hồ sơ."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small/Tư vấn đúng phạm vi được sửa hồ sơ."),
             404: OpenApiResponse(description="Không tìm thấy hồ sơ học viên."),
             409: OpenApiResponse(description="Hồ sơ đang bị khóa bởi giao dịch chuyển hoặc tài khoản."),
             503: OpenApiResponse(description="Site/CSDL chưa sẵn sàng."),
         },
     )
     def patch(self, request, slug: str):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_WRITE_ROLES)
         if error:
             return error
         serializer = StudentUpdateSerializer(data=request.data, partial=True)
@@ -455,7 +442,7 @@ class StudentAdminDetailView(APIView):
             200: StudentDeleteResponseSerializer,
             400: OpenApiResponse(description="Admin Big chưa chọn site_code hoặc site không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng phạm vi được xóa hồ sơ."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small/Tư vấn đúng phạm vi được xóa hồ sơ."),
             404: OpenApiResponse(description="Không tìm thấy hồ sơ học viên."),
             409: OpenApiResponse(description="Hồ sơ có tài khoản, đăng ký hoặc lịch sử cần được giữ."),
             429: OpenApiResponse(description="Vượt giới hạn thao tác quản lý học viên."),
@@ -463,7 +450,7 @@ class StudentAdminDetailView(APIView):
         },
     )
     def delete(self, request, slug: str):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_WRITE_ROLES)
         if error:
             return error
         try:
@@ -490,7 +477,7 @@ class StudentAvatarUploadIntentView(APIView):
         tags=["Quản lý học viên"],
         summary="Cấp chữ ký tải ảnh hồ sơ học viên lên Cloudinary",
         description=(
-            "Chỉ Admin Big/Admin Small đúng site. API tạo upload intent gắn với actor, site, slug và hồ sơ hiện tại; "
+            "Chỉ Admin Big/Admin Small/Tư vấn đúng site. API tạo upload intent gắn với actor, site, slug và hồ sơ hiện tại; "
             "ảnh được tải thẳng lên Cloudinary. Không nhận URL tùy ý hoặc để trình duyệt gửi API secret. "
             "Bước hoàn tất chỉ cập nhật metadata tại HocVien của site này (`LOCAL`)."
         ),
@@ -501,7 +488,7 @@ class StudentAvatarUploadIntentView(APIView):
             200: AdminAvatarUploadIntentResponseSerializer,
             400: OpenApiResponse(description="Site chưa chọn hoặc không hoạt động."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được tải ảnh."),
+            403: OpenApiResponse(description="Không có quyền tải ảnh hoặc vượt phạm vi site."),
             404: OpenApiResponse(description="Không tìm thấy hồ sơ học viên."),
             409: OpenApiResponse(description="Hồ sơ đã chuyển hoặc metadata ảnh chưa nhất quán."),
             429: OpenApiResponse(description="Vượt giới hạn cấp chữ ký."),
@@ -509,7 +496,7 @@ class StudentAvatarUploadIntentView(APIView):
         },
     )
     def post(self, request, slug: str):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_WRITE_ROLES)
         if error:
             return error
         serializer = EmptyRequestSerializer(data=request.data)
@@ -553,7 +540,7 @@ class StudentAvatarCompleteView(APIView):
         },
     )
     def post(self, request, slug: str):
-        site_code, error = _resolve_request_admin_site(request)
+        site_code, error = _resolve_request_admin_site(request, allowed_roles=_PROFILE_WRITE_ROLES)
         if error:
             return error
         serializer = AdminAvatarFinalizeRequestSerializer(data=request.data)

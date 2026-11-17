@@ -177,10 +177,27 @@ def _list_site_transfers(site_code: str, *, status_filter: str | None, take: int
                    g.cap_nhat_luc AS updated_at,
                    CASE WHEN g.loi_cuoi IS NULL THEN NULL
                         ELSE N'Một bước chưa hoàn tất; hãy kiểm tra site và retry/đối soát.'
-                   END AS last_error
+                   END AS last_error,
+                   fee.tuition_count, fee.total_due AS tuition_total_due,
+                   fee.amount_paid AS tuition_amount_paid, fee.balance AS tuition_balance,
+                   CASE WHEN fee.tuition_count = 0 THEN 'chua_co_khoan_phi'
+                        WHEN fee.balance <= 0 THEN 'da_dong'
+                        WHEN fee.amount_paid > 0 THEN 'dong_mot_phan'
+                        ELSE 'chua_dong'
+                   END AS tuition_status
             FROM dbo.GiaoDichChuyenCoSo AS g
             INNER JOIN dbo.HocVien AS h
                 ON h.ma_hoc_vien = g.ma_hoc_vien AND h.ma_co_so = g.co_so_nguon
+            OUTER APPLY (
+                SELECT COUNT_BIG(hp.ma_hoc_phi) AS tuition_count,
+                       COALESCE(SUM(hp.so_tien_phai_dong - hp.giam_gia), 0) AS total_due,
+                       COALESCE(SUM(hp.so_tien_da_dong), 0) AS amount_paid,
+                       COALESCE(SUM(hp.so_tien_phai_dong - hp.giam_gia - hp.so_tien_da_dong), 0) AS balance
+                FROM dbo.DangKy AS dk
+                INNER JOIN dbo.HocPhi AS hp
+                    ON hp.ma_dang_ky = dk.ma_dang_ky AND hp.ma_co_so = dk.ma_co_so
+                WHERE dk.ma_co_so = g.co_so_nguon AND dk.ma_hoc_vien = g.ma_hoc_vien
+            ) AS fee
             WHERE {where}
             ORDER BY g.ngay_tao DESC, g.ma_chuyen DESC
             OFFSET 0 ROWS FETCH NEXT %s ROWS ONLY
@@ -195,7 +212,7 @@ def list_transfer_requests(
     *, role: str, user_site: str | None, requested_site: str | None,
     status_filter: str | None, limit: int, offset: int,
 ) -> dict[str, Any]:
-    if role == "admin_small":
+    if role in {"admin_small", "ke_toan", "tu_van"}:
         if requested_site:
             raise AcademicForbidden
         sites = (str(user_site or "").strip().upper(),)

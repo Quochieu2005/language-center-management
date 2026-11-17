@@ -33,10 +33,10 @@ class _TuitionApiView(APIView):
     throttle_scope = "tuition_management"
 
 
-def _tuition_site(request, requested_site):
+def _tuition_site(request, requested_site, *, roles=None):
     return site_scope(
         request.user, requested_site,
-        roles={"admin_big", "admin_small", "ke_toan"},
+        roles=roles or {"admin_big", "admin_small", "ke_toan"},
     )
 
 
@@ -47,8 +47,9 @@ class AdminTuitionListView(_TuitionApiView):
         summary="Tra cứu học phí theo site hoặc toàn hệ thống",
         description=(
             "Admin Big bỏ site_code để đọc GLOBAL: Coordinator truy vấn từng CSDL site hoạt động rồi tổng hợp/phân trang trong API; "
-            "site lỗi được nêu trong complete=false/missing_sites. Admin Big truyền site_code để đọc LOCAL. Admin Small và kế toán "
-            "chỉ truy cập site trong phiên. Các thao tác thu/hoàn/kế hoạch vẫn ghi LOCAL tại site của khoản học phí."
+            "site lỗi được nêu trong complete=false/missing_sites. Admin Big truyền site_code để đọc LOCAL. Admin Small, Kế toán & Lễ tân "
+            "và Tư vấn & xếp lớp chỉ truy cập site trong phiên; Tư vấn chỉ đọc công nợ và gửi nhắc phí. "
+            "Các thao tác thu/hoàn/kế hoạch giữ quyền hiện có và ghi LOCAL tại site của khoản học phí."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -75,7 +76,10 @@ class AdminTuitionListView(_TuitionApiView):
                     limit=data["limit"], offset=data["offset"],
                     unavailable_exceptions=(AcademicError,),
                 ))
-            site = _tuition_site(request, data.get("site_code"))
+            site = _tuition_site(
+                request, data.get("site_code"),
+                roles={"admin_big", "admin_small", "ke_toan", "tu_van"},
+            )
             return Response(list_tuition(
                 site_code=site, status_filter=data.get("status"),
                 student_slug=data.get("student_slug"), search=data.get("search"),
