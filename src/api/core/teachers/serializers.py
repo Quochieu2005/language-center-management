@@ -107,6 +107,29 @@ class TeacherSiteQuerySerializer(StrictInputSerializer):
         return value.strip().upper()
 
 
+class TeacherAssignmentOptionsQuerySerializer(StrictInputSerializer):
+    site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
+    limit = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
+    offset = serializers.IntegerField(min_value=0, max_value=100000, required=False, default=0)
+    allowed_fields = {"site_code", "limit", "offset"}
+
+    def validate_site_code(self, value):
+        return value.strip().upper()
+
+
+class TeacherAssignmentOptionSerializer(serializers.Serializer):
+    teacher_id = serializers.CharField()
+    full_name = serializers.CharField()
+
+
+class TeacherAssignmentOptionsResponseSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    count = serializers.IntegerField()
+    limit = serializers.IntegerField()
+    offset = serializers.IntegerField()
+    results = TeacherAssignmentOptionSerializer(many=True)
+
+
 class TeacherResponseSerializer(serializers.Serializer):
     teacher_id = serializers.CharField()
     account_id = serializers.CharField(allow_null=True)

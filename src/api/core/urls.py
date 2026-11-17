@@ -24,6 +24,7 @@ from core.auth.oauth_views import (
 )
 from core.views import health_check
 from core.teachers.views import (
+    TeacherAssignmentOptionsView,
     TeacherCollectionView,
     TeacherCredentialEmailView,
     TeacherDetailView,
@@ -154,6 +155,7 @@ urlpatterns = [
     path("admin/employees/<str:slug>/avatar/upload-intents/", EmployeeAvatarUploadIntentView.as_view(), name="employee-avatar-upload-intent"),
     path("admin/employees/<str:slug>/avatar/complete/", EmployeeAvatarCompleteView.as_view(), name="employee-avatar-complete"),
     path("teachers/profile/<str:slug>/", TeacherProfileView.as_view(), name="teacher-profile"),
+    path("admin/teachers/assignment-options/", TeacherAssignmentOptionsView.as_view(), name="teacher-assignment-options"),
     path("admin/teachers/", TeacherCollectionView.as_view(), name="teacher-list-create"),
     path("admin/teachers/<str:slug>/credential-email/", TeacherCredentialEmailView.as_view(), name="teacher-credential-email"),
     path("admin/teachers/<str:slug>/status/", TeacherStatusView.as_view(), name="teacher-status"),
