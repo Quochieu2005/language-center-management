@@ -14,7 +14,7 @@ export default function RoomsPage() {
   const { user } = useSession();
   const { selectedSite, siteCodes, loadingSites } = useSiteScope();
   const isAdminBig = user?.role === "admin_big";
-  const canManage = isAdminBig || user?.role === "admin_small";
+  const canManage = isAdminBig || user?.role === "admin_small" || user?.role === "tu_van";
   const canSendReminder = canManage || user?.role === "ke_toan" || user?.role === "tu_van";
   const site = isAdminBig ? selectedSite : user?.site_code || null;
   const global = isAdminBig && site === ALL_SITES;

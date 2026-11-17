@@ -11,9 +11,10 @@ const weekdays = [2, 3, 4, 5, 6].map((value) => ({ value, label: `Thứ ${value}
 
 export default function ClassesPage() {
   const { user } = useSession();
-  const canManage = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
-  const canEnroll = canManage;
-  const canAdministerClasses = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
+  const canViewRoster = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
+  const canWriteClasses = ["admin_big", "admin_small", "tu_van"].includes(user?.role || "");
+  const canEnroll = canWriteClasses;
+  const canAdministerClasses = canWriteClasses;
   const { selectedSite, siteCodes, loadingSites, setSelectedSite } = useSiteScope();
   const isAdminBig = user?.role === "admin_big";
   const site = user?.role === "admin_big" ? selectedSite : user?.site_code || null;
@@ -30,6 +31,7 @@ export default function ClassesPage() {
   const [roster, setRoster] = useState<EnrollmentRow[]>([]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [modal, setModal] = useState<"class" | "enroll" | "move" | "teacher" | null>(null);
+  const [editingClass, setEditingClass] = useState<ClassRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [partial, setPartial] = useState<string[]>([]);
@@ -63,7 +65,7 @@ export default function ClassesPage() {
     queueMicrotask(() => {
       if (cancelled) return;
       const requests: Promise<unknown>[] = [];
-      if (modal === "class") {
+      if (modal === "class" && !editingClass) {
         requests.push(academicsApi.rooms(actionSite).then((result) => { if (!cancelled) setRooms(result.results); }));
         requests.push(adminApi.teachers(actionSite, { limit: 100 }).then((result) => { if (!cancelled) setTeachers(result.results); }));
       }
@@ -85,12 +87,13 @@ export default function ClassesPage() {
       });
     });
     return () => { cancelled = true; };
-  }, [actionSite, isAdminBig, modal]);
+  }, [actionSite, editingClass, isAdminBig, modal]);
 
   const openOperation = (next: "class" | "enroll" | "move" | "teacher", siteCode?: string) => {
     setOperationClasses([]); setRooms([]); setTeachers([]); setStudents([]); setOperationLoading(false);
     setOperationSite(siteCode || (isSpecificSite ? site || "" : operationSite));
     setOperationError("");
+    setEditingClass(null);
     classForm.resetFields();
     simpleForm.resetFields();
     setModal(next);
@@ -102,6 +105,8 @@ export default function ClassesPage() {
   const operationSiteField = isAdminBig && <Form.Item label="Cơ sở thao tác" required>
     {modal === "teacher" && detail
       ? <Input value={detail.site_code} disabled />
+      : modal === "class" && editingClass
+        ? <Input value={editingClass.site_code} disabled />
       : <Select value={operationSite || undefined} loading={loadingSites} onChange={(value) => { setOperationSite(value); setOperationError(""); setOperationClasses([]); setRooms([]); setTeachers([]); setStudents([]); setOperationLoading(false); classForm.resetFields(); simpleForm.resetFields(); }} options={siteCodes.map((value) => ({ value, label: value }))} placeholder="Chọn cơ sở để thực hiện" />}
   </Form.Item>;
   const operationAlert = operationError && <Alert type="error" showIcon title={operationError} />;
@@ -111,7 +116,7 @@ export default function ClassesPage() {
     setDetail(row); setModal(null);
     const [detailResult, rosterResult, sessionResult] = await Promise.allSettled([
       academicsApi.classDetail(row.class_id, row.site_code),
-      canManage ? academicsApi.roster(row.class_id, row.site_code) : Promise.resolve({ results: [] as EnrollmentRow[] }),
+      canViewRoster ? academicsApi.roster(row.class_id, row.site_code) : Promise.resolve({ results: [] as EnrollmentRow[] }),
       academicsApi.classSessions(row.class_id, row.site_code),
     ]);
     if (detailResult.status === "fulfilled") setDetail(detailResult.value);
@@ -121,10 +126,33 @@ export default function ClassesPage() {
   const createClass = async (values: Record<string, string | number | number[]>) => {
     if (!actionSite) return;
     try {
-      await academicsApi.createClass({ site_code: actionSite, course_id: String(values.course_id), teacher_id: String(values.teacher_id), room_id: String(values.room_id), name: String(values.name), capacity: Number(values.capacity), start_date: String(values.start_date), end_date: String(values.end_date), weekdays: values.weekdays as number[], start_time: String(values.start_time), end_time: String(values.end_time) });
-      message.success(`Đã tạo lớp và lịch tại ${actionSite}.`); setModal(null); classForm.resetFields(); refreshAfterWrite(actionSite);
+      if (editingClass) {
+        await academicsApi.updateClass(editingClass.class_id, editingClass.site_code, { name: String(values.name), capacity: Number(values.capacity) });
+        message.success(`Đã cập nhật lớp tại ${editingClass.site_code}.`);
+      } else {
+        await academicsApi.createClass({ site_code: actionSite, course_id: String(values.course_id), teacher_id: String(values.teacher_id), room_id: String(values.room_id), name: String(values.name), capacity: Number(values.capacity), start_date: String(values.start_date), end_date: String(values.end_date), weekdays: values.weekdays as number[], start_time: String(values.start_time), end_time: String(values.end_time) });
+        message.success(`Đã tạo lớp và lịch tại ${actionSite}.`);
+      }
+      setModal(null); setEditingClass(null); classForm.resetFields(); refreshAfterWrite(editingClass?.site_code || actionSite);
     } catch (error) { message.error(reason(error)); }
   };
+  const editClass = (row: ClassRow) => {
+    setOperationSite(row.site_code); setEditingClass(row); setModal("class");
+  };
+  useEffect(() => {
+    if (modal === "class" && editingClass) classForm.setFieldsValue({ name: editingClass.name, capacity: editingClass.capacity });
+  }, [classForm, editingClass, modal]);
+  const removeClass = (row: ClassRow) => Modal.confirm({
+    title: `Hủy lớp ${row.name}?`,
+    content: "Chỉ hủy lớp sắp mở chưa có đăng ký và mọi buổi học đều ở tương lai, trạng thái dự kiến. Hồ sơ lớp, lịch học và nhật ký sẽ được giữ lại.",
+    okText: "Hủy lớp", cancelText: "Quay lại", okButtonProps: { danger: true },
+    onOk: async () => {
+      try {
+        await academicsApi.deleteClass(row.class_id, row.site_code);
+        message.success(`Đã hủy lớp ${row.name}.`); refreshAfterWrite(row.site_code);
+      } catch (error) { message.error(reason(error)); }
+    },
+  });
   const enroll = async (values: { student_id: string; class_id: string }) => {
     if (!actionSite) return;
     try { await academicsApi.enroll({ site_code: actionSite, ...values }); message.success(`Đã đăng ký học tại ${actionSite}.`); setModal(null); simpleForm.resetFields(); refreshAfterWrite(actionSite); }
@@ -146,6 +174,7 @@ export default function ClassesPage() {
     { title: "Lịch", dataIndex: "schedule" }, { title: "Ngày", render: (_: unknown, row: ClassRow) => `${row.start_date} – ${row.end_date || "—"}` },
     { title: "Sĩ số", render: (_: unknown, row: ClassRow) => <span>{row.registered_count}/{row.capacity} · còn {row.remaining_seats}</span> },
     { title: "Trạng thái", dataIndex: "status", render: (value: string) => <Tag>{value}</Tag> },
+    ...(canAdministerClasses ? [{ title: "Thao tác", render: (_: unknown, row: ClassRow) => row.status === "huy" ? null : <Space><Button size="small" onClick={() => editClass(row)}>Sửa</Button><Button size="small" danger onClick={() => removeClass(row)}>Hủy lớp</Button></Space> }] : []),
   ];
   return <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
     {!site && <Alert type="warning" showIcon title="Chưa có site được chọn hoặc phiên chưa trả phạm vi cơ sở." />}
@@ -154,20 +183,22 @@ export default function ClassesPage() {
     <Card title={`Lớp học · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Space wrap>{canEnroll && <Button disabled={!canStartOperation} onClick={() => openOperation("move")}>Chuyển lớp</Button>}{canEnroll && <Button disabled={!canStartOperation} onClick={() => openOperation("enroll")}>Đăng ký học</Button>}{canAdministerClasses && <Button type="primary" onClick={() => openOperation("class")} disabled={!canStartOperation}>Mở lớp</Button>}</Space>}>
       <Table rowKey="class_id" loading={loading} columns={columns} dataSource={classes} scroll={{ x: 1000 }} />
     </Card>
-    <Modal title="Tạo lớp và lịch" open={modal === "class"} onCancel={() => setModal(null)} footer={null} width={700} destroyOnHidden><Form form={classForm} layout="vertical" onFinish={createClass}>
+    <Modal title={editingClass ? "Sửa lớp" : "Tạo lớp và lịch"} open={modal === "class"} onCancel={() => { setModal(null); setEditingClass(null); classForm.resetFields(); }} footer={null} width={700} destroyOnHidden><Form form={classForm} layout="vertical" onFinish={createClass}>
       {operationSiteField}{operationAlert}
       <Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item>
+      {editingClass ? <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item> : <>
       <Form.Item name="course_id" label="Mã khóa học có sẵn tại site" rules={[{ required: true }]}><Input maxLength={30} /></Form.Item>
       <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.filter((x) => x.status === "dang_day").map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>
       <Form.Item name="room_id" label="Phòng" rules={[{ required: true }]}><Select loading={operationLoading} options={rooms.filter((x) => x.status === "hoat_dong").map((x) => ({ value: x.room_id, label: `${x.name} · tối đa ${x.capacity}` }))} /></Form.Item>
       <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item>
       <Space wrap><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" /></Form.Item><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" /></Form.Item><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><Input type="time" /></Form.Item><Form.Item name="end_time" label="Giờ kết thúc" rules={[{ required: true }]}><Input type="time" /></Form.Item></Space>
       <Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item>
-      <Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Tạo lớp</Button>
+      </>}
+      <Button type="primary" htmlType="submit" block disabled={editingClass ? false : operationSubmitDisabled}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
     </Form></Modal>
     <Modal title="Đăng ký học viên vào lớp" open={modal === "enroll"} onCancel={() => setModal(null)} footer={null}><Form form={simpleForm} layout="vertical" onFinish={enroll}>{operationSiteField}{operationAlert}<Form.Item name="student_id" label="Học viên" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" loading={operationLoading} options={students.map((x) => ({ value: x.student_id, label: `${x.full_name} · ${x.student_id}` }))} /></Form.Item><Form.Item name="class_id" label="Lớp" rules={[{ required: true }]}><Select loading={operationLoading} options={operationClasses.map((x) => ({ value: x.class_id, label: `${x.name} · còn ${x.remaining_seats}` }))} /></Form.Item><Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Đăng ký</Button></Form></Modal>
     <Modal title="Chuyển đăng ký sang lớp khác" open={modal === "move"} onCancel={() => setModal(null)} footer={null}><Form form={simpleForm} layout="vertical" onFinish={moveEnrollment}>{operationSiteField}{operationAlert}<Form.Item name="enrollment_id" label="Mã đăng ký" rules={[{ required: true }]}><Input maxLength={24} /></Form.Item><Form.Item name="target_class_id" label="Lớp đích" rules={[{ required: true}]}><Select loading={operationLoading} options={operationClasses.map((x) => ({ value: x.class_id, label: `${x.name} · ${x.schedule}` }))} /></Form.Item><Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Xếp lớp lại</Button></Form></Modal>
-    <Modal title="Chi tiết lớp" open={Boolean(detail)} onCancel={() => setDetail(null)} footer={<Space>{canAdministerClasses && detail && (isAdminBig || site === detail.site_code) && <Button onClick={() => openOperation("teacher", detail.site_code)}>Đổi giáo viên</Button>}<Button onClick={() => setDetail(null)}>Đóng</Button></Space>} width={900}><Descriptions size="small" column={2} items={detail ? [{ key: "id", label: "Mã lớp", children: detail.class_id }, { key: "site", label: "Cơ sở", children: detail.site_code }, { key: "count", label: "Sĩ số", children: `${detail.registered_count}/${detail.capacity}` }, { key: "schedule", label: "Lịch", children: detail.schedule }] : []} /><Tabs items={[...(canManage ? [{ key: "students", label: `Học viên (${roster.length})`, children: <Table rowKey="enrollment_id" size="small" dataSource={roster} columns={[{ title: "Tên", dataIndex: "full_name" }, { title: "Mã học viên", dataIndex: "student_id" }, { title: "Đăng ký", dataIndex: "enrollment_status" }]} /> }] : []), { key: "sessions", label: `Buổi học (${sessions.length})`, children: <Table rowKey="session_id" size="small" dataSource={sessions} columns={[{ title: "Buổi", dataIndex: "session_number" }, { title: "Ngày", dataIndex: "date" }, { title: "Giờ", render: (_: unknown, x: SessionRow) => `${x.start_time}–${x.end_time}` }, { title: "Phòng", dataIndex: "room_name" }, { title: "Trạng thái", dataIndex: "status" }]} /> }]} /></Modal>
+    <Modal title="Chi tiết lớp" open={Boolean(detail)} onCancel={() => setDetail(null)} footer={<Space>{canAdministerClasses && detail && (isAdminBig || site === detail.site_code) && <Button onClick={() => openOperation("teacher", detail.site_code)}>Đổi giáo viên</Button>}<Button onClick={() => setDetail(null)}>Đóng</Button></Space>} width={900}><Descriptions size="small" column={2} items={detail ? [{ key: "id", label: "Mã lớp", children: detail.class_id }, { key: "site", label: "Cơ sở", children: detail.site_code }, { key: "count", label: "Sĩ số", children: `${detail.registered_count}/${detail.capacity}` }, { key: "schedule", label: "Lịch", children: detail.schedule }] : []} /><Tabs items={[...(canViewRoster ? [{ key: "students", label: `Học viên (${roster.length})`, children: <Table rowKey="enrollment_id" size="small" dataSource={roster} columns={[{ title: "Tên", dataIndex: "full_name" }, { title: "Mã học viên", dataIndex: "student_id" }, { title: "Đăng ký", dataIndex: "enrollment_status" }]} /> }] : []), { key: "sessions", label: `Buổi học (${sessions.length})`, children: <Table rowKey="session_id" size="small" dataSource={sessions} columns={[{ title: "Buổi", dataIndex: "session_number" }, { title: "Ngày", dataIndex: "date" }, { title: "Giờ", render: (_: unknown, x: SessionRow) => `${x.start_time}–${x.end_time}` }, { title: "Phòng", dataIndex: "room_name" }, { title: "Trạng thái", dataIndex: "status" }]} /> }]} /></Modal>
     <Modal title="Phân công giáo viên" open={modal === "teacher"} onCancel={() => setModal(null)} footer={null}><Form layout="vertical" onFinish={assignTeacher}>{operationSiteField}{operationAlert}<Form.Item name="teacher_id" label="Giáo viên đang hoạt động" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.filter((x) => x.status === "dang_day").map((x) => ({ value: x.teacher_id, label: x.full_name }))} /></Form.Item><Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Lưu phân công</Button></Form></Modal>
   </Space>;
 }

@@ -20,7 +20,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 
-_PLAN_ROLES = {"admin_big", "admin_small", "le_tan", "ke_toan"}
+_PLAN_ROLES = {"admin_big", "admin_small", "tu_van"}
 
 
 def _plan_site(request, requested_site):
@@ -64,7 +64,9 @@ class TuitionInstallmentPlanView(APIView):
         summary="Chọn đóng một lần hoặc chia học phí theo tháng",
         description=(
             "LOCAL: Chỉ được đổi kế hoạch trước lần thu đầu tiên. Kỳ chia đều, phần dư được cộng vào kỳ cuối. "
-            "Các lần thu sau được phân bổ vào kỳ chưa đóng có hạn sớm nhất; kế toán vẫn ghi phiếu thu qua endpoint receipts."
+            "Các lần thu sau được phân bổ vào kỳ chưa đóng có hạn sớm nhất; Kế toán & Lễ tân ghi phiếu thu qua endpoint receipts. "
+            "Tư vấn & xếp lớp được xem/đổi kế hoạch và chỉ điều chỉnh khoản chưa thu; không được thu/hoàn tiền. "
+            "Kế toán & Lễ tân chỉ xem kế hoạch, thu và hoàn qua endpoint receipts."
         ),
         parameters=[
             OpenApiParameter("tuition_id", str, OpenApiParameter.PATH),

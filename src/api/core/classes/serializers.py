@@ -170,6 +170,23 @@ class ClassTeacherAssignSerializer(StrictInputSerializer):
         return value.strip()
 
 
+class ClassUpdateSerializer(StrictInputSerializer):
+    name = serializers.CharField(max_length=120, trim_whitespace=True, required=False)
+    capacity = serializers.IntegerField(min_value=1, max_value=300, required=False)
+    allowed_fields = {"name", "capacity"}
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value or any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Tên lớp không hợp lệ.")
+        return value
+
+    def validate(self, attrs):
+        if not (set(attrs) & {"name", "capacity"}):
+            raise serializers.ValidationError("Cần nhập tên lớp hoặc sĩ số tối đa để cập nhật.")
+        return attrs
+
+
 class EnrollmentClassAssignSerializer(StrictInputSerializer):
     site_code = serializers.RegexField(regex=_SITE_CODE, max_length=10, required=False)
     target_class_id = serializers.CharField(max_length=24, trim_whitespace=True)
@@ -333,6 +350,12 @@ class RoomDeleteResponseSerializer(serializers.Serializer):
     room_id = serializers.CharField()
     site_code = serializers.CharField()
     deleted = serializers.BooleanField()
+
+
+class ClassDeleteResponseSerializer(serializers.Serializer):
+    class_id = serializers.CharField()
+    site_code = serializers.CharField()
+    cancelled = serializers.BooleanField()
 
 
 class EnrollmentCreateResponseSerializer(serializers.Serializer):

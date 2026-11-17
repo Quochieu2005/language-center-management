@@ -48,7 +48,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
     {
       title: "Quản lý",
       items: [
-        { label: "Hồ sơ học viên", href: "/admin/students", icon: <TeamOutlined />, roles: ["admin_big", "admin_small", "tu_van"] },
+        { label: "Hồ sơ học viên", href: "/admin/students", icon: <TeamOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
         { label: "Lớp học & Xếp lớp", href: "/admin/classes", icon: <CalendarOutlined />, roles: ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"] },
         { label: "Phòng học", href: "/admin/rooms", icon: <HomeOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
         { label: "Giáo viên", href: "/admin/teachers", icon: <UsergroupAddOutlined />, roles: ["admin_big", "admin_small"] },
@@ -57,7 +57,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
         { label: "Nhân viên", href: "/admin/employees", icon: <IdcardOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Quản lý Admin Small", href: "/admin/accounts", icon: <IdcardOutlined />, roles: ["admin_big"] },
         { label: "Chuyển cơ sở", href: "/admin/transfers", icon: <SwapOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
-        { label: "Học phí & Thu tiền", href: "/admin/tuition", icon: <DollarCircleOutlined />, roles: ["admin_big", "admin_small", "ke_toan"] },
+        { label: "Học phí & Thu tiền", href: "/admin/tuition", icon: <DollarCircleOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
         { label: user?.role === "ke_toan" ? "Báo cáo tài chính" : "Thống kê theo cơ sở", href: "/admin/reports", icon: <BarChartOutlined />, roles: ["admin_big", "admin_small", "ke_toan"] },
       ],
     },

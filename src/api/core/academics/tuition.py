@@ -89,11 +89,16 @@ def list_tuition(
             f"""
             SELECT hp.ma_hoc_phi AS tuition_id, hp.ma_dang_ky AS enrollment_id,
                    hv.ma_hoc_vien AS student_id, hv.slug AS student_slug,
-                   hv.ho_ten AS student_name, lh.ma_lop AS class_id, lh.ten_lop AS class_name,
+                   hv.ho_ten AS student_name, hv.email AS student_email,
+                   lh.ma_lop AS class_id, lh.ten_lop AS class_name, kh.ten_khoa_hoc AS course_name,
                    hp.so_tien_phai_dong AS amount_due, hp.giam_gia AS discount,
+                   hp.so_tien_phai_dong - hp.giam_gia AS total_due,
                    hp.so_tien_da_dong AS amount_paid,
                    hp.so_tien_phai_dong - hp.giam_gia - hp.so_tien_da_dong AS balance,
-                   hp.trang_thai AS status
+                   hp.trang_thai AS status,
+                   (SELECT MIN(dh.ngay_den_han) FROM dbo.DotHocPhi AS dh
+                    WHERE dh.ma_co_so = hp.ma_co_so AND dh.ma_hoc_phi = hp.ma_hoc_phi
+                      AND dh.so_tien_phai_dong > dh.so_tien_da_dong) AS due_date
             FROM dbo.HocPhi AS hp
             INNER JOIN dbo.DangKy AS dk
                 ON dk.ma_dang_ky = hp.ma_dang_ky AND dk.ma_co_so = hp.ma_co_so
@@ -101,6 +106,7 @@ def list_tuition(
                 ON hv.ma_hoc_vien = dk.ma_hoc_vien AND hv.ma_co_so = dk.ma_co_so
             INNER JOIN dbo.LopHoc AS lh
                 ON lh.ma_lop = dk.ma_lop AND lh.ma_co_so = dk.ma_co_so
+            INNER JOIN dbo.KhoaHoc AS kh ON kh.ma_khoa_hoc = lh.ma_khoa_hoc
             WHERE {clause}
             ORDER BY hp.ma_hoc_phi
             OFFSET %s ROWS FETCH NEXT %s ROWS ONLY
@@ -109,6 +115,10 @@ def list_tuition(
         )
         results = _dict_rows(cursor)
         for row in results:
+            for field in ("amount_due", "discount", "total_due", "amount_paid", "balance"):
+                row[field] = int(row[field])
+            if row["due_date"] is not None:
+                row["due_date"] = row["due_date"].isoformat()
             row["site_code"] = site_code
         return {
             "site_code": site_code, "count": count, "limit": limit,

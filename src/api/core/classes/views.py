@@ -11,8 +11,10 @@ from rest_framework.views import APIView
 
 from core.academics.common import AcademicError, global_site_list
 from core.auth.authentication import AuthCookieAuthentication
+from core.classes.mutations import delete_class, update_class
 from core.classes.serializers import (
     ClassCreateSerializer,
+    ClassDeleteResponseSerializer,
     ClassDetailResponseSerializer,
     ClassListQuerySerializer,
     ClassListResponseSerializer,
@@ -22,6 +24,7 @@ from core.classes.serializers import (
     ClassSiteQuerySerializer,
     ClassTeacherAssignSerializer,
     ClassTeacherAssignResponseSerializer,
+    ClassUpdateSerializer,
     EnrollmentClassAssignResponseSerializer,
     EnrollmentClassAssignSerializer,
     EnrollmentCreateResponseSerializer,
@@ -55,8 +58,9 @@ from core.classes.services import (
 
 
 _MANAGEMENT_ROLES = {"admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"}
-_CLASS_READ_ROLES = _MANAGEMENT_ROLES | {"ke_toan"}
-_ENROLLMENT_ROLES = _CLASS_READ_ROLES
+_CLASS_READ_ROLES = _MANAGEMENT_ROLES
+_CLASS_WRITE_ROLES = {"admin_big", "admin_small", "tu_van"}
+_ENROLLMENT_ROLES = _CLASS_WRITE_ROLES
 _SITE_RECORD_ID = re.compile(r"^[A-Za-z0-9_-]{1,24}$")
 
 
@@ -171,7 +175,7 @@ class RoomCollectionView(_ClassApiView):
             if data["site_code"] != str(request.user.site_code or "").upper():
                 return Response({"detail": "Không được chọn cơ sở khác."}, status=403)
         site_code, error = _site_scope(
-            request.user, data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+            request.user, data.get("site_code"), allowed_roles={"admin_big", "admin_small", "tu_van"}
         )
         if error:
             return error
@@ -195,7 +199,7 @@ class RoomDetailView(_ClassApiView):
         description=(
             "Đọc LOCAL trong đúng một CSDL site. Admin Big phải chọn site_code; Admin Small, Kế toán & Lễ tân "
             "và Tư vấn & xếp lớp chỉ xem site trong phiên. Trả các lớp sắp mở/đang học, roster hiện hành "
-            "và tổng học phí theo từng học viên; không cho sửa dữ liệu phòng hoặc hồ sơ."
+            "và tổng học phí theo từng học viên. Endpoint này chỉ đọc; quyền ghi phòng/hồ sơ được kiểm tra riêng."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         responses={
@@ -234,7 +238,7 @@ class RoomDetailView(_ClassApiView):
         responses={
             200: RoomUpdateResponseSerializer,
             400: OpenApiResponse(description="Thiếu site_code hoặc dữ liệu cập nhật không hợp lệ."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được sửa phòng."),
+            403: OpenApiResponse(description="Chỉ Admin Big, Admin Small hoặc Tư vấn & xếp lớp đúng site được sửa phòng."),
             404: OpenApiResponse(description="Không tìm thấy phòng tại site."),
             409: OpenApiResponse(description="Tên phòng trùng hoặc sức chứa xung đột với lớp."),
             503: OpenApiResponse(description="CSDL site không sẵn sàng."),
@@ -249,7 +253,7 @@ class RoomDetailView(_ClassApiView):
         serializer = RoomUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         site_code, error = _site_scope(
-            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small", "tu_van"}
         )
         if error:
             return error
@@ -267,7 +271,7 @@ class RoomDetailView(_ClassApiView):
         tags=["Phòng học"],
         summary="Xóa phòng học chưa được sử dụng",
         description=(
-            "Admin Big phải chọn site_code; Admin Small chỉ thao tác tại site trong phiên. Xóa LOCAL "
+            "Admin Big phải chọn site_code; Admin Small/Tư vấn & xếp lớp chỉ thao tác tại site trong phiên. Xóa LOCAL "
             "trong một CSDL site và ghi Logs cùng transaction. Từ chối nếu PhongHoc đang được LopHoc "
             "hoặc BuoiHoc tham chiếu để giữ lịch sử và toàn vẹn khóa ngoại."
         ),
@@ -276,7 +280,7 @@ class RoomDetailView(_ClassApiView):
             200: RoomDeleteResponseSerializer,
             400: OpenApiResponse(description="Mã phòng hoặc site không hợp lệ; Admin Big phải chọn site."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được xóa phòng."),
+            403: OpenApiResponse(description="Chỉ Admin Big, Admin Small hoặc Tư vấn & xếp lớp đúng site được xóa phòng."),
             404: OpenApiResponse(description="Không tìm thấy phòng tại site."),
             409: OpenApiResponse(description="Phòng đang được lớp hoặc buổi học sử dụng."),
             503: OpenApiResponse(description="CSDL site không sẵn sàng."),
@@ -289,7 +293,7 @@ class RoomDetailView(_ClassApiView):
         query = ClassSiteQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         site_code, error = _site_scope(
-            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small"}
+            request.user, query.validated_data.get("site_code"), allowed_roles={"admin_big", "admin_small", "tu_van"}
         )
         if error:
             return error
@@ -420,7 +424,7 @@ class ClassCollectionView(_ClassApiView):
         description=(
             "Tạo LopHoc cùng BuoiHoc trong một transaction cục bộ. Nếu khóa học chưa chốt số buổi, số buổi được xác định từ khoảng ngày và các thứ đã chọn. "
             "Kiểm tra khóa học, giáo viên đang dạy, phòng hoạt động/sức chứa, ngày giờ và xung đột "
-            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp dùng site phiên đăng nhập."
+            "giáo viên/phòng. Admin Big gửi site_code; Admin Small/Tư vấn & xếp lớp dùng site phiên đăng nhập. Kế toán & Lễ tân chỉ đọc lớp."
         ),
         request=ClassCreateSerializer,
         responses={
@@ -439,7 +443,9 @@ class ClassCollectionView(_ClassApiView):
         if request.user.role != "admin_big" and data.get("site_code"):
             if data["site_code"] != str(request.user.site_code or "").upper():
                 return Response({"detail": "Không được chọn cơ sở khác."}, status=403)
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles=_CLASS_WRITE_ROLES
+        )
         if error:
             return error
         try:
@@ -477,6 +483,73 @@ class ClassDetailView(_ClassApiView):
             return Response(get_class(site_code=site_code, class_id=class_id))
         except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
             return _error_response(exc)
+
+    @extend_schema(
+        operation_id="class_update",
+        tags=["Xếp lớp"],
+        summary="Sửa tên lớp hoặc sĩ số tối đa",
+        description=(
+            "Ghi LOCAL tại site sở hữu lớp. Chỉ Admin Big, Admin Small và Tư vấn & xếp lớp được sửa. "
+            "Không giảm sĩ số dưới số đăng ký hoặc vượt sức chứa phòng; API ghi Logs cùng transaction. "
+            "Giáo viên được đổi riêng qua endpoint teacher."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        request=ClassUpdateSerializer,
+        responses={200: ClassDetailResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def patch(self, request, class_id):
+        invalid_id = _validate_record_id(class_id)
+        if invalid_id:
+            return invalid_id
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        serializer = ClassUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles=_CLASS_WRITE_ROLES
+        )
+        if error:
+            return error
+        try:
+            result = update_class(
+                site_code=site_code, class_id=class_id, actor_id=request.user.account_id,
+                remote_ip=_remote_ip(request), **serializer.validated_data,
+            )
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
+
+    @extend_schema(
+        operation_id="class_delete",
+        tags=["Xếp lớp"],
+        summary="Hủy mềm lớp sắp mở chưa phát sinh nghiệp vụ",
+        description=(
+            "Ghi LOCAL tại site sở hữu lớp. Chỉ Admin Big, Admin Small và Tư vấn & xếp lớp được hủy. "
+            "Chỉ hủy lớp trạng thái sap_mo không có đăng ký và mọi BuoiHoc còn ở tương lai, trạng thái du_kien. "
+            "LopHoc chuyển sang trang_thai=huy; lớp, BuoiHoc và Logs được giữ lại."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={200: ClassDeleteResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def delete(self, request, class_id):
+        invalid_id = _validate_record_id(class_id)
+        if invalid_id:
+            return invalid_id
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles=_CLASS_WRITE_ROLES
+        )
+        if error:
+            return error
+        try:
+            result = delete_class(
+                site_code=site_code, class_id=class_id,
+                actor_id=request.user.account_id, remote_ip=_remote_ip(request),
+            )
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
 
 
 class ClassRosterView(_ClassApiView):
@@ -570,7 +643,7 @@ class ClassTeacherAssignView(_ClassApiView):
         summary="Phân công hoặc đổi giáo viên cho lớp",
         description=(
             "Đổi giáo viên ở LopHoc và chỉ cập nhật các BuoiHoc tương lai chưa diễn ra; buổi lịch sử "
-            "được giữ nguyên. Kiểm tra giáo viên đang dạy và lịch trùng tại cùng site."
+            "được giữ nguyên. Kiểm tra giáo viên đang dạy và lịch trùng tại cùng site. Chỉ Admin Big, Admin Small và Tư vấn & xếp lớp được ghi; Kế toán & Lễ tân chỉ đọc."
         ),
         request=ClassTeacherAssignSerializer,
         responses={200: ClassTeacherAssignResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 404: OpenApiResponse(), 409: OpenApiResponse(), 503: OpenApiResponse()},
@@ -585,7 +658,9 @@ class ClassTeacherAssignView(_ClassApiView):
         if request.user.role != "admin_big" and data.get("site_code"):
             if data["site_code"] != str(request.user.site_code or "").upper():
                 return Response({"detail": "Không được chọn cơ sở khác."}, status=403)
-        site_code, error = _site_scope(request.user, data.get("site_code"))
+        site_code, error = _site_scope(
+            request.user, data.get("site_code"), allowed_roles=_CLASS_WRITE_ROLES
+        )
         if error:
             return error
         try:
