@@ -86,8 +86,10 @@ def _audiences(role: str) -> tuple[str, ...]:
     if role == "admin_big":
         return ("admin_all", "admin_big")
     if role == "admin_small":
-        return ("admin_all", "admin_small")
-    raise PermissionError("Chỉ quản trị viên được xem thông báo quản trị.")
+        return ("admin_all", "admin_small", "site_staff")
+    if role in {"ke_toan", "tu_van"}:
+        return ("site_staff",)
+    raise PermissionError("Vai trò không được xem thông báo tại cơ sở.")
 
 
 def _live_tuition_summary(site_code: str) -> dict[str, Any] | None:
@@ -147,6 +149,7 @@ def _site_counts(site_code: str, role: str, category: str | None) -> int:
     alias = get_site_database_alias(site_code)
     audience = _audiences(role)
     category_sql = " AND n.danh_muc = %s" if category else ""
+    audience_sql = ", ".join("%s" for _ in audience)
     params: list[Any] = [*audience]
     if category:
         params.append(category)
@@ -156,7 +159,7 @@ def _site_counts(site_code: str, role: str, category: str | None) -> int:
                 f"""
                 SELECT COUNT_BIG(*)
                 FROM dbo.ThongBao AS n
-                WHERE n.doi_tuong IN (%s, %s){category_sql}
+                WHERE n.doi_tuong IN ({audience_sql}){category_sql}
                   {_AUTO_SUMMARY_EVENT_FILTER}
                 """,
                 params,
@@ -172,6 +175,7 @@ def _site_items(
     alias = get_site_database_alias(site_code)
     audience = _audiences(role)
     category_sql = " AND n.danh_muc = %s" if category else ""
+    audience_sql = ", ".join("%s" for _ in audience)
     params: list[Any] = [*audience]
     if category:
         params.append(category)
@@ -183,7 +187,7 @@ def _site_items(
                 SELECT n.slug, n.ma_co_so, n.danh_muc, n.muc_do,
                        n.tieu_de, n.noi_dung, n.duong_dan, n.tao_luc_utc
                 FROM dbo.ThongBao AS n
-                WHERE n.doi_tuong IN (%s, %s){category_sql}
+                WHERE n.doi_tuong IN ({audience_sql}){category_sql}
                   {_AUTO_SUMMARY_EVENT_FILTER}
                 ORDER BY n.tao_luc_utc DESC, n.slug DESC
                 OFFSET 0 ROWS FETCH NEXT %s ROWS ONLY
@@ -213,12 +217,14 @@ def list_notifications(
     site_code: str | None = None, category: str | None = None,
     limit: int = 20, offset: int = 0,
 ) -> dict[str, Any]:
-    if role == "admin_small":
+    if role in {"admin_small", "ke_toan", "tu_van"}:
         if site_code:
-            raise PermissionError("Admin Small không được chọn site trong request.")
+            raise PermissionError("Nhân viên cơ sở chỉ được xem thông báo tại site được gán.")
         sites, missing = _local_site(user_site_code), ()
-    else:
+    elif role == "admin_big":
         sites, missing = _global_sites(site_code)
+    else:
+        raise PermissionError("Vai trò không được xem thông báo.")
 
     total_count = 0
     results: list[dict[str, Any]] = []

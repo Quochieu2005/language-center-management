@@ -35,6 +35,7 @@ export default function NotificationsPage() {
   const [form] = Form.useForm<CreateAdminNotification>();
   const submission = useRef<{ signature: string; key: string } | null>(null);
   const isAdminBig = user?.role === "admin_big";
+  const canCreate = user?.role === "admin_big" || user?.role === "admin_small";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,7 +132,7 @@ export default function NotificationsPage() {
   return <Card
     title="Thông báo hệ thống"
     extra={<Space wrap>
-      <Button type="primary" onClick={openCreate}>Tạo thông báo</Button>
+      {canCreate && <Button type="primary" onClick={openCreate}>Tạo thông báo</Button>}
       {isAdminBig && <Select
         aria-label="Lọc thông báo theo cơ sở"
         value={siteFilter}

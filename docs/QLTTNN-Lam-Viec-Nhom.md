@@ -24,7 +24,7 @@ Nhóm gán tên thật vào các vai trò dưới đây. Đây là đề xuất 
 | D. Học viên và nghiệp vụ cơ sở | Hồ sơ, lớp, đăng ký/đổi lớp, học phí/phiếu thu, quy tắc cùng site | Cùng A xác nhận FK cục bộ; cùng B dùng đúng router; cùng E đối chiếu điểm danh |
 | E. Học tập, báo cáo và demo | Buổi học, điểm danh, điểm, thống kê, nhật ký màn hình và kịch bản demo | Cùng D thống nhất đăng ký/buổi học; cùng B gộp thống kê; cùng cả nhóm kiểm tra quyền |
 
-Chuyển cơ sở là công việc liên chức năng: B làm điều phối; A xác định lưu trạng thái và ràng buộc DB; D bảo đảm trạng thái học viên/lớp; C kiểm tra Admin Small/Tư vấn chỉ tạo đề nghị còn Admin Big mới duyệt/từ chối; E kiểm tra hộp thư Global Query, nhật ký, lịch sử và thống kê sau chuyển. Cả nhóm có thể review kịch bản lỗi; Pull Request vẫn phải được trưởng nhóm Quốc Hiếu kiểm tra và merge theo quy trình ở mục 5.
+Chuyển cơ sở là công việc liên chức năng: B làm điều phối; A xác định lưu trạng thái và ràng buộc DB; D bảo đảm trạng thái học viên/lớp; C kiểm tra Admin Small/Tư vấn tạo đề nghị, Admin Big hoặc Admin Small tại site nhận duyệt/từ chối đúng phạm vi; E kiểm tra hộp thư Global Query, thông báo site nhận, giữ tài khoản, nhật ký, lịch sử và thống kê sau chuyển. Cả nhóm có thể review kịch bản lỗi; Pull Request vẫn phải được trưởng nhóm Quốc Hiếu kiểm tra và merge theo quy trình ở mục 5.
 
 Mỗi vai trò chịu trách nhiệm phần giao diện của domain mình nếu có giao diện. Không dồn toàn bộ frontend vào một người ở cuối dự án.
 

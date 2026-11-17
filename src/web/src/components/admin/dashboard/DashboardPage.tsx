@@ -217,11 +217,11 @@ function SpaceLinks({ role }: { role?: Role }) {
     { label: "Học viên", href: "/admin/students", roles: ["admin_big", "admin_small", "tu_van"] },
     { label: "Lớp và đăng ký", href: "/admin/classes", roles: ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"] },
     { label: "Học phí", href: "/admin/tuition", roles: ["admin_big", "admin_small", "ke_toan"] },
-    { label: "Chuyển cơ sở", href: "/admin/transfers", roles: ["admin_big", "admin_small"] },
+    { label: "Chuyển cơ sở", href: "/admin/transfers", roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
     { label: "Giáo viên", href: "/admin/teachers", roles: ["admin_big", "admin_small"] },
     { label: "Nhân viên", href: "/admin/employees", roles: ["admin_big", "admin_small"] },
     { label: "Admin Small", href: "/admin/accounts", roles: ["admin_big"] },
-    { label: "Thông báo", href: "/admin/notifications", roles: ["admin_big", "admin_small"] },
+    { label: "Thông báo", href: "/admin/notifications", roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
     { label: "Nhật ký Admin", href: "/admin/audit", roles: ["admin_big", "admin_small"] },
     { label: "Báo cáo", href: "/admin/reports", roles: ["admin_big", "admin_small"] },
   ];

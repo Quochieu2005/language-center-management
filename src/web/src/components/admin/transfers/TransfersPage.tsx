@@ -53,7 +53,7 @@ export default function TransfersPage() {
     return () => { cancelled = true; };
   }, []);
   const create = async (values: { student_slug: string; target_site: string; reason: string }) => {
-    try { await academicsApi.requestTransfer(values); message.success("Đã gửi đề nghị tại cơ sở nguồn để Admin Big duyệt."); setRequestOpen(false); form.resetFields(); void load(); }
+    try { await academicsApi.requestTransfer(values); message.success("Đã gửi đề nghị; Admin Big hoặc Admin Small cơ sở nhận có thể duyệt."); setRequestOpen(false); form.resetFields(); void load(); }
     catch (reason) { message.error(asMessage(reason)); }
   };
   const decide = async (values: { reason?: string }) => {
@@ -65,14 +65,21 @@ export default function TransfersPage() {
     try { const result = await academicsApi.retryTransfer(row.source_site, row.transfer_id); message.success(result.complete ? "Đã hoàn tất khôi phục giao dịch." : "Giao dịch vẫn chưa hoàn tất; kiểm tra site thiếu rồi thử lại."); void load(); }
     catch (reason) { message.error(asMessage(reason)); }
   };
+  const infoText = isBig
+    ? "Admin Big xem toàn hệ thống và có thể duyệt mọi đề nghị; quyết định được ghi tại site nguồn. Học phí là lịch sử tại nguồn."
+    : isSmall
+      ? "Admin Small tạo đề nghị ở site mình và có thể duyệt đề nghị gửi tới site mình; chỉ Admin Big được retry. Học phí là lịch sử tại nguồn."
+      : canRequest
+        ? "Tư vấn & xếp lớp tạo đề nghị tại site mình; Admin Big hoặc Admin Small cơ sở nhận duyệt. Khi chuyển xong, nhân sự cơ sở nhận được thông báo để xếp lớp/phòng. Học phí là lịch sử tại nguồn."
+        : "Chỉ xem đề nghị tại cơ sở được phân công; không thể tạo, duyệt, từ chối hoặc retry. Học phí là lịch sử tại nguồn.";
   const columns = [
     { title: "Mã", dataIndex: "transfer_id" }, { title: "Học viên", dataIndex: "student_name" }, { title: "Từ", dataIndex: "source_site" }, { title: "Đến", dataIndex: "target_site" },
     { title: "Học phí tại cơ sở nguồn", render: (_: unknown, row: TransferRow) => <Space orientation="vertical" size={0}><Tag color={tuitionColor(row.tuition_status)}>{tuitionLabel(row.tuition_status)}</Tag><span>Phải đóng {formatMoney(row.tuition_total_due)} · đã thu {formatMoney(row.tuition_amount_paid)} · còn nợ {formatMoney(row.tuition_balance)}</span></Space> },
     { title: "Lý do", dataIndex: "reason" }, { title: "Trạng thái", dataIndex: "status", render: (value: string) => <Tag color={value === "hoan_tat" ? "green" : value === "that_bai" ? "red" : "gold"}>{value}</Tag> },
-    ...(isBig ? [{ title: "Thao tác", render: (_: unknown, row: TransferRow) => <Space wrap>{row.status === "cho_duyet" && <><Button size="small" type="primary" onClick={() => setDecision({ row, value: "approve" })}>Duyệt</Button><Button size="small" danger onClick={() => setDecision({ row, value: "reject" })}>Từ chối</Button></>}{["dang_xu_ly", "that_bai"].includes(row.status) && <Popconfirm title="Tiếp tục tiến trình đã duyệt?" onConfirm={() => void retry(row)}><Button size="small">Thử phục hồi</Button></Popconfirm>}</Space> }] : []),
+    ...(isBig || isSmall ? [{ title: "Thao tác", render: (_: unknown, row: TransferRow) => <Space wrap>{row.status === "cho_duyet" && (isBig || (isSmall && row.target_site === user?.site_code)) && <><Button size="small" type="primary" onClick={() => setDecision({ row, value: "approve" })}>Duyệt</Button><Button size="small" danger onClick={() => setDecision({ row, value: "reject" })}>Từ chối</Button></>}{isBig && ["dang_xu_ly", "that_bai"].includes(row.status) && <Popconfirm title="Tiếp tục tiến trình đã duyệt?" onConfirm={() => void retry(row)}><Button size="small">Thử phục hồi</Button></Popconfirm>}</Space> }] : []),
   ];
   return <Card title="Chuyển cơ sở" extra={canRequest ? <Button type="primary" onClick={() => setRequestOpen(true)}>Tạo đề nghị</Button> : null}>
-    <Alert type="info" showIcon title={isBig ? "Admin Big xem toàn hệ thống; quyết định được ghi tại site nguồn. Học phí hiển thị là lịch sử tại nguồn." : canRequest ? `${isSmall ? "Admin Small" : "Tư vấn & xếp lớp"} tạo đề nghị tại cơ sở mình; Admin Big duyệt. Học phí hiển thị theo dữ liệu lưu tại site nguồn.` : "Chỉ xem đề nghị tại cơ sở được phân công; không thể tạo, duyệt, từ chối hoặc retry. Học phí hiển thị theo dữ liệu lưu tại site nguồn."} style={{ marginBottom: 16 }} />
+    <Alert type="info" showIcon title={infoText} style={{ marginBottom: 16 }} />
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     {!complete && <Alert type="warning" showIcon title={`Dữ liệu chưa đầy đủ. Site không phản hồi: ${missing.join(", ") || "không rõ"}`} style={{ marginBottom: 16 }} />}
     <Table rowKey={(row) => `${row.source_site}:${row.transfer_id}`} loading={loading} columns={columns} dataSource={rows} scroll={{ x: 950 }} />
@@ -81,7 +88,7 @@ export default function TransfersPage() {
       <Form.Item name="student_slug" label="Slug học viên" rules={[{ required: true, max: 160 }]}><Input maxLength={160} /></Form.Item>
       <Form.Item name="target_site" label="Cơ sở nhận" rules={[{ required: true }]}><Select disabled={!siteCatalogComplete} options={activeSites.filter((code) => code !== user?.site_code).map((code) => ({ value: code, label: code }))} /></Form.Item>
       <Form.Item name="reason" label="Lý do" rules={[{ required: true, max: 500 }]}><Input.TextArea maxLength={500} rows={4} /></Form.Item>
-      <Button type="primary" htmlType="submit" block disabled={!siteCatalogComplete || !activeSites.some((code) => code !== user?.site_code)}>Gửi Admin Big duyệt</Button>
+      <Button type="primary" htmlType="submit" block disabled={!siteCatalogComplete || !activeSites.some((code) => code !== user?.site_code)}>Gửi đề nghị chờ duyệt</Button>
     </Form></Modal>
     <Modal title={decision?.value === "approve" ? "Duyệt đề nghị" : "Từ chối đề nghị"} open={Boolean(decision)} onCancel={() => setDecision(null)} footer={null} destroyOnHidden><Form form={decisionForm} layout="vertical" onFinish={decide}>{decision?.value === "reject" && <Form.Item name="reason" label="Lý do" rules={[{ required: true, max: 500 }]}><Input.TextArea maxLength={500} rows={3} /></Form.Item>}<Button type="primary" danger={decision?.value === "reject"} htmlType="submit" block>{decision?.value === "approve" ? "Duyệt và điều phối" : "Từ chối"}</Button></Form></Modal>
   </Card>;

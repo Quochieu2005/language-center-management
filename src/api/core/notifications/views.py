@@ -19,13 +19,14 @@ from core.notifications.services import NotificationInfrastructureUnavailable, N
 
 
 _ADMIN_ROLES = {"admin_big", "admin_small"}
+_SITE_READ_ROLES = _ADMIN_ROLES | {"ke_toan", "tu_van"}
 
 
-def _role_error(user):
-    if getattr(user, "role", None) in _ADMIN_ROLES:
+def _role_error(user, allowed_roles):
+    if getattr(user, "role", None) in allowed_roles:
         return None
     return Response(
-        {"detail": "Chỉ Admin Big hoặc Admin Small được quản lý thông báo."},
+        {"detail": "Vai trò không được phép thực hiện thao tác thông báo này."},
         status=status.HTTP_403_FORBIDDEN,
     )
 
@@ -55,7 +56,8 @@ class AdminNotificationListView(APIView):
         tags=["Thông báo quản trị"],
         summary="Liệt kê thông báo theo phạm vi admin",
         description=(
-            "Admin Small chỉ đọc CSDL của cơ sở được gán. Admin Big đọc các CSDL site đang hoạt động "
+            "Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc CSDL của site được gán; "
+            "nhân viên chỉ thấy thông báo dành cho nhân sự cơ sở. Admin Big đọc các CSDL site đang hoạt động "
             "qua Global Query; API gộp kết quả tại tầng ứng dụng, không JOIN xuyên site. "
             "Hệ thống không lưu trạng thái ai đã đọc thông báo. Nếu thiếu site, response báo complete=false "
             "và missing_sites, không giả định danh sách là đầy đủ."
@@ -75,16 +77,16 @@ class AdminNotificationListView(APIView):
         },
     )
     def get(self, request):
-        denied = _role_error(request.user)
+        denied = _role_error(request.user, _SITE_READ_ROLES)
         if denied:
             return denied
 
         query = NotificationQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         options = query.validated_data
-        if request.user.role == "admin_small" and options.get("site_code"):
+        if request.user.role != "admin_big" and options.get("site_code"):
             return Response(
-                {"detail": "Admin Small chỉ được xem thông báo tại cơ sở được gán."},
+                {"detail": "Người dùng tại cơ sở chỉ được xem thông báo tại site được gán."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -129,7 +131,7 @@ class AdminNotificationListView(APIView):
         },
     )
     def post(self, request):
-        denied = _role_error(request.user)
+        denied = _role_error(request.user, _ADMIN_ROLES)
         if denied:
             return denied
 

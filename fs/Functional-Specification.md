@@ -501,33 +501,35 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Lỗi:** hồ sơ không thuộc quyền, site đích không khả dụng, còn nợ, request trùng hoặc site nguồn lỗi thì không tạo đề nghị; lịch sử không bị sửa/xóa.
 
-**Nghiệm thu:** đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; Admin Small/Tư vấn không thể gọi API duyệt, từ chối hoặc retry.
+**Nghiệm thu:** đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; người đề nghị tại site nguồn không thể tự quyết định; Admin Small chỉ có thể quyết định đề nghị gửi tới site được phân công; Tư vấn và Kế toán & Lễ tân không thể duyệt/từ chối/retry.
 
 ### FS-TRF-02 — Admin Big xem, duyệt hoặc từ chối đề nghị
 
-**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối; Admin Small/Tư vấn & xếp lớp đọc đề nghị tại site được giao và có thể gửi đề nghị; Kế toán & Lễ tân chỉ đọc tại site được giao. **Kiểu:** hộp thư `GLOBAL`; đọc/tạo đề nghị của nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
+**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối mọi đề nghị; Admin Small tạo đề nghị tại site mình, xem đề nghị tại site nguồn của mình và đề nghị gửi tới site mình, chỉ duyệt/từ chối đề nghị nhận tại site được phân công; Tư vấn tạo/xem tại site mình; Kế toán & Lễ tân chỉ đọc tại site được giao. **Kiểu:** hộp thư Admin Big `GLOBAL`; hộp thư Admin Small truy vấn các site nhưng lọc theo site nguồn/đích được phép (`GLOBAL` có phạm vi); đọc/tạo đề nghị nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
 
 1. API truy vấn riêng các site hoạt động để tạo hộp thư; kết quả ghi rõ complete và missing_sites.
-2. Admin Big đọc site hoạt động toàn cục; nhân viên cơ sở chỉ đọc nguồn trong phiên và không thể gửi site khác.
+2. Admin Big đọc toàn bộ site hoạt động; Admin Small truy vấn các site nguồn nhưng chỉ nhận đề nghị do site mình tạo hoặc gửi tới site được phân công; Tư vấn/Kế toán chỉ đọc site trong phiên. Không vai trò cơ sở nào có thể truyền site khác để mở rộng quyền.
 3. Mỗi dòng hiển thị công nợ lịch sử tại nguồn, tính cục bộ qua DangKy/HocPhi; không JOIN sang site đích. Không có khoản học phí thì hiện riêng, không suy ra đã đóng.
 4. Nếu site nguồn không đọc được thì không cho quyết định trên đề nghị chưa tải được; không hiển thị hộp thư thiếu site như toàn bộ.
-5. Khi duyệt/từ chối, API định tuyến về site nguồn đã được xác định từ đề nghị và kiểm tra quyền Admin Big.
+5. Khi duyệt/từ chối, API định tuyến về site nguồn từ đề nghị; cho phép Admin Big hoặc Admin Small có site phiên trùng với site đích. Admin Small ở nguồn không được duyệt đề nghị của chính nguồn đó.
 6. Kiểm tra lại trạng thái đề nghị, học viên hiện hành, nợ, site đích và xung đột vì điều kiện có thể đổi trong lúc chờ.
 7. Từ chối: ghi tu_choi, người/thời điểm/lý do và sự kiện tu_choi tại nguồn; hồ sơ học viên không đổi.
 8. Duyệt: ghi trạng thái dang_xu_ly, bước da_tiep_nhan, người/thời điểm quyết định và sự kiện duyet tại nguồn. Chỉ sau commit quyết định mới giao Coordinator chạy distributed transfer.
 
-**Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; Admin Small/Tư vấn tạo được đề nghị nhưng không thể quyết định/retry; giáo viên không được gửi hoặc quyết định; hai Admin Big duyệt đồng thời chỉ một quyết định thắng; quyết định idempotent; không gọi coordinator chuyển nếu quyết định chưa commit.
+**Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; Admin Small/Tư vấn tạo được đề nghị; Admin Small nguồn không thể tự duyệt, Admin Small site nhận chỉ quyết định đề nghị có đúng site đích và không retry; Tư vấn không quyết định/retry; giáo viên không được gửi hoặc quyết định; Admin Big và Admin Small site nhận quyết định đồng thời thì chỉ một quyết định thắng; quyết định idempotent; không gọi Coordinator chuyển nếu quyết định chưa commit.
 
 ### FS-TRF-03 — Thực hiện và phục hồi giao dịch chuyển
 
-**Người dùng:** Coordinator chạy sau khi Admin Big duyệt; Admin Big được gọi route retry cho giao dịch chưa hoàn tất. Đây không phải thao tác tự do của Admin Small. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien tại đích; LichSuChuyenCoSo tại site phát sinh.
+**Người dùng:** Coordinator chạy sau khi Admin Big hoặc Admin Small tại site nhận duyệt; chỉ Admin Big được gọi route retry cho giao dịch chưa hoàn tất. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien/ThongBao tại đích; LichSuChuyenCoSo tại site phát sinh.
 
 1. Coordinator chỉ nhận giao dịch đã duyệt. Tải trạng thái nguồn, khóa chống lặp và bước cuối đã commit.
 2. Tạo hồ sơ HocVien cùng mã ở đích trong transaction đích; giữ slug nguồn nếu chưa được dùng tại site đích, nếu trùng thì thêm hậu tố số; sao chép `avatar_public_id`/`avatar_secure_url` nếu có để ảnh tiếp tục hiển thị; ghi sự kiện tao_ho_so_dich. Bản đích phải duy nhất theo mã và ma_chuyen. Hai hồ sơ site-local có thể cùng tham chiếu một asset Cloudinary; metadata nguồn vẫn được giữ làm lịch sử.
 3. Sau khi xác nhận đích commit, lưu bước da_tao_ho_so_dich tại nguồn.
 4. Cập nhật nguồn: HocVien thành da_chuyen_di; đóng/đánh dấu các DangKy cũ theo trạng thái chuyen_di; cập nhật bước da_cap_nhat_nguon và ghi sự kiện.
 5. Đối soát hai site; đánh dấu giao dịch hoan_tat và ghi sự kiện kết thúc. Bản nguồn được giữ lại làm lịch sử.
-6. Coordinator/retry có thể chạy lại an toàn. Nếu đích chưa commit, nguồn vẫn là bản hiện hành; nếu đích đã commit, phải tiếp tục tiến về phía trước, không xóa đích. Source hiện có route retry của Admin Big; lịch chạy tự động chưa được xác nhận.
+6. Trong transaction kích hoạt hồ sơ đích, ghi một thông báo idempotent vào `ThongBao` tại site nhận với audience `site_staff`; Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp tại site nhận xem được. Thông báo hướng Tư vấn sang chọn lớp/phòng thủ công; không tự đăng ký/xếp lớp.
+7. Giữ nguyên `HocVien.ma_tai_khoan` khi tạo hồ sơ đích; tài khoản/mật khẩu hiện có tiếp tục dùng, không tạo mới hoặc gửi lại mật khẩu.
+8. Coordinator/retry có thể chạy lại an toàn. Nếu đích chưa commit, nguồn vẫn là bản hiện hành; nếu đích đã commit, phải tiếp tục tiến về phía trước, không xóa đích. Source hiện có route retry của Admin Big; lịch chạy tự động chưa được xác nhận.
 
 | Điểm dừng/ lỗi | Hành vi bắt buộc |
 |---|---|
@@ -537,7 +539,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 | Nguồn đã cập nhật, giao dịch chưa hoàn tất | Tính bản đích theo bước đã lưu; đối soát và hoàn thành trạng thái |
 | Đích hoặc nguồn không phản hồi | Không báo hoàn tất; lưu trạng thái cần retry/đối soát và không xóa bản ghi đã commit |
 
-**Nghiệm thu:** retry không tạo hồ sơ đích thứ hai; nếu hồ sơ có ảnh thì metadata được giữ tại nguồn và sao chép sang đích; sau hoàn tất chỉ bản đích có trạng thái dang_hoc; bản nguồn da_chuyen_di còn nguyên; không tuyên bố ACID nguyên tử xuyên hai CSDL.
+**Nghiệm thu:** retry không tạo hồ sơ đích thứ hai; nếu hồ sơ có ảnh thì metadata được giữ tại nguồn và sao chép sang đích; `ma_tai_khoan` không đổi; sau hoàn tất chỉ bản đích có trạng thái dang_hoc; bản nguồn da_chuyen_di còn nguyên; thông báo site nhận chỉ có một bản dù retry; nhân viên site nhận phải tự xếp lớp/phòng; không tuyên bố ACID nguyên tử xuyên hai CSDL.
 
 ### FS-REPORT-01 — Thống kê học viên theo cơ sở
 
@@ -565,11 +567,11 @@ Không ghi password/hash, token, cookie, header xác thực, secret Cloudinary/S
 
 **Người dùng:** Admin Big và Admin Small. **Kiểu:** Admin Big dùng `REPLICATED-WRITE` ở tầng API tới các site đang hoạt động; Admin Small dùng `LOCAL` tại site được gán. **Bảng:** `ThongBao` và `Logs` tại từng site được ghi.
 
-Người tạo nhập nhóm thông báo, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn quản trị tùy chọn. API kiểm tra role từ phiên, giới hạn độ dài/giá trị, chỉ chấp nhận đường dẫn nội bộ `/admin/...`, và chỉ cho Admin Small nhắm `admin_all` hoặc `admin_small`. Admin Big gửi cùng thông báo tới các site hoạt động; Admin Small không được chỉ định site khác. Schema hiện có chỉ hỗ trợ nhóm nhận Admin Big, Admin Small hoặc cả hai, không dùng chức năng này để gửi cho học viên, giáo viên hay nhân viên.
+Người tạo nhập nhóm thông báo, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn quản trị tùy chọn. API kiểm tra role từ phiên, giới hạn độ dài/giá trị, chỉ chấp nhận đường dẫn nội bộ `/admin/...`, và chỉ cho Admin Small nhắm `admin_all` hoặc `admin_small`. Admin Big gửi cùng thông báo tới các site hoạt động; Admin Small không được chỉ định site khác. Các thông báo do nghiệp vụ tạo có thể dùng audience `site_staff` tại đúng site; hiện luồng chuyển dùng nhóm này để báo hồ sơ mới đến cho Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp. API tạo thông báo thủ công không cho client chọn `site_staff`. Migration 42 mở rộng CHECK tại từng database site. Không dùng chức năng này để gửi cho học viên hoặc giáo viên.
 
 Mỗi site ghi `ThongBao` và audit `Logs` trong transaction cục bộ. Bắt buộc `Idempotency-Key`; retry phải dùng lại cùng key và body. Nếu thiếu site, API trả trạng thái chưa hoàn tất cùng danh sách site thiếu để có thể tiếp tục; không tuyên bố ACID xuyên site và không báo thành công toàn phần. Không tạo CSDL/bảng mới, không lưu trạng thái đã đọc.
 
-**Nghiệm thu:** người không phải Admin nhận 403; Admin Small chỉ tạo ở site của mình; Admin Big phát tới toàn bộ site hoạt động; nội dung sai/đường dẫn ngoài admin bị từ chối; gửi lại cùng key không tạo trùng, đổi body với key cũ nhận 409; khi một site lỗi, response liệt kê site thiếu và retry cùng request hoàn tất mà không nhân đôi các site đã ghi.
+**Nghiệm thu:** người không phải Admin nhận 403 khi tạo thông báo thủ công; Admin Small chỉ tạo ở site của mình; Admin Big phát tới toàn bộ site hoạt động; nội dung sai/đường dẫn ngoài admin bị từ chối; gửi lại cùng key không tạo trùng, đổi body với key cũ nhận 409; khi một site lỗi, response liệt kê site thiếu và retry cùng request hoàn tất mà không nhân đôi các site đã ghi; thông báo nghiệp vụ `site_staff` chỉ được đọc tại site phát sinh.
 
 ## 7. Quy tắc trạng thái nghiệp vụ
 

@@ -21,7 +21,7 @@ Các vai trò A–E theo [phân công nhóm](QLTTNN-Lam-Viec-Nhom.md); nhóm đi
 | YC-01 | 2–4 site | Q1/Q7/TD có DB và kết nối riêng | TC-SITE-01 | A + B |
 | YC-02 | Ít nhất 1 phương pháp phân mảnh | Ngang theo `ma_co_so` với `LopHoc`; dẫn xuất `DangKy` theo lớp | TC-FRAG-01 | A + D |
 | YC-03 | Ít nhất 1 phương pháp replication | Nhân bản bảng dùng chung; dùng `MonHoc` để kiểm chứng truyền thay đổi | TC-REP-01 | A + B + C |
-| YC-04 | Ít nhất 1 distributed transaction | Chuyển học viên Q1 → Q7 sau khi Admin Big duyệt | TC-DTX-01 | B + A + D |
+| YC-04 | Ít nhất 1 distributed transaction | Chuyển học viên Q1 → Q7 sau khi Admin Big hoặc Admin Small Q7 duyệt | TC-DTX-01 | B + A + D |
 | YC-05 | Ít nhất 1 tình huống concurrency | Hai học viên tranh chỗ cuối trong cùng lớp bằng hai phiên đồng thời | TC-CON-01 | D + A + B |
 | YC-06 | Ít nhất 1 distributed query | Thống kê học viên từ từng site rồi tổng hợp tại API | TC-DQ-01 | B + E |
 | YC-07 | Đồng bộ dữ liệu | Đối soát, retry và phục hồi bản sao khi một site lỗi | TC-SYNC-01 | A + B + C |
@@ -72,8 +72,8 @@ Chạy trên dữ liệu kiểm thử riêng, không thử lỗi trên dữ li�
 ### TC-DTX-01 — Chuyển cơ sở và phục hồi
 
 1. Chuẩn bị học viên Q1 đủ điều kiện chuyển sang Q7; lưu trạng thái nguồn/đích, công nợ và đăng ký liên quan.
-2. Admin Small hoặc Tư vấn Q1 tạo đề nghị `cho_duyet`; xác nhận chưa tạo hồ sơ đích. Admin Big duyệt; Coordinator mới thực hiện chuyển.
-3. Trường hợp thành công: kiểm tra nguồn `da_chuyen_di`, đích `dang_hoc`, cùng mã học viên; lịch sử ở nguồn được giữ; trạng thái giao dịch `hoan_tat` và sự kiện từng site khớp.
+2. Admin Small hoặc Tư vấn Q1 tạo đề nghị `cho_duyet`; xác nhận chưa tạo hồ sơ đích. Kiểm tra cả Admin Big và Admin Small Q7 được phép duyệt, Admin Small Q1 không thể duyệt đề nghị của mình; Coordinator mới thực hiện chuyển.
+3. Trường hợp thành công: kiểm tra nguồn `da_chuyen_di`, đích `dang_hoc`, cùng mã học viên và `ma_tai_khoan`; lịch sử ở nguồn được giữ; trạng thái giao dịch `hoan_tat`, sự kiện từng site khớp và thông báo được tạo tại Q7 cho nhân sự cơ sở nhận.
 4. Thử riêng lỗi trước commit đích: nguồn giữ nguyên; retry hoặc kết thúc thất bại theo loại lỗi. Thử riêng dừng tiến trình sau commit đích: khởi động lại và recovery làm nốt nguồn; không xóa đích hoặc tạo hồ sơ thứ hai.
 5. Kiểm tra Global Query trong khi đang xử lý và sau phục hồi theo quy tắc chọn bản hiện hành; không đếm cả hai bản vật lý.
 
@@ -126,7 +126,7 @@ Mỗi lần chạy ghi trong tài liệu kết quả tại `docs/evidence/<ma-ki
 | TC-FRAG-01 | Script `30_enforce_site_fragment_boundaries.sql` chạy thành công trên cả ba DB; mỗi DB có 16 `CHECK` site-local. Script kiểm tra dữ liệu trước khi thêm constraint | Bảng nghiệp vụ hiện ít/không có dữ liệu kiểm thử; cần tạo bộ dữ liệu để chứng minh tái thiết mảnh và quan hệ cha/con |
 | TC-REP-01 | Luồng `MonHoc` chạy thật qua 3 DB trong transaction kiểm thử rollback; retry cùng key hoạt động; sau rollback không còn thay đổi/ACK thử | Cần chạy demo giữ thay đổi trên dữ liệu thử và chụp kết quả trước/sau ở từng site |
 | TC-SYNC-01 | Unit test mô phỏng lỗi ghi một site và xác nhận phản hồi chưa hoàn tất có nêu site lỗi; đây chưa phải outage SQL Server thật | Cần fault injection/outage trên topology nhiều site, khôi phục kết nối, retry cùng key và đối chiếu `Logs`/version |
-| TC-DTX-01 | Source có luồng đề nghị → Admin Big duyệt → Coordinator chuyển/retry; chưa chạy fault injection trên hai site | Cần bộ hồ sơ thử nguồn/đích, kiểm tra lỗi trước và sau commit đích, retry/recovery và Global Query |
+| TC-DTX-01 | Source có luồng đề nghị → Admin Big hoặc Admin Small site nhận duyệt → Coordinator chuyển/retry; chưa chạy fault injection trên hai site | Cần bộ hồ sơ thử nguồn/đích, kiểm tra quyền duyệt đúng site, lỗi trước/sau commit đích, retry/recovery, giữ tài khoản, thông báo site nhận và Global Query |
 | TC-CON-01 | Source bảo vệ sĩ số trong transaction cục bộ; unit tests không phải kiểm thử hai SQL session chạy đồng thời | Cần hai request/session độc lập tranh đúng chỗ cuối và đọc dữ liệu sau cùng |
 | TC-DQ-01 | Đã gọi thống kê qua API với ba site đang sẵn sàng và response đầy đủ | Cần lặp lại với dữ liệu có học viên tại các site và thử một site thiếu để lưu bằng chứng |
 

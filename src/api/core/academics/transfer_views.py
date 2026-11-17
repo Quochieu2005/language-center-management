@@ -38,10 +38,10 @@ class TransferCollectionView(_TransferApiView):
         summary="Liệt kê đề nghị chuyển cơ sở",
         description=(
             "Admin Big đọc hộp thư GLOBAL qua từng site; response có complete/missing_sites. "
-            "Admin Small và Tư vấn & xếp lớp có thể tạo đề nghị tại site trong phiên; "
-            "Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc danh sách tại site trong phiên. "
+            "Admin Small tạo đề nghị tại site nguồn, xem đề nghị tại nguồn và đề nghị gửi tới site mình để duyệt. "
+            "Tư vấn & xếp lớp tạo/xem tại site trong phiên; Kế toán & Lễ tân chỉ đọc tại site trong phiên. "
             "Mỗi dòng kèm tổng phải thu/đã thu/còn nợ được tính riêng từ DangKy/HocPhi tại site nguồn; "
-            "quyền quyết định và retry vẫn chỉ thuộc Admin Big."
+            "Admin Big hoặc Admin Small tại site nhận được duyệt/từ chối; retry vẫn chỉ thuộc Admin Big."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
@@ -99,10 +99,12 @@ class TransferDecisionView(_TransferApiView):
     @extend_schema(
         operation_id="transfer_request_decide",
         tags=["Chuyển cơ sở"],
-        summary="Admin Big duyệt hoặc từ chối đề nghị",
+        summary="Admin Big hoặc Admin Small cơ sở nhận duyệt/từ chối đề nghị",
         description=(
             "Quyết định ghi LOCAL vào CSDL nguồn. Duyệt chỉ chấp nhận đề nghị đang chờ; sau commit, "
-            "Coordinator thực hiện tiến trình giữa nguồn và đích. Nếu một site lỗi, trạng thái được giữ để retry."
+            "Admin Small chỉ được quyết định đề nghị có cơ sở đích đúng cơ sở trong phiên. Coordinator "
+            "thực hiện tiến trình giữa nguồn và đích; sau hoàn tất, hệ thống gửi thông báo LOCAL cho nhân sự site nhận. "
+            "Nếu một site lỗi, trạng thái được giữ để Admin Big retry."
         ),
         parameters=[OpenApiParameter("source_site", str, OpenApiParameter.PATH), OpenApiParameter("transfer_id", str, OpenApiParameter.PATH)],
         request=TransferDecisionSerializer,
@@ -114,13 +116,16 @@ class TransferDecisionView(_TransferApiView):
             return invalid
         serializer = TransferDecisionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if request.user.role != "admin_big":
-            return Response({"detail": "Chỉ Admin Big được quyết định đề nghị chuyển."}, status=403)
+        if request.user.role not in {"admin_big", "admin_small"} or (
+            request.user.role == "admin_small" and not request.user.site_code
+        ):
+            return Response({"detail": "Chỉ Admin Big hoặc Admin Small tại cơ sở nhận được quyết định đề nghị chuyển."}, status=403)
         try:
             decision = serializer.validated_data
             result = decide_transfer(
                 source_site=source_site, transfer_id=transfer_id,
-                actor_id=request.user.account_id, decision=decision["decision"],
+                actor_id=request.user.account_id, actor_role=request.user.role,
+                actor_site=request.user.site_code, decision=decision["decision"],
                 reason=decision.get("reason"),
             )
             if decision["decision"] == "reject":

@@ -11,7 +11,7 @@ _CATEGORIES = {
     "grade", "transfer", "payment", "security",
 }
 _SEVERITIES = {"info", "success", "warning", "critical"}
-_AUDIENCES = {"admin_all", "admin_big", "admin_small"}
+_AUDIENCES = {"admin_all", "admin_big", "admin_small", "site_staff"}
 _SITE_CODE = re.compile(r"^[A-Za-z0-9_-]{2,10}$")
 
 

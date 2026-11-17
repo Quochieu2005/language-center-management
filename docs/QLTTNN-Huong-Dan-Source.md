@@ -61,7 +61,7 @@ Không rải `for each site: UPDATE` trong từng màn hình. API có service gh
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 
-Admin Small hoặc Tư vấn & xếp lớp tạo đề nghị tại site mình phụ trách (`LOCAL`); Kế toán & Lễ tân chỉ xem. Admin Big đọc hộp thư bằng cách hỏi từng CSDL site rồi gộp ở Django (`GLOBAL`); quyết định được ghi về CSDL nguồn bằng transaction cục bộ. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
+Admin Small hoặc Tư vấn & xếp lớp tạo đề nghị tại site mình phụ trách (`LOCAL`); Kế toán & Lễ tân chỉ xem. Admin Big đọc hộp thư toàn cục; Admin Small ở site nhận chỉ thấy đề nghị gửi tới site mình (`GLOBAL` đọc, quyết định ghi cục bộ tại nguồn). Admin Big hoặc Admin Small site nhận có thể duyệt/từ chối, còn Admin Small nguồn không tự duyệt đề nghị của mình. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Sau khi hoàn tất, site nhận có thông báo cho nhân viên và Tư vấn chọn lớp/phòng thủ công; hồ sơ đích giữ nguyên tài khoản học viên. Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
 
 ## 4. Mã giả cho bốn kiểu thao tác
 
