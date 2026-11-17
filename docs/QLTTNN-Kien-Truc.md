@@ -81,12 +81,11 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 |---|---|
 | Admin Big | Toàn hệ thống; quản lý tài khoản/danh mục, xem báo cáo và nhật ký toàn cục; duyệt/từ chối đề nghị chuyển |
 | Admin Small | Cơ sở được phân công; điều hành nghiệp vụ, tạo đề nghị chuyển ra cơ sở khác và theo dõi đề nghị của cơ sở mình |
-| Lễ tân | Cơ sở của mình; tiếp nhận, thao tác đăng ký/lớp và kế hoạch học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
-| Tư vấn & xếp lớp | Cơ sở của mình; tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp |
-| Kế toán | Cơ sở của mình; thu học phí |
+| Kế toán & Lễ tân | Cơ sở của mình; tiếp nhận, mở lớp/phân công giáo viên, đăng ký/xếp lớp và thu/hoàn học phí; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ hoặc phòng |
+| Tư vấn & xếp lớp | Cơ sở của mình; tra cứu học viên, hỗ trợ tư vấn, mở lớp/phân công giáo viên, đăng ký/xếp lớp, tiếp nhận liên hệ và đăng/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | Lớp mình dạy; nhập điểm và điểm danh |
 
-`TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin = admin_small` và site được gán; không biểu diễn bằng `NhanVien.chuc_vu`. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ riêng. Backend kiểm tra danh tính, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small chỉ tạo đề nghị; chỉ Admin Big được quyết định. Ma trận chi tiết ở README mục 3–4.
+`TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin = admin_small` và site được gán; không biểu diễn bằng `NhanVien.chuc_vu`. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với hai chức vụ `ke_toan` và `tu_van`; migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`. Backend kiểm tra danh tính, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small chỉ tạo đề nghị; chỉ Admin Big được quyết định. Ma trận chi tiết ở README mục 3–4.
 
 ## 6. Quy tắc liên site
 

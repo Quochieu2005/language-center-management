@@ -42,7 +42,7 @@ Danh sách site không được đóng cứng trong code. Khi có thêm cơ sở
 - Một frontend web dùng chung, xác thực tập trung, sau đăng nhập hiển thị workspace theo vai trò.
 - Quản lý hồ sơ học viên, giáo viên, nhân viên, cơ sở, lớp, lịch học và danh mục khóa học.
 - Sáu nghiệp vụ đề tài: đăng ký khóa học, xếp lớp, chuyển cơ sở, đóng học phí, quản lý điểm, thống kê học viên theo cơ sở.
-- Phân quyền Admin Big, Admin Small, lễ tân, tư vấn & xếp lớp, kế toán và giáo viên.
+- Phân quyền Admin Big, Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp và giáo viên.
 - Đăng nhập nội bộ; thiết kế đăng nhập Google/Facebook và khôi phục mật khẩu theo các ràng buộc bảo mật trong tài liệu.
 - Phân mảnh ngang theo site, phân mảnh dẫn xuất, nhân bản dữ liệu dùng chung, Global Query và điều phối chuyển cơ sở.
 - Nhật ký thao tác, trạng thái đồng bộ và kiểm chứng các kịch bản site lỗi.
@@ -93,29 +93,31 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 |---|---|---|
 | Admin Big | `TaiKhoan.vai_tro=admin_big`, `ma_co_so=NULL` | Toàn hệ thống |
 | Admin Small | `TaiKhoan.vai_tro=nhan_vien`, hồ sơ `Admin.loai_admin=admin_small`, có site được giao | Một site được giao |
-| Lễ tân | Tài khoản nhân viên, chức vụ `le_tan` | Tiếp nhận tại quầy; đăng ký/lớp và kế hoạch học phí tại site; không tra cứu danh sách học viên hoặc ghi phiếu thu |
-| Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký/xếp lớp và tiếp nhận/phản hồi yêu cầu liên hệ tại site |
-| Kế toán | Tài khoản nhân viên, chức vụ `ke_toan` | Công nợ, thu/hoàn và phiếu thu; xem lớp, đăng ký/xếp lớp; chỉ đọc danh sách học viên tại site để lập đăng ký |
+| Kế toán & Lễ tân | Tài khoản nhân viên, chức vụ `ke_toan` (hồ sơ `le_tan` cũ được chuyển bằng migration 41) | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/xếp lớp; học phí, công nợ, thu/hoàn và phiếu thu tại site; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ hoặc phòng |
+| Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tra cứu học viên, hỗ trợ tư vấn, mở lớp/phân công giáo viên, đăng ký/xếp lớp và tiếp nhận/phản hồi liên hệ tại site; tạo/sửa/xuất bản bài Blog dùng chung, không sửa danh mục hoặc xóa bài |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
 | Học viên | Admin có thể cấp tài khoản theo FS-STU-01; portal tự phục vụ chưa được duyệt | Không đưa các trang portal/SePay vào phạm vi đã chốt |
 | Khách | Chưa xác thực | Xem nội dung công khai và gửi yêu cầu liên hệ tới cơ sở đang hoạt động |
 
 ### 4.1. Ma trận quyền chức năng
 
-| Chức năng | Admin Big | Admin Small | Lễ tân | Tư vấn & xếp lớp | Kế toán | Giáo viên | Học viên |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Quản lý cơ sở và danh mục dùng chung | Có | Đọc theo nhu cầu | Không | Không | Không | Không | Không |
-| Quản lý Admin Small/tài khoản nội bộ | Có | Không | Không | Không | Không | Không | Không |
-| Quản lý nhân viên nghiệp vụ | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không | Không |
-| Quản lý hồ sơ/cấp tài khoản học viên | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không | Không |
-| Tra cứu danh sách học viên tại cơ sở | Toàn hệ thống theo quyền | Site được giao | Không | Site làm việc | Read-only để lập đăng ký | Học viên thuộc lớp được giao | Không |
-| Đăng ký và xếp lớp | Giám sát/toàn hệ thống | Site được giao | Site làm việc | Site làm việc | Site làm việc | Không | Không |
-| Thu/hoàn học phí | Giám sát theo quyền | Giám sát tại site được giao | Không | Không | Site làm việc | Không | Không |
-| Điểm danh và điểm | Giám sát/đọc theo quyền | Site được giao | Không | Không | Không | Chỉ lớp được phân công | Không |
-| Tạo đề nghị chuyển | Có thể theo quy trình được duyệt | Chỉ học viên ở site mình | Không mặc định | Không | Không | Không | Không |
-| Duyệt/từ chối đề nghị chuyển | Có | Không | Không | Không | Không | Không | Không |
-| Thống kê | Toàn hệ thống | Site được giao | Không mặc định | Không mặc định | Báo cáo tài chính được cấp | Lớp được giao nếu có | Không |
-| Hộp thư liên hệ | GLOBAL hoặc chọn một site | Chỉ site được giao | Không | Site làm việc | Không | Không | Không |
+| Chức năng | Admin Big | Admin Small | Kế toán & Lễ tân | Tư vấn & xếp lớp | Giáo viên | Học viên |
+|---|---:|---:|---:|---:|---:|---:|
+| Quản lý cơ sở và danh mục dùng chung | Có | Đọc theo nhu cầu | Không | Không | Không | Không |
+| Quản lý Admin Small/tài khoản nội bộ | Có | Không | Không | Không | Không | Không |
+| Quản lý nhân viên nghiệp vụ | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không |
+| Quản lý hồ sơ/cấp tài khoản học viên | Chọn một site cho mỗi thao tác | Chỉ site được giao | Không | Không | Không | Không |
+| Tra cứu danh sách học viên tại cơ sở | Toàn hệ thống theo quyền | Site được giao | Read-only để lập đăng ký | Site làm việc | Học viên thuộc lớp được giao | Không |
+| Đăng ký và xếp lớp | Giám sát/toàn hệ thống | Site được giao | Site làm việc | Site làm việc | Không | Không |
+| Mở lớp và phân công giáo viên | Toàn hệ thống theo site thao tác | Site được giao | Site làm việc | Site làm việc | Không | Không |
+| Thu/hoàn học phí | Giám sát theo quyền | Giám sát tại site được giao | Site làm việc | Không | Không | Không |
+| Điểm danh và điểm | Giám sát/đọc theo quyền | Site được giao | Không | Không | Chỉ lớp được phân công | Không |
+| Tạo đề nghị chuyển | Có thể theo quy trình được duyệt | Chỉ học viên ở site mình | Không mặc định | Không | Không | Không |
+| Duyệt/từ chối đề nghị chuyển | Có | Không | Không | Không | Không | Không |
+| Thống kê | Toàn hệ thống | Site được giao | Báo cáo tài chính được cấp | Không mặc định | Lớp được giao nếu có | Không |
+| Hộp thư liên hệ | GLOBAL hoặc chọn một site | Chỉ site được giao | Không | Site làm việc | Không | Không |
+| Đăng/sửa bài Blog | Có | Không | Không | Toàn hệ thống (`REPLICATED-WRITE`) | Không | Không |
+| Xóa bài hoặc quản lý danh mục Blog | Có | Không | Không | Không | Không | Không |
 
 Không dùng vai trò do client gửi để cấp quyền. Không cho Admin Small truy cập dữ liệu site khác bằng cách đổi mã site trong URL/body. Không để giáo viên đọc/ghi lớp chưa được phân công.
 
@@ -188,14 +190,14 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 ### FS-BLOG-01 — Danh mục, bài viết công khai và quản trị Blog
 
-**Người dùng:** khách chưa đăng nhập (đọc công khai), Admin Big (quản trị CMS). **Phân tán:** public `GLOBAL`; CMS `REPLICATED-WRITE` tới các bản `DanhMucBlog`/`BaiVietBlog` riêng tại từng site.
+**Người dùng:** khách chưa đăng nhập (đọc công khai), Admin Big (quản trị toàn bộ CMS), Tư vấn & xếp lớp (tạo/sửa/xuất bản bài viết). **Phân tán:** public `GLOBAL`; CMS `REPLICATED-WRITE` tới các bản `DanhMucBlog`/`BaiVietBlog` riêng tại từng site.
 
 1. `GET /api/v1/blog/categories/` trả danh mục đang hoạt động cùng số bài đã xuất bản; chỉ tính bài đã xuất bản, không ẩn và không có ngày xuất bản trong tương lai.
 2. `GET /api/v1/blog/{slug}/` trả một bài đã xuất bản theo slug, gồm tiêu đề, tóm tắt, nội dung Markdown giới hạn, thời gian đọc, ngày xuất bản và danh mục. Nội dung có thể dùng đoạn văn, tiêu đề `##`/`###`, danh sách đánh số (`1. Nội dung`) và bảng Markdown; bảng và danh sách là tùy chọn.
 3. Blog không yêu cầu đăng nhập. Không trả bài nháp/ẩn, dữ liệu nội bộ hoặc HTML cần render thô; HTML nhập trong nội dung chỉ được hiển thị như văn bản.
 4. API hỏi các CSDL site đang hoạt động, không dùng database trung tâm hoặc JOIN xuyên site. Các bản sao seed ban đầu phải nhất quán; nếu thiếu site hoặc dữ liệu lệch, response phải nêu `missing_sites`/`inconsistent_sites` và không giả là đầy đủ.
 5. Slug không tồn tại ở bất kỳ site nào trả 404; bản ghi cùng slug khác nội dung giữa các site trả 409; không đọc đủ site để xác nhận slug trả 503.
-6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái và tạo, sửa, xóa qua CMS `/admin/blog` cùng các route `/api/v1/admin/blog/...`; quyền lấy từ phiên đã xác thực ở server. Admin Small không được ghi dữ liệu Blog dùng chung.
+6. Admin Big được đọc danh mục/bài viết ở mọi trạng thái, quản lý danh mục và tạo/sửa/xóa bài. Tư vấn & xếp lớp được đọc danh mục/bài viết và tạo/sửa/xuất bản bài qua CMS `/admin/blog`; không được sửa/xóa danh mục hoặc xóa bài. Quyền lấy từ phiên đã xác thực ở server. Bài viết là dữ liệu dùng chung; thao tác của Tư vấn & xếp lớp cũng ghi `REPLICATED-WRITE` tới mọi site hoạt động, không giới hạn ở site được phân công. Admin Small và các vai trò khác không được ghi Blog.
    - Khi tạo bài, CMS tự tạo slug từ tiêu đề; người dùng có thể tự sửa slug. Khi sửa bài đã có slug tùy chỉnh, đổi tiêu đề không tự thay URL đó.
    - Ngày xuất bản mặc định là ngày tạo theo `Asia/Ho_Chi_Minh`, chỉ chọn ngày; API nhận mốc 00:00 theo múi giờ này. Để trống ngày nếu muốn xuất bản ngay khi bật trạng thái.
    - Trình soạn Markdown có nút thêm một hàng vào bảng tại vị trí con trỏ; hàng mới dùng đúng số cột của bảng.
@@ -203,7 +205,7 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 8. Nếu site thiếu trước khi ghi, trả lỗi dịch vụ; nếu một site lỗi sau khi các site khác đã commit, trả trạng thái chưa hoàn tất cùng `missing_sites`. Bản sao lệch hoặc key dùng lại với payload khác trả xung đột; không báo hoàn tất.
 9. Không xóa danh mục đang có bài viết tham chiếu. Xóa bài viết lưu ảnh chụp trước thao tác vào nhật ký đồng bộ; bài viết chỉ xuất hiện công khai khi đã xuất bản, danh mục hoạt động và đến thời điểm xuất bản.
 
-**Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; nội dung thường vẫn hiển thị khi không có bảng/danh sách, còn Markdown bảng và danh sách đánh số hiển thị đúng khi có; HTML thô không được thực thi. Trình soạn thảo thêm được hàng bảng đúng số cột tại vị trí con trỏ. Slug bài viết mới tự sinh từ tiêu đề và vẫn có thể nhập tay; slug tùy chỉnh của bài cũ không tự đổi khi sửa tiêu đề. Ngày xuất bản chỉ có ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh` và được lưu ở đầu ngày địa phương; có thể để trống để xuất bản ngay. Admin Big quản lý được cả danh mục và bài viết; quyền, validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
+**Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; nội dung thường vẫn hiển thị khi không có bảng/danh sách, còn Markdown bảng và danh sách đánh số hiển thị đúng khi có; HTML thô không được thực thi. Trình soạn thảo thêm được hàng bảng đúng số cột tại vị trí con trỏ. Slug bài viết mới tự sinh từ tiêu đề và vẫn có thể nhập tay; slug tùy chỉnh của bài cũ không tự đổi khi sửa tiêu đề. Ngày xuất bản chỉ có ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh` và được lưu ở đầu ngày địa phương; có thể để trống để xuất bản ngay. Admin Big quản lý toàn bộ danh mục/bài viết; Tư vấn & xếp lớp đọc danh mục/bài và tạo/sửa/xuất bản bài nhưng không xóa bài hoặc ghi danh mục. API từ chối thao tác ngoài quyền; validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
 
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
@@ -292,7 +294,7 @@ Admin Big đọc danh sách giáo viên bằng Global Query khi bỏ `site_code`
 
 Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạt động (`GLOBAL` read), kiểm tra hồ sơ và ghi kết quả email vào `Logs` tại site sở hữu (`LOCAL`); SMTP là dịch vụ ngoài, không phải database thứ tư.
 
-1. **Tạo (`POST /admin/employees/`):** nhận `full_name`, `email`, tùy chọn `username`/`phone`, `avatar_requested`, `job_title` và `site_code`. Chức vụ chỉ gồm `le_tan`, `tu_van` (hiển thị Tư vấn & xếp lớp), `ke_toan`; email/tên đăng nhập phải duy nhất trên các bản sao tài khoản. Admin Big phải chọn site; Admin Small không được chọn site khác.
+1. **Tạo (`POST /admin/employees/`):** nhận `full_name`, `email`, tùy chọn `username`/`phone`, `avatar_requested`, `job_title` và `site_code`. Chức vụ mới chỉ gồm `tu_van` (hiển thị Tư vấn & xếp lớp) và `ke_toan` (hiển thị Kế toán & Lễ tân); email/tên đăng nhập phải duy nhất trên các bản sao tài khoản. Admin Big phải chọn site; Admin Small không được chọn site khác.
 2. API tạo hồ sơ `NhanVien` tại site được giao và tài khoản đăng nhập `nhan_vien` bằng service nhân bản hiện có. Mật khẩu khởi tạo chỉ lấy từ cấu hình backend, lưu dạng hash, không trả trong response/log và bắt buộc đổi mật khẩu lần đầu. Tạo tài khoản không gửi email; API ghi `employee_credential_email_ready` vào `Logs` tại site. Admin Big/Admin Small chủ động bấm **Gửi mật khẩu** để gọi `POST /admin/employees/{account_id}/credential-email/?site_code=...`. Chỉ trạng thái `ready` hoặc SMTP xác nhận thất bại (`failed`) mới cho gửi/thử lại; `sent`, `processing`, `unknown` hoặc `changed` khóa gửi lại để tránh lộ/gửi trùng mật khẩu. Email cấp tài khoản dùng email làm thông tin đăng nhập chính; username vẫn dùng được như định danh thay thế. Mỗi CSDL commit riêng; site lỗi thì không trả thành công toàn phần, retry cùng dữ liệu để tiếp tục đối soát, không tuyên bố ACID xuyên site.
    `avatar_requested` mặc định là `false`. Nếu được bật, response trả setup token ngắn hạn; giao diện xin upload intent, gửi bytes ảnh trực tiếp tới Cloudinary rồi gọi endpoint hoàn tất với public ID. API xác minh intent/asset và cập nhật `TaiKhoan.avatar_public_id`/`avatar_secure_url` theo chính sách `REPLICATED-WRITE`. Chỉ nhận JPG/JPEG, PNG, WebP tối đa 5 MB; không lưu bytes ảnh ở SQL Server/source. Upload ảnh lỗi không xóa tài khoản vừa tạo; giao diện phải báo rõ ảnh chưa lưu.
 3. **Đọc danh sách/chi tiết (`GET`):** Admin Big bỏ `site_code` để đọc `GLOBAL` qua từng site hoạt động; truyền `site_code` để lọc `LOCAL`. Admin Small chỉ đọc site của mình. Danh sách trả `site_code` trên từng dòng cùng email, username, số điện thoại, chức vụ, trạng thái tài khoản và trạng thái gửi mật khẩu lấy từ `Logs`. Khi site lỗi, trả kết quả một phần cùng `complete=false`/`missing_sites`; không coi site thiếu là không có nhân viên. Chi tiết theo `slug` luôn kết hợp hồ sơ `NhanVien` với bản `TaiKhoan` cục bộ của site được chỉ rõ, không gộp nhiều CSDL.
@@ -303,7 +305,7 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 **Nghiệm thu:** người không phải Admin Big/Admin Small nhận 403; Admin Small không truy cập/sửa/xóa nhân viên ở site khác; site không hoạt động hoặc slug không thuộc site bị từ chối; danh sách mặc định của Admin Big gộp đúng các site hoạt động, mỗi dòng có `site_code`, username, phone và trạng thái gửi mật khẩu; lọc site chỉ trả dữ liệu site đó; lỗi site được đánh dấu `complete=false`/`missing_sites`; POST tạo nhân viên không gửi email và ghi trạng thái `ready`; chỉ thao tác bấm gửi mới gọi SMTP, `sent`/`unknown`/`changed` không thể gửi lại, SMTP xác nhận thất bại mới cho thử lại; email/username đều đăng nhập được; tạo nhân viên ở site khác không làm mất chế độ xem toàn hệ thống; upload ảnh sai MIME/loại/kích thước, token hết hạn hoặc public ID không khớp bị từ chối; ảnh chỉ được báo hoàn tất sau khi metadata đồng nhất trên các site; trạng thái tài khoản chỉ chuyển `active` → `inactive` và việc ngưng thu hồi phiên; DELETE làm tài khoản biến mất khỏi mọi bản sao, giữ Logs/phiếu thu, chỉ giữ hồ sơ rời tài khoản khi phiếu thu tham chiếu; lỗi site không bị báo thành công toàn phần và retry tiếp tục theo dấu đã lưu.
 
-**Trạng thái source:** `GET` danh sách/chi tiết, `POST`, `PATCH` hồ sơ/ngưng tài khoản, `DELETE` vĩnh viễn và `POST .../credential-email/` gửi mật khẩu theo thao tác người quản lý có route/service; upload avatar ban đầu qua Cloudinary. Vẫn cần kiểm chứng SQL Server, SMTP, quyền từng vai trò/site và lỗi/khôi phục đồng bộ nhiều site. Migration 37 chuẩn hóa hồ sơ `xep_lop` cũ thành `tu_van` trước khi triển khai code gộp chức vụ.
+**Trạng thái source:** `GET` danh sách/chi tiết, `POST`, `PATCH` hồ sơ/ngưng tài khoản, `DELETE` vĩnh viễn và `POST .../credential-email/` gửi mật khẩu theo thao tác người quản lý có route/service; upload avatar ban đầu qua Cloudinary. Vai trò mới gộp Lễ tân vào Kế toán; chạy migration 37 rồi 41 trên mọi site trước khi triển khai code. Vẫn cần kiểm chứng SQL Server, SMTP, quyền từng vai trò/site và lỗi/khôi phục đồng bộ nhiều site.
 
 ### FS-ACC-02 — Xóa vĩnh viễn Admin Small
 
@@ -335,7 +337,7 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 ### FS-STU-01 — Quản lý hồ sơ học viên tại cơ sở
 
-**Người dùng:** Admin Big đọc danh sách mặc định toàn hệ thống và chọn site cụ thể khi ghi; Admin Small quản lý tại site được gán; Tư vấn & xếp lớp chỉ tra cứu danh sách tại site; Lễ tân không tra cứu danh sách/hồ sơ học viên. **Phân tán:** danh sách Admin Big là `GLOBAL`, đọc `HocVien` riêng tại từng CSDL site rồi gộp trong API; chi tiết và CRUD hồ sơ là `LOCAL` trên `HocVien`.
+**Người dùng:** Admin Big đọc danh sách mặc định toàn hệ thống và chọn site cụ thể khi ghi; Admin Small quản lý tại site được gán; Tư vấn & xếp lớp tra cứu danh sách tại site; Kế toán & Lễ tân chỉ dùng API danh sách read-only bên trong biểu mẫu đăng ký, không có trang/quyền quản lý hồ sơ. **Phân tán:** danh sách Admin Big là `GLOBAL`, đọc `HocVien` riêng tại từng CSDL site rồi gộp trong API; chi tiết và CRUD hồ sơ là `LOCAL` trên `HocVien`.
 
 1. Admin Big có thể bỏ `site_code` khi đọc danh sách để xem toàn bộ cơ sở đang hoạt động; khi tạo/sửa/xóa/cấp tài khoản hoặc xem chi tiết, phải dùng một cơ sở cụ thể. Admin Small lấy cơ sở từ phiên. API không tin `site_code` do Admin Small gửi lên. Global Query báo `complete=false` và `missing_sites` khi có site chưa đọc được.
 2. Tạo hồ sơ với mã `Seq_HV` của site, `ma_co_so` và `co_so_goc` bằng site được chọn, trạng thái `dang_hoc`, `ma_tai_khoan = NULL`. Slug mặc định được chuẩn hóa từ họ tên; người tạo có thể chỉnh slug trước khi lưu. API bảo đảm slug duy nhất trong CSDL site bằng hậu tố số khi trùng. Tạo hồ sơ không tạo tài khoản hay gửi mật khẩu.
@@ -346,15 +348,15 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 7. DELETE chỉ xóa hồ sơ chưa liên kết tài khoản, chưa có `DangKy` và chưa có lịch sử/giao dịch chuyển. Nếu có dữ liệu học tập, điểm danh, học phí hoặc lịch sử cần giữ, trả conflict; không xóa hồ sơ, bản sao tài khoản, chứng từ hay `Logs`.
 8. Admin Big/Admin Small chủ động bấm `Cấp tài khoản` sau khi tạo hồ sơ. Chỉ hồ sơ đang `dang_hoc` và có email hợp lệ mới đủ điều kiện; không bắt buộc phải có `DangKy` trước khi cấp. `TaiKhoan` được ghi theo chính sách replication hiện có, `HocVien.ma_tai_khoan` ghi tại site hồ sơ, mật khẩu tạm chỉ được gửi qua email sau thao tác này. Thư ghi email làm thông tin đăng nhập chính; API vẫn chấp nhận username tương thích.
 
-**Nghiệm thu:** danh sách mặc định của Admin Big gộp dữ liệu các site hoạt động, hiển thị site trên từng dòng và cảnh báo site thiếu; lọc một site chỉ đọc site đó; Admin Big chỉ tạo/sửa/xóa/cấp tài khoản tại một site cụ thể và Admin Small không truy cập site khác; Lễ tân không có quyền tra cứu danh sách; Tư vấn chỉ tra cứu danh sách tại site được giao; mã có tiền tố không được dùng để suy site hiện tại; slug tạo theo họ tên, chuẩn hóa và duy nhất trong site; giới tính chỉ nhận `Nam`, `Nữ`, `Khác` ở API; email/ngày sinh/điện thoại được validate ở server; tạo hồ sơ không cấp tài khoản; ảnh tùy chọn chỉ cập nhật metadata tại CSDL site hồ sơ sau khi API xác minh Cloudinary; lỗi upload không làm mất hồ sơ; xóa hồ sơ có lịch sử bị từ chối mà không mất dữ liệu; Admin có thể cấp tài khoản cho hồ sơ đang học có email hợp lệ trước khi tạo đăng ký khóa học, chỉ qua thao tác riêng và API không trả mật khẩu.
+**Nghiệm thu:** danh sách mặc định của Admin Big gộp dữ liệu các site hoạt động, hiển thị site trên từng dòng và cảnh báo site thiếu; lọc một site chỉ đọc site đó; Admin Big chỉ tạo/sửa/xóa/cấp tài khoản tại một site cụ thể và Admin Small không truy cập site khác; Kế toán & Lễ tân không có trang/quyền quản lý hồ sơ, chỉ tra cứu read-only trong biểu mẫu đăng ký; Tư vấn tra cứu danh sách tại site được giao; mã có tiền tố không được dùng để suy site hiện tại; slug tạo theo họ tên, chuẩn hóa và duy nhất trong site; giới tính chỉ nhận `Nam`, `Nữ`, `Khác` ở API; email/ngày sinh/điện thoại được validate ở server; tạo hồ sơ không cấp tài khoản; ảnh tùy chọn chỉ cập nhật metadata tại CSDL site hồ sơ sau khi API xác minh Cloudinary; lỗi upload không làm mất hồ sơ; xóa hồ sơ có lịch sử bị từ chối mà không mất dữ liệu; Admin có thể cấp tài khoản cho hồ sơ đang học có email hợp lệ trước khi tạo đăng ký khóa học, chỉ qua thao tác riêng và API không trả mật khẩu.
 
 ### FS-ENR-01 — Đăng ký khóa học
 
-**Người dùng:** Admin Small, lễ tân, Tư vấn & xếp lớp hoặc Kế toán. **Kiểu:** LOCAL. **Site:** site hiện tại của học viên/lớp. **Bảng:** HocVien, KhoaHoc, LopHoc, DangKy, HocPhi, Logs.
+**Người dùng:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp. **Kiểu:** LOCAL. **Site:** site hiện tại của học viên/lớp. **Bảng:** HocVien, KhoaHoc, LopHoc, DangKy, HocPhi, Logs.
 
 **Điều kiện:** người dùng có quyền tại site; học viên đang học tại site; lớp thuộc site, nhận đăng ký và còn chỗ; học viên chưa có đăng ký còn hiệu lực trùng khóa/lớp theo quy tắc schema.
 
-1. Nhân viên tìm học viên và chọn khóa/lớp tại cùng site. Kế toán chỉ dùng tra cứu tên/mã trong biểu mẫu đăng ký; không được sửa/cấp/xóa hồ sơ học viên.
+1. Nhân viên tìm học viên và chọn khóa/lớp tại cùng site. Kế toán & Lễ tân chỉ dùng tra cứu tên/mã read-only trong biểu mẫu đăng ký; không được sửa/cấp/xóa hồ sơ học viên.
 2. API lấy site từ phiên/quyền và định tuyến bằng Site Router; không nhận alias/database tùy ý từ client.
 3. API kiểm tra trạng thái học viên/lớp, sức chứa, lịch xung đột, đăng ký trùng và mức học phí theo dữ liệu server.
 4. Trong một transaction cục bộ, tạo DangKy, tạo HocPhi, cập nhật sĩ số nếu schema lưu sĩ số tổng hợp, ghi nhật ký.
@@ -368,9 +370,9 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 ### FS-CLASS-01 — Mở lớp và tạo lịch học
 
-**Người dùng:** Admin Big đọc danh sách toàn hệ thống hoặc chọn một site để quản lý; Admin Small/lễ tân/Tư vấn & xếp lớp/Kế toán xem lớp tại site được cấp. Kế toán được đăng ký hoặc xếp lại học viên trong site, không được quản trị phòng/giáo viên. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `LopHoc` cùng số liệu `DangKy` tại từng site rồi tổng hợp trong API; thao tác cơ sở là `LOCAL`. **Bảng:** KhoaHoc, GiaoVien, PhongHoc, LopHoc, BuoiHoc, DangKy, Logs.
+**Người dùng:** Admin Big đọc danh sách toàn hệ thống hoặc chọn một site để quản lý; Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp xem lớp tại site được cấp. Kế toán & Lễ tân/Tư vấn được mở lớp, phân công giáo viên, đăng ký hoặc xếp lại học viên trong site; chỉ Admin Big/Admin Small được thêm, sửa, xóa phòng. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `LopHoc` cùng số liệu `DangKy` tại từng site rồi tổng hợp trong API; thao tác cơ sở là `LOCAL`. **Bảng:** KhoaHoc, GiaoVien, PhongHoc, LopHoc, BuoiHoc, DangKy, Logs.
 
-Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, có `site_code` trên mỗi dòng và trả `complete=false`/`missing_sites` khi thiếu site. Xem chi tiết định tuyến theo site của lớp. Khi bộ lọc đang ở `Toàn hệ thống`, Admin Big vẫn dùng được các thao tác mở lớp, thêm phòng, đăng ký, đổi lớp và phân công giáo viên; giao diện yêu cầu chọn site ngay trong biểu mẫu thao tác, rồi API chỉ ghi `LOCAL` tại site đó. Khi mở thao tác từ chi tiết lớp, phân công giáo viên dùng site trên bản ghi lớp. Admin Small/lễ tân/Tư vấn & xếp lớp tiếp tục thao tác tại site trong phiên; Kế toán chỉ xem lớp và dùng đăng ký/đổi lớp tại site trong phiên. Không JOIN xuyên site.
+Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, có `site_code` trên mỗi dòng và trả `complete=false`/`missing_sites` khi thiếu site. Xem chi tiết định tuyến theo site của lớp. Khi bộ lọc đang ở `Toàn hệ thống`, Admin Big vẫn dùng được các thao tác mở lớp, thêm phòng, đăng ký, đổi lớp và phân công giáo viên; giao diện yêu cầu chọn site ngay trong biểu mẫu thao tác, rồi API chỉ ghi `LOCAL` tại site đó. Khi mở thao tác từ chi tiết lớp, phân công giáo viên dùng site trên bản ghi lớp. Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp thao tác lớp tại site trong phiên; chỉ Admin Big/Admin Small quản trị phòng. Không JOIN xuyên site.
 
 1. Nhân viên chọn khóa học, giáo viên, phòng, sức chứa, ngày bắt đầu/kết thúc, thứ trong tuần và khung giờ.
 2. API kiểm tra tất cả dữ liệu thuộc site, giáo viên đang dạy, phòng khả dụng, ngày/giờ hợp lệ và không trùng lịch giáo viên/phòng.
@@ -393,7 +395,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-CLASS-02 — Xếp học viên vào lớp hoặc đổi lớp
 
-**Người dùng:** Admin Small, lễ tân, Tư vấn & xếp lớp hoặc Kế toán. **Kiểu:** LOCAL. **Bảng:** HocVien, DangKy, LopHoc, Logs.
+**Người dùng:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp. **Kiểu:** LOCAL. **Bảng:** HocVien, DangKy, LopHoc, Logs.
 
 1. Nhân viên chọn đăng ký hiện hành và lớp đích.
 2. API xác nhận học viên/đăng ký/lớp cùng site, lớp đích còn chỗ, lịch phù hợp, đăng ký chưa hoàn tất/hủy/chuyển đi và không tạo bản ghi trùng.
@@ -418,9 +420,9 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-TUI-01 — Thu học phí tại cơ sở
 
-**Người dùng:** Admin Big xem danh sách toàn hệ thống; kế toán ghi nhận thu/hoàn tại site được cấp; Admin Small giám sát theo quyền tại site. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; thu/hoàn/kế hoạch và nhắc học phí là `LOCAL` tại site của khoản phí/lớp. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
+**Người dùng:** Admin Big xem danh sách toàn hệ thống; Kế toán & Lễ tân ghi nhận thu/hoàn tại site được cấp; Admin Small giám sát theo quyền tại site. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; thu/hoàn/kế hoạch và nhắc học phí là `LOCAL` tại site của khoản phí/lớp. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
-1. Kế toán xem danh sách theo site; mặc định lọc khoản có số dư dương và mỗi dòng thể hiện học viên, lớp, tổng học phí, đã thu, còn lại và trạng thái.
+1. Kế toán & Lễ tân xem danh sách theo site; mặc định lọc khoản có số dư dương và mỗi dòng thể hiện học viên, lớp, tổng học phí, đã thu, còn lại và trạng thái.
 2. Có thể tìm theo tên/mã học viên hoặc tên/mã lớp, chọn trạng thái và phân trang trên server; báo cáo tổng công nợ không chỉ cộng trang hiện tại.
 3. Người dùng nhập số tiền dương không vượt quá số còn nợ, phương thức hợp lệ và ghi chú không chứa dữ liệu thanh toán nhạy cảm.
 4. API kiểm tra quyền, trạng thái khoản phí và khóa chống gửi lặp/idempotency.
@@ -433,7 +435,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-TUI-02 — Hoàn hoặc điều chỉnh học phí
 
-**Người dùng:** kế toán có quyền hoàn; Admin Small giám sát theo phân quyền. **Kiểu:** LOCAL. **Bảng:** HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
+**Người dùng:** Kế toán & Lễ tân có quyền hoàn; Admin Small giám sát theo phân quyền. **Kiểu:** LOCAL. **Bảng:** HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
 1. Người dùng chọn phiếu thu gốc và lý do hoàn/điều chỉnh.
 2. API xác định site và số tiền có thể hoàn từ dữ liệu lưu; không cho hoàn vượt tổng số đã thu trừ số đã hoàn.
@@ -444,9 +446,9 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 ### FS-TUI-03 — Báo cáo tài chính học phí
 
-**Người dùng:** Kế toán tại site được giao; Admin Small tại site được giao; Admin Big theo site hoặc toàn hệ thống. **Kiểu:** `LOCAL` hoặc `GLOBAL`. **Bảng:** `HocPhi`, `PhieuThu`.
+**Người dùng:** Kế toán & Lễ tân tại site được giao; Admin Small tại site được giao; Admin Big theo site hoặc toàn hệ thống. **Kiểu:** `LOCAL` hoặc `GLOBAL`. **Bảng:** `HocPhi`, `PhieuThu`.
 
-1. Kế toán và Admin Small chỉ đọc CSDL site trong phiên; Admin Big chọn một site hoặc để trống để đọc toàn bộ site hoạt động.
+1. Kế toán & Lễ tân và Admin Small chỉ đọc CSDL site trong phiên; Admin Big chọn một site hoặc để trống để đọc toàn bộ site hoạt động.
 2. API truy vấn độc lập từng CSDL rồi tổng hợp tại ứng dụng, trả số khoản, số khoản còn nợ, tổng phải thu, đã thu ròng, còn nợ, tổng phiếu thu và tổng phiếu hoàn.
 3. Nếu thiếu site trong Global Query, trả `complete=false` cùng `missing_sites`, không trình bày phần đã đọc như tổng đầy đủ.
 

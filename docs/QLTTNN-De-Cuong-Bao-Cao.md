@@ -55,9 +55,8 @@ Hệ thống hỗ trợ đăng nhập và phân quyền; quản lý học viên,
 |---|---|---|
 | Admin Big | Quản lý tài khoản/danh mục/cơ sở; xem báo cáo/nhật ký toàn hệ thống; duyệt hoặc từ chối đề nghị chuyển học viên | Toàn hệ thống theo quyền |
 | Admin Small | Quản lý lớp, phòng, lịch, học viên, học phí; tạo đề nghị chuyển học viên từ cơ sở mình; xem báo cáo tại cơ sở | Site được gán |
-| Lễ tân | Tiếp nhận tại quầy; đăng ký/lớp và kế hoạch học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu | Site được gán |
-| Tư vấn & xếp lớp | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký và xếp lớp | Site được gán |
-| Kế toán | Thu học phí và xem danh sách lớp | Site được gán |
+| Kế toán & Lễ tân | Tiếp nhận tại quầy; mở lớp/phân công giáo viên, đăng ký/xếp lớp, thu/hoàn học phí; chỉ đọc học viên trong form đăng ký, không quản lý hồ sơ/phòng | Site được gán |
+| Tư vấn & xếp lớp | Tra cứu học viên, hỗ trợ tư vấn, mở lớp/phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ, đăng/sửa/xuất bản bài Blog dùng chung | Site được gán; Blog ghi mọi site hoạt động |
 | Giáo viên | Xem lớp mình dạy, điểm danh, nhập điểm | Các lớp mình dạy |
 | Máy trạm tại cơ sở | Giao diện người dùng, gửi yêu cầu tới ứng dụng | Không kết nối tùy tiện sang CSDL site khác |
 | Coordinator/ứng dụng | Xác thực, phân quyền, định tuyến, gộp truy vấn, đồng bộ và điều phối giao dịch | Kết nối tới các site theo cấu hình |
@@ -76,11 +75,11 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 | Chức năng/truy vấn | Kiểu | Vị trí gọi | Site được truy cập | Tần suất dự kiến | Bảng đọc/ghi chính |
 |---|---|---|---|---|---|
 | Đăng nhập bằng mật khẩu/Google/Facebook | `GLOBAL` đối chiếu tài khoản và subject đã liên kết | Máy trạm mọi cơ sở | Các site đang hoạt động; API đối chiếu rồi dựng phiên | Cao (đăng nhập mỗi phiên) | Đọc `TaiKhoan`, gồm `google_subject`/`facebook_subject`; ghi nhật ký đăng nhập an toàn |
-| Xem khóa học/lớp còn chỗ | `LOCAL` | Lễ tân/quản lý tại cơ sở | Site đang làm việc | Cao | Đọc `KhoaHoc`, `LopHoc`, `HocVien`, `DangKy` |
-| Đăng ký khóa học | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Cao theo mùa tuyển sinh | Ghi `DangKy`, `HocPhi`, `LopHoc`, `Logs` |
-| Đổi lớp | `LOCAL` | Lễ tân/quản lý | Site đang làm việc | Trung bình | Ghi `DangKy`, sĩ số `LopHoc`; đọc lịch và học phí |
+| Xem khóa học/lớp còn chỗ | `LOCAL` | Kế toán & Lễ tân/Tư vấn & xếp lớp/quản lý tại cơ sở | Site đang làm việc | Cao | Đọc `KhoaHoc`, `LopHoc`, `HocVien`, `DangKy` |
+| Đăng ký khóa học | `LOCAL` | Kế toán & Lễ tân/Tư vấn & xếp lớp/quản lý | Site đang làm việc | Cao theo mùa tuyển sinh | Ghi `DangKy`, `HocPhi`, `LopHoc`, `Logs` |
+| Đổi lớp | `LOCAL` | Kế toán & Lễ tân/Tư vấn & xếp lớp/quản lý | Site đang làm việc | Trung bình | Ghi `DangKy`, sĩ số `LopHoc`; đọc lịch và học phí |
 | Mở lớp/sinh lịch | `LOCAL` | Quản lý cơ sở/admin | Site sở hữu lớp | Trung bình/theo khóa | Ghi `LopHoc`, `BuoiHoc`; đọc giáo viên/phòng/khóa |
-| Thu hoặc hoàn học phí | `LOCAL` | Kế toán/quản lý/admin theo quyền | Site đăng ký | Cao, theo ngày | Ghi `PhieuThu`, cập nhật `HocPhi`, `Logs` |
+| Thu hoặc hoàn học phí | `LOCAL` | Kế toán & Lễ tân/quản lý/admin theo quyền | Site đăng ký | Cao, theo ngày | Ghi `PhieuThu`, cập nhật `HocPhi`, `Logs` |
 | Điểm danh | `LOCAL` | Giáo viên | Site lớp/buổi học | Trung bình/cao vào ngày học | Ghi `DiemDanh`, cập nhật `BuoiHoc` |
 | Nhập/sửa điểm | `LOCAL` | Giáo viên/admin | Site lớp/đăng ký | Trung bình/theo kỳ | Ghi `Diem`, `Logs` |
 | Xem thống kê cơ sở | `LOCAL` | Quản lý/admin | Một site | Trung bình | Đọc `HocVien`, `DangKy`, `HocPhi`, `PhieuThu`, `Diem` |
@@ -95,18 +94,22 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 
 Chép ma trận quyền từ README mục 3 vào báo cáo; không tự suy ra quyền mới. Tóm lược:
 
-| Chức năng | Admin Big | Admin Small | Lễ tân | Kế toán | Giáo viên |
+| Chức năng | Admin Big | Admin Small | Kế toán & Lễ tân | Tư vấn & xếp lớp | Giáo viên |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Quản lý tài khoản và danh mục | ✓ |  |  |  |  |
 | Tạo đề nghị chuyển từ cơ sở mình |  | ✓ |  |  |  |
 | Duyệt/từ chối đề nghị chuyển toàn hệ thống | ✓ |  |  |  |  |
 | Thống kê/nhật ký toàn hệ thống | ✓ |  |  |  |  |
 | Thống kê/nhật ký cơ sở | ✓ | ✓ |  |  |  |
-| Mở lớp, lịch và phòng | ✓ | ✓ |  |  |  |
-| Học viên, đăng ký, đổi lớp | ✓ | ✓ | ✓ |  |  |
-| Thu học phí | ✓ | ✓ |  | ✓ |  |
-| Hoàn học phí | ✓ | ✓ |  |  |  |
-| Xem danh sách lớp cơ sở | ✓ | ✓ | ✓ | ✓ |  |
+| Mở lớp và phân công giáo viên | ✓ | ✓ | ✓ | ✓ |  |
+| Quản lý phòng học | ✓ | ✓ |  |  |  |
+| Học viên, đăng ký, đổi lớp | ✓ | ✓ | ✓ | ✓ |  |
+| Tra cứu học viên read-only trong form đăng ký | ✓ | ✓ | ✓ |  |  |
+| Thu/hoàn học phí | ✓ | ✓ | ✓ |  |  |
+| Báo cáo tài chính cơ sở | ✓ | ✓ | ✓ |  |  |
+| Nhận/phản hồi liên hệ | ✓ | ✓ |  | ✓ |  |
+| Đăng/sửa/xuất bản bài Blog dùng chung | ✓ |  |  | ✓ |  |
+| Xóa bài hoặc quản lý danh mục Blog | ✓ |  |  |  |  |
 | Điểm danh/nhập điểm lớp được dạy | ✓ |  |  |  | ✓ |
 | Tự đổi mật khẩu | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -122,7 +125,7 @@ Các cơ sở Q1, Q7 và TD dùng cùng một bộ chức năng và cấu trúc 
 
 | Vị trí | Nhiệm vụ tại vị trí | Dữ liệu thường đọc/ghi | Phạm vi |
 |---|---|---|---|
-| Cơ sở Q1, Q7, TD | Lễ tân tiếp nhận hồ sơ, đăng ký và đổi lớp; kế toán thu/hoàn tiền theo quyền; giáo viên điểm danh và nhập điểm lớp được phân công; quản lý mở lớp, xếp lịch/phòng và xem báo cáo cơ sở | Hồ sơ học viên, lớp, buổi học, đăng ký, học phí, phiếu thu, điểm danh, điểm, nhật ký cơ sở | Ghi dữ liệu nghiệp vụ vào CSDL của chính cơ sở; không tự truy cập DB của cơ sở khác |
+| Cơ sở Q1, Q7, TD | Kế toán & Lễ tân tiếp nhận hồ sơ, mở lớp/phân công giáo viên, đăng ký và đổi lớp, thu/hoàn tiền; Tư vấn & xếp lớp tra cứu học viên, xử lý liên hệ và đăng bài dùng chung; giáo viên điểm danh/nhập điểm lớp được phân công; quản lý phòng và báo cáo cơ sở | Hồ sơ học viên, lớp, buổi học, đăng ký, học phí, phiếu thu, điểm danh, điểm, nhật ký cơ sở | Ghi dữ liệu nghiệp vụ vào CSDL của chính cơ sở; không tự truy cập DB của cơ sở khác; Blog bài viết được Coordinator nhân bản tới site hoạt động |
 | Admin Big | Quản lý danh mục dùng chung, xem thống kê/nhật ký toàn cục, quản lý vòng đời cơ sở, duyệt/từ chối đề nghị chuyển | Bản sao danh mục/tài khoản; hộp thư đọc gộp; quyết định tại CSDL nguồn; dữ liệu nguồn/đích sau khi duyệt | Coordinator định tuyến tới đúng site; chỉ yêu cầu đã duyệt mới chạy module giao dịch phân tán |
 | Admin Small | Điều hành site được giao, tạo đề nghị chuyển học viên ra site khác và theo dõi trạng thái | Dữ liệu nghiệp vụ của site mình; đề nghị chuyển tại CSDL nguồn | API tự lấy nguồn từ phạm vi tài khoản; không cho tự duyệt hoặc truy cập site khác |
 | Nhóm vận hành/triển khai | Tạo CSDL, cấu hình kết nối, cấp quyền dịch vụ, kiểm tra backup, đồng bộ và phục hồi | Cấu hình môi trường, trạng thái site, phiên bản dữ liệu dùng chung, nhật ký đồng bộ | Không dùng quyền vận hành để thay quyền nghiệp vụ của người dùng |

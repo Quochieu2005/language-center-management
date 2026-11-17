@@ -13,7 +13,7 @@ export default function ClassesPage() {
   const { user } = useSession();
   const canManage = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
   const canEnroll = canManage;
-  const canAdministerClasses = ["admin_big", "admin_small", "le_tan", "tu_van"].includes(user?.role || "");
+  const canAdministerClasses = ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"].includes(user?.role || "");
   const { selectedSite, siteCodes, loadingSites, setSelectedSite } = useSiteScope();
   const isAdminBig = user?.role === "admin_big";
   const site = user?.role === "admin_big" ? selectedSite : user?.site_code || null;

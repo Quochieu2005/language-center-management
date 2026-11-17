@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ApiError } from "@/lib/api/client";
+import { useSession } from "@/lib/auth/session";
 import BlogContentEditor from "./BlogContentEditor";
 import styles from "./BlogPage.module.scss";
 import {
@@ -81,6 +82,9 @@ function readPendingWrite(): PendingWrite | null {
 
 export default function BlogPage() {
   const { message, modal } = App.useApp();
+  const { user } = useSession();
+  const isAdminBig = user?.role === "admin_big";
+  const canWriteArticles = isAdminBig || user?.role === "tu_van";
   const [categoryList, setCategoryList] = useState<BlogList<BlogCategory> | null>(null);
   const [articleList, setArticleList] = useState<BlogList<BlogArticleSummary> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -203,7 +207,7 @@ export default function BlogPage() {
   };
 
   const submitCategory = (values: CategoryForm) => {
-    if (!canWrite) return;
+    if (!isAdminBig || !canWrite) return;
     const body = { ...values, slug: values.slug.trim(), name: values.name.trim(), description: values.description?.trim() || null };
     const key = crypto.randomUUID();
     void runWrite(editor?.slug
@@ -212,7 +216,7 @@ export default function BlogPage() {
   };
 
   const submitArticle = (values: ArticleForm) => {
-    if (!canWrite) return;
+    if (!canWriteArticles || !canWrite) return;
     const body: BlogArticleInput = {
       slug: values.slug.trim(), category_slug: values.category_slug, title: values.title.trim(),
       excerpt: values.excerpt.trim(), content: values.content.trim(),
@@ -244,7 +248,7 @@ export default function BlogPage() {
     { title: "Mô tả", dataIndex: "description", render: (value) => value || "—" },
     { title: "Bài viết", dataIndex: "post_count" },
     { title: "Trạng thái", dataIndex: "status", render: (value: BlogCategory["status"]) => <Tag color={value === "hoat_dong" ? "green" : "default"}>{categoryStatus[value]}</Tag> },
-    { title: "Thao tác", render: (_, row) => <Space><Button size="small" disabled={!canWrite} onClick={() => openCategory(row)}>Sửa</Button><Button danger size="small" disabled={!canWrite || row.post_count > 0} title={row.post_count > 0 ? "Danh mục đang được bài viết sử dụng." : undefined} onClick={() => confirmDelete("category", row)}>Xóa</Button></Space> },
+    ...(isAdminBig ? [{ title: "Thao tác", render: (_: unknown, row: BlogCategory) => <Space><Button size="small" disabled={!canWrite} onClick={() => openCategory(row)}>Sửa</Button><Button danger size="small" disabled={!canWrite || row.post_count > 0} title={row.post_count > 0 ? "Danh mục đang được bài viết sử dụng." : undefined} onClick={() => confirmDelete("category", row)}>Xóa</Button></Space> }] : []),
   ];
 
   const articleColumns: ColumnsType<BlogArticleSummary> = [
@@ -254,7 +258,7 @@ export default function BlogPage() {
     { title: "Thời gian đọc", dataIndex: "reading_time_minutes", render: (value) => `${value} phút` },
     { title: "Trạng thái", dataIndex: "status", render: (value: BlogArticleSummary["status"]) => <Tag color={value === "da_xuat_ban" ? "green" : value === "an" ? "default" : "gold"}>{articleStatus[value]}</Tag> },
     { title: "Ngày xuất bản", dataIndex: "published_at", render: (value: string | null) => value ? vietnamDate.format(new Date(value)) : "Ngay khi xuất bản" },
-    { title: "Thao tác", render: (_, row) => <Space><Button size="small" disabled={!canWrite} loading={loadingArticle === row.slug} onClick={() => void openArticle(row)}>Sửa</Button><Button danger size="small" disabled={!canWrite} onClick={() => confirmDelete("article", row)}>Xóa</Button></Space> },
+    { title: "Thao tác", render: (_, row) => <Space><Button size="small" disabled={!canWrite} loading={loadingArticle === row.slug} onClick={() => void openArticle(row)}>Sửa</Button>{isAdminBig && <Button danger size="small" disabled={!canWrite} onClick={() => confirmDelete("article", row)}>Xóa</Button>}</Space> },
   ];
 
   return <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
@@ -262,7 +266,7 @@ export default function BlogPage() {
     {categoryList && !categoryList.complete && <Alert type="warning" showIcon title="Danh mục Blog chưa được đối chiếu đủ các cơ sở. Thao tác ghi đang bị khóa." description={`Site thiếu: ${categoryList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${categoryList.inconsistent_sites.join(", ") || "không có"}.`} />}
     {articleList && !articleList.complete && <Alert type="warning" showIcon title="Bài viết Blog chưa được đối chiếu đủ các cơ sở. Thao tác ghi đang bị khóa." description={`Site thiếu: ${articleList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${articleList.inconsistent_sites.join(", ") || "không có"}.`} />}
     {pending && <Alert type="warning" showIcon title="Yêu cầu Blog chưa đồng bộ hoàn tất" description={<Space orientation="vertical"><span>Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định; API chưa xác nhận kết quả"}. Giữ nguyên mã yêu cầu và nội dung khi thử lại.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
-    <Card title={`Quản lý Blog${categoryList && articleList ? ` · ${categoryList.count} danh mục · ${articleList.count} bài viết` : ""}`} extra={<Space><Button disabled={loading || saving} onClick={() => void load()}>Tải lại</Button><Button type="primary" disabled={!canWrite || !activeCategories.length} onClick={() => openArticle()}>Tạo bài viết</Button><Button type="primary" disabled={!canWrite} onClick={() => openCategory()}>Tạo danh mục</Button></Space>}>
+    <Card title={`${isAdminBig ? "Quản lý Blog" : "Bài viết Blog"}${categoryList && articleList ? ` · ${categoryList.count} danh mục · ${articleList.count} bài viết` : ""}`} extra={<Space><Button disabled={loading || saving} onClick={() => void load()}>Tải lại</Button>{canWriteArticles && <Button type="primary" disabled={!canWrite || !activeCategories.length} onClick={() => openArticle()}>Tạo bài viết</Button>}{isAdminBig && <Button type="primary" disabled={!canWrite} onClick={() => openCategory()}>Tạo danh mục</Button>}</Space>}>
       {categoryList && articleList && <div style={{ marginBottom: 12 }}><Tag color={dataComplete ? "green" : "orange"}>{dataComplete ? "Đã đối chiếu đầy đủ" : "Chưa đồng bộ đủ"}</Tag><span>Các site: {categoryList.site_codes.join(", ") || "Chưa có dữ liệu"}</span></div>}
       <Tabs defaultActiveKey="articles" items={[
         { key: "articles", label: `Bài viết (${articleList?.count ?? 0})`, children: <Table<BlogArticleSummary> rowKey="slug" loading={loading} columns={articleColumns} dataSource={articleList?.results ?? []} scroll={{ x: 980 }} locale={{ emptyText: <Empty description="Chưa có bài viết Blog." /> }} pagination={{ pageSize: 10 }} /> },

@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 _SITE_CODE = r"^[A-Za-z0-9_-]{2,10}$"
 _USERNAME = r"^[A-Za-z0-9._-]{3,100}$"
-_STAFF_ROLES = ("le_tan", "tu_van", "ke_toan")
+_STAFF_ROLES = ("tu_van", "ke_toan")
 
 
 class StrictInputSerializer(serializers.Serializer):

@@ -256,7 +256,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 | `phien_ban`, `cap_nhat_luc` | | Đối soát đồng bộ (mục 2) |
 | `avatar_public_id`, `avatar_secure_url` | *null* được phép | Metadata ảnh đại diện Cloudinary; không lưu bytes ảnh trong SQL Server |
 
-Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ `le_tan`, `tu_van` (hiển thị “Tư vấn & xếp lớp”) hoặc `ke_toan`.
+Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Chức vụ nhân viên hiện tại là `tu_van` (hiển thị “Tư vấn & xếp lớp”) hoặc `ke_toan` (hiển thị “Kế toán & Lễ tân”). Migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`; không thêm bảng/cột.
 
 Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL. Coordinator phải kiểm tra các bản sao trước khi liên kết/thu hồi subject (`REPLICATED-WRITE`). Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret hoặc email provider trong `TaiKhoan`; chỉ lưu metadata avatar Cloudinary nêu trên.
 
@@ -311,10 +311,10 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_co_so` | FK | |
 | `ma_tai_khoan` | FK, UQ, *null* | → `TaiKhoan` |
 | `ho_ten`, `sdt`, `email` | | |
-| `chuc_vu` | | `le_tan` · `tu_van` (tư vấn và xếp lớp) · `ke_toan` |
+| `chuc_vu` | | `tu_van` (tư vấn và xếp lớp) · `ke_toan` (kế toán và lễ tân; hợp nhất từ `le_tan` cũ) |
 | `trang_thai` | | `dang_lam` · `nghi_viec` |
 
-Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. Ảnh dùng `TaiKhoan.avatar_public_id` và `avatar_secure_url`; bytes nằm trên Cloudinary và metadata được đồng bộ cùng tài khoản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Trạng thái đăng nhập `TaiKhoan.trang_thai` độc lập với trạng thái công việc `NhanVien.trang_thai`; endpoint nhân viên chỉ chuyển `active` → `inactive` và thu hồi phiên, không có kích hoạt lại. Mật khẩu chỉ được gửi sau thao tác của Admin Big/Admin Small; các trạng thái `employee_credential_email_*` được ghi vào `Logs` tại site hồ sơ để khóa gửi trùng/không rõ kết quả, không cần thêm bảng hoặc cột. Khi xóa vĩnh viễn tài khoản, xóa hồ sơ `NhanVien` nếu không có phiếu thu tham chiếu; nếu có `PhieuThu`, đặt `ma_tai_khoan=NULL`, `trang_thai=nghi_viec` và giữ hồ sơ để bảo toàn khóa ngoại/chứng từ. Danh sách quản lý chỉ hiển thị hồ sơ còn gắn tài khoản. `Logs` và phiếu thu không bị xóa. Migration 37 chuyển dữ liệu `xep_lop` cũ thành `tu_van`; không thêm bảng/cột cho ảnh nhân viên.
+Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. Ảnh dùng `TaiKhoan.avatar_public_id` và `avatar_secure_url`; bytes nằm trên Cloudinary và metadata được đồng bộ cùng tài khoản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Trạng thái đăng nhập `TaiKhoan.trang_thai` độc lập với trạng thái công việc `NhanVien.trang_thai`; endpoint nhân viên chỉ chuyển `active` → `inactive` và thu hồi phiên, không có kích hoạt lại. Mật khẩu chỉ được gửi sau thao tác của Admin Big/Admin Small; các trạng thái `employee_credential_email_*` được ghi vào `Logs` tại site hồ sơ để khóa gửi trùng/không rõ kết quả, không cần thêm bảng hoặc cột. Khi xóa vĩnh viễn tài khoản, xóa hồ sơ `NhanVien` nếu không có phiếu thu tham chiếu; nếu có `PhieuThu`, đặt `ma_tai_khoan=NULL`, `trang_thai=nghi_viec` và giữ hồ sơ để bảo toàn khóa ngoại/chứng từ. Danh sách quản lý chỉ hiển thị hồ sơ còn gắn tài khoản. `Logs` và phiếu thu không bị xóa. Migration 37 chuyển dữ liệu `xep_lop` cũ thành `tu_van`; migration 41 chuyển dữ liệu `le_tan` cũ thành `ke_toan`. Không thêm bảng/cột cho thay đổi chức vụ hoặc ảnh nhân viên.
 
 ### 6.4. Lớp học
 
@@ -579,7 +579,7 @@ Migration `db/39_add_contact_inbox.sql` cần chạy riêng tại từng CSDL si
 
 ## 7. Dữ liệu mẫu cho các ví dụ
 
-> Chỉ để minh họa luồng trong `README.md`. Dữ liệu thật phải lấy từ CSDL, **không hard-code vào code**.
+> Chỉ để minh họa luồng trong `README.md`. Dữ liệu thật phải lấy từ CSDL, **không hard-code vào code**. Vai trò mẫu dưới đây mô tả trạng thái sau migration 41; hồ sơ `le_tan` cũ được chuyển thành `ke_toan`.
 
 ### Danh mục và tài khoản (nhân bản – có ở cả 3 site)
 
@@ -589,16 +589,16 @@ Migration `db/39_add_contact_inbox.sql` cần chạy riêng tại từng CSDL si
 | `KhoaHoc` | `KH-IELTS-65` | "IELTS 6.5" · 24 buổi · học phí chuẩn **12.000.000** |
 | `KhoaHoc` | `KH-JP-N5` | "Tiếng Nhật N5" · 30 buổi · học phí chuẩn **6.000.000** |
 | `TaiKhoan` | `Q1-TK-000001` | `admin.tong` · admin · `ma_co_so = NULL` |
-| `TaiKhoan` | `Q1-TK-000004` | `lan.le` · nhân viên · Q1 (lễ tân) |
-| `TaiKhoan` | `Q1-TK-000005` | `minh.kt` · nhân viên · Q1 (kế toán) |
+| `TaiKhoan` | `Q1-TK-000004` | `lan.le` · nhân viên · Q1 (Kế toán & Lễ tân) |
+| `TaiKhoan` | `Q1-TK-000005` | `minh.kt` · nhân viên · Q1 (Kế toán & Lễ tân) |
 | `TaiKhoan` | `Q1-TK-000007` | `ha.pham` · giáo viên · Q1 · `ha.pham@example.com` |
 
 ### Site Q1
 
 | Bảng | Mã | Nội dung |
 |------|----|----------|
-| `NhanVien` | `Q1-NV-000001` | Lê Thị Lan · lễ tân · tài khoản `Q1-TK-000004` |
-| `NhanVien` | `Q1-NV-000002` | Đỗ Quang Minh · kế toán · tài khoản `Q1-TK-000005` |
+| `NhanVien` | `Q1-NV-000001` | Lê Thị Lan · Kế toán & Lễ tân · tài khoản `Q1-TK-000004` |
+| `NhanVien` | `Q1-NV-000002` | Đỗ Quang Minh · Kế toán & Lễ tân · tài khoản `Q1-TK-000005` |
 | `GiaoVien` | `Q1-GV-000003` | Phạm Thu Hà · tài khoản `Q1-TK-000007` |
 | `GiaoVien` | `Q1-GV-000004` | Ngô Bảo Châu |
 | `PhongHoc` | `Q1-PH-02`, `Q1-PH-03` | Phòng 02, Phòng 03 (20 chỗ) |

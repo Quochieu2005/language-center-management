@@ -195,7 +195,7 @@ Nếu cơ sở đang `hoat_dong` nhưng thiếu cấu hình kết nối, Django 
 
 **Admin Big** giữ quyền quản trị toàn hệ thống: tạo/đóng cơ sở, phân công Admin Small, quản lý dữ liệu dùng chung, xem thống kê toàn trung tâm và duyệt hoặc từ chối đề nghị chuyển học viên giữa các cơ sở. Sau khi duyệt, Coordinator mới chạy giao dịch phân tán. **Admin Small** điều hành cơ sở được giao và là người tạo đề nghị chuyển học viên từ cơ sở mình; Admin Small có thể theo dõi kết quả nhưng không thể tự duyệt đề nghị. Các việc thường ngày khác gồm giám sát nhân sự, lớp/lịch, hồ sơ học viên, đăng ký, học phí, điểm danh, điểm và báo cáo tại cơ sở. Mỗi cơ sở phải có người phụ trách Admin Small.
 
-Trong schema hiện tại, `TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, nhưng hồ sơ quyền được xác định qua `Admin.loai_admin = admin_small` và `ma_co_so`; không nhầm hồ sơ Admin Small với hồ sơ nhân viên tại `NhanVien`. Nhân viên thường dùng `NhanVien.chuc_vu` gồm `le_tan`, `tu_van` (hiển thị “Tư vấn & xếp lớp”), `ke_toan`.
+Trong schema hiện tại, `TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, nhưng hồ sơ quyền được xác định qua `Admin.loai_admin = admin_small` và `ma_co_so`; không nhầm hồ sơ Admin Small với hồ sơ nhân viên tại `NhanVien`. Nhân viên nghiệp vụ hiện dùng `NhanVien.chuc_vu` gồm `ke_toan` (hiển thị “Kế toán & Lễ tân”) và `tu_van` (hiển thị “Tư vấn & xếp lớp”); migration 41 chuyển dữ liệu `le_tan` cũ sang `ke_toan`.
 
 ```mermaid
 flowchart LR
@@ -209,9 +209,8 @@ flowchart LR
 |---|---|---|
 | Admin Big | Toàn hệ thống | Mặc định xem danh sách học viên, nhân viên, giáo viên, lớp và học phí qua Global Query; mỗi dòng nêu site và kết quả phải cảnh báo site thiếu. Có thể lọc về một site. Thao tác ghi hồ sơ/lớp chọn site cụ thể hoặc dùng site của bản ghi; quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; cấp tài khoản học viên theo thao tác riêng; xem thống kê/log và hộp thư đề nghị toàn cục, duyệt/từ chối đề nghị chuyển |
 | Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
-| Lễ tân | Một site | Tiếp nhận tại quầy; thao tác đăng ký/lớp; API có quyền kế hoạch học phí nhưng giao diện chưa có menu Học phí; không tra cứu danh sách học viên hoặc ghi phiếu thu |
-| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký/xếp lớp và nhận/phản hồi liên hệ từ form website tại cơ sở |
-| Kế toán | Một site | Thu/hoàn học phí, xem công nợ/biên nhận; xem lớp và đăng ký/xếp lớp tại cơ sở |
+| Kế toán & Lễ tân | Một site | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/lớp; thu/hoàn học phí, xem công nợ/biên nhận; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ/phòng |
+| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, mở lớp, phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
@@ -303,7 +302,7 @@ Mọi luồng bắt đầu ở giao diện web, gửi yêu cầu tới API, qua 
 
 ### 5.1. Đăng ký khóa học
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, lễ tân, Tư vấn & xếp lớp hoặc Kế toán tại site của học viên.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp tại site của học viên.
 
 ```mermaid
 flowchart LR
@@ -325,7 +324,7 @@ Không gửi học viên sang site khác để đăng ký lớp; nếu học ở
 
 ### 5.2. Xếp hoặc đổi lớp
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, lễ tân, Tư vấn & xếp lớp hoặc Kế toán.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp.
 
 ```mermaid
 flowchart LR
@@ -340,11 +339,11 @@ Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại c
 
 ### 5.3. Thu hoặc hoàn học phí
 
-**Loại:** `LOCAL` · **Ai làm:** Kế toán ghi nhận thu/hoàn; Admin Small giám sát theo quyền tại site được giao.
+**Loại:** `LOCAL` · **Ai làm:** Kế toán & Lễ tân ghi nhận thu/hoàn; Admin Small giám sát theo quyền tại site được giao.
 
 ```mermaid
 flowchart LR
-    KeToan["Kế toán"] -->|gửi thao tác| GiaoDienWeb["GiaoDienWeb"]
+    KeToan["Kế toán & Lễ tân"] -->|gửi thao tác| GiaoDienWeb["GiaoDienWeb"]
     GiaoDienWeb["GiaoDienWeb"] -->|gửi yêu cầu| API["API"]
     API["API"] -->|điều phối nghiệp vụ| ThuHoanHocPhi["Thu và hoàn học phí"]
     ThuHoanHocPhi["Thu và hoàn học phí"] -->|chọn cơ sở của học viên| SiteRouter["Bộ định tuyến cơ sở"]
@@ -353,9 +352,9 @@ flowchart LR
     ThuHoanHocPhi["Thu và hoàn học phí"] -->|ghi nhật ký| GhiNhatKy["Ghi nhật ký"]
 ```
 
-Trước khi thu hoặc hoàn, kiểm tra khoản phải thu, tổng đã thu/đã hoàn và số dư. Hoàn phải trỏ tới phiếu thu gốc; trong cùng transaction tại site, API tạo phiếu hoàn mới, đảo số tiền các kỳ, cập nhật trạng thái `HocPhi` và ghi nhật ký. Idempotency key ngăn ghi trùng khi retry. Không xóa hoặc sửa phiếu đã phát sinh; Admin Small giám sát, còn thao tác thu/hoàn do Kế toán thực hiện.
+Trước khi thu hoặc hoàn, kiểm tra khoản phải thu, tổng đã thu/đã hoàn và số dư. Hoàn phải trỏ tới phiếu thu gốc; trong cùng transaction tại site, API tạo phiếu hoàn mới, đảo số tiền các kỳ, cập nhật trạng thái `HocPhi` và ghi nhật ký. Idempotency key ngăn ghi trùng khi retry. Không xóa hoặc sửa phiếu đã phát sinh; Admin Small giám sát, còn thao tác thu/hoàn do chức vụ Kế toán & Lễ tân thực hiện.
 
-Báo cáo tài chính học phí cho Kế toán xem dữ liệu `LOCAL` tại cơ sở được phân công; Admin Small chỉ xem site của mình, còn Admin Big có thể xem một site hoặc dùng Global Query. API hỏi từng CSDL site riêng và nêu site thiếu; các số liệu là tổng hiện tại từ `HocPhi`/`PhieuThu`, không phải báo cáo lọc theo kỳ ngày.
+Báo cáo tài chính học phí cho Kế toán & Lễ tân xem dữ liệu `LOCAL` tại cơ sở được phân công; Admin Small chỉ xem site của mình, còn Admin Big có thể xem một site hoặc dùng Global Query. API hỏi từng CSDL site riêng và nêu site thiếu; các số liệu là tổng hiện tại từ `HocPhi`/`PhieuThu`, không phải báo cáo lọc theo kỳ ngày.
 
 Màn Học phí mặc định lọc các khoản còn nợ, hiển thị từng học viên, lớp, tổng học phí, đã thu và còn lại; có thể tìm theo tên/mã học viên hoặc tên/mã lớp, đổi bộ lọc và chuyển trang. Các thẻ tổng quan lấy từ báo cáo tại site, không chỉ cộng trang đang xem. Nếu chưa có dòng học phí, cần kiểm tra đăng ký lớp: một khoản `HocPhi` được tạo khi đăng ký hợp lệ phát sinh.
 
@@ -522,7 +521,7 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên đã có các chức vụ `le_tan`, `tu_van` (tư vấn và xếp lớp trong cùng một chức vụ) và `ke_toan`; không cần thêm chức vụ Lễ tân mới. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Lễ tân và Tư vấn & xếp lớp dùng quyền lớp/đăng ký theo site; Tư vấn có thêm hộp thư liên hệ. Kế toán có quyền xem lớp/đăng ký và tra cứu danh sách học viên tại site để lập đăng ký, song không được mở trang quản lý hồ sơ học viên hoặc thay đổi hồ sơ. Kế toán vẫn quản lý học phí/phiếu thu theo quyền hiện có.
+Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên có hai chức vụ `ke_toan` (“Kế toán & Lễ tân”) và `tu_van` (“Tư vấn & xếp lớp”); migration 41 chuyển các hồ sơ `le_tan` hiện có sang `ke_toan`. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Kế toán & Lễ tân dùng quyền mở lớp, phân công giáo viên, đăng ký/lớp và học phí/thu/hoàn; chỉ tra cứu học viên trong form đăng ký, không mở trang quản lý hồ sơ hoặc phòng. Tư vấn có hộp thư liên hệ và được tạo/sửa/xuất bản bài Blog dùng chung, nhưng không xóa bài hoặc sửa danh mục. Blog article write là `REPLICATED-WRITE` đến mọi site hoạt động, không giới hạn theo cơ sở nhân viên.
 
 Tạo nhân viên ghi `NhanVien` ở site công tác và nhân bản `TaiKhoan`; ảnh tùy chọn được tải trực tiếp lên Cloudinary, còn metadata ảnh cập nhật trong các bản sao `TaiKhoan`. Email cấp tài khoản dùng email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động, dù API vẫn nhận username thay thế. Danh sách nhân viên là `LOCAL` theo cơ sở đang chọn và hiển thị email, username, số điện thoại cùng `site_code`; sau khi tạo, giao diện chọn đúng site vừa tạo và tải lại danh sách. API dùng mật khẩu khởi tạo trong cấu hình backend, chỉ lưu hash, không trả mật khẩu và buộc đổi ở lần đăng nhập đầu; tạo nhân viên chỉ ghi trạng thái chờ gửi vào `Logs`, còn Admin Big/Admin Small bấm `Gửi mật khẩu` để chủ động gửi email một lần. Gửi thành công hoặc kết quả SMTP chưa rõ thì khóa gửi lại; chỉ SMTP xác nhận thất bại mới cho thử lại. Sửa chỉ cập nhật họ tên, điện thoại, chức vụ và audit trong transaction cục bộ; email/tên đăng nhập thuộc danh tính tài khoản nhân bản, còn site là vị trí phân mảnh nên không đổi tại đây. Nút trạng thái chỉ cho `active` → `inactive`; thao tác `Ngưng` thu hồi phiên nhưng không đổi tình trạng làm việc `NhanVien`, và không có nút kích hoạt lại. Nút `Xóa vĩnh viễn` xóa tài khoản, phiên, token reset và ảnh ở các bản sao; nếu hồ sơ đã được phiếu thu tham chiếu thì gỡ liên kết tài khoản, giữ hồ sơ nghỉ việc để bảo toàn chứng từ, còn hồ sơ chưa có phiếu thu được xóa vật lý. Logs và phiếu thu được giữ; site lỗi thì không báo hoàn tất và gọi lại cùng slug để tiếp tục. Các CSDL commit riêng, không phải ACID xuyên site. Chi tiết hợp đồng nằm trong [FS](fs/Functional-Specification.md), [API spec](specs/api.md) và [schema](docs/DATABASE_SCHEMA.md).
 
@@ -629,14 +628,14 @@ Thêm site không được yêu cầu sửa vòng lặp “3 lần” hoặc vi�
 
 ### 5.15. Đọc và quản trị Blog
 
-**Loại:** public `GLOBAL`; CMS `REPLICATED-WRITE` · **Ai làm:** khách đọc công khai, Admin Big quản trị.
+**Loại:** public `GLOBAL`; CMS `REPLICATED-WRITE` · **Ai làm:** khách đọc công khai; Admin Big quản trị toàn bộ; Tư vấn & xếp lớp tạo/sửa/xuất bản bài.
 
 - `GET /api/v1/blog/categories/` đọc danh mục và số bài đã xuất bản.
 - `GET /api/v1/blog/{slug}/` đọc chi tiết bài theo slug; chỉ trả bài đã xuất bản, danh mục đang hoạt động và đã đến thời điểm xuất bản.
 - API hỏi riêng từng CSDL site qua Site Router, đối chiếu các bản sao `DanhMucBlog`/`BaiVietBlog` rồi trả kết quả ở tầng ứng dụng. Không tạo DB trung tâm hoặc JOIN xuyên site. Danh sách báo `complete`, `missing_sites`, `inconsistent_sites`; chi tiết trả 404 khi không có slug, 409 khi bản sao khác nhau, 503 khi không đọc đủ site.
-- Admin Big dùng `/api/v1/admin/blog/categories/` và `/api/v1/admin/blog/articles/` để đọc, tạo, sửa, xóa danh mục/bài viết; API yêu cầu phiên Admin Big và `Idempotency-Key`. Danh mục đang được bài viết dùng không thể xóa.
+- Admin Big dùng các route `/api/v1/admin/blog/` để đọc, tạo, sửa, xóa danh mục/bài viết. Tư vấn & xếp lớp được đọc danh mục/bài viết và tạo/sửa/xuất bản bài; không được sửa/xóa danh mục hoặc xóa bài. Các thao tác bài viết của Tư vấn ghi `REPLICATED-WRITE` tới mọi site hoạt động. API yêu cầu phiên hợp lệ và `Idempotency-Key`; danh mục đang được bài viết dùng không thể xóa.
 - CMS ghi theo `REPLICATED-WRITE` tới từng site đang hoạt động, mỗi site dùng transaction cục bộ và lưu ACK trong `Logs`. Nếu lỗi sau khi một phần đã commit, API trả `202` với site thiếu; retry phải dùng cùng key/payload. Không có cam kết ACID nguyên tử xuyên database; bản sao lệch trả conflict để đối soát.
-- Mục Blog trên sidebar mở CMS tại `/admin/blog`, chỉ dành cho Admin Big; tại đây có thể tạo/sửa/xóa danh mục và bài viết, xem trạng thái bản nháp/đã xuất bản/đã ẩn, soạn nội dung Markdown giới hạn với bảng/danh sách đánh số tùy chọn, xem trước và retry cùng yêu cầu khi một site chưa ghi xong. Trang chi tiết `/blog/{slug}` đọc bài đã xuất bản qua API; danh sách `/blog` vẫn là nội dung tĩnh nên bài mới chưa tự xuất hiện trong danh sách.
+- Mục Blog trên sidebar mở CMS tại `/admin/blog` cho Admin Big và Tư vấn & xếp lớp. Admin Big có thể tạo/sửa/xóa danh mục và bài viết; Tư vấn có thể tạo/sửa/xuất bản bài nhưng không xóa bài hoặc sửa danh mục. Cả hai xem trạng thái bản nháp/đã xuất bản/đã ẩn, soạn nội dung Markdown giới hạn với bảng/danh sách đánh số tùy chọn, xem trước và retry cùng yêu cầu khi một site chưa ghi xong. Trang chi tiết `/blog/{slug}` đọc bài đã xuất bản qua API; danh sách `/blog` vẫn là nội dung tĩnh nên bài mới chưa tự xuất hiện trong danh sách.
 
 Blog là chức năng hỗ trợ, không thay thế sáu nghiệp vụ bắt buộc của đề tài. Xem [hợp đồng API](specs/api.md), [schema](docs/DATABASE_SCHEMA.md) và [ma trận trạng thái](docs/Trang-Thai-Trien-Khai.md).
 
@@ -696,8 +695,8 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 |---|---|---|---|
 | Tài khoản | Đăng nhập, đăng xuất, quên/đặt lại mật khẩu | `GLOBAL`, `REPLICATED-WRITE` | Người dùng nội bộ |
 | Quản trị | Tạo tài khoản, khóa/mở tài khoản, phân công Admin Small | `REPLICATED-WRITE` + `LOCAL` | Admin Big |
-| Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu; Lễ tân và Kế toán thao tác đăng ký/lớp theo quyền API; Kế toán chỉ đọc danh sách trong form đăng ký |
-| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán; Admin Small giám sát theo quyền |
+| Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu; Kế toán & Lễ tân thao tác đăng ký/lớp theo quyền API và chỉ đọc danh sách trong form đăng ký |
+| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán & Lễ tân; Admin Small giám sát theo quyền |
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
 | Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX` | Admin Small đề nghị; Admin Big duyệt/từ chối |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |

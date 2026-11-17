@@ -33,7 +33,7 @@ from core.auth.service_common import (
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
 
-_JOB_TITLES = {"le_tan", "tu_van", "ke_toan"}
+_JOB_TITLES = {"tu_van", "ke_toan"}
 
 
 class EmployeeConflict(Exception):

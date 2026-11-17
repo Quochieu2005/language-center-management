@@ -105,7 +105,7 @@ Lỗi validation trả `400` hoặc `422` cùng mã trường, ví dụ `{"error
 
 ### Tự hết hạn phiên sau 1 giờ không hoạt động
 
-- Áp dụng cho mọi phiên đã xác thực của Admin Big, Admin Small, lễ tân, kế toán, nhân viên và giáo viên; nếu sau này bật tài khoản học viên thì áp dụng cùng chính sách. Mỗi phiên/trình duyệt/thiết bị được theo dõi riêng; đăng xuất do idle ở một thiết bị không tự đăng xuất thiết bị khác.
+- Áp dụng cho mọi phiên đã xác thực của Admin Big, Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp, giáo viên và nhân viên; nếu sau này bật tài khoản học viên thì áp dụng cùng chính sách. Mỗi phiên/trình duyệt/thiết bị được theo dõi riêng; đăng xuất do idle ở một thiết bị không tự đăng xuất thiết bị khác.
 - Thời hạn idle là **3600 giây (60 phút)** kể từ hoạt động người dùng gần nhất. Thời gian được tính bằng đồng hồ phía server, lưu timestamp UTC có timezone; không dựa vào giờ hệ điều hành của trình duyệt.
 - Hoạt động được tính gồm thao tác bàn phím, nhấn/chạm, cuộn trang có chủ ý và thao tác nghiệp vụ do người dùng khởi tạo. Không tính polling, refresh tự động, health check, analytics, request nền, tab còn mở hoặc timer. Reload trang không đặt lại thời hạn.
 - API phải kiểm tra hết hạn ở **mọi request cần xác thực**, không chỉ dựa vào timer giao diện. Phiên cần trạng thái có thể thu hồi và `last_user_activity_at`/`idle_expires_at` do server quản lý. Chữ ký token hoặc cookie hết hạn tuyệt đối không tự chứng minh idle timeout nếu server không thể xác minh hoạt động gần nhất.
@@ -180,9 +180,8 @@ SQL Server chỉ lưu metadata (`avatar_public_id`, `avatar_secure_url`): trong 
 |---|---|---|
 | Admin Big | `TaiKhoan.vai_tro = admin_big`, `ma_co_so = NULL` | Toàn hệ thống; thao tác nhiều site phải được gắn `GLOBAL`, `REPLICATED-WRITE` hoặc `DISTRIBUTED-TX` rõ ràng |
 | Admin Small | `TaiKhoan.vai_tro = nhan_vien`, hồ sơ `Admin.loai_admin = admin_small`, có site được gán | Một site được gán; không được chọn site khác trong query/body để mở rộng quyền |
-| Lễ tân | `nhan_vien`, `NhanVien.chuc_vu=le_tan` | Tiếp nhận tại quầy; thao tác lớp/đăng ký và kế hoạch học phí tại site được gán; không tra cứu danh sách học viên hoặc ghi phiếu thu |
-| Tư vấn & xếp lớp | `nhan_vien`, `NhanVien.chuc_vu=tu_van` | Tra cứu danh sách học viên, đăng ký/xếp lớp và hộp thư liên hệ tại site được gán |
-| Kế toán | `nhan_vien`, `NhanVien.chuc_vu=ke_toan` | Học phí/phiếu thu và quyền xem lớp, đăng ký/xếp lớp tại site được gán; tra cứu danh sách học viên chỉ để lập đăng ký |
+| Kế toán & Lễ tân | `nhan_vien`, `NhanVien.chuc_vu=ke_toan` (`le_tan` cũ được chuyển bằng migration 41) | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/xếp lớp; học phí, công nợ, thu/hoàn và phiếu thu tại site; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ hoặc phòng học |
+| Tư vấn & xếp lớp | `nhan_vien`, `NhanVien.chuc_vu=tu_van` | Tra cứu danh sách học viên, mở lớp, phân công giáo viên, đăng ký/xếp lớp và hộp thư liên hệ tại site được gán; tạo/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | `TaiKhoan.vai_tro = giao_vien`, hồ sơ `GiaoVien` tại site | Chỉ lớp/buổi được phân công; API kiểm tra phân công ở mỗi thao tác |
 | Học viên | Schema/API/UI có tài khoản và portal trong source; phạm vi đồ án chưa được duyệt | Không đưa vào phạm vi nghiệm thu trước khi nhóm thống nhất và cập nhật các tài liệu liên quan |
 
@@ -227,31 +226,31 @@ API không có endpoint đăng ký tài khoản công khai; source có `POST /ap
 
 API gọi SMTP trong khi transaction tại site sở hữu đang mở, sau đó cập nhật dữ liệu; hai hệ thống không có commit nguyên tử. Nếu SMTP chấp nhận thư nhưng commit SQL lỗi, yêu cầu có thể còn `cho_xu_ly` và lần gửi lại có thể gửi trùng; transactional outbox là hướng nâng cấp nếu cần đóng khoảng hở này. Nếu SMTP chưa cấu hình hoặc báo lỗi trước khi chấp nhận, yêu cầu giữ `cho_xu_ly`. SMTP trả chấp nhận không chứng minh email đã đến inbox. Site được xác thực từ danh mục `CoSo` và Site Router; API không nhận email đích, tài khoản Admin hoặc site được phân quyền từ nội dung body reply.
 
-### Blog — đọc công khai và CMS Admin Big đã có trong source
+### Blog — đọc công khai và CMS Admin Big/Tư vấn đã có trong source
 
 Hai route chỉ đọc và cho phép khách chưa đăng nhập:
 
 - `GET /api/v1/blog/categories/` trả `{scope, complete, site_codes, missing_sites, inconsistent_sites, count, results}`. Mỗi danh mục có `slug`, `name`, `description`, `post_count`. `post_count` chỉ tính bài `da_xuat_ban` đã tới thời điểm xuất bản.
 - `GET /api/v1/blog/{slug}/` trả `{scope, complete, site_codes, result}`. `result` có `slug`, `title`, `excerpt`, `content` là chuỗi Markdown giới hạn, `reading_time_minutes`, `published_at` và `category: {slug, name}`. Hỗ trợ đoạn văn, tiêu đề `##`/`###`, danh sách đánh số và bảng Markdown; các khối này có thể bỏ qua.
 
-Admin Big dùng các route sau; phiên và vai trò phải được xác thực ở server, không nhận site hoặc role từ client:
+Admin Big dùng toàn bộ route CMS; Tư vấn & xếp lớp dùng các route đọc và tạo/sửa bài viết. Phiên và vai trò phải được xác thực ở server, không nhận site hoặc role từ client:
 
 | Route | Hành vi |
 |---|---|
-| `GET /api/v1/admin/blog/categories/` | Đọc mọi danh mục và trạng thái, kèm số bài đang tham chiếu; trả trạng thái đối chiếu site. |
+| `GET /api/v1/admin/blog/categories/` | Admin Big/Tư vấn: đọc mọi danh mục và trạng thái, kèm số bài đang tham chiếu; trả trạng thái đối chiếu site. |
 | `POST /api/v1/admin/blog/categories/` | Tạo danh mục `{slug, name, description?, status?}`. |
 | `GET /api/v1/admin/blog/categories/{slug}/` | Đọc một danh mục mọi trạng thái. |
 | `PATCH /api/v1/admin/blog/categories/{slug}/` | Sửa một phần `slug`, `name`, `description`, `status`. |
 | `DELETE /api/v1/admin/blog/categories/{slug}/` | Xóa danh mục chỉ khi không có bài viết tham chiếu. |
-| `GET /api/v1/admin/blog/articles/` | Đọc metadata bài viết mọi trạng thái (không tải toàn bộ `content` cho danh sách); dùng route chi tiết để lấy nội dung. |
-| `POST /api/v1/admin/blog/articles/` | Tạo `{slug, category_slug, title, excerpt, content, reading_time_minutes, status?, published_at?}`. `content` là chuỗi Markdown giới hạn tối đa 20.000 ký tự, không phải HTML; `published_at` nhận thời điểm ISO có offset và lưu UTC tới giây. |
-| `GET /api/v1/admin/blog/articles/{slug}/` | Đọc một bài ở mọi trạng thái. |
-| `PATCH /api/v1/admin/blog/articles/{slug}/` | Sửa một phần các trường của bài viết, gồm `category_slug`, nội dung Markdown giới hạn và thời điểm ISO có offset `published_at` (lưu UTC tới giây). |
+| `GET /api/v1/admin/blog/articles/` | Admin Big/Tư vấn: đọc metadata bài viết mọi trạng thái (không tải toàn bộ `content` cho danh sách); dùng route chi tiết để lấy nội dung. |
+| `POST /api/v1/admin/blog/articles/` | Admin Big/Tư vấn tạo `{slug, category_slug, title, excerpt, content, reading_time_minutes, status?, published_at?}`. `content` là chuỗi Markdown giới hạn tối đa 20.000 ký tự, không phải HTML; `published_at` nhận thời điểm ISO có offset và lưu UTC tới giây. |
+| `GET /api/v1/admin/blog/articles/{slug}/` | Admin Big/Tư vấn đọc một bài ở mọi trạng thái. |
+| `PATCH /api/v1/admin/blog/articles/{slug}/` | Admin Big/Tư vấn sửa một phần các trường của bài viết, gồm `category_slug`, nội dung Markdown giới hạn và thời điểm ISO có offset `published_at` (lưu UTC tới giây). |
 | `DELETE /api/v1/admin/blog/articles/{slug}/` | Xóa bài viết và ghi ảnh chụp trước thao tác vào ACK đồng bộ tại từng site. |
 
 Trường `published_at` vẫn nhận ISO timestamp có offset; CMS chỉ cho chọn ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh`, rồi gửi thời điểm 00:00 tại múi giờ này. Để trống ngày gửi `null` để xuất bản ngay khi trạng thái cho phép.
 
-Mọi request ghi yêu cầu `Idempotency-Key` hợp lệ. Tất cả thao tác CMS thuộc `REPLICATED-WRITE`, chỉ Admin Big được dùng; Coordinator lấy các site hoạt động từ dữ liệu/cấu hình, dùng transaction cục bộ trên từng database và ghi ACK `Logs` cùng dữ liệu. Không có DB trung tâm hoặc khóa ngoại/JOIN xuyên site và không tuyên bố ACID nguyên tử xuyên database. Retry phải dùng lại cùng key, cùng route/path và cùng payload; key đã dùng cho nội dung khác trả `409`. Site thiếu trước khi bắt đầu ghi trả `503`; lỗi site sau khi một phần đã commit trả `202`, `complete=false`, `missing_sites` để retry. Bản sao Blog khác nhau trả `409`; slug sai/trùng và danh mục bài viết không tồn tại/đang ngừng được từ chối. Danh mục đang được bài viết dùng không thể xóa.
+Mọi request ghi yêu cầu `Idempotency-Key` hợp lệ. Tất cả thao tác CMS thuộc `REPLICATED-WRITE`; Admin Big quản trị toàn bộ, Tư vấn & xếp lớp chỉ tạo/sửa bài viết và không xóa bài hoặc ghi danh mục. Bài viết được chia sẻ toàn hệ thống, nên quyền ghi của Tư vấn không giới hạn ở site được phân công. Coordinator lấy các site hoạt động từ dữ liệu/cấu hình, dùng transaction cục bộ trên từng database và ghi ACK `Logs` cùng dữ liệu. Không có DB trung tâm hoặc khóa ngoại/JOIN xuyên site và không tuyên bố ACID nguyên tử xuyên database. Retry phải dùng lại cùng key, cùng route/path và cùng payload; key đã dùng cho nội dung khác trả `409`. Site thiếu trước khi bắt đầu ghi trả `503`; lỗi site sau khi một phần đã commit trả `202`, `complete=false`, `missing_sites` để retry. Bản sao Blog khác nhau trả `409`; slug sai/trùng và danh mục bài viết không tồn tại/đang ngừng được từ chối. Danh mục đang được bài viết dùng không thể xóa.
 
 Site tham gia là mọi cơ sở `hoat_dong` có cấu hình Site Router. Ghi đọc/đối chiếu `DanhMucBlog` hoặc `BaiVietBlog` tại từng site; mỗi transaction cục bộ ghi thêm `Logs` (`loai_log='sync'`) để giữ ACK/idempotency và trạng thái trước/sau. Với bài viết, `category_slug` được giải ra khóa danh mục nội bộ riêng tại từng database; không đồng bộ giá trị `IDENTITY` giữa site.
 
@@ -308,9 +307,10 @@ Với các route collection `GET /api/v1/admin/students/`, `/employees/`, `/teac
 | `POST /api/v1/admin/teachers/` | Admin Big hoặc Admin Small theo quyền | Tạo tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Tạo tại site được chỉ rõ/được cấp; không nhận role tùy ý |
 | `GET, DELETE /api/v1/admin/teachers/{slug}/?site_code=...` | Admin Big hoặc Admin Small đúng site | Đọc `LOCAL`; xóa mềm/tắt tài khoản theo các site và hồ sơ tại site | Route source: GET chi tiết; DELETE vô hiệu hóa tài khoản và chuyển hồ sơ sang nghỉ việc, giữ dữ liệu lịch sử |
 | `PATCH /api/v1/admin/teachers/{slug}/status/?site_code=...` | Admin Big hoặc Admin Small đúng site | Tài khoản `REPLICATED-WRITE` + hồ sơ `LOCAL` | Route source: đổi trạng thái tài khoản/hồ sơ giáo viên, thu hồi phiên; không phải endpoint cập nhật phân công lớp |
-| `GET /api/v1/admin/classes/?site_code=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small/lễ tân/Tư vấn & xếp lớp/Kế toán đúng site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `LopHoc` và đối chiếu `DangKy` tại từng CSDL site; mỗi dòng có `site_code`; site thiếu được nêu rõ |
-| `PUT /api/v1/admin/classes/{class_id}/teacher/` | Admin Big/Admin Small theo quyền lớp | `LOCAL` | Route source: gán giáo viên cho lớp tại site sở hữu lớp; kiểm tra giáo viên và lớp cùng site |
-| `GET /api/v1/admin/tuition/?site_code=...&status=...&student_slug=...&search=...&limit=...&offset=...` | Admin Big; Admin Small/kế toán theo quyền site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `HocPhi`, `DangKy`, `HocVien`, `LopHoc` riêng tại từng site; `status=con_no` lọc số dư dương, `search` tìm tên/mã học viên hoặc tên/mã lớp; mỗi dòng có `site_code`; nếu site lỗi trả `complete=false`/`missing_sites`, `count=null` |
+| `GET /api/v1/admin/classes/?site_code=...&status=...&search=...&limit=...&offset=...` | Admin Big; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp đúng site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `LopHoc` và đối chiếu `DangKy` tại từng CSDL site; mỗi dòng có `site_code`; site thiếu được nêu rõ |
+| `POST /api/v1/admin/classes/` | Admin Big; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp tại site | `LOCAL` | Đọc `KhoaHoc`, `GiaoVien`, `PhongHoc`; ghi `LopHoc`, `BuoiHoc`, `Logs` trong một transaction; nhân viên chỉ dùng site trong phiên, quản lý phòng vẫn chỉ Admin Big/Admin Small |
+| `PUT /api/v1/admin/classes/{class_id}/teacher/` | Admin Big; Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp đúng site | `LOCAL` | Route source: gán giáo viên cho lớp tại site sở hữu lớp; kiểm tra giáo viên và lớp cùng site |
+| `GET /api/v1/admin/tuition/?site_code=...&status=...&student_slug=...&search=...&limit=...&offset=...` | Admin Big; Admin Small/Kế toán & Lễ tân theo quyền site | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; nhân viên: `LOCAL` | Đọc `HocPhi`, `DangKy`, `HocVien`, `LopHoc` riêng tại từng site; `status=con_no` lọc số dư dương, `search` tìm tên/mã học viên hoặc tên/mã lớp; mỗi dòng có `site_code`; nếu site lỗi trả `complete=false`/`missing_sites`, `count=null` |
 | `GET /api/v1/admin/shared/subjects/` | Admin Big | `GLOBAL` chỉ đọc | Đọc `MonHoc` từ từng site đang hoạt động và tổng hợp danh sách ở API. Trả `complete`, `missing_sites`, `inconsistent_sites`; không cho chọn môn nếu danh mục chưa được đối chiếu đầy đủ |
 | `PATCH /api/v1/admin/shared/subjects/{slug}/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Route đã có: cập nhật `MonHoc` trên mọi site hoạt động, ghi ACK vào `Logs`, bắt buộc `Idempotency-Key`; trả `200` khi đủ site, `202` khi còn site cần retry, `409` khi key/body hoặc bản sao xung đột. Không tạo môn mới |
 | `POST /api/v1/admin/courses/` | Admin Big | `REPLICATED-WRITE` theo từng transaction cục bộ | Tạo `KhoaHoc` ở các site hoạt động; `ma_khoa_hoc` tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số và có thể chứa các đoạn bổ sung ngăn bằng dấu gạch nối đơn (ví dụ `FG`, `HK-TOEIC-450-550`); giao diện chuẩn hóa mã nhập thành chữ in hoa. API bắt buộc `ma_mon` tồn tại và có bản sao giống nhau tại mọi site; `so_buoi` là tổng số buổi theo chương trình và được nhập riêng, không suy ra từ số tháng; thời lượng tháng nhận số thập phân tối đa 2 chữ số, thời lượng ngày phải nguyên; ghi ACK `Logs`, retry bằng cùng `Idempotency-Key` |
@@ -329,15 +329,15 @@ Với các route collection `GET /api/v1/admin/students/`, `/employees/`, `/teac
 | `GET /api/v1/classes/{ma_lop}` / `PATCH /api/v1/classes/{ma_lop}` | Admin Small đúng site; giáo viên chỉ đọc lớp được giao | `LOCAL` | Không cho đổi lớp sang site khác; ghi nhật ký các thay đổi quan trọng |
 | `GET /api/v1/classes/{ma_lop}/sessions` / `POST /api/v1/classes/{ma_lop}/sessions` | Admin Small đúng site; giáo viên được phân công chỉ đọc | `LOCAL` | Đọc/tạo `BuoiHoc`; kiểm tra phòng, giờ, giáo viên và trùng lịch trong cùng site |
 | `PATCH /api/v1/classes/{ma_lop}/sessions/{ma_buoi}` | Admin Small đúng site | `LOCAL` | Sửa lịch/buổi hợp lệ, cập nhật audit và từ chối nếu phát sinh xung đột |
-| `GET /api/v1/site/dashboard` | Admin Small, lễ tân, Tư vấn & xếp lớp, kế toán đúng site | `LOCAL` | Tóm tắt việc cần xử lý tại site được gán; chỉ trả widget phù hợp quyền |
-| `GET /api/v1/enrollments?ma_hoc_vien=...&ma_lop=...` | Admin Small/lễ tân/Tư vấn & xếp lớp/Kế toán tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi được cấp | Đọc `DangKy`; API giới hạn site, phân trang và trạng thái |
-| `GET /api/v1/enrollments/{ma_dang_ky}` | Admin Small/lễ tân/Tư vấn & xếp lớp/Kế toán đúng site; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết đăng ký, lớp và khoản học phí liên quan; không JOIN xuyên site |
-| `GET /api/v1/admin/tuition/?site_code=...&status=...&search=...&limit=...&offset=...` | Kế toán/Admin Small tại site; Admin Big theo phạm vi | `LOCAL` hoặc `GLOBAL` | Đã triển khai: đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc`, tìm theo tên/mã học viên hoặc lớp, phân trang. `status=con_no` lọc số dư dương; mỗi dòng trả số phải thu, đã thu và còn lại |
-| `GET /api/v1/tuition/{ma_hoc_phi}` | Kế toán/Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết khoản phí, dư nợ và lịch sử thu/hoàn tại site sở hữu dữ liệu |
-| `GET /api/v1/tuition-receipts?ma_hoc_phi=...&ma_hoc_vien=...&ma_phieu=...&tu_ngay=...&den_ngay=...&loai=...&cursor=...&limit=...` | Kế toán; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi | Tìm/lọc biên nhận theo học phí, học viên, mã phiếu, khoảng ngày và loại thu/hoàn; phân trang, giới hạn site và quyền tài chính |
-| `GET /api/v1/tuition-receipts/{ma_phieu}` | Kế toán; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết biên nhận/hoàn tiền; không trả dữ liệu thẻ hoặc bí mật cổng |
+| `GET /api/v1/site/dashboard` | Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp đúng site | `LOCAL` | Tóm tắt việc cần xử lý tại site được gán; chỉ trả widget phù hợp quyền |
+| `GET /api/v1/enrollments?ma_hoc_vien=...&ma_lop=...` | Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi được cấp | Đọc `DangKy`; API giới hạn site, phân trang và trạng thái |
+| `GET /api/v1/enrollments/{ma_dang_ky}` | Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp đúng site; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết đăng ký, lớp và khoản học phí liên quan; không JOIN xuyên site |
+| `GET /api/v1/admin/tuition/?site_code=...&status=...&search=...&limit=...&offset=...` | Kế toán & Lễ tân/Admin Small tại site; Admin Big theo phạm vi | `LOCAL` hoặc `GLOBAL` | Đã triển khai: đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc`, tìm theo tên/mã học viên hoặc lớp, phân trang. `status=con_no` lọc số dư dương; mỗi dòng trả số phải thu, đã thu và còn lại |
+| `GET /api/v1/tuition/{ma_hoc_phi}` | Kế toán & Lễ tân/Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết khoản phí, dư nợ và lịch sử thu/hoàn tại site sở hữu dữ liệu |
+| `GET /api/v1/tuition-receipts?ma_hoc_phi=...&ma_hoc_vien=...&ma_phieu=...&tu_ngay=...&den_ngay=...&loai=...&cursor=...&limit=...` | Kế toán & Lễ tân; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` theo phạm vi | Tìm/lọc biên nhận theo học phí, học viên, mã phiếu, khoảng ngày và loại thu/hoàn; phân trang, giới hạn site và quyền tài chính |
+| `GET /api/v1/tuition-receipts/{ma_phieu}` | Kế toán & Lễ tân; Admin Small theo quyền; Admin Big theo quyền | `LOCAL` hoặc định vị rồi `LOCAL` | Chi tiết biên nhận/hoàn tiền; không trả dữ liệu thẻ hoặc bí mật cổng |
 | `GET /api/v1/reports/site-summary?ma_co_so=...&tu_ngay=...&den_ngay=...` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`, hoặc `LOCAL` khi lọc một site; Admin Small: `LOCAL` | Tổng hợp số học viên/lớp và chỉ số vận hành trong phạm vi được cấp; nêu site thiếu |
-| `GET /api/v1/admin/reports/tuition-by-site/?site_code=...` | Admin Big; Admin Small; Kế toán tại site | Admin Big: `GLOBAL` khi bỏ `site_code`, `LOCAL` khi chọn site; Admin Small/Kế toán: `LOCAL` | Đã triển khai snapshot từ `HocPhi`, `PhieuThu`: số khoản, số khoản còn nợ, phải thu, đã thu ròng, đã thu, đã hoàn và còn nợ; báo `complete`/`missing_sites`; chưa lọc theo ngày |
+| `GET /api/v1/admin/reports/tuition-by-site/?site_code=...` | Admin Big; Admin Small; Kế toán & Lễ tân tại site | Admin Big: `GLOBAL` khi bỏ `site_code`, `LOCAL` khi chọn site; Admin Small/Kế toán & Lễ tân: `LOCAL` | Đã triển khai snapshot từ `HocPhi`, `PhieuThu`: số khoản, số khoản còn nợ, phải thu, đã thu ròng, đã thu, đã hoàn và còn nợ; báo `complete`/`missing_sites`; chưa lọc theo ngày |
 | `GET /api/v1/reports/audit-logs/?ma_co_so=...&ma_tai_khoan=...&loai_log=...&tu_ngay=...&den_ngay=...&limit=...&offset=...` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`, hoặc `LOCAL` khi lọc một site; Admin Small: `LOCAL` | Đã triển khai: đọc `dbo.Logs` độc lập tại từng site, lọc tài khoản/loại/ngày Việt Nam và phân trang ở API. Trả `complete`/`missing_sites`; 503 nếu thiếu site. Không trả IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
 | `GET /api/v1/admin/notifications/` | Admin Big; Admin Small | Admin Big: `GLOBAL` hoặc `LOCAL` khi lọc site; Admin Small: `LOCAL` | Đã triển khai: đọc `dbo.ThongBao`; không lưu trạng thái đã đọc. |
 | `POST /api/v1/admin/notifications/` | Admin Big; Admin Small | Admin Big: `REPLICATED-WRITE` tới site hoạt động; Admin Small: `LOCAL` | Đã triển khai: tạo thông báo Admin Big/Admin Small trong `dbo.ThongBao`, ghi audit `dbo.Logs` tại mỗi site được ghi. Bắt buộc `Idempotency-Key`; trả `200` khi đủ site hoặc `202 complete=false` với `missing_sites` để retry cùng key/body. Không có transaction ACID xuyên site. |
@@ -348,7 +348,7 @@ Tạo thông báo nhận `category`, `severity`, `audience`, `title`, `message` 
 
 ### Nhân viên nghiệp vụ — đã có route trong source
 
-Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`le_tan`, `tu_van`, `ke_toan`); form tạo đã có lựa chọn Lễ tân. `tu_van` hiển thị “Tư vấn & xếp lớp” và có hộp thư liên hệ LOCAL tại site được gán; `ke_toan` có quyền xem lớp/đăng ký, đăng ký/xếp lớp và danh sách học viên chỉ để chọn người đăng ký, không có quyền sửa hồ sơ. Không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big được bỏ `site_code` trên GET danh sách nhân viên để đọc GLOBAL; nếu truyền site thì chỉ đọc LOCAL site đó. GET chi tiết và mọi thao tác ghi cần site cụ thể. Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body.
+Nhân viên nghiệp vụ dùng `NhanVien.chuc_vu` (`ke_toan`, `tu_van`); form chỉ tạo hai chức vụ “Kế toán & Lễ tân” và “Tư vấn & xếp lớp”. Migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`; role gộp có quyền mở lớp/phân công giáo viên/đăng ký lớp, học phí/thu-hoàn và báo cáo tài chính, nhưng chỉ đọc danh sách học viên trong form đăng ký, không quản lý hồ sơ hoặc phòng học. `tu_van` hiển thị “Tư vấn & xếp lớp”, có hộp thư liên hệ LOCAL tại site được gán và quyền tạo/sửa/xuất bản bài Blog dùng chung qua `REPLICATED-WRITE` (không xóa bài hoặc sửa danh mục). Không dùng hồ sơ `Admin.loai_admin=admin_small`. API xác định quyền từ phiên đã xác thực. Admin Big được bỏ `site_code` trên GET danh sách nhân viên để đọc GLOBAL; nếu truyền site thì chỉ đọc LOCAL site đó. GET chi tiết và mọi thao tác ghi cần site cụ thể. Admin Small có site cố định và không thể mở rộng phạm vi bằng query/body.
 
 | Method và path | Người gọi | Kiểu phân tán | Bảng đọc/ghi và hành vi |
 |---|---|---|---|
@@ -368,7 +368,7 @@ API GET danh sách/chi tiết nhân viên dùng scope đọc `employee_read` (12
 
 Email cấp tài khoản nhân viên hiển thị email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động. Login API vẫn chấp nhận username như định danh thay thế.
 
-`tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này trước khi triển khai phiên bản mới. Chức vụ `le_tan` là nhân viên tiếp nhận tại quầy; trong source hiện tại được thao tác lớp/đăng ký và kế hoạch đóng học phí, còn tra cứu danh sách học viên thuộc `tu_van`.
+`tu_van` là chức vụ duy nhất cho tư vấn và xếp lớp; migration 37 chuyển dữ liệu `xep_lop` cũ sang giá trị này. Migration 41 chuyển `le_tan` thành `ke_toan` để dùng chung chức vụ “Kế toán & Lễ tân”. Chạy tuần tự migration 37 và 41 tại từng CSDL site trước khi triển khai phiên bản mới.
 
 Create trả `201`; GET/PATCH/DELETE và gửi email thành công trả `200`; lỗi validation/quyền/không tìm thấy/xung đột lần lượt có thể trả `400`/`403`/`404`/`409`. Ảnh không bắt buộc, chỉ nhận JPG/JPEG/PNG/WebP tối đa 5 MB; API xác minh setup token, upload intent và asset, client gửi bytes trực tiếp Cloudinary, không qua Django. Nếu upload ảnh thất bại thì tài khoản đã tạo vẫn tồn tại và giao diện phải báo ảnh chưa lưu. POST tạo không gửi email; người quản lý bấm gửi riêng. SMTP báo không nhận thì trả `502` và cho thử lại; kết quả chưa rõ trả `503` và khóa gửi lại để tránh gửi trùng. PATCH `/status/` chỉ cho phép `active` → `inactive`, thu hồi phiên và tách biệt với DELETE. DELETE xóa vật lý tài khoản, phiên/token, trạng thái đọc thông báo và ảnh; hồ sơ NhanVien chỉ giữ lại khi PhieuThu tham chiếu, đồng thời gỡ liên kết tài khoản và đánh dấu nghỉ việc. Giữ Logs/chứng từ. Nếu site chưa đồng bộ hoặc dọn ảnh được thì trả `503`, không báo thành công toàn phần, và có thể gọi lại cùng slug để tiếp tục. Các database commit độc lập nên `REPLICATED-WRITE` không đồng nghĩa ACID xuyên site; chưa có bằng chứng lỗi và phục hồi nhiều site thật.
 
@@ -397,7 +397,7 @@ Các đường dẫn thực tế được khai báo trong `src/api/core/urls.py`
 
 | Route source | Hành vi | Trạng thái phạm vi |
 |---|---|---|
-| `GET /api/v1/admin/students/?site_code=...&status=...&search=...&account_issued=...&limit=...&offset=...` | Liệt kê học viên | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; Admin Small/Tư vấn/Kế toán chỉ đọc site phiên. Kế toán dùng danh sách read-only để chọn học viên khi đăng ký; không có quyền tạo/sửa/xóa hồ sơ hoặc cấp tài khoản. Trả `avatar_secure_url`, cờ cấp tài khoản và `site_code` từng dòng; kết quả thiếu site có `complete=false`, `missing_sites`, `count=null` |
+| `GET /api/v1/admin/students/?site_code=...&status=...&search=...&account_issued=...&limit=...&offset=...` | Liệt kê học viên | Admin Big bỏ site: `GLOBAL`; có site: `LOCAL`; Admin Small/Tư vấn/Kế toán & Lễ tân chỉ đọc site phiên. Kế toán & Lễ tân dùng danh sách read-only để chọn học viên khi đăng ký; không có quyền tạo/sửa/xóa hồ sơ hoặc cấp tài khoản. Trả `avatar_secure_url`, cờ cấp tài khoản và `site_code` từng dòng; kết quả thiếu site có `complete=false`, `missing_sites`, `count=null` |
 | `POST /api/v1/admin/students/` | Tạo hồ sơ học viên | Trong phạm vi; `LOCAL` trên `HocVien`, sinh mã từ `Seq_HV`; slug tùy chọn mặc định theo họ tên, được chuẩn hóa và thêm hậu tố số nếu trùng tại site; giới tính tùy chọn chỉ nhận `Nam`, `Nữ`, `Khác`; chưa tạo tài khoản/mật khẩu |
 | `GET/PATCH/DELETE /api/v1/admin/students/{slug}/` | Xem/sửa/xóa hồ sơ | Trong phạm vi; `LOCAL`. Chỉ Admin Big/Admin Small đúng site; PATCH giới tính chỉ nhận `Nam`, `Nữ`, `Khác`; chỉ xóa nếu chưa có tài khoản, đăng ký hoặc lịch sử chuyển; `Logs` và dữ liệu học tập không bị xóa |
 | `POST /api/v1/admin/students/{slug}/avatar/upload-intents/?site_code=...` | Admin Big chọn site; Admin Small đúng site | `LOCAL` đọc `HocVien`; cấp intent ngắn hạn gắn với người gọi, hồ sơ và site; trình duyệt tải trực tiếp JPG/PNG/WebP tối đa 5 MB lên Cloudinary |
@@ -464,11 +464,11 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 
 | Nghiệp vụ | Endpoint đề xuất | Vai trò | Kiểu phân tán | Site và bảng chính |
 |---|---|---|---|---|
-| Đăng ký khóa học | `POST /api/v1/enrollments` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp, Kế toán | `LOCAL` | Site học viên/lớp; đọc `HocVien`, `LopHoc`; ghi `DangKy`, `HocPhi`, cập nhật sĩ số `LopHoc` |
-| Xếp/đổi lớp | `PATCH /api/v1/enrollments/{ma_dang_ky}/class` | Admin Big, Admin Small, Lễ tân, Tư vấn & xếp lớp, Kế toán | `LOCAL` | Site của đăng ký; đọc lớp và sĩ số; cập nhật `DangKy`, sĩ số hai lớp |
-| Liệt kê phiếu thu/hoàn | `GET /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán tại site | `LOCAL` | Đọc `HocPhi`, `PhieuThu`; trả từng phiếu gốc và số còn có thể hoàn |
-| Thu học phí tại quầy | `POST /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán tại site | `LOCAL` | Ghi `PhieuThu`, cập nhật `HocPhi` và các kỳ; chống gửi lặp bằng mã phiếu site-prefixed |
-| Hoàn học phí | `POST /api/v1/admin/tuition/{tuition_id}/receipts/{receipt_id}/refund/` | Kế toán tại site | `LOCAL` | Ghi phiếu `hoan` tham chiếu phiếu thu gốc, cập nhật `HocPhi`/`DotHocPhi`, audit; idempotency lưu tại site |
+| Đăng ký khóa học | `POST /api/v1/enrollments` | Admin Big, Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site học viên/lớp; đọc `HocVien`, `LopHoc`; ghi `DangKy`, `HocPhi`, cập nhật sĩ số `LopHoc` |
+| Xếp/đổi lớp | `PATCH /api/v1/enrollments/{ma_dang_ky}/class` | Admin Big, Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp | `LOCAL` | Site của đăng ký; đọc lớp và sĩ số; cập nhật `DangKy`, sĩ số hai lớp |
+| Liệt kê phiếu thu/hoàn | `GET /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán & Lễ tân tại site | `LOCAL` | Đọc `HocPhi`, `PhieuThu`; trả từng phiếu gốc và số còn có thể hoàn |
+| Thu học phí tại quầy | `POST /api/v1/admin/tuition/{tuition_id}/receipts/` | Kế toán & Lễ tân tại site | `LOCAL` | Ghi `PhieuThu`, cập nhật `HocPhi` và các kỳ; chống gửi lặp bằng mã phiếu site-prefixed |
+| Hoàn học phí | `POST /api/v1/admin/tuition/{tuition_id}/receipts/{receipt_id}/refund/` | Kế toán & Lễ tân tại site | `LOCAL` | Ghi phiếu `hoan` tham chiếu phiếu thu gốc, cập nhật `HocPhi`/`DotHocPhi`, audit; idempotency lưu tại site |
 | Tạo/tiếp tục yêu cầu thanh toán trực tuyến (nếu nhóm chọn tích hợp cổng) | `POST /api/v1/tuition-payment-attempts` | Vai trò thanh toán đã được nhóm duyệt | `LOCAL` | Lưu yêu cầu tại đúng site của `HocPhi`; chưa ghi `PhieuThu` hay tăng số đã thu khi chưa xác minh thành công |
 | Tra cứu trạng thái thanh toán | `GET /api/v1/tuition-payment-attempts/{ma_yeu_cau}` | Người tạo và nhân viên có quyền tại site; Admin Big theo quyền | `LOCAL` hoặc `GLOBAL` định vị rồi `LOCAL` | Đọc trạng thái bền vững tại site chứa khoản học phí; không suy site từ tiền tố mã |
 | Tiếp tục yêu cầu còn mở | `GET /api/v1/tuition/{ma_hoc_phi}/payment-attempts?active=true` | Người học đã được liên kết (chỉ khi portal được duyệt); nhân viên có quyền tại site | `LOCAL` sau khi định vị site nếu cần | Tìm yêu cầu còn mở sau khi đóng tab, đổi thiết bị hoặc mất mã yêu cầu |
@@ -482,7 +482,7 @@ Các path dưới đây là **bản nháp để thảo luận**, chưa khẳng �
 | Xem trạng thái chuyển | `GET /api/v1/transfers/{ma_chuyen}` | Admin Big; Admin Small trong phạm vi được phép | Admin Big: `GLOBAL` để định vị nguồn; Admin Small: `LOCAL` tại site được gán | Đọc trạng thái tại nguồn; không suy ra site từ tiền tố mã học viên |
 | Thống kê học viên theo cơ sở | `GET /api/v1/reports/students-by-site` | Admin Big toàn hệ thống; Admin Small site mình | `LOCAL` hoặc `GLOBAL` tùy phạm vi | Đọc `HocVien` và trạng thái chuyển liên quan; gộp tại API khi nhiều site |
 | Tổng quan vận hành cơ sở | `GET /api/v1/reports/site-summary` | Admin Big; Admin Small đúng site | Admin Big: `GLOBAL`; Admin Small: `LOCAL` | Tổng hợp số học viên/lớp và chỉ số vận hành; gộp ở API, báo site thiếu |
-| Báo cáo tài chính học phí | `GET /api/v1/admin/reports/tuition-by-site/` | Admin Big; Admin Small; Kế toán tại site | Admin Big: `GLOBAL` hoặc chọn site; Admin Small/Kế toán: `LOCAL` | Đọc `HocPhi`, `PhieuThu`; tổng hợp phải thu/đã thu/đã hoàn/còn nợ; nếu thiếu site thì trả `complete=false` và `missing_sites` |
+| Báo cáo tài chính học phí | `GET /api/v1/admin/reports/tuition-by-site/` | Admin Big; Admin Small; Kế toán & Lễ tân tại site | Admin Big: `GLOBAL` hoặc chọn site; Admin Small/Kế toán & Lễ tân: `LOCAL` | Đọc `HocPhi`, `PhieuThu`; tổng hợp phải thu/đã thu/đã hoàn/còn nợ; nếu thiếu site thì trả `complete=false` và `missing_sites` |
 
 ## Request và quy tắc kiểm tra chính
 
@@ -606,7 +606,7 @@ Endpoint này dùng cho nhân viên ghi nhận khoản tiền đã thu/xác minh
 
 Request thu tại quầy có `idempotency_key` trong body; request hoàn có UUID `idempotency_key` cùng số tiền, phương thức và lý do. API tự lấy site từ phiên và khoản học phí, xác thực quyền và kiểm tra số tiền dương, số dư, trạng thái khoản phí. Trong một transaction `LOCAL`, API khóa/đọc lại `HocPhi`, tạo `PhieuThu`, cập nhật `HocPhi`/`DotHocPhi` và ghi nhật ký. Khi hoàn, cùng người gọi + cùng site + cùng key và nội dung trả lại cùng phiếu; cùng key nhưng nội dung khác trả `409`. Nếu transaction rollback thì có thể gửi lại cùng key. Không xóa phiếu đã phát sinh; hoàn tiền tạo dòng `PhieuThu` loại `hoan` với mã `ma_phieu_goc` và khóa idempotency riêng.
 
-Với hoàn tiền, `receipt_id` trong URL là phiếu gốc; API kiểm tra số đã hoàn trước đó và không cho tổng hoàn vượt số tiền thu còn có thể hoàn hoặc tổng đã thu ròng. Phiếu gốc được giữ nguyên. Hợp đồng hiện tại cho phép Kế toán ghi nhận trực tiếp; **chưa có** quy trình đề nghị/duyệt hoàn tiền riêng. Admin Small giám sát theo quyền, không ghi phiếu hoàn bằng API này.
+Với hoàn tiền, `receipt_id` trong URL là phiếu gốc; API kiểm tra số đã hoàn trước đó và không cho tổng hoàn vượt số tiền thu còn có thể hoàn hoặc tổng đã thu ròng. Phiếu gốc được giữ nguyên. Hợp đồng hiện tại cho phép Kế toán & Lễ tân ghi nhận trực tiếp; **chưa có** quy trình đề nghị/duyệt hoàn tiền riêng. Admin Small giám sát theo quyền, không ghi phiếu hoàn bằng API này.
 
 `GET /api/v1/admin/tuition/{tuition_id}/receipts/?site_code=Q1` liệt kê phiếu của một khoản tại site; mỗi phiếu thu có `refunded_amount` và `refundable_amount`. `POST /api/v1/admin/tuition/{tuition_id}/receipts/{receipt_id}/refund/?site_code=Q1` nhận:
 
@@ -621,7 +621,7 @@ Với hoàn tiền, `receipt_id` trong URL là phiếu gốc; API kiểm tra s�
 
 `GET /api/v1/admin/tuition/?status=con_no&search=...&limit=20&offset=0` trả danh sách khoản có số dư dương, kèm học viên, lớp, tổng học phí, đã thu và còn lại; `search` tìm theo tên/mã học viên hoặc tên/mã lớp. Danh sách phân trang từ API để không bỏ sót khoản ở site có nhiều hồ sơ.
 
-`GET /api/v1/admin/reports/tuition-by-site/` trả số khoản học phí, số khoản còn nợ, tổng phải thu, đã thu, đã hoàn, thu ròng và còn nợ theo site. Kế toán chỉ nhận báo cáo `LOCAL` của site trong phiên; Admin Small cũng chỉ đọc site được giao; Admin Big có thể đọc `GLOBAL` hoặc chọn một site. `GLOBAL` truy vấn riêng từng DB và đánh dấu site thiếu.
+`GET /api/v1/admin/reports/tuition-by-site/` trả số khoản học phí, số khoản còn nợ, tổng phải thu, đã thu, đã hoàn, thu ròng và còn nợ theo site. Kế toán & Lễ tân chỉ nhận báo cáo `LOCAL` của site trong phiên; Admin Small cũng chỉ đọc site được giao; Admin Big có thể đọc `GLOBAL` hoặc chọn một site. `GLOBAL` truy vấn riêng từng DB và đánh dấu site thiếu.
 
 ### SePay — code có trong source, phạm vi và vận hành chưa được duyệt
 
