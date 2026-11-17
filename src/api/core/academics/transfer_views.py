@@ -1,4 +1,4 @@
-"""Two-step site-scoped employee requests and Admin Big transfer decisions."""
+"""Site-scoped consultant transfer requests and admin decisions."""
 
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -38,8 +38,9 @@ class TransferCollectionView(_TransferApiView):
         summary="Liệt kê đề nghị chuyển cơ sở",
         description=(
             "Admin Big đọc hộp thư GLOBAL qua từng site; response có complete/missing_sites. "
-            "Admin Small tạo đề nghị tại site nguồn, xem đề nghị tại nguồn và đề nghị gửi tới site mình để duyệt. "
-            "Tư vấn & xếp lớp tạo/xem tại site trong phiên; Kế toán & Lễ tân chỉ đọc tại site trong phiên. "
+            "Admin Small xem đề nghị phát sinh tại site mình và đề nghị gửi tới site mình để duyệt. "
+            "Chỉ Tư vấn & xếp lớp được tạo đề nghị và xem danh sách tại site trong phiên; "
+            "Kế toán & Lễ tân chỉ đọc tại site trong phiên. "
             "Mỗi dòng kèm tổng phải thu/đã thu/còn nợ được tính riêng từ DangKy/HocPhi tại site nguồn; "
             "Admin Big hoặc Admin Small tại site nhận được duyệt/từ chối; retry vẫn chỉ thuộc Admin Big."
         ),
@@ -69,9 +70,9 @@ class TransferCollectionView(_TransferApiView):
     @extend_schema(
         operation_id="transfer_request_create",
         tags=["Chuyển cơ sở"],
-        summary="Admin Small hoặc Tư vấn đề nghị chuyển học viên sang cơ sở khác",
+        summary="Tư vấn & xếp lớp đề nghị chuyển học viên sang cơ sở khác",
         description=(
-            "LOCAL tại nguồn. Nguồn lấy từ phiên Admin Small hoặc Tư vấn & xếp lớp; kiểm tra học viên đang học, không còn công nợ, "
+            "LOCAL tại nguồn. Nguồn lấy từ phiên Tư vấn & xếp lớp; kiểm tra học viên đang học, không còn công nợ, "
             "site đích đang hoạt động và không có giao dịch mở. Chưa ghi hồ sơ đích hoặc đổi trạng thái nguồn."
         ),
         request=TransferRequestSerializer,
@@ -80,8 +81,8 @@ class TransferCollectionView(_TransferApiView):
     def post(self, request):
         serializer = TransferRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if request.user.role not in {"admin_small", "tu_van"} or not request.user.site_code:
-            return Response({"detail": "Chỉ Admin Small hoặc Tư vấn & xếp lớp được tạo đề nghị tại cơ sở được phân công."}, status=403)
+        if request.user.role != "tu_van" or not request.user.site_code:
+            return Response({"detail": "Chỉ Tư vấn & xếp lớp được tạo đề nghị tại cơ sở được phân công."}, status=403)
         try:
             result = create_transfer_request(
                 source_site=request.user.site_code,

@@ -489,11 +489,11 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Nghiệm thu:** giáo viên ngoài lớp bị từ chối; điểm ngoài khoảng hoặc loại lạ bị từ chối; mỗi đăng ký không có hai điểm cùng loại; lỗi log/ghi theo thiết kế không làm mất tính nhất quán.
 
-### FS-TRF-01 — Admin Small hoặc Tư vấn tạo đề nghị chuyển cơ sở
+### FS-TRF-01 — Tư vấn & xếp lớp tạo đề nghị chuyển cơ sở
 
-**Người dùng:** Admin Small hoặc Tư vấn & xếp lớp tại site nguồn. **Kiểu:** LOCAL tạo đề nghị; có thể dùng Global để xác định bản HocVien hiện hành. **Bảng nguồn:** HocVien, HocPhi/DangKy để kiểm tra điều kiện, GiaoDichChuyenCoSo, LichSuChuyenCoSo.
+**Người dùng:** Tư vấn & xếp lớp tại site nguồn. **Kiểu:** LOCAL tạo đề nghị; có thể dùng Global để xác định bản HocVien hiện hành. **Bảng nguồn:** HocVien, HocPhi/DangKy để kiểm tra điều kiện, GiaoDichChuyenCoSo, LichSuChuyenCoSo.
 
-1. Admin Small hoặc Tư vấn & xếp lớp chọn học viên, site đích đang hoạt động và nhập lý do. Không có bước người đề nghị tự xác nhận chuyển hoàn tất.
+1. Tư vấn & xếp lớp chọn học viên, site đích đang hoạt động và nhập lý do. Không có bước người đề nghị tự xác nhận chuyển hoàn tất.
 2. API lấy site nguồn từ tài khoản đã xác thực, xác định bản HocVien dang_hoc hiện hành bằng định vị site; không nhận nguồn tin cậy từ client và không suy từ prefix ID.
 3. Kiểm tra học viên thuộc nguồn; không có đề nghị/giao dịch mở; không còn công nợ theo quy tắc nghiệp vụ hiện hành; site đích khác nguồn và hoạt động.
 4. Trong transaction nguồn, tạo GiaoDichChuyenCoSo trạng thái cho_duyet và sự kiện append-only de_nghi. Chưa tạo hồ sơ đích, chưa đánh dấu nguồn da_chuyen_di.
@@ -501,14 +501,14 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Lỗi:** hồ sơ không thuộc quyền, site đích không khả dụng, còn nợ, request trùng hoặc site nguồn lỗi thì không tạo đề nghị; lịch sử không bị sửa/xóa.
 
-**Nghiệm thu:** đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; người đề nghị tại site nguồn không thể tự quyết định; Admin Small chỉ có thể quyết định đề nghị gửi tới site được phân công; Tư vấn và Kế toán & Lễ tân không thể duyệt/từ chối/retry.
+**Nghiệm thu:** chỉ Tư vấn & xếp lớp được tạo đề nghị; đề nghị mới chưa làm thay đổi cơ sở hiện tại hoặc thống kê; người đề nghị không thể tự quyết định; Admin Big có thể quyết định mọi đề nghị, Admin Small chỉ có thể quyết định đề nghị gửi tới site được phân công; Kế toán & Lễ tân không thể tạo/duyệt/từ chối/retry.
 
-### FS-TRF-02 — Admin Big xem, duyệt hoặc từ chối đề nghị
+### FS-TRF-02 — Admin Big hoặc Admin Small cơ sở nhận xem, duyệt hoặc từ chối đề nghị
 
-**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối mọi đề nghị; Admin Small tạo đề nghị tại site mình, xem đề nghị tại site nguồn của mình và đề nghị gửi tới site mình, chỉ duyệt/từ chối đề nghị nhận tại site được phân công; Tư vấn tạo/xem tại site mình; Kế toán & Lễ tân chỉ đọc tại site được giao. **Kiểu:** hộp thư Admin Big `GLOBAL`; hộp thư Admin Small truy vấn các site nhưng lọc theo site nguồn/đích được phép (`GLOBAL` có phạm vi); đọc/tạo đề nghị nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
+**Người dùng:** Admin Big xem hộp thư `GLOBAL` và duyệt/từ chối mọi đề nghị; Admin Small xem đề nghị phát sinh tại site mình hoặc gửi tới site mình, chỉ duyệt/từ chối đề nghị có site đích trùng site được phân công; Tư vấn tạo/xem đề nghị tại site mình; Kế toán & Lễ tân chỉ đọc tại site được giao. **Kiểu:** hộp thư Admin Big `GLOBAL`; hộp thư Admin Small truy vấn các site nhưng lọc theo site nguồn/đích được phép (`GLOBAL` có phạm vi); đọc đề nghị nhân viên là `LOCAL`; quyết định ghi `LOCAL` tại CSDL nguồn. **Bảng:** GiaoDichChuyenCoSo, LichSuChuyenCoSo, CoSo, HocVien, DangKy, HocPhi.
 
 1. API truy vấn riêng các site hoạt động để tạo hộp thư; kết quả ghi rõ complete và missing_sites.
-2. Admin Big đọc toàn bộ site hoạt động; Admin Small truy vấn các site nguồn nhưng chỉ nhận đề nghị do site mình tạo hoặc gửi tới site được phân công; Tư vấn/Kế toán chỉ đọc site trong phiên. Không vai trò cơ sở nào có thể truyền site khác để mở rộng quyền.
+2. Admin Big đọc toàn bộ site hoạt động; Admin Small truy vấn các site nguồn nhưng chỉ nhận đề nghị phát sinh tại site mình hoặc gửi tới site được phân công; Tư vấn/Kế toán chỉ đọc site trong phiên. Không vai trò cơ sở nào có thể truyền site khác để mở rộng quyền.
 3. Mỗi dòng hiển thị công nợ lịch sử tại nguồn, tính cục bộ qua DangKy/HocPhi; không JOIN sang site đích. Không có khoản học phí thì hiện riêng, không suy ra đã đóng.
 4. Nếu site nguồn không đọc được thì không cho quyết định trên đề nghị chưa tải được; không hiển thị hộp thư thiếu site như toàn bộ.
 5. Khi duyệt/từ chối, API định tuyến về site nguồn từ đề nghị; cho phép Admin Big hoặc Admin Small có site phiên trùng với site đích. Admin Small ở nguồn không được duyệt đề nghị của chính nguồn đó.
@@ -516,7 +516,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 7. Từ chối: ghi tu_choi, người/thời điểm/lý do và sự kiện tu_choi tại nguồn; hồ sơ học viên không đổi.
 8. Duyệt: ghi trạng thái dang_xu_ly, bước da_tiep_nhan, người/thời điểm quyết định và sự kiện duyet tại nguồn. Chỉ sau commit quyết định mới giao Coordinator chạy distributed transfer.
 
-**Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; Admin Small/Tư vấn tạo được đề nghị; Admin Small nguồn không thể tự duyệt, Admin Small site nhận chỉ quyết định đề nghị có đúng site đích và không retry; Tư vấn không quyết định/retry; giáo viên không được gửi hoặc quyết định; Admin Big và Admin Small site nhận quyết định đồng thời thì chỉ một quyết định thắng; quyết định idempotent; không gọi Coordinator chuyển nếu quyết định chưa commit.
+**Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; chỉ Tư vấn tạo được đề nghị; Admin Big quyết định được mọi đề nghị, Admin Small site nhận chỉ quyết định đề nghị có đúng site đích và không retry; Tư vấn không quyết định/retry; giáo viên không được gửi hoặc quyết định; Admin Big và Admin Small site nhận quyết định đồng thời thì chỉ một quyết định thắng; quyết định idempotent; không gọi Coordinator chuyển nếu quyết định chưa commit.
 
 ### FS-TRF-03 — Thực hiện và phục hồi giao dịch chuyển
 

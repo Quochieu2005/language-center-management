@@ -54,7 +54,7 @@ Hệ thống hỗ trợ đăng nhập và phân quyền; quản lý học viên,
 | Vị trí/vai trò | Nhiệm vụ chính | Phạm vi dữ liệu |
 |---|---|---|
 | Admin Big | Quản lý tài khoản/danh mục/cơ sở; xem báo cáo/nhật ký toàn hệ thống; duyệt hoặc từ chối mọi đề nghị chuyển học viên và retry | Toàn hệ thống theo quyền |
-| Admin Small | Quản lý lớp, phòng, lịch, học viên, học phí; tạo đề nghị chuyển tại cơ sở mình; xem đề nghị nguồn và đề nghị gửi tới mình; duyệt/từ chối đề nghị đến cơ sở được gán | Site được gán |
+| Admin Small | Quản lý lớp, phòng, lịch, học viên, học phí; xem đề nghị nguồn và đề nghị gửi tới mình; duyệt/từ chối đề nghị đến cơ sở được gán; không tạo đề nghị chuyển | Site được gán |
 | Kế toán & Lễ tân | Chỉ xem phòng, lớp/roster, hồ sơ học viên, công nợ và lịch sử chuyển tại nguồn; gửi nhắc phí; xem báo cáo/phiếu thu và thu/hoàn học phí; không ghi phòng/lớp/hồ sơ hoặc đăng ký/xếp lớp | Site được gán |
 | Tư vấn & xếp lớp | CRUD hồ sơ học viên tại site được giao nhưng không cấp tài khoản; CRUD phòng; mở lớp/phân công giáo viên/đăng ký/xếp lớp; sửa tên/sĩ số và hủy mềm lớp đủ điều kiện; xem/nhắc công nợ và sửa kế hoạch đóng; tạo đề nghị và xem lịch sử chuyển tại nguồn, không duyệt/từ chối/retry; nhận/phản hồi liên hệ, đăng/sửa/xuất bản bài Blog dùng chung | Nghiệp vụ tại site được gán; Blog ghi mọi site hoạt động |
 | Giáo viên | Xem lớp mình dạy, điểm danh, nhập điểm | Các lớp mình dạy |
@@ -86,7 +86,7 @@ Do chưa có log vận hành của một trung tâm thật, bảng này là **ư
 | Thống kê/tra cứu toàn cục | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp–trung bình | Đọc bảng nghiệp vụ tại từng site; Coordinator gộp |
 | Xem nhật ký toàn hệ thống | `GLOBAL` | Admin | Mọi site `hoat_dong` | Thấp, chủ yếu kiểm tra/audit | Đọc `Logs` riêng ở từng site và tổng hợp tại API |
 | Sửa danh mục/tài khoản/liên kết OAuth | `REPLICATED-WRITE` | Admin hoặc chủ tài khoản đã xác thực theo thao tác | Mọi site `hoat_dong` | Thấp hơn đọc, nhưng cần nhất quán | Ghi `MonHoc`, `KhoaHoc`, `TaiKhoan` (các cột subject), `CoSo` |
-| Đề nghị chuyển | `LOCAL` | Admin Small hoặc Tư vấn tại nguồn | CSDL nguồn | Theo nhu cầu | Ghi `GiaoDichChuyenCoSo` trạng thái `cho_duyet`, sự kiện `de_nghi` |
+| Đề nghị chuyển | `LOCAL` | Tư vấn & xếp lớp tại nguồn | CSDL nguồn | Theo nhu cầu | Ghi `GiaoDichChuyenCoSo` trạng thái `cho_duyet`, sự kiện `de_nghi` |
 | Hộp thư/duyệt đề nghị | `GLOBAL` đọc; quyết định ghi cục bộ tại nguồn | Admin Big; Admin Small chỉ với đề nghị gửi tới site mình | Big đọc mọi site; Small đọc các site để lọc đề nghị nguồn/site nhận; ghi CSDL nguồn | Thấp, cần độ đúng cao | Đọc `GiaoDichChuyenCoSo`; ghi quyết định và `LichSuChuyenCoSo` tại nguồn |
 | Thực hiện chuyển sau duyệt | `DISTRIBUTED-TX` | Coordinator sau khi Admin Big hoặc Admin Small site nhận duyệt | Site nguồn và site đích | Thấp, cần độ đúng cao | Đọc/ghi `HocVien`, đăng ký/lớp liên quan và lịch sử chuyển; giữ `ma_tai_khoan`, ghi thông báo nhân sự tại đích |
 
@@ -130,7 +130,7 @@ Các cơ sở Q1, Q7 và TD dùng cùng một bộ chức năng và cấu trúc 
 |---|---|---|---|
 | Cơ sở Q1, Q7, TD | Kế toán & Lễ tân chỉ xem phòng/lớp/roster/hồ sơ/công nợ và lịch sử chuyển tại nguồn; gửi nhắc phí, xem báo cáo/phiếu thu và thu/hoàn. Tư vấn & xếp lớp CRUD hồ sơ học viên và phòng tại site được giao nhưng không cấp tài khoản, mở/xếp lớp, sửa/hủy lớp an toàn, xem công nợ và sửa kế hoạch đóng; xử lý liên hệ, đăng bài dùng chung. Giáo viên điểm danh/nhập điểm lớp được phân công | Hồ sơ học viên, phòng, lớp, buổi học, đăng ký, học phí, phiếu thu, điểm danh, điểm, nhật ký cơ sở | Nhân viên chỉ thao tác theo quyền tại CSDL được giao; không tự truy cập site khác; Blog bài viết được Coordinator nhân bản tới site hoạt động |
 | Admin Big | Quản lý danh mục dùng chung, xem thống kê/nhật ký toàn cục, quản lý vòng đời cơ sở, duyệt/từ chối mọi đề nghị và retry | Bản sao danh mục/tài khoản; hộp thư đọc gộp; quyết định tại CSDL nguồn; dữ liệu nguồn/đích sau khi duyệt | Coordinator định tuyến tới đúng site; chỉ yêu cầu đã duyệt mới chạy module giao dịch phân tán |
-| Admin Small | Điều hành site được giao, tạo đề nghị tại site mình, xem đề nghị nguồn/đến và duyệt/từ chối đề nghị gửi tới site mình | Dữ liệu nghiệp vụ của site mình; đề nghị tại CSDL nguồn | API tự lấy site từ phiên; chỉ cho quyết định khi cơ sở đích trùng site trong phiên |
+| Admin Small | Điều hành site được giao, xem đề nghị nguồn/đến và duyệt/từ chối đề nghị gửi tới site mình; không tạo đề nghị | Dữ liệu nghiệp vụ của site mình; đề nghị tại CSDL nguồn | API tự lấy site từ phiên; chỉ cho quyết định khi cơ sở đích trùng site trong phiên |
 | Nhóm vận hành/triển khai | Tạo CSDL, cấu hình kết nối, cấp quyền dịch vụ, kiểm tra backup, đồng bộ và phục hồi | Cấu hình môi trường, trạng thái site, phiên bản dữ liệu dùng chung, nhật ký đồng bộ | Không dùng quyền vận hành để thay quyền nghiệp vụ của người dùng |
 
 Tên Q1/Q7/TD là ba site hiện tại. Trong lược đồ và mã nguồn, tập site được lấy từ `CoSo` có trạng thái `hoat_dong` rồi đối chiếu cấu hình kết nối, không xử lý bằng ba nhánh cố định.
@@ -234,7 +234,7 @@ Ràng buộc bổ sung: học viên đăng ký lớp cùng cơ sở. Mỗi bản
 | Loại | Quan hệ vị trí | Cơ chế theo thiết kế |
 |---|---|---|
 | Nhân bản | Với `R ∈ {CoSo, MonHoc, KhoaHoc, TaiKhoan}`, mỗi site hoạt động giữ một bản giống nhau của `R`; subject Google/Facebook là cột của `TaiKhoan` | Chỉ ghi qua module Đồng bộ dữ liệu dùng chung; thiếu một site hoạt động thì từ chối; đối soát qua phiên bản |
-| Cục bộ | `GiaoDichChuyenCoSo` lưu đề nghị/quyết định/trạng thái chỉ tại nguồn; `LichSuChuyenCoSo` ghi sự kiện tại site phát sinh | Không nhân bản đại trà; Admin Small/Tư vấn tạo đề nghị tại nguồn, Admin Big hoặc Admin Small site nhận quyết định qua Coordinator; bảng sự kiện chỉ thêm |
+| Cục bộ | `GiaoDichChuyenCoSo` lưu đề nghị/quyết định/trạng thái chỉ tại nguồn; `LichSuChuyenCoSo` ghi sự kiện tại site phát sinh | Không nhân bản đại trà; Tư vấn tạo đề nghị tại nguồn, Admin Big hoặc Admin Small site nhận quyết định qua Coordinator; bảng sự kiện chỉ thêm |
 
 `TaiKhoan.ten_dang_nhap` và `email` cần kiểm tra duy nhất trên toàn hệ thống trước khi ghi. Mật khẩu/token chỉ lưu dạng băm; không xuất hiện trong nhật ký.
 
@@ -278,7 +278,7 @@ Sơ đồ logic là client/server: người dùng ở máy trạm gọi ứng d�
 2. Ghi chung luôn đi qua một module. Trước khi ghi phải xác nhận toàn bộ site hoạt động sẵn sàng; thiếu một site thì từ chối.
 3. Các bản ghi nhân bản có `phien_ban`, `cap_nhat_luc`; đối soát định kỳ phát hiện site cũ và đưa dữ liệu về bản mới nhất theo quy tắc được chốt.
 4. `Logs` ghi audit và ACK đồng bộ theo site, không ghi bí mật. ACK runtime hiện được áp dụng cho thay đổi `MonHoc`; không coi đây là bằng chứng mọi bảng dùng chung đã có replication.
-5. Admin Small hoặc Tư vấn tạo đề nghị `cho_duyet` và sự kiện append-only tại CSDL nguồn; Admin Big dùng Global Query đọc hộp thư toàn hệ thống, còn Admin Small chỉ thấy đề nghị nguồn/site nhận và có thể quyết định đề nghị gửi tới site mình. Quyết định được ghi tại nguồn. Chỉ sau khi duyệt mới tạo hồ sơ đích, giữ nguyên tài khoản, đánh dấu bản nguồn `da_chuyen_di`, ghi thông báo nhân sự tại đích và phục hồi tiến về phía trước nếu bị dừng giữa chừng. Tư vấn xếp lớp/phòng thủ công. Không xóa hồ sơ đích đã commit. Global Query thống kê áp dụng quy tắc một hồ sơ hiện hành theo trạng thái/bước. Xem [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md) để biết trình tự và các điểm lỗi.
+5. Tư vấn tạo đề nghị `cho_duyet` và sự kiện append-only tại CSDL nguồn; Admin Big dùng Global Query đọc hộp thư toàn hệ thống, còn Admin Small chỉ thấy đề nghị nguồn/site nhận và có thể quyết định đề nghị gửi tới site mình. Quyết định được ghi tại nguồn. Chỉ sau khi duyệt mới tạo hồ sơ đích, giữ nguyên tài khoản, đánh dấu bản nguồn `da_chuyen_di`, ghi thông báo nhân sự tại đích và phục hồi tiến về phía trước nếu bị dừng giữa chừng. Tư vấn xếp lớp/phòng thủ công. Không xóa hồ sơ đích đã commit. Global Query thống kê áp dụng quy tắc một hồ sơ hiện hành theo trạng thái/bước. Xem [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md) để biết trình tự và các điểm lỗi.
 
 Luồng này dùng các transaction cục bộ tại từng CSDL với Coordinator phục hồi tiến về phía trước. Không mô tả là ACID nguyên tử giữa hai CSDL; báo cáo kết quả kiểm thử theo trạng thái từng site, sự kiện đã ghi, cách retry và quy tắc thống kê khi giao dịch còn `dang_xu_ly`.
 
@@ -361,7 +361,7 @@ Chạy từng kịch bản trên các CSDL độc lập. Mỗi lần ghi lại t
 | Phân quyền | Thử mỗi role trên chức năng được phép và bị cấm | Thành công đúng quyền; từ chối quyền sai; có log thất bại |
 | Trigger/permission | Tạo role/principal DBMS và quyền tối thiểu; thử trigger cục bộ cho quy tắc được chọn (ví dụ chặn sửa/xóa nhật ký) | User không được cấp quyền bị từ chối; trigger chặn đúng thao tác; backend vẫn kiểm tra vai trò và site. Ghi riêng kết quả từng lớp bảo vệ |
 | Ghi nhân bản | Thêm/sửa danh mục khi các site hoạt động; lặp lại khi một site tắt | Bản sao khớp; lần thiếu site không ghi dở hoặc không báo thành công |
-| Đề nghị/duyệt chuyển cơ sở | Admin Small/Tư vấn gửi; Admin Big hoặc Admin Small site nhận duyệt/từ chối; kiểm tra quyền và dữ liệu từng site | Đề nghị chờ duyệt vẫn ở nguồn; từ chối không đổi hồ sơ; duyệt đúng site mới kích hoạt chuyển |
+| Đề nghị/duyệt chuyển cơ sở | Tư vấn gửi; Admin Big hoặc Admin Small site nhận duyệt/từ chối; kiểm tra quyền và dữ liệu từng site | Admin Small không tạo; đề nghị chờ duyệt vẫn ở nguồn; từ chối không đổi hồ sơ; duyệt đúng site mới kích hoạt chuyển |
 | Chuyển sau khi duyệt | Q1→Q7, kiểm tra trạng thái, lớp, lịch sử, học phí/điểm | Bản nguồn `da_chuyen_di`, đích `dang_hoc`, history được giữ, thống kê không đếm trùng |
 | Retry/recovery | Từ chối khi đích đóng; mất kết nối trước khi đích commit; dừng app sau khi đích commit; gửi trùng request | Nguồn giữ nguyên trước khi đích commit; sau commit đích thì recovery hoàn tất nguồn; idempotency không tạo hồ sơ/giao dịch trùng |
 | Concurrency — TC-CON-01 | Hai phiên độc lập đăng ký hai học viên vào một lớp còn đúng một chỗ, chạy chồng lấp tại vùng kiểm tra/cập nhật | Cách tạo cạnh tranh, cơ chế khóa/cô lập/cập nhật có điều kiện, response hai phiên; một đăng ký/học phí mới, không vượt sĩ số hoặc ghi dở dang |

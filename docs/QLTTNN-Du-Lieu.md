@@ -47,9 +47,9 @@ Mã chính dùng dạng `<SITE>-<LOẠI>-<SỐ THỨ TỰ 6 CHỮ SỐ>`, ví d�
 
 Điều kiện và kết quả theo README mục 5.5:
 
-1. Admin Small hoặc Tư vấn & xếp lớp tại cơ sở nguồn tạo đề nghị, nhập cơ sở đích và lý do; API lấy site nguồn từ tài khoản đang đăng nhập.
+1. Chỉ Tư vấn & xếp lớp tại cơ sở nguồn tạo đề nghị, nhập cơ sở đích và lý do; API lấy site nguồn từ tài khoản đang đăng nhập.
 2. Đề nghị và sự kiện `de_nghi` được ghi tại CSDL nguồn với trạng thái `cho_duyet`. Học viên vẫn đang học ở nguồn; chưa tạo hồ sơ đích.
-3. Admin Big xem danh sách bằng Global Query; Admin Small tại cơ sở nhận chỉ thấy đề nghị đến cơ sở mình. Một trong hai có thể duyệt/từ chối; Admin Small nguồn không tự duyệt đề nghị do mình tạo. Khi duyệt, API kiểm tra lại học viên còn đang học, hết nợ, site đích hoạt động và hai site sẵn sàng. Quyết định và sự kiện được ghi tại nguồn; từ chối không đổi hồ sơ.
+3. Admin Big xem danh sách bằng Global Query; Admin Small tại cơ sở nhận chỉ thấy đề nghị đến cơ sở mình. Admin Big hoặc Admin Small cơ sở nhận có thể duyệt/từ chối; Admin Small nguồn không thể duyệt vì không phải site đích. Khi duyệt, API kiểm tra lại học viên còn đang học, hết nợ, site đích hoạt động và hai site sẵn sàng. Quyết định và sự kiện được ghi tại nguồn; từ chối không đổi hồ sơ.
 4. Chỉ sau khi được duyệt, Coordinator tạo hồ sơ cùng mã tại site mới trước, giữ nguyên `ma_tai_khoan`; sau đó site cũ đánh dấu `da_chuyen_di`, đóng các lớp đang học và cập nhật sĩ số.
 5. Khi hoàn tất, hệ thống ghi thông báo tại site nhận cho Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp. Tư vấn chọn lớp/phòng thủ công theo quy trình đăng ký bình thường; không tạo tài khoản hoặc mật khẩu mới.
 6. Giữ điểm, học phí, phiếu thu, điểm danh và lịch sử ở site cũ.

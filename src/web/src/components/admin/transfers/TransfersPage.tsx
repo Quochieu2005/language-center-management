@@ -24,7 +24,7 @@ export default function TransfersPage() {
   const [decisionForm] = Form.useForm();
   const isBig = user?.role === "admin_big";
   const isSmall = user?.role === "admin_small";
-  const canRequest = isSmall || user?.role === "tu_van";
+  const canRequest = user?.role === "tu_van";
   const load = useCallback(async () => {
     try {
       const result = await academicsApi.transfers();
@@ -68,7 +68,7 @@ export default function TransfersPage() {
   const infoText = isBig
     ? "Admin Big xem toàn hệ thống và có thể duyệt mọi đề nghị; quyết định được ghi tại site nguồn. Học phí là lịch sử tại nguồn."
     : isSmall
-      ? "Admin Small tạo đề nghị ở site mình và có thể duyệt đề nghị gửi tới site mình; chỉ Admin Big được retry. Học phí là lịch sử tại nguồn."
+      ? "Admin Small xem đề nghị tại site mình và có thể duyệt đề nghị gửi tới site mình; chỉ Admin Big được retry. Học phí là lịch sử tại nguồn."
       : canRequest
         ? "Tư vấn & xếp lớp tạo đề nghị tại site mình; Admin Big hoặc Admin Small cơ sở nhận duyệt. Khi chuyển xong, nhân sự cơ sở nhận được thông báo để xếp lớp/phòng. Học phí là lịch sử tại nguồn."
         : "Chỉ xem đề nghị tại cơ sở được phân công; không thể tạo, duyệt, từ chối hoặc retry. Học phí là lịch sử tại nguồn.";

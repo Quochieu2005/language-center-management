@@ -61,7 +61,7 @@ Không rải `for each site: UPDATE` trong từng màn hình. API có service gh
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 
-Admin Small hoặc Tư vấn & xếp lớp tạo đề nghị tại site mình phụ trách (`LOCAL`); Kế toán & Lễ tân chỉ xem. Admin Big đọc hộp thư toàn cục; Admin Small ở site nhận chỉ thấy đề nghị gửi tới site mình (`GLOBAL` đọc, quyết định ghi cục bộ tại nguồn). Admin Big hoặc Admin Small site nhận có thể duyệt/từ chối, còn Admin Small nguồn không tự duyệt đề nghị của mình. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Sau khi hoàn tất, site nhận có thông báo cho nhân viên và Tư vấn chọn lớp/phòng thủ công; hồ sơ đích giữ nguyên tài khoản học viên. Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
+Chỉ Tư vấn & xếp lớp tạo đề nghị tại site mình phụ trách (`LOCAL`); Kế toán & Lễ tân chỉ xem. Admin Big đọc hộp thư toàn cục; Admin Small ở site được giao chỉ thấy đề nghị phát sinh tại site mình hoặc gửi tới site mình (`GLOBAL` đọc có phạm vi, quyết định ghi cục bộ tại nguồn). Admin Big hoặc Admin Small site nhận có thể duyệt/từ chối, còn Admin Small nguồn không thể duyệt vì không phải site đích. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Sau khi hoàn tất, site nhận có thông báo cho nhân viên và Tư vấn chọn lớp/phòng thủ công; hồ sơ đích giữ nguyên tài khoản học viên. Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
 
 ## 4. Mã giả cho bốn kiểu thao tác
 
