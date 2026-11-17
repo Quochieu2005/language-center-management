@@ -14,7 +14,11 @@ from core.auth.account_status import (
     AccountStatusTargetNotFound,
     change_account_status,
 )
-from core.auth.serializers import AccountStatusResponseSerializer, AccountStatusUpdateSerializer
+from core.auth.serializers import (
+    AccountStatusResponseSerializer,
+    AccountStatusUpdateSerializer,
+    EmptyRequestSerializer,
+)
 from core.auth.service_common import AuthInfrastructureUnavailable
 from core.media.avatars import create_teacher_avatar_setup_token
 from core.teachers.serializers import (
@@ -251,6 +255,7 @@ class TeacherCredentialEmailView(APIView):
         operation_id="teacher_credentials_send_email",
         tags=["Quản lý giáo viên"],
         summary="Gửi thông tin tài khoản giáo viên qua email một lần",
+        request=EmptyRequestSerializer,
         description=(
             "Chỉ Admin Big/Admin Small trong phạm vi site. Chỉ gửi khi trạng thái còn sẵn sàng "
             "hoặc lần gửi trước thất bại rõ ràng; trạng thái đã gửi hoặc không xác định không thể gửi lại. "
