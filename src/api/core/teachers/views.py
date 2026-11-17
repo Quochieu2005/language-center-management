@@ -70,11 +70,10 @@ class TeacherAssignmentOptionsView(APIView):
         description=(
             "LOCAL tại một site. Admin Big phải chọn site_code; Admin Small và Tư vấn & xếp lớp "
             "dùng site trong phiên đăng nhập và không được gửi site_code. Chỉ trả mã, họ tên và "
-            "trạng thái giáo viên đang dạy; không trả thông tin liên hệ hoặc đăng nhập."
+            "chỉ giáo viên đang dạy; không trả thông tin liên hệ hoặc đăng nhập."
         ),
         parameters=[
             OpenApiParameter("site_code", str, OpenApiParameter.QUERY),
-            OpenApiParameter("search", str, OpenApiParameter.QUERY),
             OpenApiParameter("limit", int, OpenApiParameter.QUERY),
             OpenApiParameter("offset", int, OpenApiParameter.QUERY),
         ],
@@ -113,7 +112,6 @@ class TeacherAssignmentOptionsView(APIView):
             result = list_teachers(
                 site_code=site_code,
                 status_filter="dang_day",
-                search=data.get("search"),
                 limit=data["limit"],
                 offset=data["offset"],
             )
@@ -125,7 +123,7 @@ class TeacherAssignmentOptionsView(APIView):
             "limit": result["limit"],
             "offset": result["offset"],
             "results": [
-                {"teacher_id": row["teacher_id"], "full_name": row["full_name"], "status": row["status"]}
+                {"teacher_id": row["teacher_id"], "full_name": row["full_name"]}
                 for row in result["results"]
             ],
         })
