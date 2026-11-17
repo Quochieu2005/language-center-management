@@ -27,8 +27,8 @@ export default function LoginPage() {
       void Promise.resolve().then(() => {
         setSocialBusy("session");
         return authApi.session();
-      }).then(({ user }) => {
-        signIn(user);
+      }).then(({ user, expires_at }) => {
+        signIn(user, expires_at);
         if (user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
         router.replace(homeForRole(user.role));
       }).catch(() => setError("Không xác minh được phiên Google/Facebook. Hãy đăng nhập lại bằng tài khoản được cấp."))
@@ -55,7 +55,7 @@ export default function LoginPage() {
     setBusy(true); setError("");
     try {
       const result = await authApi.login(values.identifier, values.password);
-      signIn(result.user);
+      signIn(result.user, result.expires_at);
       if (result.user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
       router.replace(homeForRole(result.user.role));
     } catch (reason) {

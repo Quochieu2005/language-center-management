@@ -265,12 +265,13 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 1. Mỗi phiên đăng nhập có hạn idle **60 phút (3600 giây)** từ hoạt động người dùng thật gần nhất. Mỗi thiết bị/trình duyệt là một phiên riêng.
 2. Hoạt động thật gồm thao tác bàn phím, nhấn/chạm, cuộn trang có chủ ý và thao tác nghiệp vụ do người dùng khởi tạo. Request nền, polling, health check, tự refresh, timer, tab chỉ mở và thao tác reload không làm mới hạn.
 3. API lưu/kiểm tra thời điểm hoạt động và thời điểm hết hạn theo đồng hồ server. Sau hạn, mọi API cần xác thực trả `401 SESSION_IDLE_TIMEOUT`, thu hồi phiên và xóa cookie. Frontend đưa người dùng về trang đăng nhập.
-4. Frontend đồng bộ hoạt động giữa các tab cùng phiên. Có thể cảnh báo ở phút 55; nút “Tiếp tục phiên” phải được API xác nhận và không được dùng để hồi sinh phiên đã hết hạn.
-5. Logout thủ công, khóa/vô hiệu tài khoản hoặc reset mật khẩu phải thu hồi phiên theo chính sách bảo mật; không ghi cookie/token vào log.
+4. Khi đăng nhập hoặc tải lại trang, API trả `expires_at` của phiên; frontend khôi phục danh tính bằng `GET /auth/session/` từ cookie HttpOnly. Reload không gia hạn idle timeout. Frontend đặt bộ đếm theo `expires_at`, khi tới hạn hỏi API để xác nhận; trong bước phục hồi, chỉ `401` mới xóa trạng thái đăng nhập. Lỗi mạng/5xx phải giữ nguyên cookie, không điều hướng nhầm về đăng nhập và cho phép thử xác minh lại.
+5. Frontend đồng bộ hoạt động giữa các tab cùng phiên. Có thể cảnh báo ở phút 55; nút “Tiếp tục phiên” phải được API xác nhận và không được dùng để hồi sinh phiên đã hết hạn.
+6. Logout thủ công, khóa/vô hiệu tài khoản hoặc reset mật khẩu phải thu hồi phiên theo chính sách bảo mật; không ghi cookie/token vào log.
 
-**Nghiệm thu:** phiên còn hiệu lực tại 59:59 nếu có hoạt động; sau 60:00 không hoạt động thì không truy cập được API và giao diện trở về đăng nhập; hoạt động thật đặt lại hạn; polling nền không đặt lại; reload/tab ngủ không vượt hạn; test riêng Admin Big, Admin Small và giáo viên cho cùng kết quả. Schema/API lưu phiên đã có; cần kiểm chứng timeout và đồng bộ tab trên frontend.
+**Nghiệm thu:** phiên còn hiệu lực tại 59:59 nếu có hoạt động; sau 60:00 không hoạt động thì API từ chối và giao diện tự về đăng nhập; hoạt động thật đặt lại hạn; polling nền không đặt lại; reload khôi phục phiên còn hiệu lực nhưng không gia hạn; reload sau khi phiên hết hạn phải về đăng nhập; lỗi 503 không bị hiểu thành logout; test riêng Admin Big, Admin Small và giáo viên cho cùng kết quả. Schema/API lưu phiên đã có; cần kiểm chứng timeout và đồng bộ tab trên frontend.
 
-**Trạng thái source:** API có cookie session, thu hồi phiên và idle timeout; kiểm chứng tích hợp frontend, nhiều tab và runtime vẫn phải ghi riêng.
+**Trạng thái source:** API có cookie session, trả `expires_at` khi đăng nhập/khôi phục/gia hạn, endpoint khôi phục phiên, thu hồi phiên và idle timeout; frontend khôi phục qua `/auth/session/`, tự kiểm tra tại hạn hết phiên và giữ cookie khi gặp lỗi không phải 401. Kiểm chứng tích hợp, nhiều tab và runtime vẫn phải ghi riêng.
 
 ### FS-ACC-01 — Tạo và phân công tài khoản Admin Small/giáo viên
 

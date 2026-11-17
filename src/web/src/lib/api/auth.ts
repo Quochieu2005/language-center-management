@@ -12,7 +12,7 @@ export type SessionUser = {
   must_change_password: boolean;
   avatar_secure_url?: string | null;
 };
-export type LoginResponse = { user: SessionUser; idle_timeout_seconds: number };
+export type LoginResponse = { user: SessionUser; idle_timeout_seconds: number; expires_at: string };
 export type ProfileResponse = { user: SessionUser; expires_at: string };
 export type AvatarUploadIntent = {
   intent_token: string;
@@ -35,13 +35,13 @@ export const authApi = {
     apiRequest<{ account_id: string; role: Role; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
       `/auth/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
-  session: () => apiRequest<{ user: SessionUser }>("/auth/session/"),
+  session: () => apiRequest<ProfileResponse>("/auth/session/"),
   oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
   startOAuthLink: (provider: OAuthProvider) =>
     apiRequest<{ authorization_url: string }>(`/auth/oauth/${provider}/start/`, { method: "POST", body: "{}" }),
   oauthConnections: (slug: string) =>
     apiRequest<{ connections: Record<OAuthProvider, boolean> }>(`/auth/oauth/connections/${encodeURIComponent(slug)}/`),
-  activity: () => apiRequest<{ expires_at: string }>("/auth/activity/", { method: "POST", body: "{}" }),
+  activity: () => apiRequest<ProfileResponse>("/auth/activity/", { method: "POST", body: "{}" }),
   logout: () => apiRequest<{ detail: string }>("/auth/logout/", { method: "POST", body: "{}" }),
   changePassword: (current_password: string, new_password: string, confirm_password: string) =>
     apiRequest<{ detail: string }>("/auth/password/change/", {

@@ -14,6 +14,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthCookieAuthentication, AuthenticationUnavailable
+from core.auth.serializers import AuthProfileResponseSerializer
 from core.auth.oauth_services import (
     OAUTH_STATE_COOKIE_AGE,
     PROVIDER_COLUMNS,
@@ -31,7 +32,7 @@ from core.auth.oauth_services import (
     read_oauth_flow,
 )
 from core.auth.service_common import AuthInfrastructureUnavailable, LoginRateLimitExceeded
-from core.auth.views import _serialized_user
+from core.auth.views import _serialized_user, _utc_datetime
 
 
 def _frontend_origin() -> str:
@@ -266,7 +267,7 @@ class AuthSessionView(APIView):
         operation_id="auth_session_read",
         tags=["Xác thực"],
         summary="Lấy thông tin tài khoản của phiên đăng nhập hiện tại",
-        responses={200: OpenApiResponse(description="Tài khoản và vai trò đã xác thực."), 401: OpenApiResponse(description="Phiên không hợp lệ hoặc hết hạn.")},
+        responses={200: AuthProfileResponseSerializer, 401: OpenApiResponse(description="Phiên không hợp lệ hoặc hết hạn.")},
     )
     def get(self, request):
-        return Response({"user": _serialized_user(request.user)})
+        return Response({"user": _serialized_user(request.user), "expires_at": _utc_datetime(request.auth.expires_at)})

@@ -184,11 +184,12 @@ class AuthLoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        user, token, _expires_at = result
+        user, token, expires_at = result
         response = Response(
             {
                 "user": _serialized_user(user),
                 "idle_timeout_seconds": settings.AUTH_IDLE_TIMEOUT_SECONDS,
+                "expires_at": _utc_datetime(expires_at),
             },
             status=status.HTTP_200_OK,
         )

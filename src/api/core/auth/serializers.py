@@ -321,6 +321,7 @@ class AuthUserSerializer(serializers.Serializer):
 class AuthLoginResponseSerializer(serializers.Serializer):
     user = AuthUserSerializer()
     idle_timeout_seconds = serializers.IntegerField()
+    expires_at = serializers.DateTimeField()
 
 
 class AuthProfileResponseSerializer(serializers.Serializer):
