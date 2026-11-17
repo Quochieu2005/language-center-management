@@ -19,6 +19,7 @@ from core.academics.common import (
     AcademicInvalid,
     AcademicNotFound,
     AcademicSiteUnavailable,
+    site_scope,
 )
 from core.auth.authentication import AuthCookieAuthentication
 from core.contacts.serializers import (
@@ -31,6 +32,7 @@ from core.contacts.serializers import (
     ContactSubmissionSerializer,
 )
 from core.contacts.services import (
+    CONTACT_ROLES,
     ContactEmailUnavailable,
     create_contact_request,
     list_admin_contact_requests,
@@ -39,7 +41,6 @@ from core.contacts.services import (
 )
 
 
-_ADMIN_ROLES = {"admin_big", "admin_small"}
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 
 
@@ -167,8 +168,8 @@ class AdminContactListView(APIView):
         tags=["Liên hệ"],
         summary="Xem hộp thư liên hệ theo phạm vi quản trị",
         description=(
-            "Admin Big đọc GLOBAL từ từng CSDL site hoạt động hoặc lọc một site; Admin Small chỉ đọc "
-            "site được gán. API tổng hợp Global Query trong bộ nhớ, không có CSDL trung tâm. Nếu thiếu "
+            "Admin Big đọc GLOBAL từ từng CSDL site hoạt động hoặc lọc một site; Admin Small và Tư vấn & "
+            "xếp lớp chỉ đọc site được gán. API tổng hợp Global Query trong bộ nhớ, không có CSDL trung tâm. Nếu thiếu "
             "site, response 503 kèm complete=false và missing_sites; kết quả một phần không được coi là đầy đủ."
         ),
         parameters=[
@@ -182,13 +183,13 @@ class AdminContactListView(APIView):
             200: AdminContactListSerializer,
             400: OpenApiResponse(description="Bộ lọc không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small; Admin Small không chọn site khác."),
+            403: OpenApiResponse(description="Vai trò không được phép hoặc site vượt phạm vi được gán."),
             503: AdminContactListSerializer,
         },
     )
     def get(self, request):
-        if request.user.role not in _ADMIN_ROLES:
-            return Response({"detail": "Chỉ Admin Big hoặc Admin Small được xem hộp thư liên hệ."}, status=403)
+        if request.user.role not in CONTACT_ROLES:
+            return Response({"detail": "Tài khoản không được phép xem hộp thư liên hệ."}, status=403)
         query = AdminContactQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         options = query.validated_data
@@ -220,7 +221,7 @@ class AdminContactReplyView(APIView):
         tags=["Liên hệ"],
         summary="Gửi email phản hồi cho yêu cầu liên hệ",
         description=(
-            "Admin Big/Admin Small chỉ phản hồi tại site sở hữu yêu cầu. API lấy địa chỉ nhận từ bản ghi, "
+            "Admin Big, Admin Small và Tư vấn & xếp lớp chỉ phản hồi tại site sở hữu yêu cầu trong phạm vi được gán. API lấy địa chỉ nhận từ bản ghi, "
             "gửi plain-text email qua SMTP đã cấu hình rồi lưu nội dung phản hồi, trạng thái và Logs trong "
             "transaction cục bộ. Yêu cầu chỉ được phản hồi một lần; xác nhận gửi SMTP không chứng minh email đã đến inbox."
         ),
@@ -238,16 +239,16 @@ class AdminContactReplyView(APIView):
         },
     )
     def post(self, request, site_code, request_id):
-        if request.user.role not in _ADMIN_ROLES:
-            return Response({"detail": "Chỉ Admin Big hoặc Admin Small được phản hồi liên hệ."}, status=403)
+        if request.user.role not in CONTACT_ROLES:
+            return Response({"detail": "Tài khoản không được phép phản hồi liên hệ."}, status=403)
         query = AdminContactQuerySerializer(data={"site_code": site_code})
         query.is_valid(raise_exception=True)
         serializer = ContactReplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            site = query.validated_data["site_code"]
-            if request.user.role == "admin_small" and str(request.user.site_code or "").upper() != site:
-                raise AcademicForbidden
+            site = site_scope(
+                request.user, query.validated_data["site_code"], roles=CONTACT_ROLES
+            )
             result = send_contact_reply(
                 site_code=site,
                 request_id=request_id,

@@ -49,7 +49,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
       title: "Quản lý",
       items: [
         { label: "Hồ sơ học viên", href: "/admin/students", icon: <TeamOutlined />, roles: ["admin_big", "admin_small", "tu_van"] },
-        { label: "Lớp học & Xếp lớp", href: "/admin/classes", icon: <CalendarOutlined />, roles: ["admin_big", "admin_small", "le_tan", "tu_van"] },
+        { label: "Lớp học & Xếp lớp", href: "/admin/classes", icon: <CalendarOutlined />, roles: ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"] },
         { label: "Phòng học", href: "/admin/rooms", icon: <HomeOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Giáo viên", href: "/admin/teachers", icon: <UsergroupAddOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Môn học dùng chung", href: "/admin/subjects", icon: <BookOutlined />, roles: ["admin_big"] },
@@ -67,7 +67,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
         { label: "Thông báo", href: "/admin/notifications", icon: <BellOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Nhật ký Admin", href: "/admin/audit", icon: <FileSearchOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Blog", href: "/admin/blog", icon: <ReadOutlined />, roles: ["admin_big"] },
-        { label: "Liên hệ", href: "/admin/contacts", icon: <PhoneOutlined />, roles: ["admin_big", "admin_small"] },
+        { label: "Liên hệ", href: "/admin/contacts", icon: <PhoneOutlined />, roles: ["admin_big", "admin_small", "tu_van"] },
       ],
     },
   ];

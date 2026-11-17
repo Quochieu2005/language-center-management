@@ -32,6 +32,7 @@ from core.sites.connections import get_site_connection, get_site_database_alias
 
 
 logger = logging.getLogger(__name__)
+CONTACT_ROLES = frozenset({"admin_big", "admin_small", "tu_van"})
 
 
 class ContactEmailUnavailable(AcademicInfrastructureUnavailable):
@@ -200,7 +201,9 @@ def list_admin_contact_requests(
             offset=offset,
             unavailable_exceptions=(AcademicInfrastructureUnavailable, AcademicSiteUnavailable),
         )
-    site = site_scope(user=user, requested_site=site_code, roles={"admin_big", "admin_small"})
+    site = site_scope(
+        user=user, requested_site=site_code, roles=CONTACT_ROLES,
+    )
     result = _list_site_contacts(
         site_code=site, status_filter=status_filter, search=search, limit=limit, offset=offset
     )
