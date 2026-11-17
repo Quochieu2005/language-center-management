@@ -47,12 +47,13 @@ Mã chính dùng dạng `<SITE>-<LOẠI>-<SỐ THỨ TỰ 6 CHỮ SỐ>`, ví d�
 
 Điều kiện và kết quả theo README mục 5.5:
 
-1. Admin Small hoặc Tư vấn & xếp lớp tại cơ sở nguồn tạo đề nghị, nhập cơ sở đích và lý do; API lấy site nguồn từ tài khoản đang đăng nhập.
+1. Chỉ Tư vấn & xếp lớp tại cơ sở nguồn tạo đề nghị, nhập cơ sở đích và lý do; API lấy site nguồn từ tài khoản đang đăng nhập.
 2. Đề nghị và sự kiện `de_nghi` được ghi tại CSDL nguồn với trạng thái `cho_duyet`. Học viên vẫn đang học ở nguồn; chưa tạo hồ sơ đích.
-3. Admin Big xem danh sách bằng Global Query qua các CSDL site riêng rồi duyệt hoặc từ chối. Nếu duyệt, API kiểm tra lại học viên còn đang học, hết nợ, site đích hoạt động và hai site sẵn sàng. Nếu từ chối, lưu người duyệt, thời điểm, lý do và sự kiện tại nguồn; hồ sơ học viên không đổi.
-4. Chỉ sau khi được duyệt, Coordinator tạo hồ sơ cùng mã tại site mới trước; sau đó site cũ đánh dấu `da_chuyen_di`, đóng các lớp đang học và cập nhật sĩ số.
-5. Giữ điểm, học phí, phiếu thu, điểm danh và lịch sử ở site cũ. Học viên đăng ký lớp mới ở cơ sở mới theo quy trình đăng ký bình thường.
-6. Thống kê học viên đang học chỉ tính một bản hiện hành; trong `cho_duyet`, đó là bản nguồn. Khi giao dịch đang chạy, áp dụng quy tắc theo bước trong tài liệu giao dịch phân tán.
+3. Admin Big xem danh sách bằng Global Query; Admin Small tại cơ sở nhận chỉ thấy đề nghị đến cơ sở mình. Admin Big hoặc Admin Small cơ sở nhận có thể duyệt/từ chối; Admin Small nguồn không thể duyệt vì không phải site đích. Khi duyệt, API kiểm tra lại học viên còn đang học, hết nợ, site đích hoạt động và hai site sẵn sàng. Quyết định và sự kiện được ghi tại nguồn; từ chối không đổi hồ sơ.
+4. Chỉ sau khi được duyệt, Coordinator tạo hồ sơ cùng mã tại site mới trước, giữ nguyên `ma_tai_khoan`; sau đó site cũ đánh dấu `da_chuyen_di`, đóng các lớp đang học và cập nhật sĩ số.
+5. Khi hoàn tất, hệ thống ghi thông báo tại site nhận cho Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp. Tư vấn chọn lớp/phòng thủ công theo quy trình đăng ký bình thường; không tạo tài khoản hoặc mật khẩu mới.
+6. Giữ điểm, học phí, phiếu thu, điểm danh và lịch sử ở site cũ.
+7. Thống kê học viên đang học chỉ tính một bản hiện hành; trong `cho_duyet`, đó là bản nguồn. Khi giao dịch đang chạy, áp dụng quy tắc theo bước trong tài liệu giao dịch phân tán.
 
 `GiaoDichChuyenCoSo` tại nguồn lưu trạng thái hiện tại, bước cuối, khóa chống lặp và lỗi gần nhất; `LichSuChuyenCoSo` chỉ ghi thêm sự kiện tại nguồn/đích, liên kết bằng `ma_chuyen` nhưng không có FK xuyên site. Trước khi đích commit, lỗi dứt điểm có thể kết thúc giao dịch và giữ nguyên nguồn; lỗi tạm thời được retry. Sau khi đích commit, lần chạy lại phải đối chiếu sự kiện tại đích rồi làm nốt phần nguồn, không tạo hồ sơ đích lần hai hoặc xóa hồ sơ đã commit. Chi tiết trình tự và thống kê trong thời gian xử lý nằm ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
 

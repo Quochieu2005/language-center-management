@@ -19,6 +19,7 @@ from core.academics.common import (
     require_active_site,
     translate_database_errors,
 )
+from core.notifications.publisher import publish_notification
 from core.sites.connections import get_site_database_alias
 from core.students.slugging import available_student_slug
 
@@ -152,10 +153,13 @@ def create_transfer_request(
     }
 
 
-def _list_site_transfers(site_code: str, *, status_filter: str | None, take: int) -> tuple[int, list[dict[str, Any]]]:
+def _list_site_transfers(
+    site_code: str, *, status_filter: str | None, take: int,
+    visible_to_site: str | None = None,
+) -> tuple[int, list[dict[str, Any]]]:
     alias = require_active_site(site_code)
-    where = "g.co_so_nguon = %s"
-    params: list[Any] = [site_code]
+    where = "(g.co_so_nguon = %s OR g.co_so_dich = %s)" if visible_to_site else "g.co_so_nguon = %s"
+    params: list[Any] = [visible_to_site, visible_to_site] if visible_to_site else [site_code]
     if status_filter:
         where += " AND g.trang_thai = %s"
         params.append(status_filter)
@@ -212,11 +216,20 @@ def list_transfer_requests(
     *, role: str, user_site: str | None, requested_site: str | None,
     status_filter: str | None, limit: int, offset: int,
 ) -> dict[str, Any]:
-    if role in {"admin_small", "ke_toan", "tu_van"}:
+    recipient_site = None
+    if role == "admin_small":
+        if requested_site:
+            raise AcademicForbidden
+        recipient_site = str(user_site or "").strip().upper()
+        if not recipient_site:
+            raise AcademicSiteUnavailable
+        require_active_site(recipient_site)
+        sites, missing = active_site_state()
+    elif role in {"ke_toan", "tu_van"}:
         if requested_site:
             raise AcademicForbidden
         sites = (str(user_site or "").strip().upper(),)
-        missing: tuple[str, ...] = ()
+        missing = ()
     elif role == "admin_big":
         if requested_site:
             site = str(requested_site).strip().upper()
@@ -234,7 +247,10 @@ def list_transfer_requests(
     unavailable = list(missing)
     for site in sites:
         try:
-            count, items = _list_site_transfers(site, status_filter=status_filter, take=take)
+            count, items = _list_site_transfers(
+                site, status_filter=status_filter, take=take,
+                visible_to_site=recipient_site,
+            )
             counts += count
             results.extend(items)
         except AcademicInfrastructureUnavailable:
@@ -252,6 +268,7 @@ def list_transfer_requests(
 @translate_database_errors
 def decide_transfer(
     *, source_site: str, transfer_id: str, actor_id: str,
+    actor_role: str, actor_site: str | None,
     decision: str, reason: str | None,
 ) -> dict[str, Any]:
     source_site = str(source_site).strip().upper()
@@ -259,17 +276,25 @@ def decide_transfer(
         raise AcademicInvalid("Quyết định chỉ được là duyệt hoặc từ chối.")
     if decision == "reject" and not str(reason or "").strip():
         raise AcademicInvalid("Cần nêu lý do từ chối.")
+    if actor_role not in {"admin_big", "admin_small"}:
+        raise AcademicForbidden
+    assigned_site = str(actor_site or "").strip().upper()
+    if actor_role == "admin_small" and not assigned_site:
+        raise AcademicForbidden
     source_alias = require_active_site(source_site)
+    with connections[source_alias].cursor() as cursor:
+        cursor.execute(
+            "SELECT co_so_dich FROM dbo.GiaoDichChuyenCoSo WHERE ma_chuyen = %s AND co_so_nguon = %s",
+            [transfer_id, source_site],
+        )
+        row = cursor.fetchone()
+    if row is None:
+        raise AcademicNotFound
+    target_site = str(row[0]).strip().upper()
+    if actor_role == "admin_small" and target_site != assigned_site:
+        raise AcademicForbidden
     if decision == "approve":
-        with connections[source_alias].cursor() as cursor:
-            cursor.execute(
-                "SELECT co_so_dich FROM dbo.GiaoDichChuyenCoSo WHERE ma_chuyen = %s AND co_so_nguon = %s",
-                [transfer_id, source_site],
-            )
-            row = cursor.fetchone()
-        if row is None:
-            raise AcademicNotFound
-        _active_destination(source_site, str(row[0]))
+        _active_destination(source_site, target_site)
 
     with transaction.atomic(using=source_alias):
         with connections[source_alias].cursor() as cursor:
@@ -287,6 +312,8 @@ def decide_transfer(
             if row is None:
                 raise AcademicNotFound
             student_id, source, target = str(row[0]), str(row[1]), str(row[2])
+            if actor_role == "admin_small" and target.strip().upper() != assigned_site:
+                raise AcademicForbidden
             current_status, current_step = str(row[3]), str(row[4])
             if current_status in {"dang_xu_ly", "hoan_tat"} and decision == "approve":
                 pass
@@ -677,6 +704,20 @@ def _activate_destination(snapshot: dict[str, Any], actor_id: str) -> None:
                     before={"student_status": "bao_luu"},
                     after={"student_id": snapshot["student_id"], "student_status": "dang_hoc"},
                 )
+            publish_notification(
+                cursor,
+                site_code=target_site,
+                event_key=f"transfer-received:{snapshot['transfer_id']}",
+                category="transfer",
+                severity="success",
+                audience="site_staff",
+                title="Học viên mới đã chuyển đến",
+                message=(
+                    f"{snapshot['full_name']} ({snapshot['slug']}) đã chuyển đến từ {snapshot['source_site']}. "
+                    "Tư vấn & xếp lớp vui lòng chọn lớp và phòng phù hợp."
+                ),
+                target_path="/admin/classes",
+            )
 
 
 def _record_retryable_transfer_error(source_site: str, transfer_id: str, actor_id: str) -> None:
@@ -721,7 +762,7 @@ def execute_approved_transfer(*, source_site: str, transfer_id: str, actor_id: s
     if state == "hoan_tat":
         return {"transfer_id": transfer_id, "status": state, "step": step, "complete": True}
     if state != "dang_xu_ly":
-        raise AcademicConflict("Chỉ giao dịch đã được Admin Big duyệt mới được thực hiện.")
+        raise AcademicConflict("Chỉ giao dịch đã được duyệt mới được thực hiện.")
     _active_destination(str(snapshot["source_site"]), str(snapshot["target_site"]))
     try:
         if step == "da_tiep_nhan":

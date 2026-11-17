@@ -20,7 +20,7 @@ Phải chốt phương pháp replication, tiến trình/ACK/phiên bản cho đ�
 | D. Quyền và dữ liệu dùng chung | Đăng nhập, phân quyền, tài khoản, quên mật khẩu, danh mục, phương pháp replication và đồng bộ | TC-REP-01/TC-SYNC-01: truyền thay đổi thật, đối soát sau lỗi; không báo hoàn tất khi thiếu site |
 | E. Nghiệp vụ cơ sở | Mở lớp, sinh lịch, đăng ký, đổi lớp, học phí, điểm danh, điểm; kiểm soát concurrency | Rollback cùng site; TC-CON-01: hai phiên tranh chỗ cuối chỉ một yêu cầu thắng |
 | F. Nghiệp vụ toàn cục | Thống kê, tra cứu học viên, nhật ký nhiều site | Kết quả gộp; cảnh báo site thiếu; không đếm `da_chuyen_di` |
-| G. Chuyển cơ sở | Đề nghị Admin Small/Tư vấn, duyệt/từ chối của Admin Big, Global Query, transaction, retry và phục hồi | Chứng minh chờ duyệt, từ chối, duyệt; lỗi trước khi tạo đích và restart sau khi tạo đích |
+| G. Chuyển cơ sở | Đề nghị Tư vấn, duyệt/từ chối của Admin Big hoặc Admin Small tại cơ sở nhận, Global Query, transaction, retry và phục hồi | Chứng minh chỉ Tư vấn tạo đề nghị, chờ duyệt, từ chối, đúng phạm vi người duyệt; giữ nguyên tài khoản, thông báo tại đích; lỗi trước khi tạo đích và restart sau khi tạo đích |
 | H. Hoàn thiện | Giao diện, kiểm thử tích hợp, demo, ảnh cài đặt, báo cáo và slide | Kịch bản demo có thể chạy lại từ đầu; tài liệu khớp source thực tế |
 
 Đây là nhóm giai đoạn để quản lý tích hợp; danh sách chức năng theo thứ tự chi tiết vẫn là README mục 10.

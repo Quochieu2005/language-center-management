@@ -28,7 +28,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
   const [notificationError, setNotificationError] = useState("");
 
   useEffect(() => {
-    if (!user || !["admin_big", "admin_small"].includes(user.role)) return;
+    if (!user || !["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role)) return;
     adminApi.notifications({ limit: 10 }).then((data) => {
       setNotifications(data.results);
       setNotificationError(data.complete ? "" : `Thiếu dữ liệu từ: ${data.missing_sites.join(", ")}`);
@@ -80,7 +80,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
       </div>}
       {user?.role !== "admin_big" && user?.site_code && <Tag color="blue">Cơ sở {user.site_code}</Tag>}
 
-      {(user?.role === "admin_big" || user?.role === "admin_small") && <Dropdown menu={notificationMenu} trigger={["click"]} placement="bottomRight">
+      {user && ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role) && <Dropdown menu={notificationMenu} trigger={["click"]} placement="bottomRight">
         <button type="button" className={styles.iconBtn} title={notificationError || "Thông báo"} aria-label="Thông báo">
           <Badge count={notifications.length} size="small"><BellOutlined /></Badge>
         </button>
