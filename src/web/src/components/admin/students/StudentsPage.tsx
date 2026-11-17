@@ -49,7 +49,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
   const slugEdited = useRef(false);
   const [form] = Form.useForm<StudentProfileWrite>();
   const isAdminBig = user?.role === "admin_big";
-  const canManage = isAdminBig || user?.role === "admin_small";
+  const canManage = isAdminBig || user?.role === "admin_small" || user?.role === "tu_van";
   const canIssueAccount = isAdminBig || user?.role === "admin_small";
   const site = isAdminBig ? selectedSite || undefined : user?.site_code || undefined;
   const requestedSite = site === ALL_SITES ? undefined : site;
