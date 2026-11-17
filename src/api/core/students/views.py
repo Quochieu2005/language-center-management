@@ -66,7 +66,7 @@ from core.students.avatars import (
 
 _ADMIN_ROLES = {"admin_big", "admin_small"}
 _PROFILE_READ_ROLES = _ADMIN_ROLES | {"tu_van", "ke_toan"}
-_PROFILE_WRITE_ROLES = _ADMIN_ROLES
+_PROFILE_WRITE_ROLES = _ADMIN_ROLES | {"tu_van"}
 
 
 def _resolve_admin_site(user, requested_site: str | None, *, allowed_roles=None):
@@ -185,8 +185,8 @@ class StudentAdminCollectionView(APIView):
         summary="Liệt kê hồ sơ học viên tại một cơ sở",
         description=(
             "Đọc LOCAL từ đúng CSDL site. Admin Big phải chọn site_code; Admin Small, tư vấn và kế toán dùng site trong "
-            "phiên đăng nhập và không được chọn site khác. Tư vấn chỉ tra cứu; kế toán chỉ dùng danh sách để chọn học viên khi đăng ký lớp. "
-            "Các vai trò này không cấp tài khoản hay xóa học viên. "
+            "phiên đăng nhập và không được chọn site khác. Tư vấn được CRUD hồ sơ tại site được giao; Kế toán & Lễ tân chỉ đọc. "
+            "Nhân viên không được cấp tài khoản học viên. "
             "Trả slug, trạng thái, cờ đã cấp tài khoản và điều kiện hiện tại để cấp tài khoản; "
             "không đọc hoặc nối dữ liệu giữa các CSDL site."
         ),
@@ -245,7 +245,7 @@ class StudentAdminCollectionView(APIView):
         summary="Tạo hồ sơ học viên tại một cơ sở",
         description=(
             "Ghi LOCAL vào HocVien tại site đã được xác thực qua Site Router. Admin Big chọn site_code; "
-            "Admin Small chỉ dùng site trong phiên. Sinh mã học viên theo sequence của site, ghi nhật ký "
+            "Admin Small và Tư vấn & xếp lớp chỉ dùng site trong phiên. Sinh mã học viên theo sequence của site, ghi nhật ký "
             "cùng transaction. Không tạo TaiKhoan hoặc gửi mật khẩu; tài khoản chỉ được cấp bằng thao tác riêng "
             "khi hồ sơ có email hợp lệ."
         ),
@@ -362,7 +362,7 @@ class StudentAdminDetailView(APIView):
         summary="Xem và cập nhật hồ sơ học viên tại một cơ sở",
         description=(
             "Đọc LOCAL trong HocVien của site được xác thực. Admin Big chọn site_code; Admin Small, Tư vấn & xếp lớp "
-            "và Kế toán & Lễ tân dùng site trong phiên. Chỉ Admin Big/Admin Small được sửa; nhân viên chỉ đọc. "
+            "và Kế toán & Lễ tân dùng site trong phiên. Admin Big/Admin Small/Tư vấn được sửa; Kế toán & Lễ tân chỉ đọc. "
             "Không sửa hồ sơ đã chuyển đi, đang được giao dịch chuyển xử lý, hoặc email đã gắn với tài khoản."
         ),
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH),
@@ -433,7 +433,7 @@ class StudentAdminDetailView(APIView):
         description=(
             "Xóa LOCAL trong một transaction chỉ khi hồ sơ chưa có tài khoản, đăng ký hoặc lịch sử chuyển cơ sở. "
             "Nếu đã phát sinh nghiệp vụ, trả 409 và giữ toàn bộ lịch sử; không xóa phiếu thu, điểm, điểm danh, "
-            "giao dịch hoặc Logs. Admin Big chọn site_code; Admin Small dùng site trong phiên."
+            "giao dịch hoặc Logs. Admin Big chọn site_code; Admin Small/Tư vấn & xếp lớp dùng site trong phiên."
         ),
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH),
                     OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
@@ -477,7 +477,7 @@ class StudentAvatarUploadIntentView(APIView):
         tags=["Quản lý học viên"],
         summary="Cấp chữ ký tải ảnh hồ sơ học viên lên Cloudinary",
         description=(
-            "Chỉ Admin Big/Admin Small/Tư vấn đúng site. API tạo upload intent gắn với actor, site, slug và hồ sơ hiện tại; "
+            "Chỉ Admin Big/Admin Small/Tư vấn & xếp lớp đúng site. API tạo upload intent gắn với actor, site, slug và hồ sơ hiện tại; "
             "ảnh được tải thẳng lên Cloudinary. Không nhận URL tùy ý hoặc để trình duyệt gửi API secret. "
             "Bước hoàn tất chỉ cập nhật metadata tại HocVien của site này (`LOCAL`)."
         ),
@@ -532,7 +532,7 @@ class StudentAvatarCompleteView(APIView):
             200: StudentAvatarResponseSerializer,
             400: OpenApiResponse(description="Ảnh hoặc upload intent không hợp lệ/hết hạn."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên đã hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small đúng site được lưu ảnh."),
+            403: OpenApiResponse(description="Chỉ Admin Big/Admin Small/Tư vấn & xếp lớp đúng site được lưu ảnh."),
             404: OpenApiResponse(description="Không tìm thấy hồ sơ học viên."),
             409: OpenApiResponse(description="Hồ sơ đã chuyển hoặc metadata ảnh bị xung đột."),
             429: OpenApiResponse(description="Vượt giới hạn hoàn tất upload."),

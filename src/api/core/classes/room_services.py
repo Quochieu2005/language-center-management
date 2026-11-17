@@ -64,7 +64,7 @@ def list_rooms(
             ) AS room_stats
             WHERE {where_sql} ORDER BY p.ten_phong, p.ma_phong
             OFFSET %s ROWS FETCH NEXT %s ROWS ONLY
-            """
+            """,
             [*params, offset, limit],
         )
         results = [
