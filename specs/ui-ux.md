@@ -14,7 +14,7 @@ Tài liệu quy định cách chia component, page, section, SCSS, SVG, nội du
 | Thương hiệu | Tên thương hiệu chưa được nhóm cung cấp; trong bản phác thảo dùng `[Tên trung tâm]`, không tự đặt tên |
 | Cơ sở ban đầu | Quận 1 (Q1), Quận 7 (Q7), Thủ Đức (TD); danh sách hiển thị lấy từ API, không viết cứng trong giao diện |
 | Người xem Web | Khách xem khóa học/cơ sở; người dùng nội bộ cũng truy cập cùng website để đăng nhập |
-| Người dùng sau đăng nhập | Admin Big, Admin Small, nhân viên nghiệp vụ, giáo viên và tài khoản học viên có trong source; cùng frontend nhưng nội dung và thao tác theo quyền API. Portal học viên có code nhưng phạm vi môn học còn chờ nhóm xác nhận |
+| Người dùng sau đăng nhập | Admin Big, Admin Small, nhân viên nghiệp vụ, giáo viên và tài khoản học viên có trong source; cùng frontend nhưng nội dung và thao tác theo quyền API. CRUD hồ sơ và cấp tài khoản học viên theo thao tác Admin thuộc FS-STU-01; portal học viên vẫn chờ nhóm xác nhận |
 | Nỗi băn khoăn dùng cho nội dung | Người học cần so sánh trình độ, lịch và cơ sở để tìm lớp phù hợp; đây là giả định nội dung, không tuyên bố là kết quả khảo sát khách hàng |
 | Bằng chứng hiện có | Có ba cơ sở ban đầu theo phạm vi đồ án. Chưa có dữ liệu được xác nhận về số học viên, kết quả thi, tỷ lệ đậu hoặc đánh giá khách hàng |
 | Giọng văn | Thực tế, rõ ràng, gần gũi và chuyên nghiệp; câu ngắn, nói việc người học cần làm |
@@ -127,8 +127,8 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
 | Trang chủ | Điều hướng chung tới Chương trình, Khóa học, Blog, Liên hệ và Đăng nhập; Hero, định hướng học, lợi ích, trạng thái khóa học, bài viết, FAQ, liên hệ, CTA, footer | Giúp người xem hiểu hướng học và tìm bước tiếp theo; nội dung động chỉ hiển thị khi API xác nhận; người dùng nội bộ luôn có thể vào cùng trang đăng nhập |
 | Chương trình | Hero định hướng, nhóm mục tiêu học tập, câu hỏi xác định nhu cầu, trạng thái danh mục, FAQ | Nhóm mục tiêu và ví dụ chỉ mang tính định hướng; không mô tả như khóa/lớp đang tuyển sinh khi chưa có API |
-| Blog | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc công khai và API CMS Admin Big đã có; Next.js vẫn dùng nội dung tĩnh, chưa nối API công khai hoặc có form CMS. Khi tích hợp, chỉ hiển thị dữ liệu API, giữ cảnh báo thiếu site và render nội dung dưới dạng text đã escape |
-| Liên hệ | Lối tắt khóa học/cơ sở, các bước tra cứu, trạng thái kênh liên hệ và FAQ | Không tự tạo email, số điện thoại, địa chỉ hoặc form gửi thành công khi API chưa có |
+| Blog công khai | Danh mục, bài viết và chi tiết theo slug; trạng thái tải/lỗi/thiếu site | API đọc công khai đã có; Next.js vẫn dùng nội dung tĩnh, chưa nối API công khai. Nội dung phải được render dưới dạng text đã escape |
+| Liên hệ | Form họ tên, email, cơ sở đang hoạt động, số điện thoại tùy chọn, tiêu đề và nội dung; trạng thái tải, lỗi, site thiếu và gửi thành công | Gửi tới API, giữ cùng `Idempotency-Key` khi retry cùng nội dung; chỉ báo đã nhận khi API xác nhận ghi tại site đã chọn |
 | Danh sách khóa học | Trạng thái danh mục, hướng dẫn chọn khóa, các trường thông tin cần xem, FAQ | So sánh khóa học/lớp đang được API trả về; khi API chưa có thì hiển thị trạng thái và hướng dẫn, không dựng bộ lọc/lớp giả |
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
 | Cơ sở | Danh sách cơ sở, địa chỉ/liên hệ nếu có dữ liệu được duyệt, hướng dẫn xem lớp tại cơ sở | Chọn địa điểm học từ dữ liệu cơ sở đang hoạt động |
@@ -142,14 +142,14 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Page | Sections chính | Quyền và cách lấy dữ liệu |
 |---|---|---|
 | Trang tổng quan | Tiêu đề/ngữ cảnh cơ sở, công việc cần xử lý, chỉ số nghiệp vụ, cảnh báo site | Admin Big xem toàn hệ thống; Admin Small xem site được gán; các chức vụ khác chỉ thấy thông tin cần cho công việc được giao; thiếu site phải báo rõ |
-| Học viên | Tìm kiếm/bộ lọc, danh sách, thông tin hồ sơ, lịch sử liên quan | Site Router định tuyến theo phạm vi; không suy site chỉ từ tiền tố mã |
+| Học viên | Tìm kiếm/bộ lọc, danh sách, thông tin hồ sơ, lịch sử liên quan | Admin Small quản lý theo site; Tư vấn & xếp lớp được tra cứu danh sách theo site; Kế toán & Lễ tân chỉ đọc danh sách trong form đăng ký, không có trang quản lý hồ sơ; không suy site chỉ từ tiền tố mã |
 | Đăng ký và xếp lớp | Chọn học viên/lớp, danh sách đăng ký, chi tiết đăng ký, đổi lớp | `LOCAL`; kiểm tra học viên và lớp cùng cơ sở, chỗ còn lại và trạng thái lớp |
-| Học phí và thanh toán | Danh sách khoản phải thu, chi tiết công nợ, ghi nhận thu tại quầy, lịch sử/chi tiết biên nhận, ghi nhận hoàn tiền và trạng thái thanh toán | `LOCAL`; phiếu đã phát sinh không có nút xóa; Admin Small/kế toán chỉ thao tác theo quyền được API cấp |
+| Học phí và thanh toán | Danh sách khoản phải thu, chi tiết công nợ, ghi nhận thu tại quầy, lịch sử/chi tiết biên nhận, chọn phiếu gốc để hoàn một phần/toàn phần | `LOCAL`; phiếu gốc không sửa/xóa; Kế toán & Lễ tân ghi thu/hoàn, Admin Small giám sát theo quyền API |
 | Trạng thái thanh toán trực tuyến | Màn hình đang chờ/xác minh/thành công/thất bại/đang đối soát sau khi quay về từ cổng; đường dẫn tới biên nhận nếu đã thu | Chỉ hiển thị trạng thái lấy từ API; không suy ra thành công từ URL redirect. Chỉ bật khi nhóm chốt cổng và quyền tài khoản thanh toán |
 | Điểm | Chọn lớp, danh sách học viên, nhập/sửa điểm, lịch sử thay đổi | `LOCAL`; giáo viên chỉ thấy lớp được phân công |
 | Chuyển cơ sở | Form đề nghị cho Admin Small; hộp thư/chi tiết/duyệt/từ chối cho Admin Big; theo dõi trạng thái | Đề nghị `LOCAL` ở nguồn, hộp thư `GLOBAL`, giao dịch nguồn-đích chỉ chạy sau duyệt |
-| Báo cáo | Bộ lọc theo site/thời gian/trạng thái, bảng hoặc biểu đồ, trạng thái đầy đủ dữ liệu | Admin Small chỉ site mình; Admin Big dùng `GLOBAL` và thấy cảnh báo khi thiếu site; lễ tân/kế toán/giáo viên chỉ thấy báo cáo được cấp |
-| Quản lý Admin Small | Danh sách Admin Small theo cơ sở, tạo tài khoản kèm phân công cơ sở, khóa/mở và xem trạng thái phụ trách | Chỉ Admin Big; tài khoản dùng chung theo `REPLICATED-WRITE`, hồ sơ được tạo tại site được phân công. API hiện chưa có thao tác đổi cơ sở sau khi tạo, nên không hiển thị chức năng này. Không cho tạo hoặc tự nâng quyền thành Admin Big |
+| Báo cáo | Bộ lọc theo site/thời gian/trạng thái, bảng hoặc biểu đồ, trạng thái đầy đủ dữ liệu | Admin Small chỉ site mình; Admin Big dùng `GLOBAL` và thấy cảnh báo khi thiếu site; Kế toán & Lễ tân, Tư vấn & xếp lớp và giáo viên chỉ thấy báo cáo được cấp |
+| Quản lý Admin Small | Danh sách Admin Small theo cơ sở (ảnh đại diện đứng trước tên; chưa có ảnh thì dùng biểu tượng mặc định), tạo tài khoản kèm phân công cơ sở, khóa/mở và xem trạng thái phụ trách | Chỉ Admin Big; tài khoản dùng chung theo `REPLICATED-WRITE`, hồ sơ được tạo tại site được phân công. API hiện chưa có thao tác đổi cơ sở sau khi tạo, nên không hiển thị chức năng này. Không cho tạo hoặc tự nâng quyền thành Admin Big |
 | Quản lý giáo viên | Danh sách giáo viên, xem/cập nhật hồ sơ và trạng thái, tạo tài khoản/hồ sơ, phân công lớp/buổi | API source có route danh sách/tạo/chi tiết/trạng thái/phân công; kiểm tra quyền và site ở server. Chỉ hiển thị thao tác có trong hợp đồng hiện tại; đối chiếu ma trận trạng thái và API spec trước khi đổi UI |
 | Tài khoản và phân quyền | Danh sách tài khoản nội bộ, trạng thái, chức vụ và phạm vi được cấp | Admin Big quản lý tài khoản toàn hệ thống; không cho người dùng tự chọn role, site hoặc phạm vi quyền; các thao tác ghi dữ liệu dùng chung tuân theo chính sách đồng bộ |
 
@@ -159,8 +159,8 @@ Trong **Quản lý Admin Small**, Admin Big có thao tác riêng để kích ho�
 |---|---|
 | Admin Big | Khu vực quản trị toàn hệ thống: tạo/khóa và phân công Admin Small; khởi tạo tài khoản, phân công hồ sơ giáo viên; quản lý cơ sở/danh mục; thống kê toàn cục; duyệt/từ chối đề nghị chuyển cơ sở |
 | Admin Small | Khu vực quản trị site được giao: quản lý roster giáo viên và phân công tại site theo quyền API; nghiệp vụ cơ sở; tạo đề nghị chuyển học viên và theo dõi đề nghị; không tự tạo Admin Big, không duyệt đề nghị và không truy cập site khác |
-| Lễ tân | Hồ sơ học viên, đăng ký khóa học, xếp/đổi lớp trong một site được giao |
-| Kế toán | Học phí, phiếu thu/hoàn và công nợ trong một site được giao |
+| Kế toán & Lễ tân | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/xếp lớp, học phí, phiếu thu/hoàn và báo cáo tài chính tại site; chỉ đọc học viên trong form đăng ký, không quản lý hồ sơ hoặc phòng |
+| Tư vấn & xếp lớp | Tra cứu danh sách học viên, hỗ trợ tư vấn, đăng ký/xếp lớp, nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | Các lớp/buổi được phân công; điểm danh và nhập/sửa điểm theo quyền |
 | Học viên | Source có tài khoản/portal và route `/student`; chỉ tính vào phạm vi đồ án sau khi nhóm thống nhất quyết định phạm vi và đồng bộ tài liệu |
 
@@ -172,7 +172,7 @@ Các sơ đồ dưới đây mô tả **trang và luồng điều hướng trên
 
 #### Admin Big — quản trị toàn hệ thống
 
-Admin Big không bị giới hạn vào một cơ sở. Những thao tác ghi vẫn phải đi đúng kiểu phân tán: dữ liệu danh mục/tài khoản dùng chung qua `REPLICATED-WRITE`; hồ sơ nhân sự cục bộ ghi vào site được chọn; báo cáo và hộp thư đề nghị đọc từng site qua `GLOBAL`; chỉ sau khi duyệt đề nghị mới chạy `DISTRIBUTED-TX`.
+Admin Big không bị giới hạn vào một cơ sở. Bộ chọn trên thanh đầu trang có `Toàn hệ thống` và từng site đang hoạt động, mặc định là `Toàn hệ thống` cho các danh sách. Các trang học viên, nhân viên, giáo viên, lớp và học phí gửi GET không có `site_code` để API đọc từng CSDL site và gộp; mỗi dòng phải hiện site sở hữu. Nếu thiếu site, giao diện hiện cảnh báo cùng danh sách site thiếu. Chọn một site để lọc riêng; khi ghi hồ sơ/lớp phải chọn site cụ thể, còn hành động từ một dòng dùng `site_code` của dòng đó. Dữ liệu danh mục/tài khoản dùng chung qua `REPLICATED-WRITE`; báo cáo và hộp thư đề nghị đọc từng site qua `GLOBAL`; chỉ sau khi duyệt đề nghị mới chạy `DISTRIBUTED-TX`.
 
 ```mermaid
 flowchart TD
@@ -193,16 +193,17 @@ flowchart TD
 | Page Admin Big | Nội dung / hành động | Truy cập dữ liệu và giới hạn |
 |---|---|---|
 | Tổng quan | Tình trạng site, việc chờ xử lý, số liệu tổng hợp và cảnh báo kết quả thiếu site | `GLOBAL`; API hỏi các CSDL site riêng rồi gộp tại tầng ứng dụng |
+| Phạm vi danh sách | Bộ chọn `Toàn hệ thống` hoặc một cơ sở đang hoạt động; mặc định `Toàn hệ thống` | Chỉ đổi phạm vi đọc; không cấp quyền mới. API vẫn xác thực vai trò và site. Dòng dữ liệu toàn cục phải nêu `site_code`; khi site lỗi, hiện `complete=false`/`missing_sites` |
 | Cơ sở | Xem trạng thái; luồng thêm/đóng cơ sở theo quy trình vận hành | Thông tin `CoSo` dùng chung; cấu hình kết nối không hiển thị bí mật ra trình duyệt |
 | Admin Small | Tạo/khóa tài khoản và phân công người quản lý vào cơ sở | `TaiKhoan` qua `REPLICATED-WRITE`; hồ sơ `NhanVien` tại CSDL site được giao; không cấp quyền Admin Big từ màn hình này |
 | Tài khoản và nhân sự | Tạo tài khoản nội bộ; tạo hồ sơ nhân viên/giáo viên tại cơ sở; xem trạng thái | Ghi tài khoản dùng chung qua `REPLICATED-WRITE`, hồ sơ làm việc qua `LOCAL` tới site đích; không để tài khoản hoạt động nếu hồ sơ/phạm vi cần thiết chưa được tạo |
 | Danh mục dùng chung | Quản lý môn học và khóa học | `REPLICATED-WRITE`; chỉ báo thành công khi chính sách đồng bộ tới các site hoạt động được thỏa mãn |
 | Hộp thư chuyển cơ sở | Lọc đề nghị, xem chi tiết, duyệt hoặc từ chối, theo dõi kết quả | Hộp thư `GLOBAL`; quyết định được ghi về CSDL nguồn; chuyển học viên chỉ bắt đầu sau khi duyệt |
-| Báo cáo / nhật ký | Lọc và xem thống kê hoặc sự kiện theo cơ sở/thời gian | `GLOBAL`; phải hiển thị site không truy cập được và đánh dấu kết quả chưa đầy đủ |
+| Báo cáo / nhật ký | Admin xem thống kê theo phạm vi; Kế toán & Lễ tân xem báo cáo thu/hoàn/công nợ tại site | Báo cáo tài chính Kế toán & Lễ tân là `LOCAL`; báo cáo Admin Big có thể `GLOBAL`, nêu site thiếu thay vì coi dữ liệu một phần là đầy đủ |
 
 #### Admin Small — quản lý một cơ sở được phân công
 
-Admin Small đăng nhập bằng `TaiKhoan.vai_tro = nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`, gắn với một `ma_co_so`. Không biểu diễn Admin Small bằng `NhanVien.chuc_vu`; chức vụ nhân viên nghiệp vụ là `le_tan`, `tu_van`, `ke_toan` hoặc `xep_lop`. Mọi thao tác nghiệp vụ thường ngày chỉ dùng CSDL của cơ sở đó; Admin Small **không** xem/sửa site khác, không quản lý danh mục toàn hệ thống và không duyệt đề nghị chuyển cơ sở.
+Admin Small đăng nhập bằng `TaiKhoan.vai_tro = nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`, gắn với một `ma_co_so`. Không biểu diễn Admin Small bằng `NhanVien.chuc_vu`; hai chức vụ nhân viên nghiệp vụ hiện tại là `ke_toan` (hiển thị Kế toán & Lễ tân) và `tu_van` (hiển thị Tư vấn & xếp lớp). Migration 41 chuyển `le_tan` cũ thành `ke_toan`. Mọi thao tác nghiệp vụ thường ngày chỉ dùng CSDL của cơ sở đó; Admin Small **không** xem/sửa site khác, không quản lý danh mục toàn hệ thống và không duyệt đề nghị chuyển cơ sở.
 
 ```mermaid
 flowchart TD
@@ -291,12 +292,12 @@ flowchart TD
 
 ### 3.4. Luồng đăng nhập, đăng ký và phân quyền giao diện
 
-1. Mọi vai trò mở cùng route `/login`; trang dùng tên đăng nhập/mật khẩu. Source có OAuth Google/Facebook cho tài khoản học viên đã liên kết; chỉ hiển thị nút khi cấu hình provider thật sẵn sàng. Frontend không hỏi người dùng muốn vào vai trò nào.
+1. Mọi vai trò mở cùng route `/login`; form yêu cầu email và mật khẩu. Thư cấp tài khoản ghi email là thông tin đăng nhập chính; API vẫn nhận username để tương thích tài khoản cũ. Source có OAuth Google/Facebook cho tài khoản học viên đã liên kết; chỉ hiển thị nút khi cấu hình provider thật sẵn sàng. Frontend không hỏi người dùng muốn vào vai trò nào.
 2. Với OAuth, frontend điều hướng trình duyệt tới API start endpoint; backend quản lý state/nonce, callback, kiểm tra provider subject và liên kết tài khoản. Frontend không nhận hay lưu provider access token. Không tự tạo tài khoản hoặc tự liên kết qua email; kết nối provider thật còn phải được cấu hình và kiểm chứng.
 3. API xác thực trạng thái hoạt động và quyền; mật khẩu không được lưu ở trình duyệt hoặc ghi ra log. API là nơi quyết định vai trò, chức vụ, site và phạm vi lớp.
-4. Sau đăng nhập thành công, frontend gọi `GET /api/v1/auth/profile/{slug}/` với slug nhận từ phản hồi đăng nhập, đọc hồ sơ phiên do API trả về rồi mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; lễ tân, kế toán và giáo viên thấy menu theo nhiệm vụ.
+4. Sau đăng nhập thành công, frontend gọi `GET /api/v1/auth/profile/{slug}/` với slug nhận từ phản hồi đăng nhập, đọc hồ sơ phiên do API trả về rồi mở trang tổng quan phù hợp. Admin Big thấy menu toàn hệ thống; Admin Small thấy menu site được giao; Kế toán & Lễ tân, Tư vấn & xếp lớp và giáo viên thấy menu theo nhiệm vụ.
 5. Các API nghiệp vụ vẫn phải kiểm tra quyền và site ở phía máy chủ. Frontend không được dùng giá trị site từ URL/local storage để cấp quyền hoặc truy vấn thẳng cơ sở dữ liệu.
-6. Đăng xuất kết thúc phiên phía server rồi xóa cookie. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
+6. Mọi trang có phiên đã xác thực đều cung cấp thao tác Đăng xuất, gồm route cổng học viên đang có trong source; thao tác thu hồi phiên phía server rồi xóa phiên phía giao diện. Đây không đồng nghĩa portal tự phục vụ đã được duyệt vào phạm vi môn học. OAuth lỗi, danh tính chưa liên kết, tài khoản bị khóa và site không đủ dữ liệu hiển thị thông báo chung, không tiết lộ tài khoản có tồn tại hay không. Đăng ký công khai vẫn tắt.
 7. Tài khoản nội bộ được Admin Big tạo qua quy trình hiện có; không hiển thị route kích hoạt `/auth/activate` khi source chưa có route đó. Quên mật khẩu dùng trang `/forgot-password` và luồng OTP; API chỉ lưu hash OTP, mặc định hết hạn sau 120 giây theo `PASSWORD_RESET_TIMEOUT`. Không hiển thị việc tài khoản/email có tồn tại hay không. Đổi mật khẩu đã xác thực dùng trang `/password/change`.
 
 #### Tự đăng xuất khi không hoạt động
@@ -362,7 +363,7 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 |---|---|
 | Công khai | `/`, `/programs`, `/branches`, `/contact`, `/courses`, `/courses/[slug]`, `/blog`, `/blog/[slug]` |
 | Xác thực/hồ sơ | `/login`, `/forgot-password`, `/password/change`, `/profile` |
-| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/teacher`, `/student` |
+| Workspace | `/admin`, `/admin/dashboard`, `/admin/students`, `/admin/classes`, `/admin/rooms`, `/admin/courses`, `/admin/subjects`, `/admin/teachers`, `/admin/employees`, `/admin/accounts`, `/admin/tuition`, `/admin/transfers`, `/admin/reports`, `/admin/notifications`, `/admin/audit`, `/admin/blog`, `/admin/contacts`, `/teacher`, `/student` |
 
 #### Trang công khai và xác thực
 
@@ -374,24 +375,30 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 | `/courses/[slug]` | Chi tiết khóa học | Môn, trình độ, số buổi, học phí chuẩn, cơ sở/lớp đang mở và trạng thái danh mục | Tìm trong danh mục API; không tuyên bố đã đăng ký lớp |
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
 | `/blog` và `/blog/[slug]` | Bài viết học tập | Danh mục, danh sách/chi tiết và hướng dẫn áp dụng | API đã có `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`; giao diện hiện chưa nối API và còn dùng dữ liệu tĩnh |
-| `/contact` | Liên hệ và hướng dẫn | Lối tắt khóa học/cơ sở, chuẩn bị trao đổi, FAQ và trạng thái kênh liên hệ | Không bịa địa chỉ/điện thoại hoặc giả vờ gửi form |
+| `/contact` | Gửi yêu cầu liên hệ | Form gửi họ tên, email, cơ sở đang hoạt động, điện thoại tùy chọn, tiêu đề và nội dung; báo lỗi/site thiếu và xác nhận sau khi API nhận | `GET /api/v1/contact/sites/` lấy site có thể nhận; `POST /api/v1/contact/` ghi `LOCAL` tại site khách chọn. Giữ dữ liệu khi lỗi và dùng lại `Idempotency-Key` khi retry cùng nội dung |
 | `/login` | Đăng nhập dùng chung | Form mật khẩu, lỗi và trạng thái gửi; OAuth chỉ khi provider được cấu hình | Route có trong source; API dựng role từ tài khoản, OAuth chỉ dành cho học viên đã liên kết; không tự đăng ký/chọn role |
-| — (chưa có route kích hoạt) | Kích hoạt tài khoản nội bộ | Không hiển thị luồng mở liên kết/mời trong UI hiện tại | Source gửi thông tin tài khoản/mật khẩu khởi tạo; không có token activation route |
+| — (chưa có route kích hoạt) | Kích hoạt tài khoản nội bộ | Không hiển thị luồng mở liên kết/mời trong UI hiện tại | Admin chủ động gửi mật khẩu khởi tạo qua thao tác cấp tài khoản; không có token activation route |
 | `/forgot-password` | Quên/đặt lại mật khẩu | Nhập định danh, OTP và mật khẩu mới theo các bước của API; thông báo chung, lỗi/hết hạn/đã dùng | Route có trong source; OTP 6 số, hash ở DB, mặc định hết hạn sau 120 giây |
 | `/auth/register` | Đăng ký | Không hiển thị hoặc giữ trang thông báo chưa mở | Tắt cho tới khi nhóm duyệt đăng ký công khai và schema/API phù hợp |
 | `/portal/account/security` (đề xuất) | Phương thức đăng nhập | Trang quản lý liên kết Google/Facebook | API có endpoint đọc kết nối OAuth cho học viên; route UI này chưa có trong Next.js source |
 
 #### Điều hướng Admin đang có trong source
 
-Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang công khai trong tab mới, không phải màn hình CMS. API Blog Admin Big chưa có giao diện quản trị tương ứng.
+Sidebar Blog mở CMS tại `/admin/blog` cho Admin Big và Tư vấn & xếp lớp; mục Liên hệ mở hộp thư tại `/admin/contacts` cho Admin Big/Admin Small/Tư vấn & xếp lớp. Tư vấn chỉ xem và phản hồi liên hệ tại site được gán, còn bài Blog là dữ liệu chung: được đọc/tạo/sửa/xuất bản qua `REPLICATED-WRITE` đến mọi site hoạt động, không xóa bài hoặc sửa danh mục. CMS Blog đọc đối chiếu danh mục và bài viết trên các site, hiển thị site thiếu/lệch và giữ cùng `Idempotency-Key` khi retry. Không bật thao tác ghi nếu dữ liệu chưa được đối chiếu đầy đủ.
 
 | Route | Mục sidebar | Nội dung và giới hạn |
 |---|---|---|
-| `/admin/employees` | Nhân viên | Admin Big/Admin Small xem và tạo nhân viên theo chức vụ lễ tân, tư vấn, kế toán hoặc xếp lớp; API tự giới hạn site và quyền. |
-| `/admin/accounts` | Quản trị Admin Small | Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn Admin Small. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
+| `/admin` và `/admin/dashboard` | Tổng quan | Admin Big có biểu đồ học viên đang học theo các site và cảnh báo site thiếu dữ liệu (`GLOBAL`); Admin Small có chỉ số học viên tại site và biểu đồ lớp theo trạng thái (`LOCAL`). Hai vai trò dùng dữ liệu/API khác nhau; nhân viên khác chỉ có lối tắt nghiệp vụ. |
+| `/admin/students` | Hồ sơ học viên | Admin Big mặc định xem danh sách `GLOBAL`, có thể lọc một site; Admin Small dùng site được gán. Mỗi dòng hiển thị `site_code`; cảnh báo khi thiếu site. Tạo/sửa/xóa/cấp tài khoản và xem chi tiết cần một site cụ thể (`LOCAL`). Danh sách hiển thị ảnh đại diện trước họ tên; nếu chưa có ảnh thì dùng biểu tượng mặc định. Form đặt ảnh đại diện tùy chọn thành một hàng riêng, bên dưới là lưới hai cột cho họ tên, email, slug, ngày sinh, giới tính và điện thoại; địa chỉ chiếm toàn hàng. Giới tính là danh sách chọn gồm `Nam`, `Nữ`, `Khác`. Slug tự tạo từ họ tên, cho phép chỉnh khi tạo và khóa khi sửa; API chuẩn hóa và thêm hậu tố nếu slug đã có tại site. Ảnh nhận JPG/PNG/WebP tối đa 5 MB, có xem trước, tải trực tiếp lên Cloudinary rồi lưu metadata tại `HocVien` của site hồ sơ. Nếu bước lưu ảnh lỗi sau khi tải lên, hồ sơ vẫn được giữ và có nút thử xác nhận lại. Tạo hồ sơ không tạo tài khoản hay gửi mật khẩu. Với hồ sơ đang học có email hợp lệ, nút `Cấp tài khoản` hoạt động riêng ngay cả khi chưa có đăng ký khóa học; chỉ khi Admin bấm mới tạo tài khoản và gửi mật khẩu. Xóa chỉ thành công nếu hồ sơ chưa liên kết tài khoản, chưa có đăng ký hoặc lịch sử chuyển; xác nhận nêu rõ lịch sử phát sinh được giữ và API từ chối xóa hồ sơ đã tham chiếu. Tư vấn chỉ xem danh sách tại site; Kế toán & Lễ tân chỉ dùng API danh sách read-only trong form đăng ký, không có quyền quản lý hồ sơ. |
+| `/admin/employees` | Nhân viên | Admin Big mặc định xem `GLOBAL`, có thể lọc một site; Admin Small chỉ xem site được gán. Mỗi dòng hiển thị site, email, tên đăng nhập, số điện thoại và trạng thái email mật khẩu; cảnh báo khi thiếu site. Tạo/sửa/xóa hồ sơ cần site cụ thể; gửi mật khẩu/xóa từ dòng dùng site sở hữu của dòng. Form chỉ có hai chức vụ: Kế toán & Lễ tân và Tư vấn & xếp lớp. Form tạo cho chọn ảnh đại diện JPG/PNG/WebP tối đa 5 MB, xem trước và tải thẳng lên Cloudinary; metadata ảnh được nhân bản trong `TaiKhoan`. Tạo nhân viên không tự gửi email; người quản lý bấm `Gửi mật khẩu` trong bảng để gửi một lần, chỉ SMTP xác nhận thất bại mới cho thử lại. Khi sửa chỉ đổi họ tên, số điện thoại, chức vụ; email/tên đăng nhập là danh tính tài khoản, cơ sở là vị trí mảnh nên không sửa trên form hồ sơ. Tài khoản active có nút `Ngưng` để chuyển sang inactive và thu hồi phiên; không có nút kích hoạt lại. `Xóa vĩnh viễn` mở modal xác nhận ở giữa màn hình; modal nêu rõ tài khoản bị xóa và hồ sơ có phiếu thu được giữ rời tài khoản. Kế toán & Lễ tân thao tác lớp/đăng ký/học phí, chỉ tra cứu học viên read-only trong form và không quản lý phòng; Tư vấn có hộp thư liên hệ LOCAL và quyền đăng/sửa/xuất bản bài Blog dùng chung, không xóa bài hoặc sửa danh mục. |
+| `/admin/teachers` | Giáo viên | Admin Big mặc định xem danh sách `GLOBAL`, mỗi dòng có cơ sở và cảnh báo site thiếu; Admin Small xem site được gán. Tạo/sửa/xóa/đổi trạng thái cần site cụ thể; gửi mật khẩu và thao tác từ dòng định tuyến theo `site_code` của dòng. |
+| `/admin/classes` | Lớp học & Xếp lớp | Admin Big mặc định xem lớp toàn hệ thống (`GLOBAL`), chi tiết lớp đọc theo site trên dòng; Admin Small/nhân viên xem site được cấp. Mỗi dòng có cơ sở và cảnh báo thiếu site. Ở phạm vi toàn hệ thống, Admin Big dùng được các nút mở lớp, đăng ký và chuyển lớp; biểu mẫu yêu cầu chọn site thao tác và tải danh sách phụ thuộc đúng site đó. Kế toán & Lễ tân và Tư vấn & xếp lớp xem lớp; cả hai được mở lớp, phân công giáo viên, đăng ký/chuyển lớp tại site phiên. Kế toán & Lễ tân dùng danh sách học viên read-only để chọn người học; Tư vấn có trang danh sách riêng theo quyền. Chỉ Admin Big/Admin Small quản lý phòng ở `/admin/rooms`. Mọi thao tác ghi vẫn là `LOCAL`; nhân viên không thể chọn site khác site trong phiên. |
+| `/admin/rooms` | Phòng học | Admin Big mặc định xem phòng toàn hệ thống (`GLOBAL`), có thể lọc một site; Admin Small chỉ xem site trong phiên. Danh sách mỗi dòng hiển thị cơ sở; cảnh báo khi Global Query thiếu site. Thêm/sửa/xóa đều ghi `LOCAL` và dùng site của dòng hoặc site được chọn; form thêm khi đang xem toàn hệ thống phải yêu cầu chọn cơ sở. Chỉ Admin Big/Admin Small có quyền quản lý; không xóa phòng đang được lớp/buổi học sử dụng. |
+| `/admin/tuition` | Học phí & Thu tiền | Mặc định lọc khoản còn nợ; hiển thị tổng công nợ và số khoản còn nợ từ API báo cáo, cùng danh sách từng học viên/lớp với phải thu, đã thu và còn lại. Có tìm theo tên/mã học viên hoặc lớp, lọc trạng thái và phân trang server-side. Admin Big xem `GLOBAL` hoặc site đã chọn; Kế toán & Lễ tân/Admin Small chỉ xem site trong phiên. Tổng không cộng riêng trang hiện tại; thiếu site phải cảnh báo và không hiển thị số liệu thiếu như đầy đủ. |
+| `/admin/accounts` | Quản trị Admin Small | Admin Big mặc định xem danh sách toàn hệ thống, có thể lọc một site; mỗi dòng có cơ sở. Chỉ Admin Big xem/tạo, kích hoạt/ngưng, hoặc xóa vĩnh viễn. Các thao tác của dòng dùng site gắn với hồ sơ. Xác nhận xóa phải cảnh báo không thể khôi phục và nói rõ dữ liệu lịch sử được giữ. |
 | `/admin/notifications` | Thông báo | Admin Big xem toàn hệ thống/lọc site và tạo thông báo tới các site hoạt động; Admin Small xem/tạo tại site được cấp. Form có nhóm, mức độ, nhóm nhận, tiêu đề, nội dung và đường dẫn nội bộ tùy chọn. Thiếu site phải hiển thị cảnh báo và cho retry; không có thao tác đánh dấu đã đọc. Nhóm nhận hiện chỉ gồm Admin Big/Admin Small. |
 | `/admin/audit` | Nhật ký Admin | Đọc `Logs` qua API; lọc theo cơ sở (Admin Big), tài khoản, loại và ngày; Admin Small chỉ xem site được cấp. Nêu rõ site thiếu; không hiển thị IP, hash, token, JSON trước/sau hoặc ghi chú tự do. |
-| `/blog`, `/contact` | Blog, Liên hệ | Mở trang công khai trong tab mới. CMS Blog hiện chỉ có API Admin Big; chưa có màn hình tạo/sửa/xóa. Chưa có xử lý yêu cầu liên hệ. |
+| `/admin/contacts` | Liên hệ | Admin Big xem `GLOBAL`, lọc site hoặc chọn một site; Admin Small và Tư vấn & xếp lớp chỉ xem site được giao (`LOCAL`). Hiện người gửi, email, nội dung và trạng thái; ba vai trò trên được phản hồi plain text tới email trong yêu cầu qua SMTP đã cấu hình. Kế toán & Lễ tân không có quyền hộp thư. Site thiếu phải cảnh báo và không trình bày kết quả một phần như đầy đủ. SMTP chấp nhận không chứng minh thư đã tới inbox; nếu commit SQL lỗi sau khi SMTP nhận thư, lần thử lại có thể gửi trùng. |
 
 #### Admin Big — các trang toàn hệ thống
 
@@ -408,16 +415,17 @@ Sidebar chỉ dẫn tới route đã có; link Blog và Liên hệ mở trang c�
 | `/portal/admin-big/reports` | Báo cáo toàn hệ thống | Lọc theo cơ sở/khoảng ngày, có thống kê học phí/thu/hoàn theo site, kết quả từng site và cảnh báo kết quả chưa đủ |
 | `/portal/admin-big/audit-logs` | Nhật ký toàn hệ thống | Tìm sự kiện theo người dùng/site/thời gian; không lộ secret hoặc dữ liệu xác thực |
 | `/admin/notifications` | Thông báo quản trị | Danh sách theo site, lọc nhóm/mức độ, nút tạo và form thông báo; Admin Big ghi tới site hoạt động, thấy cảnh báo site thiếu và có thể retry cùng nội dung |
+| `/admin/blog` | CMS Blog | Admin Big quản lý toàn bộ; Tư vấn & xếp lớp đọc danh mục/bài và được tạo/sửa/xuất bản bài, không tạo/sửa/xóa danh mục hoặc xóa bài. Tư vấn ghi bài Blog dùng chung tới mọi site hoạt động (`REPLICATED-WRITE`), không giới hạn ở cơ sở được gán. Hai tab danh mục và bài viết; chọn danh mục đang hoạt động; slug bài viết mới tự tạo từ tiêu đề nhưng vẫn cho sửa tay; bài cũ giữ slug đã tùy chỉnh khi đổi tiêu đề. Form bài viết xếp tiêu đề/slug và metadata theo hàng ngang trên màn hình rộng, phần soạn Markdown và xem trước đặt cạnh nhau, tự xếp dọc trên màn hình hẹp. Nội dung Markdown giới hạn gồm đoạn văn, tiêu đề, danh sách đánh số và bảng tùy chọn; có nút chèn bảng mẫu, thêm hàng theo số cột tại vị trí con trỏ và chèn danh sách đánh số; HTML thô không được thực thi. Trang chi tiết `/blog/{slug}` đọc bài đã xuất bản qua API và hiển thị cùng định dạng. Trạng thái nháp/đã xuất bản/đã ẩn; ngày xuất bản mặc định là ngày tạo theo `Asia/Ho_Chi_Minh`, chỉ chọn ngày và gửi tới API thành timestamp lúc 00:00 có offset; có thể để trống để xuất bản ngay. Hiện site thiếu/lệch; khóa thao tác ghi khi chưa đối chiếu đủ; retry dùng lại cùng mã yêu cầu/payload và giữ qua reload trong tab hiện tại. Không khẳng định ACID xuyên database. Danh sách `/blog` vẫn là nội dung tĩnh. |
 
-#### Admin Small, lễ tân và kế toán — các trang tại cơ sở
+#### Admin Small, Kế toán & Lễ tân, Tư vấn & xếp lớp — các trang tại cơ sở
 
-Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy và thao tác đúng quyền tại site được gán; lễ tân và kế toán dùng cùng page nhưng chỉ thấy thao tác API cho phép.
+Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy và thao tác đúng quyền tại site được gán; Kế toán & Lễ tân và Tư vấn & xếp lớp dùng chung frontend nhưng chỉ thấy thao tác API cho phép. Tư vấn & xếp lớp được tra cứu danh sách học viên và hộp thư liên hệ tại site; có thể đăng/sửa/xuất bản bài Blog dùng chung. Kế toán & Lễ tân thao tác đăng ký/lớp và quản lý học phí/phiếu thu; chỉ dùng danh sách học viên read-only trong form đăng ký, không quản lý hồ sơ.
 
 | Route minh họa | Page | Nội dung chính |
 |---|---|---|
 | `/portal/admin-small/dashboard` | Tổng quan cơ sở | Việc cần xử lý, lịch trong ngày, công nợ/đăng ký và cảnh báo cục bộ |
-| `/portal/admin-small/students` và `/portal/admin-small/students/new` | Danh sách/tạo học viên | Tìm kiếm, lọc, phân trang, tạo hồ sơ; site lấy từ phiên |
-| `/portal/admin-small/students/[studentId]` | Chi tiết hồ sơ học viên | Thông tin, đăng ký, lịch sử học tập và trạng thái chuyển; không xóa lịch sử |
+| `/admin/students` (route dùng chung ở bảng trên) | Danh sách/tạo/sửa/xóa học viên | Admin Big mặc định xem danh sách `GLOBAL`, có thể lọc một site; tạo/sửa/xóa và xem chi tiết dùng site cụ thể. Admin Small dùng site từ phiên. Tư vấn & xếp lớp tra cứu danh sách tại site; Kế toán & Lễ tân chỉ gọi danh sách read-only tại site trong form đăng ký, không có quyền vào trang quản lý hồ sơ. Không có route `/portal/admin-small/students` riêng trong giao diện hiện tại |
+| Modal trên `/admin/students` | Chi tiết/sửa hồ sơ học viên | Nạp chi tiết theo slug và site đã xác thực; không cho sửa mã, slug, site, trạng thái hoặc email đã gắn tài khoản; xóa chỉ hồ sơ chưa có tài khoản, đăng ký hay lịch sử chuyển |
 | `/portal/admin-small/enrollments` và `/portal/admin-small/enrollments/new` | Danh sách/tạo đăng ký | Chọn học viên/lớp, kiểm tra cùng site, chỗ trống và khoản học phí phát sinh |
 | `/portal/admin-small/enrollments/[enrollmentId]` | Chi tiết đăng ký/xếp lớp | Trạng thái, lớp hiện tại, đổi lớp hợp lệ, liên kết tới khoản học phí |
 | `/portal/admin-small/classes` và `/portal/admin-small/classes/[classId]` | Danh sách/chi tiết lớp | Lịch, phòng, giáo viên, sức chứa, danh sách đăng ký và buổi học |
@@ -599,7 +607,7 @@ Animation chỉ dùng để giải thích kết quả thao tác: mở/đóng men
 | Danh sách lớp, học viên và đăng ký | Hiện tên cơ sở/phạm vi đang xem; Admin Small chỉ thao tác tại cơ sở được giao; không lấy site từ tiền tố mã học viên | YC-01/YC-02, TC-SITE-01 và TC-FRAG-01 |
 | Danh mục môn/khóa học của Admin Big | Đang lưu, hoàn tất hoặc chưa đồng bộ đủ; khi API chưa xác nhận đủ bản sao, thông báo “Thay đổi chưa hoàn tất đồng bộ” và cho xem/kiểm tra lại trạng thái theo quyền | YC-03/YC-07, TC-REP-01 và TC-SYNC-01 |
 | Tạo đề nghị và chi tiết chuyển cơ sở | Phân biệt chờ duyệt, bị từ chối, đang chuyển/phục hồi và hoàn tất; reload đọc lại tiến trình; không hiển thị “Chuyển thành công” chỉ vì đã duyệt | YC-04, TC-DTX-01 |
-| Form đăng ký lớp của Admin Small/lễ tân | Khi người khác lấy chỗ cuối, hiển thị “Lớp đã hết chỗ. Hãy chọn lớp khác.” theo lỗi API; giữ học viên đang chọn, tải lại sĩ số và cho chọn lớp khác. Không tự retry thao tác đăng ký | YC-05, TC-CON-01 |
+| Form đăng ký lớp của Admin Small/Kế toán & Lễ tân/Tư vấn & xếp lớp | Khi người khác lấy chỗ cuối, hiển thị “Lớp đã hết chỗ. Hãy chọn lớp khác.” theo lỗi API; giữ học viên đang chọn, tải lại sĩ số và cho chọn lớp khác. Không tự retry thao tác đăng ký | YC-05, TC-CON-01 |
 | Báo cáo học viên của Admin Big | Tổng đầy đủ khác với kết quả một phần; nêu cơ sở chưa phản hồi, cho đọc lại; không trình bày dữ liệu thiếu thành 0 | YC-06, TC-DQ-01 |
 
 Copy lỗi phải khớp trạng thái API đã chốt. Dùng màn hình/section nghiệp vụ hiện có; không cần tạo trang kỹ thuật riêng để giả lập các tiêu chí này. Việc khóa nút chỉ chống gửi lặp trong một giao diện, không thay thế kiểm soát concurrency tại API/DB. Replication và đồng bộ có thể cùng cơ chế; UI chỉ hiển thị hoàn tất theo xác nhận của server.

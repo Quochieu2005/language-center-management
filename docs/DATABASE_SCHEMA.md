@@ -36,6 +36,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 | `DK` | Đăng ký | `CC` | Chuyển cơ sở |
 | `TOKEN` | Token đặt lại mật khẩu | `DB` | Nhật ký đồng bộ |
 | `LS` | Sự kiện lịch sử chuyển cơ sở | | |
+| `LH` | Yêu cầu liên hệ | | |
 
 > ⚠️ **Tiền tố là nơi TẠO, không phải nơi HIỆN TẠI.**
 > Các bản ghi không bao giờ di chuyển (lớp, đăng ký, học phí, điểm...) thì tiền tố luôn trùng site chứa nó.
@@ -107,8 +108,9 @@ flowchart LR
 | `GiaoDichChuyenCoSo` | Cục bộ | trạng thái hiện tại của một lần chuyển | Chỉ CSDL site nguồn; Coordinator cập nhật để phục hồi |
 | `LichSuChuyenCoSo` | Cục bộ | sự kiện append-only của lần chuyển | Site thực hiện sự kiện (thường nguồn và đích) |
 | `PhienDangNhap`, `TokenDatLaiMatKhau`, `GiaoDichDatLaiMatKhau` | Cục bộ kỹ thuật | session/OTP/ledger xác thực | Database site cấu hình `AUTH_SESSION_SITE_CODE` |
-| `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, tùy migration/portal | điều phối xóa học viên nhiều site | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22 |
+| `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, legacy | dấu tiến trình cho luồng purge học viên cũ | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22. DELETE hiện hành không dùng bảng này và không purge lịch sử |
 | `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
+| `YeuCauLienHe` | Phân mảnh ngang theo yêu cầu | `ma_co_so` do khách chọn và API xác nhận | Chỉ CSDL của site được chọn; Admin Big đọc GLOBAL bằng cách hỏi từng site, Admin Small chỉ đọc site được giao |
 | `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
 
 ---
@@ -228,7 +230,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 | `BaiVietBlog.ma_danh_muc_blog` | FK → `DanhMucBlog` | Chỉ tham chiếu trong cùng database site |
 | `BaiVietBlog.slug` | UQ, `VARCHAR(160)` | Slug duy nhất trong từng bản sao; API đối chiếu slug trên mọi site |
 | `BaiVietBlog.tieu_de`, `tom_tat` | `NVARCHAR(200)`, `NVARCHAR(500)` | Tiêu đề và mô tả công khai |
-| `BaiVietBlog.noi_dung` | `NVARCHAR(MAX)` | Nội dung văn bản thường, không render như HTML |
+| `BaiVietBlog.noi_dung` | `NVARCHAR(MAX)` | Lưu nguồn Markdown giới hạn dạng văn bản thường; hỗ trợ đoạn văn, tiêu đề `##`/`###`, danh sách đánh số và bảng. HTML thô không được render hoặc thực thi; không cần đổi schema |
 | `BaiVietBlog.so_phut_doc` | `SMALLINT`, 1–240 | Thời lượng đọc ước tính |
 | `BaiVietBlog.trang_thai` | `nhap` / `da_xuat_ban` / `an` | API chỉ đọc bài đã xuất bản và tới thời điểm xuất bản |
 | `BaiVietBlog.ngay_xuat_ban_utc` | `DATETIME2(0)`, nullable | `NULL` nghĩa là bài đã xuất bản ngay; thời điểm tương lai được ẩn đến hạn |
@@ -254,7 +256,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 | `phien_ban`, `cap_nhat_luc` | | Đối soát đồng bộ (mục 2) |
 | `avatar_public_id`, `avatar_secure_url` | *null* được phép | Metadata ảnh đại diện Cloudinary; không lưu bytes ảnh trong SQL Server |
 
-Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với chức vụ `le_tan`, `tu_van`, `ke_toan` hoặc `xep_lop`.
+Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Chức vụ nhân viên hiện tại là `tu_van` (hiển thị “Tư vấn & xếp lớp”) hoặc `ke_toan` (hiển thị “Kế toán & Lễ tân”). Migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`; không thêm bảng/cột.
 
 Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL. Coordinator phải kiểm tra các bản sao trước khi liên kết/thu hồi subject (`REPLICATED-WRITE`). Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret hoặc email provider trong `TaiKhoan`; chỉ lưu metadata avatar Cloudinary nêu trên.
 
@@ -278,12 +280,18 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | Cột | Ràng buộc | Mô tả |
 |-----|-----------|-------|
 | `ma_hoc_vien` | PK | |
+| `slug` | UQ trong từng site | Định danh hồ sơ dùng trong API; mặc định chuẩn hóa từ họ tên, cho phép chỉnh khi tạo và thêm hậu tố số nếu trùng trong site; không dùng để suy site |
 | `ma_co_so` | FK | **Site chứa** bản ghi (quyết định phân mảnh) |
 | `co_so_goc` | FK | Cơ sở đăng ký lần đầu, **không đổi** |
-| `ho_ten`, `ngay_sinh`, `gioi_tinh` | | |
+| `ma_tai_khoan` | FK, UQ có lọc, *null* | Liên kết tài khoản học viên được cấp riêng sau khi hồ sơ đủ điều kiện |
+| `ho_ten`, `ngay_sinh` | | |
+| `gioi_tinh` | NULL | API chuẩn hóa giá trị và chỉ chấp nhận `Nam`, `Nữ` hoặc `Khác`; trường có thể để trống |
 | `sdt`, `email`, `dia_chi` | | |
+| `avatar_public_id`, `avatar_secure_url` | *null* được phép | Metadata ảnh Cloudinary riêng tại site chứa hồ sơ; bytes không lưu trong SQL Server |
 | `ngay_nhap_hoc` | | |
 | `trang_thai` | | `dang_hoc` · `bao_luu` · `da_chuyen_di` · `nghi_hoc` |
+
+Ảnh học viên là metadata site-local, không phải bản sao tài khoản. Luồng chuyển cơ sở chép hai trường avatar vào hồ sơ đích trong transaction cục bộ tại đích và giữ nguyên metadata nguồn. Hai hồ sơ có thể cùng tham chiếu asset Cloudinary; vì chưa có sổ tham chiếu toàn site, thay ảnh hoặc xóa hồ sơ không tự xóa asset cũ.
 
 **`GiaoVien`**
 
@@ -303,8 +311,10 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_co_so` | FK | |
 | `ma_tai_khoan` | FK, UQ, *null* | → `TaiKhoan` |
 | `ho_ten`, `sdt`, `email` | | |
-| `chuc_vu` | | `le_tan` · `tu_van` · `ke_toan` · `xep_lop` |
+| `chuc_vu` | | `tu_van` (tư vấn và xếp lớp) · `ke_toan` (kế toán và lễ tân; hợp nhất từ `le_tan` cũ) |
 | `trang_thai` | | `dang_lam` · `nghi_viec` |
+
+Trong API quản lý nhân viên, `NhanVien` là mảnh ngang nằm tại site công tác. Họ tên, điện thoại và chức vụ là hồ sơ cục bộ; `email` được ghi cùng lúc tạo hồ sơ nhưng danh tính đăng nhập chuẩn (email/tên đăng nhập) nằm ở `TaiKhoan` đã nhân bản. Ảnh dùng `TaiKhoan.avatar_public_id` và `avatar_secure_url`; bytes nằm trên Cloudinary và metadata được đồng bộ cùng tài khoản. API sửa hồ sơ không cho đổi email/tên đăng nhập hoặc `ma_co_so`; cần một luồng đồng bộ danh tính/điều chuyển riêng nếu nghiệp vụ đó được duyệt. Trạng thái đăng nhập `TaiKhoan.trang_thai` độc lập với trạng thái công việc `NhanVien.trang_thai`; endpoint nhân viên chỉ chuyển `active` → `inactive` và thu hồi phiên, không có kích hoạt lại. Mật khẩu chỉ được gửi sau thao tác của Admin Big/Admin Small; các trạng thái `employee_credential_email_*` được ghi vào `Logs` tại site hồ sơ để khóa gửi trùng/không rõ kết quả, không cần thêm bảng hoặc cột. Khi xóa vĩnh viễn tài khoản, xóa hồ sơ `NhanVien` nếu không có phiếu thu tham chiếu; nếu có `PhieuThu`, đặt `ma_tai_khoan=NULL`, `trang_thai=nghi_viec` và giữ hồ sơ để bảo toàn khóa ngoại/chứng từ. Danh sách quản lý chỉ hiển thị hồ sơ còn gắn tài khoản. `Logs` và phiếu thu không bị xóa. Migration 37 chuyển dữ liệu `xep_lop` cũ thành `tu_van`; migration 41 chuyển dữ liệu `le_tan` cũ thành `ke_toan`. Không thêm bảng/cột cho thay đổi chức vụ hoặc ảnh nhân viên.
 
 ### 6.4. Lớp học
 
@@ -390,6 +400,8 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_phieu` | PK | |
 | `ma_co_so` | FK → `CoSo` | Site lấy từ học phí cha; người thu phải thuộc site này |
 | `ma_hoc_phi` | FK → `HocPhi` | |
+| `ma_phieu_goc` | FK ghép → `PhieuThu` cùng site, *null* | Phiếu thu gốc của bút toán `hoan`; phiếu gốc không bị sửa |
+| `khoa_idempotency` | UQ có lọc, *null* | UUID chống ghi lặp bút toán hoàn; lưu cùng transaction |
 | `loai` | | `thu` · `hoan` |
 | `so_tien` | | Luôn > 0; dấu do `loai` quyết định |
 | `hinh_thuc` | | `tien_mat` · `chuyen_khoan` · `the` |
@@ -397,6 +409,8 @@ Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng O
 | `ma_nhan_vien` | FK → `NhanVien` | Người thu |
 | `ma_yeu_cau` | FK ghép, *null* → `YeuCauThanhToan` | Chỉ có khi phiếu được tạo từ thanh toán SePay; thu tại quầy để trống |
 | `ghi_chu` | | |
+
+`ma_phieu_goc` tham chiếu `(ma_phieu, ma_co_so)` nên SQL Server chặn liên kết phiếu hoàn sang site khác. API chỉ tạo `loai='hoan'` sau khi kiểm tra số còn có thể hoàn; `khoa_idempotency` có unique index lọc trên từng CSDL site. Phiếu hoàn lịch sử chưa gắn phiếu gốc được giữ nguyên; API chặn hoàn tiếp cho khoản đó đến khi đối soát.
 
 **`DotHocPhi`** (cha: `HocPhi`) là các kỳ thu phí được lưu cùng site với khoản học phí. Có mã kỳ, mã site, thứ tự kỳ, ngày đến hạn, số phải thu, số đã thu và trạng thái `chua_dong`/`dong_mot_phan`/`da_dong`.
 
@@ -535,7 +549,7 @@ Source dùng bảng này cho OTP reset mật khẩu quản trị: mã 6 số ch�
 | Nghiệp vụ | `dang_ky_khoa_hoc` `xep_lop` `huy_dang_ky` `dong_hoc_phi` `hoan_hoc_phi` `nhap_diem` `sua_diem` `diem_danh` `mo_lop` `doi_lich_buoi_hoc` |
 | Hệ thống | `chuyen_co_so` `sua_danh_muc` |
 
-`db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng xóa dữ liệu học viên đã bật cờ phiên theo quy trình.
+`db/26_consolidate_logs_and_remove_notification_reads.sql` gộp log hệ thống, đăng nhập, quên mật khẩu và đồng bộ vào `Logs`; sau migration, `NhatKyHeThong` và `NhatKyDongBo` không còn là bảng runtime. Trigger append-only chặn UPDATE; DELETE chỉ được phép trong luồng purge legacy có bật cờ phiên. CRUD học viên hiện hành không xóa `Logs`.
 
 **Xóa vĩnh viễn Admin Small:** Admin Big có thể xóa vật lý dòng `Admin`, các bản sao `TaiKhoan`, phiên, token/giao dịch đặt lại mật khẩu còn gắn tài khoản và ảnh Cloudinary. Chạy `db/32_allow_admin_small_hard_delete.sql` riêng tại từng site trước khi bật thao tác này. Migration bỏ FK tới `TaiKhoan` ở các cột người thao tác của `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `DiemDanh` và bảng log cũ để giữ nguyên mã người thao tác trong lịch sử; không xóa các dòng lịch sử. FK `YeuCauThanhToan_TaiKhoan` vẫn được giữ; nếu còn yêu cầu thanh toán tham chiếu tài khoản thì API từ chối xóa. Hồ sơ `HocVien`/`GiaoVien`/`NhanVien` hoặc giao dịch chuyển cơ sở đang mở cũng khiến thao tác bị từ chối. Mỗi site commit độc lập, có dấu retry trong `Logs`; đây là `REPLICATED-WRITE`, không phải ACID xuyên CSDL.
 
@@ -543,9 +557,29 @@ Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_t
 
 ---
 
+### 6.7. Yêu cầu liên hệ website (phân mảnh ngang theo cơ sở)
+
+`YeuCauLienHe` lưu trong CSDL của site mà người gửi chọn; không nhân bản và không có database inbox trung tâm. API kiểm tra site có trong danh sách hoạt động, ghi yêu cầu và log tại cùng site trong một transaction cục bộ. Admin Big dùng Global Query để tổng hợp kết quả từ từng CSDL; Admin Small chỉ đọc site được phân công. Site lỗi phải xuất hiện trong `missing_sites`.
+
+| Cột | Ràng buộc | Mô tả |
+|-----|-----------|-------|
+| `ma_yeu_cau` | PK | Mã dạng `<SITE>-LH-000001`; sequence `Seq_LH` riêng tại từng site |
+| `ma_co_so` | FK → `CoSo` cục bộ | Site sở hữu và nhận yêu cầu |
+| `ho_ten`, `email` | Bắt buộc | Thông tin để quản trị viên liên hệ lại; email được chuẩn hóa chữ thường |
+| `so_dien_thoai` | *null* được phép | Kênh liên hệ thêm do người gửi cung cấp |
+| `tieu_de`, `noi_dung` | Bắt buộc | Nội dung form; tối đa 160 và 5.000 ký tự |
+| `trang_thai` | CHECK | `cho_xu_ly` hoặc `da_phan_hoi` |
+| `khoa_chong_lap`, `payload_hash` | UQ (`ma_co_so`, `khoa_chong_lap`) | Chống ghi trùng khi khách retry; key dùng lại với body khác bị từ chối |
+| `noi_dung_phan_hoi` | *null* khi chưa phản hồi | Phản hồi plain text đã gửi qua SMTP |
+| `ma_nguoi_phan_hoi` | Mã tài khoản lịch sử, không FK | Quản trị viên đã phản hồi; giữ dấu vết kể cả khi tài khoản bị xóa |
+| `phan_hoi_luc_utc` | *null* khi chưa phản hồi | Thời điểm SMTP chấp nhận email phản hồi |
+| `tao_luc_utc`, `cap_nhat_luc_utc` | Mặc định UTC | Thời điểm nhận yêu cầu và cập nhật trạng thái |
+
+Migration `db/39_add_contact_inbox.sql` cần chạy riêng tại từng CSDL site trước khi bật form/API. `Logs` chỉ lưu mã yêu cầu, site, hành động và trạng thái; không lưu email hoặc nội dung liên hệ. API gọi SMTP khi transaction site đang mở rồi cập nhật bản ghi; SMTP không tham gia transaction SQL. Nếu SMTP đã nhận thư nhưng commit DB lỗi, bản ghi có thể còn `cho_xu_ly` và lần gửi lại có thể gửi trùng; cần transactional outbox để loại bỏ khoảng hở. SMTP chấp nhận thư cũng chưa bảo đảm thư đã tới inbox.
+
 ## 7. Dữ liệu mẫu cho các ví dụ
 
-> Chỉ để minh họa luồng trong `README.md`. Dữ liệu thật phải lấy từ CSDL, **không hard-code vào code**.
+> Chỉ để minh họa luồng trong `README.md`. Dữ liệu thật phải lấy từ CSDL, **không hard-code vào code**. Vai trò mẫu dưới đây mô tả trạng thái sau migration 41; hồ sơ `le_tan` cũ được chuyển thành `ke_toan`.
 
 ### Danh mục và tài khoản (nhân bản – có ở cả 3 site)
 
@@ -555,16 +589,16 @@ Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_t
 | `KhoaHoc` | `KH-IELTS-65` | "IELTS 6.5" · 24 buổi · học phí chuẩn **12.000.000** |
 | `KhoaHoc` | `KH-JP-N5` | "Tiếng Nhật N5" · 30 buổi · học phí chuẩn **6.000.000** |
 | `TaiKhoan` | `Q1-TK-000001` | `admin.tong` · admin · `ma_co_so = NULL` |
-| `TaiKhoan` | `Q1-TK-000004` | `lan.le` · nhân viên · Q1 (lễ tân) |
-| `TaiKhoan` | `Q1-TK-000005` | `minh.kt` · nhân viên · Q1 (kế toán) |
+| `TaiKhoan` | `Q1-TK-000004` | `lan.le` · nhân viên · Q1 (Kế toán & Lễ tân) |
+| `TaiKhoan` | `Q1-TK-000005` | `minh.kt` · nhân viên · Q1 (Kế toán & Lễ tân) |
 | `TaiKhoan` | `Q1-TK-000007` | `ha.pham` · giáo viên · Q1 · `ha.pham@example.com` |
 
 ### Site Q1
 
 | Bảng | Mã | Nội dung |
 |------|----|----------|
-| `NhanVien` | `Q1-NV-000001` | Lê Thị Lan · lễ tân · tài khoản `Q1-TK-000004` |
-| `NhanVien` | `Q1-NV-000002` | Đỗ Quang Minh · kế toán · tài khoản `Q1-TK-000005` |
+| `NhanVien` | `Q1-NV-000001` | Lê Thị Lan · Kế toán & Lễ tân · tài khoản `Q1-TK-000004` |
+| `NhanVien` | `Q1-NV-000002` | Đỗ Quang Minh · Kế toán & Lễ tân · tài khoản `Q1-TK-000005` |
 | `GiaoVien` | `Q1-GV-000003` | Phạm Thu Hà · tài khoản `Q1-TK-000007` |
 | `GiaoVien` | `Q1-GV-000004` | Ngô Bảo Châu |
 | `PhongHoc` | `Q1-PH-02`, `Q1-PH-03` | Phòng 02, Phòng 03 (20 chỗ) |
