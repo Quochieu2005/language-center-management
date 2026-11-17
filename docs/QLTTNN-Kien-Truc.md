@@ -69,7 +69,7 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 | `LOCAL` | Một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm, mở lớp, điểm danh | Không ghi sang site khác; giao dịch tại site được rollback nếu bước cục bộ thất bại |
 | `GLOBAL` | Đọc các site cần thiết; ứng dụng gộp | Thống kê, tra cứu học viên, nhật ký toàn hệ thống | README 5.6 cho phép hiện phần có được kèm cảnh báo site thiếu; không trình bày số đó như tổng đầy đủ |
 | `REPLICATED-WRITE` | Ghi bảng dùng chung ở mọi site `hoat_dong` | Tài khoản, liên kết OAuth, môn học, khóa học, trạng thái cơ sở | Thiếu site sẵn sàng thì từ chối; không báo thành công nếu chỉ ghi một phần |
-| Đề nghị chuyển | CSDL nguồn | Admin Small tạo đề nghị `cho_duyet` | Học viên chưa chuyển và vẫn ở nguồn |
+| Đề nghị chuyển | CSDL nguồn | Admin Small/Tư vấn tạo đề nghị `cho_duyet` | Học viên chưa chuyển và vẫn ở nguồn |
 | Hộp thư/duyệt đề nghị | Đọc các site; ghi quyết định tại nguồn | Admin Big đọc hộp thư, duyệt hoặc từ chối (`GLOBAL` + ghi cục bộ) | Kết quả thiếu site phải được đánh dấu; không có DB trung tâm |
 | `DISTRIBUTED-TX` | Hai site nguồn/đích của học viên | Chuyển hồ sơ sau khi được duyệt | Chỉ bắt đầu khi đề nghị `cho_duyet` đã chuyển sang `dang_xu_ly`; phục hồi theo trạng thái đã lưu, xem [giao dịch phân tán](QLTTNN-Giao-Dich-Phan-Tan.md) |
 
@@ -82,10 +82,10 @@ Không suy ra site hiện tại của học viên từ tiền tố mã. Học vi
 | Admin Big | Toàn hệ thống; quản lý tài khoản/danh mục, xem báo cáo và nhật ký toàn cục; duyệt/từ chối đề nghị chuyển |
 | Admin Small | Cơ sở được phân công; điều hành nghiệp vụ, tạo đề nghị chuyển ra cơ sở khác và theo dõi đề nghị của cơ sở mình |
 | Kế toán & Lễ tân | Cơ sở của mình; chỉ xem phòng, lớp/roster, hồ sơ học viên, công nợ và lịch sử chuyển tại nguồn; gửi nhắc phí, xem báo cáo/phiếu thu và thu/hoàn; không ghi phòng/lớp/hồ sơ hoặc đăng ký/xếp lớp |
-| Tư vấn & xếp lớp | Cơ sở của mình; CRUD hồ sơ học viên nhưng không cấp tài khoản; xem công nợ và lịch sử chuyển tại nguồn; CRUD phòng, mở/xếp lớp, sửa tên/sĩ số và hủy mềm lớp đủ điều kiện; sửa kế hoạch đóng, gửi nhắc phí, tiếp nhận liên hệ và đăng/sửa/xuất bản Blog dùng chung |
+| Tư vấn & xếp lớp | Cơ sở của mình; CRUD hồ sơ học viên nhưng không cấp tài khoản; tạo đề nghị và xem công nợ/lịch sử chuyển tại nguồn; không duyệt/từ chối/retry; CRUD phòng, mở/xếp lớp, sửa tên/sĩ số và hủy mềm lớp đủ điều kiện; sửa kế hoạch đóng, gửi nhắc phí, tiếp nhận liên hệ và đăng/sửa/xuất bản Blog dùng chung |
 | Giáo viên | Lớp mình dạy; nhập điểm và điểm danh |
 
-`TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin = admin_small` và site được gán; không biểu diễn bằng `NhanVien.chuc_vu`. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với hai chức vụ `ke_toan` và `tu_van`; migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`. Backend kiểm tra danh tính, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small chỉ tạo đề nghị; chỉ Admin Big được quyết định. Ma trận chi tiết ở README mục 3–4.
+`TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin = admin_small` và site được gán; không biểu diễn bằng `NhanVien.chuc_vu`. Nhân viên nghiệp vụ có hồ sơ `NhanVien` với hai chức vụ `ke_toan` và `tu_van`; migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`. Backend kiểm tra danh tính, quyền chức năng, phạm vi cơ sở và quyền lớp trước khi đọc/ghi. Với chuyển cơ sở, Admin Small và Tư vấn được tạo đề nghị tại site mình; chỉ Admin Big được quyết định/retry. Ma trận chi tiết ở README mục 3–4.
 
 ## 6. Quy tắc liên site
 
