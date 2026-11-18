@@ -222,6 +222,22 @@ class ClassItemSerializer(serializers.Serializer):
     status = serializers.CharField()
 
 
+class ClassCourseOptionSerializer(serializers.Serializer):
+    course_id = serializers.CharField()
+    name = serializers.CharField()
+    subject_name = serializers.CharField()
+    level = serializers.CharField()
+    session_count = serializers.IntegerField(allow_null=True)
+    duration_value = serializers.DecimalField(max_digits=7, decimal_places=2, allow_null=True)
+    duration_unit = serializers.ChoiceField(choices=("thang", "ngay"), allow_null=True)
+
+
+class ClassCourseOptionListSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    count = serializers.IntegerField(min_value=0)
+    results = ClassCourseOptionSerializer(many=True)
+
+
 class ClassListResponseSerializer(serializers.Serializer):
     scope = serializers.ChoiceField(choices=("LOCAL", "GLOBAL"), required=False)
     complete = serializers.BooleanField(required=False)

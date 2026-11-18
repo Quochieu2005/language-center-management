@@ -11,6 +11,12 @@ export type ClassRow = {
   current_count: number; registered_count: number; remaining_seats: number; capacity_consistent: boolean;
   start_date: string; end_date: string | null; schedule: string; start_time: string; end_time: string; status: string;
 };
+export type ClassCourseOption = {
+  course_id: string; name: string; subject_name: string; level: string;
+  session_count: number | null; duration_value: number | string | null;
+  duration_unit: "thang" | "ngay" | null;
+};
+export type ClassCourseOptionList = { site_code: string; count: number; results: ClassCourseOption[] };
 export type RoomRow = { room_id: string; site_code: string; name: string; capacity: number; status: string; class_count: number; student_count: number };
 export type RoomRosterStudent = { student_id: string; student_slug: string; student_name: string; total_due: number; amount_paid: number; balance: number; tuition_status: "chua_co_khoan_phi" | "chua_dong" | "dong_mot_phan" | "da_dong" };
 export type RoomRosterClass = { class_id: string; class_name: string; status: string; student_count: number; students: RoomRosterStudent[] };
@@ -25,6 +31,7 @@ export type StudentSePayPayment = { site_code: string; attempt_id: string; insta
 export const academicsApi = {
   health: () => apiRequest<{ status: string; service?: string }>("/health/"),
   classes: (site_code?: string, options: { search?: string; status?: string; limit?: number; offset?: number } = {}) => apiRequest<ApiList<ClassRow>>(`/admin/classes/${query({ site_code, ...options })}`),
+  classCourseOptions: (site_code?: string) => apiRequest<ClassCourseOptionList>(`/admin/classes/course-options/${query({ site_code })}`),
   createClass: (body: { site_code?: string; course_id: string; teacher_id: string; room_id: string; name: string; capacity: number; start_date: string; end_date: string; weekdays: number[]; start_time: string; end_time: string }) => apiRequest<ClassRow & { session_count: number }>("/admin/classes/", { method: "POST", body: jsonBody(body) }),
   classDetail: (id: string, site_code: string) => apiRequest<ClassRow & { session_count: number }>(`/admin/classes/${encodeURIComponent(id)}/${query({ site_code })}`),
   updateClass: (id: string, site_code: string, body: { name?: string; capacity?: number }) => apiRequest<ClassRow>(`/admin/classes/${encodeURIComponent(id)}/${query({ site_code })}`, { method: "PATCH", body: jsonBody(body) }),
