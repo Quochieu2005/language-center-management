@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { adminApi, type Student } from "@/lib/api/admin";
 import { academicsApi, type TransferRow } from "@/lib/api/academics";
 import { contactsApi } from "@/lib/api/contacts";
 import { ApiError } from "@/lib/api/client";
@@ -16,6 +17,12 @@ export default function TransfersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [requestOpen, setRequestOpen] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const studentSearchRequest = useRef(0);
   const [siteCatalogComplete, setSiteCatalogComplete] = useState(false);
   const [siteCatalogMissing, setSiteCatalogMissing] = useState<string[]>([]);
   const [siteCatalogError, setSiteCatalogError] = useState("");
@@ -52,8 +59,40 @@ export default function TransfersPage() {
     });
     return () => { cancelled = true; };
   }, []);
+  useEffect(() => {
+    if (!requestOpen || !canRequest) return;
+    const requestId = ++studentSearchRequest.current;
+    const timer = window.setTimeout(() => {
+      setStudentsLoading(true);
+      setStudentsError("");
+      void adminApi.students({ status: "dang_hoc", search: studentSearch.trim() || undefined, limit: 100 })
+        .then((result) => {
+          if (requestId === studentSearchRequest.current) setStudents(result.results);
+        })
+        .catch((reason) => {
+          if (requestId === studentSearchRequest.current) {
+            setStudents([]);
+            setStudentsError(reason instanceof Error ? reason.message : "Không tải được danh sách học viên.");
+          }
+        })
+        .finally(() => {
+          if (requestId === studentSearchRequest.current) setStudentsLoading(false);
+        });
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      if (requestId === studentSearchRequest.current) studentSearchRequest.current += 1;
+    };
+  }, [canRequest, requestOpen, studentSearch]);
+  const resetRequest = () => {
+    setRequestOpen(false);
+    setStudentSearch("");
+    setStudentsError("");
+    setSelectedStudent(null);
+    form.resetFields();
+  };
   const create = async (values: { student_slug: string; target_site: string; reason: string }) => {
-    try { await academicsApi.requestTransfer(values); message.success("Đã gửi đề nghị; Admin Big hoặc Admin Small cơ sở nhận có thể duyệt."); setRequestOpen(false); form.resetFields(); void load(); }
+    try { await academicsApi.requestTransfer(values); message.success("Đã gửi đề nghị; Admin Big hoặc Admin Small cơ sở nhận có thể duyệt."); resetRequest(); void load(); }
     catch (reason) { message.error(asMessage(reason)); }
   };
   const decide = async (values: { reason?: string }) => {
@@ -78,17 +117,34 @@ export default function TransfersPage() {
     { title: "Lý do", dataIndex: "reason" }, { title: "Trạng thái", dataIndex: "status", render: (value: string) => <Tag color={value === "hoan_tat" ? "green" : value === "that_bai" ? "red" : "gold"}>{value}</Tag> },
     ...(isBig || isSmall ? [{ title: "Thao tác", render: (_: unknown, row: TransferRow) => <Space wrap>{row.status === "cho_duyet" && (isBig || (isSmall && row.target_site === user?.site_code)) && <><Button size="small" type="primary" onClick={() => setDecision({ row, value: "approve" })}>Duyệt</Button><Button size="small" danger onClick={() => setDecision({ row, value: "reject" })}>Từ chối</Button></>}{isBig && ["dang_xu_ly", "that_bai"].includes(row.status) && <Popconfirm title="Tiếp tục tiến trình đã duyệt?" onConfirm={() => void retry(row)}><Button size="small">Thử phục hồi</Button></Popconfirm>}</Space> }] : []),
   ];
+  const studentOptions = [
+    ...(selectedStudent && !students.some((student) => student.slug === selectedStudent.slug) ? [selectedStudent] : []),
+    ...students,
+  ].map((student) => ({ value: student.slug, label: `${student.full_name} · ${student.email || student.student_id}` }));
   return <Card title="Chuyển cơ sở" extra={canRequest ? <Button type="primary" onClick={() => setRequestOpen(true)}>Tạo đề nghị</Button> : null}>
     <Alert type="info" showIcon title={infoText} style={{ marginBottom: 16 }} />
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     {!complete && <Alert type="warning" showIcon title={`Dữ liệu chưa đầy đủ. Site không phản hồi: ${missing.join(", ") || "không rõ"}`} style={{ marginBottom: 16 }} />}
     <Table rowKey={(row) => `${row.source_site}:${row.transfer_id}`} loading={loading} columns={columns} dataSource={rows} scroll={{ x: 950 }} />
-    <Modal title="Tạo đề nghị chuyển cơ sở" open={requestOpen} onCancel={() => setRequestOpen(false)} footer={null} destroyOnHidden><Form form={form} layout="vertical" onFinish={create}>
+    <Modal title="Tạo đề nghị chuyển cơ sở" open={requestOpen} onCancel={resetRequest} footer={null} destroyOnHidden><Form form={form} layout="vertical" onFinish={create}>
       {siteCatalogError ? <Alert type="error" showIcon title={siteCatalogError} style={{ marginBottom: 16 }} /> : !siteCatalogComplete ? <Alert type="warning" showIcon title={`Danh sách cơ sở chưa đầy đủ${siteCatalogMissing.length ? `; thiếu: ${siteCatalogMissing.join(", ")}` : ""}. Tải lại trang khi các site sẵn sàng.`} style={{ marginBottom: 16 }} /> : null}
-      <Form.Item name="student_slug" label="Slug học viên" rules={[{ required: true, max: 160 }]}><Input maxLength={160} /></Form.Item>
+      {studentsError && <Alert type="error" showIcon title={studentsError} style={{ marginBottom: 16 }} />}
+      <Form.Item name="student_slug" label="Học viên" extra="Tìm theo họ tên, email hoặc mã học viên. Chỉ hiển thị học viên đang học tại cơ sở của bạn." rules={[{ required: true, message: "Hãy chọn học viên." }]}>
+        <Select
+          showSearch
+          allowClear
+          filterOption={false}
+          loading={studentsLoading}
+          options={studentOptions}
+          placeholder="Tìm và chọn học viên"
+          notFoundContent={studentsLoading ? "Đang tìm học viên..." : "Không tìm thấy học viên đang học."}
+          onSearch={setStudentSearch}
+          onChange={(slug: string | undefined) => setSelectedStudent(slug ? students.find((student) => student.slug === slug) || selectedStudent : null)}
+        />
+      </Form.Item>
       <Form.Item name="target_site" label="Cơ sở nhận" rules={[{ required: true }]}><Select disabled={!siteCatalogComplete} options={activeSites.filter((code) => code !== user?.site_code).map((code) => ({ value: code, label: code }))} /></Form.Item>
       <Form.Item name="reason" label="Lý do" rules={[{ required: true, max: 500 }]}><Input.TextArea maxLength={500} rows={4} /></Form.Item>
-      <Button type="primary" htmlType="submit" block disabled={!siteCatalogComplete || !activeSites.some((code) => code !== user?.site_code)}>Gửi đề nghị chờ duyệt</Button>
+      <Button type="primary" htmlType="submit" block disabled={!siteCatalogComplete || !activeSites.some((code) => code !== user?.site_code) || studentsLoading}>Gửi đề nghị chờ duyệt</Button>
     </Form></Modal>
     <Modal title={decision?.value === "approve" ? "Duyệt đề nghị" : "Từ chối đề nghị"} open={Boolean(decision)} onCancel={() => setDecision(null)} footer={null} destroyOnHidden><Form form={decisionForm} layout="vertical" onFinish={decide}>{decision?.value === "reject" && <Form.Item name="reason" label="Lý do" rules={[{ required: true, max: 500 }]}><Input.TextArea maxLength={500} rows={3} /></Form.Item>}<Button type="primary" danger={decision?.value === "reject"} htmlType="submit" block>{decision?.value === "approve" ? "Duyệt và điều phối" : "Từ chối"}</Button></Form></Modal>
   </Card>;
