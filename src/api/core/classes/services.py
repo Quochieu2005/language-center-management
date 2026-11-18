@@ -347,9 +347,9 @@ def create_class(*, site_code: str, actor_id: str, remote_ip: str, data: dict[st
             if expected_sessions is not None and expected_sessions > 500:
                 raise ClassInvalid("Số buổi khóa học vượt giới hạn tạo lịch tự động của API.")
             latest_end_date = _course_end_date(data["start_date"], course[1], course[2])
-            if data["end_date"] > latest_end_date:
+            if data["end_date"] != latest_end_date:
                 raise ClassInvalid(
-                    f"Ngày kết thúc phải nằm trong thời lượng khóa học, không muộn hơn {latest_end_date.isoformat()}."
+                    f"Ngày kết thúc phải theo đủ thời lượng khóa học: {latest_end_date.isoformat()}."
                 )
             generated_dates = _session_dates(
                 data["start_date"], data["end_date"], data["weekdays"], expected_sessions

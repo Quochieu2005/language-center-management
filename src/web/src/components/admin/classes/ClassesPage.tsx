@@ -88,6 +88,10 @@ export default function ClassesPage() {
   const [classForm] = Form.useForm();
   const [simpleForm] = Form.useForm();
   const actionSite = isAdminBig ? operationSite : site || "";
+  const updateCourseEndDate = (courseId: string | undefined, startDate: string | undefined) => {
+    const course = courseOptions.find((item) => item.course_id === courseId);
+    classForm.setFieldValue("end_date", course && startDate ? courseEndDate(startDate, course) || undefined : undefined);
+  };
   const canStartOperation = canEnroll && (isAdminBig ? !loadingSites && siteCodes.length > 0 : isSpecificSite);
   const sourceClass = operationClasses.find((item) => item.class_id === sourceClassId);
   const targetClasses = operationClasses.filter((item) => item.class_id !== sourceClassId && item.course_id === sourceClass?.course_id && ["sap_mo", "dang_hoc"].includes(item.status) && item.remaining_seats > 0);
@@ -274,7 +278,7 @@ export default function ClassesPage() {
       </Row> : <>
       <Row gutter={16}>
         <Col xs={24} sm={12}><Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item></Col>
-        <Col xs={24} sm={12}><Form.Item name="course_id" label="Khóa học" rules={[{ required: true, message: "Chọn khóa học." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} placeholder="Chọn khóa học tại cơ sở" notFoundContent={operationLoading ? "Đang tải khóa học..." : "Cơ sở chưa có khóa học"} options={courseOptions.map((course) => ({ value: course.course_id, label: `${course.name} · ${course.subject_name} · ${course.level} · ${durationText(course)}` }))} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="course_id" label="Khóa học" rules={[{ required: true, message: "Chọn khóa học." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} placeholder="Chọn khóa học tại cơ sở" notFoundContent={operationLoading ? "Đang tải khóa học..." : "Cơ sở chưa có khóa học"} options={courseOptions.map((course) => ({ value: course.course_id, label: `${course.name} · ${course.subject_name} · ${course.level} · ${durationText(course)}` }))} onChange={(courseId) => updateCourseEndDate(courseId, classForm.getFieldValue("start_date"))} /></Form.Item></Col>
       </Row>
       <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id}>
         {({ getFieldValue }) => {
@@ -314,8 +318,8 @@ export default function ClassesPage() {
                     : "";
           return <>
       <Row gutter={16}>
-        <Col xs={24} sm={12}><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" min={todayVietnam()} /></Form.Item></Col>
-        <Col xs={24} sm={12}><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" min={startDate} max={latestEndDate || undefined} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" min={todayVietnam()} onChange={(event) => updateCourseEndDate(selectedCourse?.course_id, event.target.value || undefined)} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]} help={latestEndDate ? "Tự điền theo thời lượng khóa đã chọn." : undefined}><Input type="date" min={latestEndDate || startDate} max={latestEndDate || undefined} /></Form.Item></Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={12}><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>

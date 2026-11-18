@@ -460,6 +460,7 @@ class ClassCollectionView(_ClassApiView):
         summary="Mở lớp, phân công giáo viên/phòng và tạo lịch buổi học",
         description=(
             "Tạo LopHoc cùng BuoiHoc trong một transaction cục bộ. Nếu khóa học chưa chốt số buổi, số buổi được xác định từ khoảng ngày và các thứ đã chọn. "
+            "Ngày kết thúc phải đúng ngày được tính đủ theo thời lượng khóa từ ngày bắt đầu. "
             "Kiểm tra khóa học, giáo viên đang dạy, phòng hoạt động/sức chứa, ngày giờ và xung đột "
             "giáo viên/phòng. Admin Big gửi site_code; Admin Small/Tư vấn & xếp lớp dùng site phiên đăng nhập. Kế toán & Lễ tân chỉ đọc lớp."
         ),
