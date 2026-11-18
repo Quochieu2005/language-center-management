@@ -230,6 +230,7 @@ class ClassCourseOptionSerializer(serializers.Serializer):
     session_count = serializers.IntegerField(allow_null=True)
     duration_value = serializers.DecimalField(max_digits=7, decimal_places=2, allow_null=True)
     duration_unit = serializers.ChoiceField(choices=("thang", "ngay"), allow_null=True)
+    standard_fee = serializers.IntegerField(min_value=0)
 
 
 class ClassCourseOptionListSerializer(serializers.Serializer):

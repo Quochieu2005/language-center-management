@@ -254,7 +254,7 @@ def list_class_course_options(*, site_code: str) -> dict[str, Any]:
         _active_site(cursor, site_code)
         cursor.execute(
             "SELECT k.ma_khoa_hoc, k.ten_khoa_hoc, m.ten_mon, k.trinh_do, "
-            "k.so_buoi, k.thoi_luong_so, k.thoi_luong_don_vi "
+            "k.so_buoi, k.thoi_luong_so, k.thoi_luong_don_vi, k.hoc_phi_chuan "
             "FROM dbo.KhoaHoc k JOIN dbo.MonHoc m ON m.ma_mon = k.ma_mon "
             "ORDER BY m.ten_mon, k.ten_khoa_hoc, k.ma_khoa_hoc"
         )
@@ -271,6 +271,7 @@ def list_class_course_options(*, site_code: str) -> dict[str, Any]:
                 "session_count": None if row[4] is None else int(row[4]),
                 "duration_value": row[5],
                 "duration_unit": None if row[6] is None else str(row[6]),
+                "standard_fee": int(row[7]),
             }
             for row in rows
         ],
@@ -346,9 +347,9 @@ def create_class(*, site_code: str, actor_id: str, remote_ip: str, data: dict[st
             if expected_sessions is not None and expected_sessions > 500:
                 raise ClassInvalid("Số buổi khóa học vượt giới hạn tạo lịch tự động của API.")
             latest_end_date = _course_end_date(data["start_date"], course[1], course[2])
-            if data["end_date"] > latest_end_date:
+            if data["end_date"] != latest_end_date:
                 raise ClassInvalid(
-                    f"Ngày kết thúc phải nằm trong thời lượng khóa học, không muộn hơn {latest_end_date.isoformat()}."
+                    f"Ngày kết thúc phải theo đủ thời lượng khóa học: {latest_end_date.isoformat()}."
                 )
             generated_dates = _session_dates(
                 data["start_date"], data["end_date"], data["weekdays"], expected_sessions
