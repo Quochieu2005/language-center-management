@@ -11,6 +11,48 @@ const weekdays = [2, 3, 4, 5, 6, 7, 1].map((value) => ({ value, label: value ===
 const durationText = (course: ClassCourseOption) => course.duration_value == null || !course.duration_unit
   ? "Chưa cập nhật thời lượng"
   : `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(Number(course.duration_value))} ${course.duration_unit === "thang" ? "tháng" : "ngày"}`;
+const dayMs = 24 * 60 * 60 * 1000;
+const todayVietnam = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+const parseDate = (value: string) => {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+const formatDate = (value: Date) => Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+const addMonths = (start: Date, months: number) => {
+  const monthIndex = start.getUTCFullYear() * 12 + start.getUTCMonth() + months;
+  const year = Math.floor(monthIndex / 12);
+  const month = monthIndex - year * 12;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(start.getUTCDate(), lastDay)));
+};
+const courseEndDate = (startValue: string, course: ClassCourseOption) => {
+  const start = parseDate(startValue);
+  const duration = Number(course.duration_value);
+  if (!start || !Number.isFinite(duration) || duration <= 0) return null;
+  if (course.duration_unit === "ngay") {
+    return Number.isInteger(duration) ? formatDate(new Date(start.getTime() + (duration - 1) * dayMs)) : null;
+  }
+  if (course.duration_unit !== "thang") return null;
+  const wholeMonths = Math.floor(duration);
+  const boundary = addMonths(start, wholeMonths);
+  const fraction = duration - wholeMonths;
+  const nextBoundary = addMonths(start, wholeMonths + 1);
+  const extraDays = fraction ? Math.ceil((nextBoundary.getTime() - boundary.getTime()) / dayMs * fraction - 1e-9) : 0;
+  return formatDate(new Date(boundary.getTime() + (extraDays - 1) * dayMs));
+};
+const countScheduledSessions = (startValue: string, endValue: string, selectedWeekdays: number[]) => {
+  const start = parseDate(startValue);
+  const end = parseDate(endValue);
+  if (!start || !end || end < start || !selectedWeekdays.length) return 0;
+  const days = Math.floor((end.getTime() - start.getTime()) / dayMs) + 1;
+  const fullWeeks = Math.floor(days / 7);
+  const weekdaysSet = new Set(selectedWeekdays);
+  let count = fullWeeks * weekdaysSet.size;
+  for (let offset = 0; offset < days % 7; offset += 1) {
+    if (weekdaysSet.has(((start.getUTCDay() + offset) % 7) + 1)) count += 1;
+  }
+  return count;
+};
 
 export default function ClassesPage() {
   const { user } = useSession();
@@ -237,17 +279,45 @@ export default function ClassesPage() {
       <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>
       <Form.Item name="room_id" label="Phòng" rules={[{ required: true }]}><Select loading={operationLoading} options={rooms.filter((x) => x.status === "hoat_dong").map((x) => ({ value: x.room_id, label: `${x.name} · tối đa ${x.capacity}` }))} /></Form.Item>
       <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item>
+      <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id || previous.start_date !== current.start_date || previous.end_date !== current.end_date || JSON.stringify(previous.weekdays) !== JSON.stringify(current.weekdays)}>
+        {({ getFieldValue }) => {
+          const selectedCourse = courseOptions.find((course) => course.course_id === getFieldValue("course_id"));
+          const startDate = getFieldValue("start_date") as string | undefined;
+          const endDate = getFieldValue("end_date") as string | undefined;
+          const selectedWeekdays = (getFieldValue("weekdays") || []) as number[];
+          const latestEndDate = selectedCourse && startDate ? courseEndDate(startDate, selectedCourse) : null;
+          const hasSchedule = Boolean(startDate && endDate && selectedWeekdays.length);
+          const sessionCount = hasSchedule ? countScheduledSessions(startDate!, endDate!, selectedWeekdays) : null;
+          const scheduleError = selectedCourse && (!latestEndDate && startDate)
+            ? "Khóa học chưa có thời lượng hợp lệ. Cập nhật khóa học trước khi mở lớp."
+            : selectedCourse && endDate && latestEndDate && endDate > latestEndDate
+              ? `Ngày kết thúc vượt thời lượng khóa học; ngày muộn nhất là ${latestEndDate}.`
+              : startDate && endDate && endDate < startDate
+                ? "Ngày kết thúc không được trước ngày bắt đầu."
+              : sessionCount === 0
+                ? "Khoảng ngày không có buổi nào khớp với các thứ đã chọn."
+                : sessionCount != null && sessionCount > 500
+                  ? "Lịch lớp không được vượt quá 500 buổi."
+                  : sessionCount != null && selectedCourse?.session_count != null && sessionCount !== selectedCourse.session_count
+                    ? `Lịch hiện có ${sessionCount} buổi; khóa học yêu cầu ${selectedCourse.session_count} buổi.`
+                    : "";
+          return <>
       <Row gutter={16}>
-        <Col xs={24} sm={12}><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" /></Form.Item></Col>
-        <Col xs={24} sm={12}><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" min={todayVietnam()} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" min={startDate} max={latestEndDate || undefined} /></Form.Item></Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={12}><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
         <Col xs={24} sm={12}><Form.Item name="end_time" label="Giờ kết thúc" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
       </Row>
       <Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item>
+            {selectedCourse && <Alert type={scheduleError ? "warning" : "info"} showIcon title={scheduleError || `Ngày kết thúc tối đa: ${latestEndDate || "chưa tính được"} · Số buổi theo lịch: ${sessionCount ?? "chọn ngày và thứ học để tính"}${selectedCourse.session_count == null ? "" : `/${selectedCourse.session_count} buổi của khóa`}`} />}
+            <Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled || Boolean(scheduleError)}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
+          </>;
+        }}
+      </Form.Item>
       </>}
-      <Button type="primary" htmlType="submit" block disabled={editingClass ? false : operationSubmitDisabled}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
+      {editingClass && <Button type="primary" htmlType="submit" block disabled={false}>Lưu thay đổi</Button>}
     </Form></Modal>
     <Modal title="Đăng ký học viên vào lớp" open={modal === "enroll"} onCancel={() => setModal(null)} footer={null}><Form form={simpleForm} layout="vertical" onFinish={enroll}>{operationSiteField}{operationAlert}<Form.Item name="student_id" label="Học viên" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" loading={operationLoading} options={students.map((x) => ({ value: x.student_id, label: `${x.full_name} · ${x.student_id}` }))} /></Form.Item><Form.Item name="class_id" label="Lớp" rules={[{ required: true }]}><Select loading={operationLoading} options={operationClasses.map((x) => ({ value: x.class_id, label: `${x.name} · còn ${x.remaining_seats}` }))} /></Form.Item><Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Đăng ký</Button></Form></Modal>
     <Modal title="Chuyển đăng ký sang lớp khác" open={modal === "move"} onCancel={() => setModal(null)} footer={null} width={760}><Form form={simpleForm} layout="vertical" onFinish={moveEnrollment}>{operationSiteField}{operationAlert}<Form.Item name="source_class_id" label="Lớp hiện tại · phòng" rules={[{ required: true, message: "Chọn lớp hiện tại của học viên." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} options={operationClasses.map((x) => ({ value: x.class_id, label: "Lớp " + x.name + " · Phòng " + (x.room_name || "Chưa xếp") + " · " + x.schedule }))} onChange={(value) => { setSourceClassId(value); setMoveEnrollments([]); setOperationError(""); simpleForm.setFieldsValue({ enrollment_id: undefined, target_class_id: undefined }); }} /></Form.Item><Form.Item name="enrollment_id" label="Học viên" rules={[{ required: true, message: "Chọn học viên cần chuyển lớp." }]}><Select showSearch optionFilterProp="label" loading={moveRosterLoading} disabled={!sourceClassId || moveRosterLoading} placeholder={sourceClassId ? "Tìm theo họ tên hoặc mã học viên" : "Chọn lớp hiện tại trước"} notFoundContent={moveRosterLoading ? "Đang tải học viên..." : "Lớp này không có đăng ký đang hiệu lực."} options={moveEnrollments.filter((x) => x.student_status === "dang_hoc").map((x) => ({ value: x.enrollment_id, label: x.full_name + " · " + x.student_id + " · " + x.enrollment_id }))} /></Form.Item><Form.Item name="target_class_id" label="Lớp đích · phòng" rules={[{ required: true, message: "Chọn lớp đích." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} disabled={!sourceClassId} placeholder="Chọn lớp cùng khóa học còn chỗ" options={targetClasses.map((x) => ({ value: x.class_id, label: "Lớp " + x.name + " · Phòng " + (x.room_name || "Chưa xếp") + " · " + x.schedule + " · còn " + x.remaining_seats }))} /></Form.Item><Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled}>Xếp lớp lại</Button></Form></Modal>
