@@ -493,7 +493,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Người dùng:** Tư vấn & xếp lớp tại site nguồn. **Kiểu:** LOCAL tạo đề nghị; có thể dùng Global để xác định bản HocVien hiện hành. **Bảng nguồn:** HocVien, HocPhi/DangKy để kiểm tra điều kiện, GiaoDichChuyenCoSo, LichSuChuyenCoSo.
 
-1. Tư vấn & xếp lớp chọn học viên, site đích đang hoạt động và nhập lý do. Không có bước người đề nghị tự xác nhận chuyển hoàn tất.
+1. Tư vấn & xếp lớp tìm/chọn học viên theo họ tên, email hoặc mã học viên từ danh sách tại site nguồn, chọn site đích đang hoạt động và nhập lý do; không cần nhập slug. Giao diện gửi slug của hồ sơ đã chọn trong request nội bộ. Không có bước người đề nghị tự xác nhận chuyển hoàn tất.
 2. API lấy site nguồn từ tài khoản đã xác thực, xác định bản HocVien dang_hoc hiện hành bằng định vị site; không nhận nguồn tin cậy từ client và không suy từ prefix ID.
 3. Kiểm tra học viên thuộc nguồn; không có đề nghị/giao dịch mở; không còn công nợ theo quy tắc nghiệp vụ hiện hành; site đích khác nguồn và hoạt động.
 4. Trong transaction nguồn, tạo GiaoDichChuyenCoSo trạng thái cho_duyet và sự kiện append-only de_nghi. Chưa tạo hồ sơ đích, chưa đánh dấu nguồn da_chuyen_di.
