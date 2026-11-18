@@ -431,7 +431,7 @@ class SharedCourseReplicationTests(SimpleTestCase):
 
         self.assertEqual(sum(site_state["delete_count"] for site_state in states.values()), 0)
 
-    def test_only_admin_big_can_delete_shared_courses(self):
+    def test_admin_small_cannot_delete_shared_courses(self):
         request = APIRequestFactory().delete(
             "/api/v1/admin/courses/tieng-anh-a1/", HTTP_IDEMPOTENCY_KEY="course-delete-001"
         )
@@ -480,7 +480,7 @@ class SharedCourseReplicationTests(SimpleTestCase):
                 update_serializer = SharedCoursePatchSerializer(data={"ma_khoa_hoc": invalid_code})
                 self.assertFalse(update_serializer.is_valid())
 
-    def test_only_admin_big_can_create_shared_courses(self):
+    def test_admin_small_cannot_create_shared_courses(self):
         request = APIRequestFactory().post(
             "/api/v1/admin/courses/", {"ma_khoa_hoc": "KH-EN-A1"},
             format="json", HTTP_IDEMPOTENCY_KEY="course-create-001",

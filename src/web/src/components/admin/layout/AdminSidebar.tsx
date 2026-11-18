@@ -53,7 +53,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
         { label: "Phòng học", href: "/admin/rooms", icon: <HomeOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
         { label: "Giáo viên", href: "/admin/teachers", icon: <UsergroupAddOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Môn học dùng chung", href: "/admin/subjects", icon: <BookOutlined />, roles: ["admin_big"] },
-        { label: "Khóa học", href: "/admin/courses", icon: <ReadOutlined />, roles: ["admin_big"] },
+        { label: "Khóa học", href: "/admin/courses", icon: <ReadOutlined />, roles: ["admin_big", "tu_van", "ke_toan"] },
         { label: "Nhân viên", href: "/admin/employees", icon: <IdcardOutlined />, roles: ["admin_big", "admin_small"] },
         { label: "Quản lý Admin Small", href: "/admin/accounts", icon: <IdcardOutlined />, roles: ["admin_big"] },
         { label: "Chuyển cơ sở", href: "/admin/transfers", icon: <SwapOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },

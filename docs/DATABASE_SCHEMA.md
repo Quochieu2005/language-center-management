@@ -210,7 +210,7 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | `ma_mon` | FK → `MonHoc` | |
 | `ten_khoa_hoc` | | |
 | `trinh_do` | | A1..C2 / N5..N1 / ... |
-| `so_buoi` | | Tổng số buổi theo chương trình khóa học; lưu riêng, không suy ra chỉ từ số tháng. Khi mở lớp, API đối chiếu tổng này với số ngày học tính từ khoảng ngày và các thứ đã chọn |
+| `so_buoi` | | Tổng số buổi chuẩn theo chương trình khóa học; lưu riêng, không suy ra chỉ từ số tháng. Khi mở lớp, API đối chiếu tổng này với số ngày học tính từ khoảng ngày và các thứ đã chọn. Không ghi đè bằng số buổi đã tạo của một lớp; số buổi từng lớp được đếm từ `BuoiHoc` tại site sở hữu lớp |
 | `thoi_luong_so` | `DECIMAL(7,2)`, nullable | Số tháng (cho phép tối đa 2 chữ số thập phân, ví dụ 3,5) hoặc số ngày nguyên |
 | `thoi_luong_don_vi` | `VARCHAR(10)`, nullable | `thang` hoặc `ngay`; nếu là ngày thì số lượng phải nguyên |
 | `hoc_phi_chuan` | | Số tiền |

@@ -329,17 +329,18 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 ### FS-SITE-01 — Quản lý cơ sở và danh mục dùng chung
 
-**Người dùng:** Admin Big. **Phân tán:** đọc/ghi CoSo, MonHoc, KhoaHoc bằng Replicated-Write.
+**Người dùng:** Admin Big quản lý cơ sở và môn học; Admin Big, Tư vấn & xếp lớp, Kế toán & Lễ tân xem và quản lý khóa học. **Phân tán:** đọc/ghi `CoSo`, `MonHoc`, `KhoaHoc` bằng Replicated-Write; số buổi từng lớp đọc theo site.
 
-1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái.
+1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái. Tư vấn & xếp lớp và Kế toán & Lễ tân được xem, tạo, sửa, xóa khóa học dùng chung; không được tạo/sửa/xóa môn học hoặc cơ sở.
 2. API kiểm tra mã ổn định, quan hệ môn-khóa, miền dữ liệu và không cho đóng site đang có nghiệp vụ mở mà chưa xử lý. Mã khóa học tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số; có thể có các đoạn bổ sung ngăn bằng dấu gạch nối đơn. Giao diện chuẩn hóa mã thành chữ in hoa; cùng mã phải được giữ nhất quán trên mọi site.
-3. API danh mục môn học có đọc toàn cục và tạo/cập nhật/xóa đồng bộ qua các site đang hoạt động; API khóa học có tạo/cập nhật/xóa `KhoaHoc` theo cùng mô hình, kiểm tra môn học tồn tại giống nhau trên mọi site trước khi ghi. Mỗi site ghi ACK vào `Logs` trong transaction cục bộ. Runtime replication cho thay đổi `CoSo` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu. Cơ chế tại tầng API chưa thay cho bằng chứng kiểm chứng dữ liệu thực tế ở nhiều site.
+3. API danh mục môn học có đọc toàn cục; chỉ Admin Big được tạo/cập nhật/xóa môn học. API khóa học cho Admin Big, Tư vấn & xếp lớp và Kế toán & Lễ tân xem, tạo, sửa, xóa `KhoaHoc` theo cùng mô hình Replicated-Write; kiểm tra môn học tồn tại giống nhau trên mọi site trước khi ghi. Mỗi site ghi ACK vào `Logs` trong transaction cục bộ. Runtime replication cho thay đổi `CoSo` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu. Cơ chế tại tầng API chưa thay cho bằng chứng kiểm chứng dữ liệu thực tế ở nhiều site.
 4. Thời lượng khóa học lưu số tháng với tối đa hai chữ số thập phân (ví dụ `3,5 tháng`); nếu chọn ngày thì số lượng phải là số nguyên. API, ràng buộc SQL và các bản sao `KhoaHoc` phải áp dụng cùng quy tắc.
 5. `so_buoi` là tổng số buổi theo chương trình đào tạo và được nhập riêng với thời lượng tháng/ngày. Không tự tính số buổi từ số tháng nếu chưa có tần suất học mỗi tuần.
-6. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
-7. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
+6. Số buổi đã tạo cho mỗi lớp được đếm từ `BuoiHoc` tại CSDL site sở hữu lớp. Màn quản lý khóa học hiển thị số chuẩn `KhoaHoc.so_buoi` riêng với số buổi theo từng lớp; lịch của một lớp không được ghi đè hoặc nhân bản ngược lên số chuẩn dùng chung.
+7. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
+8. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
 
-**Nghiệm thu:** thiếu cấu hình hoặc lỗi một site được hiển thị cụ thể; không có trạng thái thành công toàn phần giả; các site sau đồng bộ có cùng mã và phiên bản. Đối với `MonHoc`, retry cùng `Idempotency-Key` và body tiếp tục site chưa ACK; cùng key khác body bị từ chối. Phải chạy TC-REP-01/TC-SYNC-01 trước khi kết luận đạt toàn phần.
+**Nghiệm thu:** API từ chối quyền sửa danh mục cơ sở/môn học đối với Tư vấn và Kế toán, đồng thời cho ba vai trò được nêu quản lý khóa học; thiếu cấu hình hoặc lỗi một site được hiển thị cụ thể; không có trạng thái thành công toàn phần giả; các site sau đồng bộ có cùng mã và phiên bản. Màn khóa học tách số buổi chuẩn với số BuoiHoc theo từng lớp; Admin Big thấy kết quả GLOBAL có cảnh báo site thiếu, nhân viên chỉ thấy LOCAL tại site của phiên. Đối với `MonHoc`, retry cùng `Idempotency-Key` và body tiếp tục site chưa ACK; cùng key khác body bị từ chối. Phải chạy TC-REP-01/TC-SYNC-01 trước khi kết luận đạt toàn phần.
 
 ### FS-STU-01 — Quản lý hồ sơ học viên tại cơ sở
 

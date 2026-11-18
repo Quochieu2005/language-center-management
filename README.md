@@ -274,7 +274,9 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big, Tư vấn & xếp lớp và Kế toán & Lễ tân có thể gửi yêu cầu xem/tạo/sửa/xóa khóa học dùng chung; Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+
+Trang `/admin/courses` hiển thị `KhoaHoc.so_buoi` là số buổi chuẩn riêng với số buổi đã tạo cho từng lớp. Endpoint quản trị `/api/v1/admin/courses/class-sessions/` đọc `LopHoc` và `BuoiHoc` riêng tại từng site rồi tổng hợp trong API cho Admin Big (`GLOBAL`); Tư vấn và Kế toán chỉ đọc cơ sở trong phiên (`LOCAL`). Không ghi số buổi lớp ngược lên bản sao `KhoaHoc`.
 
 CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
@@ -708,7 +710,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
 | Chuyển cơ sở | Tư vấn tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Admin Big hoặc Admin Small site nhận duyệt/từ chối; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX`; Kế toán chỉ đọc tại site nguồn kèm công nợ lịch sử | Tư vấn đề nghị; Admin Big hoặc Admin Small đúng site nhận duyệt/từ chối; Kế toán xem read-only |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |
-| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
+| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big quản lý cơ sở/môn; Admin Big, Tư vấn & xếp lớp, Kế toán & Lễ tân quản lý khóa học |
 | Báo cáo | Thống kê theo site/toàn trung tâm, tra cứu log | `GLOBAL` | Admin Small, Admin Big |
 
 ---

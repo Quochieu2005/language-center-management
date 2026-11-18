@@ -1,3 +1,4 @@
+from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -6,8 +7,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from core.academics.common import AcademicInfrastructureUnavailable, AcademicSiteUnavailable
 from core.auth.authentication import AuthCookieAuthentication
+from core.catalog.class_sessions import list_course_class_sessions
 from core.catalog.serializers import (
+    CourseClassSessionSummarySerializer,
     SharedCourseCreateSerializer,
     SharedCourseDeleteResponseSerializer,
     SharedCoursePatchSerializer,
@@ -28,6 +32,10 @@ from core.catalog.services import (
 from core.catalog.subject_write_services import create_shared_subject, delete_shared_subject
 from core.catalog.public_courses import list_public_courses, list_shared_subjects
 from core.catalog.course_services import create_shared_course, delete_shared_course, update_shared_course
+from core.sites.connections import UnknownSiteError
+
+
+_COURSE_MANAGEMENT_ROLES = {"admin_big", "tu_van", "ke_toan"}
 
 
 def _catalog_idempotency_key(request):
@@ -99,21 +107,21 @@ class SharedSubjectCollectionView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Liệt kê môn học dùng chung đã đối chiếu các site",
         description=(
-            "Chỉ Admin Big. Global Query đọc MonHoc riêng tại từng site đang hoạt động, "
+            "Admin Big, Tư vấn & xếp lớp và Kế toán & Lễ tân được xem. Global Query đọc MonHoc riêng tại từng site đang hoạt động, "
             "đối chiếu các bản sao và tổng hợp danh sách ở tầng API. Trả complete=false "
             "kèm site thiếu hoặc lệch; không ghi dữ liệu."
         ),
         responses={
             200: SharedSubjectListSerializer,
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big được xem danh mục quản trị."),
+            403: OpenApiResponse(description="Vai trò hiện tại không được xem danh mục môn học."),
             503: OpenApiResponse(description="Không đọc được danh sách site hoặc CSDL site nào."),
         },
     )
     def get(self, request):
-        if request.user.role != "admin_big":
+        if request.user.role not in _COURSE_MANAGEMENT_ROLES:
             return Response(
-                {"detail": "Chỉ Admin Big được xem danh mục quản trị."},
+                {"detail": "Vai trò hiện tại không được xem danh mục môn học."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
@@ -325,7 +333,7 @@ class SharedCourseCollectionView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Tạo khóa học và nhân bản tới các site hoạt động",
         description=(
-            "Chỉ Admin Big. Ghi KhoaHoc và ACK Logs trong transaction cục bộ ở từng site; "
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Ghi KhoaHoc và ACK Logs trong transaction cục bộ ở từng site; "
             "mã môn phải tồn tại và giống nhau tại mọi site. Bắt buộc Idempotency-Key. "
             "Lỗi giữa chừng trả 202 để retry cùng key/body; đây là replication tầng ứng dụng, "
             "không phải một transaction ACID xuyên CSDL."
@@ -340,15 +348,15 @@ class SharedCourseCollectionView(APIView):
             202: SharedCourseWriteResponseSerializer,
             400: OpenApiResponse(description="Dữ liệu khóa học hoặc Idempotency-Key không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big được quản lý danh mục khóa học."),
+            403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Môn học không tồn tại ở mọi site hoạt động."),
             409: OpenApiResponse(description="Mã/slug trùng, bản sao lệch hoặc key/body xung đột."),
             503: OpenApiResponse(description="Site bắt buộc chưa sẵn sàng hoặc cần đối soát."),
         },
     )
     def post(self, request):
-        if request.user.role != "admin_big":
-            return Response({"detail": "Chỉ Admin Big được quản lý danh mục khóa học."}, status=403)
+        if request.user.role not in _COURSE_MANAGEMENT_ROLES:
+            return Response({"detail": "Vai trò hiện tại không được quản lý khóa học."}, status=403)
         key = _catalog_idempotency_key(request)
         if not key:
             return Response({"detail": "Idempotency-Key phải có 8–128 ký tự chữ, số hoặc . _ : -."}, status=400)
@@ -385,7 +393,7 @@ class SharedCourseDetailView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Cập nhật khóa học và nhân bản tới các site hoạt động",
         description=(
-            "Chỉ Admin Big được sửa thông tin khóa học, bao gồm mã khóa học. Khi đổi mã, "
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân được sửa thông tin khóa học, bao gồm mã khóa học. Khi đổi mã, "
             "các lớp đang tham chiếu được cập nhật trong cùng transaction tại từng site. "
             "Ghi KhoaHoc cùng ACK Logs trong transaction cục bộ; retry kết quả một phần "
             "bằng đúng Idempotency-Key và body."
@@ -403,15 +411,15 @@ class SharedCourseDetailView(APIView):
             202: SharedCourseWriteResponseSerializer,
             400: OpenApiResponse(description="Slug, body hoặc Idempotency-Key không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big được quản lý danh mục khóa học."),
+            403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Không tìm thấy khóa học hoặc môn học."),
             409: OpenApiResponse(description="Bản sao lệch hoặc Idempotency-Key/body xung đột."),
             503: OpenApiResponse(description="Site bắt buộc chưa sẵn sàng hoặc cần đối soát."),
         },
     )
     def patch(self, request, slug):
-        if request.user.role != "admin_big":
-            return Response({"detail": "Chỉ Admin Big được quản lý danh mục khóa học."}, status=403)
+        if request.user.role not in _COURSE_MANAGEMENT_ROLES:
+            return Response({"detail": "Vai trò hiện tại không được quản lý khóa học."}, status=403)
         slug = str(slug or "").strip().lower()
         if (
             len(slug) > 160 or not slug
@@ -449,7 +457,7 @@ class SharedCourseDetailView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Xóa khóa học khỏi các site hoạt động",
         description=(
-            "Chỉ Admin Big. Xóa cứng KhoaHoc trên các site đang hoạt động nếu khóa học chưa được "
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Xóa cứng KhoaHoc trên các site đang hoạt động nếu khóa học chưa được "
             "LopHoc nào sử dụng. Dữ liệu lớp không bị xóa. Mỗi site ghi ACK append-only vào Logs "
             "trong transaction cục bộ; bắt buộc Idempotency-Key để retry nếu mất kết nối. Đây không "
             "phải transaction ACID xuyên CSDL."
@@ -465,15 +473,15 @@ class SharedCourseDetailView(APIView):
             200: SharedCourseDeleteResponseSerializer,
             400: OpenApiResponse(description="Slug hoặc Idempotency-Key không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
-            403: OpenApiResponse(description="Chỉ Admin Big được quản lý danh mục khóa học."),
+            403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Không tìm thấy khóa học."),
             409: OpenApiResponse(description="Khóa học đang được lớp sử dụng hoặc các bản sao không thống nhất."),
             503: OpenApiResponse(description="Site chưa sẵn sàng hoặc cần retry/đối soát."),
         },
     )
     def delete(self, request, slug):
-        if request.user.role != "admin_big":
-            return Response({"detail": "Chỉ Admin Big được quản lý danh mục khóa học."}, status=403)
+        if request.user.role not in _COURSE_MANAGEMENT_ROLES:
+            return Response({"detail": "Vai trò hiện tại không được quản lý khóa học."}, status=403)
         slug = str(slug or "").strip().lower()
         if (
             len(slug) > 160 or not slug
@@ -502,3 +510,47 @@ class SharedCourseDetailView(APIView):
                 status=503,
             )
         return Response(result, status=status.HTTP_200_OK)
+
+
+class CourseClassSessionSummaryView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "report_read"
+
+    @extend_schema(
+        operation_id="admin_course_class_session_summary",
+        tags=["Khóa học"],
+        summary="Đếm buổi học đã tạo theo từng lớp",
+        description=(
+            "Admin Big đọc GLOBAL từ LopHoc và BuoiHoc ở từng CSDL site hoạt động rồi tổng hợp trong API; "
+            "Tư vấn & xếp lớp và Kế toán & Lễ tân chỉ đọc LOCAL tại site gắn với phiên. "
+            "Số buổi là số dòng BuoiHoc đã tạo cho từng lớp, không cập nhật KhoaHoc.so_buoi. "
+            "Nếu thiếu site, trả complete=false và missing_sites."
+        ),
+        responses={
+            200: CourseClassSessionSummarySerializer,
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Không có quyền xem lịch lớp."),
+            404: OpenApiResponse(description="Cơ sở được phân công không còn hoạt động."),
+            503: OpenApiResponse(description="Không đọc được CSDL của cơ sở được phân công."),
+        },
+    )
+    def get(self, request):
+        try:
+            result = list_course_class_sessions(
+                role=request.user.role,
+                user_site_code=request.user.site_code,
+            )
+        except PermissionError:
+            return Response({"detail": "Vai trò hiện tại không được xem số buổi theo lớp."}, status=403)
+        except AcademicSiteUnavailable:
+            if request.user.role == "admin_big":
+                return Response({"detail": "Không xác định được danh sách cơ sở hoạt động."}, status=503)
+            return Response({"detail": "Cơ sở được phân công không còn hoạt động."}, status=404)
+        except (AcademicInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+            return Response(
+                {"detail": "Không đọc được lịch lớp tại cơ sở; số buổi theo lớp chưa tải được."},
+                status=503,
+            )
+        return Response(result)

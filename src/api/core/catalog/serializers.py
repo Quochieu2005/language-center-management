@@ -36,6 +36,24 @@ class PublicCourseListSerializer(serializers.Serializer):
     results = PublicCourseSerializer(many=True)
 
 
+class CourseClassSessionSerializer(serializers.Serializer):
+    course_id = serializers.CharField()
+    class_id = serializers.CharField()
+    class_name = serializers.CharField()
+    class_status = serializers.CharField()
+    site_code = serializers.CharField()
+    session_count = serializers.IntegerField(min_value=0)
+
+
+class CourseClassSessionSummarySerializer(serializers.Serializer):
+    scope = serializers.ChoiceField(choices=("GLOBAL", "LOCAL"))
+    complete = serializers.BooleanField()
+    site_codes = serializers.ListField(child=serializers.CharField())
+    missing_sites = serializers.ListField(child=serializers.CharField())
+    count = serializers.IntegerField(min_value=0)
+    results = CourseClassSessionSerializer(many=True)
+
+
 class SharedSubjectSerializer(serializers.Serializer):
     ma_mon = serializers.CharField()
     slug = serializers.CharField()
