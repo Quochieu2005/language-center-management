@@ -294,14 +294,16 @@ export default function ClassesPage() {
         <Col xs={24} md={6}><Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item></Col>
         <Col xs={24} md={18}><Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item></Col>
       </Row>
-      <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id || previous.start_date !== current.start_date || previous.end_date !== current.end_date || JSON.stringify(previous.weekdays) !== JSON.stringify(current.weekdays)}>
+      <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id || previous.start_date !== current.start_date || previous.end_date !== current.end_date || previous.start_time !== current.start_time || previous.end_time !== current.end_time || JSON.stringify(previous.weekdays) !== JSON.stringify(current.weekdays)}>
         {({ getFieldValue }) => {
           const selectedCourse = courseOptions.find((course) => course.course_id === getFieldValue("course_id"));
           const startDate = getFieldValue("start_date") as string | undefined;
           const endDate = getFieldValue("end_date") as string | undefined;
+          const startTime = getFieldValue("start_time");
+          const endTime = getFieldValue("end_time");
           const selectedWeekdays = (getFieldValue("weekdays") || []) as number[];
           const latestEndDate = selectedCourse && startDate ? courseEndDate(startDate, selectedCourse) : null;
-          const hasSchedule = Boolean(startDate && endDate && selectedWeekdays.length);
+          const hasSchedule = Boolean(startDate && endDate && startTime && endTime && selectedWeekdays.length);
           const sessionCount = hasSchedule ? countScheduledSessions(startDate!, endDate!, selectedWeekdays) : null;
           const scheduleError = selectedCourse && (!latestEndDate && startDate)
             ? "Khóa học chưa có thời lượng hợp lệ. Cập nhật khóa học trước khi mở lớp."
@@ -325,7 +327,7 @@ export default function ClassesPage() {
         <Col xs={24} sm={12}><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
         <Col xs={24} sm={12}><Form.Item name="end_time" label="Giờ kết thúc" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
       </Row>
-            {selectedCourse && <Alert type={scheduleError ? "warning" : "info"} showIcon title={scheduleError || `Ngày kết thúc tối đa: ${latestEndDate || "chưa tính được"} · Số buổi theo lịch: ${sessionCount ?? "chọn ngày và thứ học để tính"}${selectedCourse.session_count == null ? "" : `/${selectedCourse.session_count} buổi của khóa`}`} />}
+            {selectedCourse && <Alert type={scheduleError ? "warning" : "info"} showIcon title={scheduleError || `Ngày kết thúc theo thời lượng: ${latestEndDate || "chưa tính được"} · Số buổi dự kiến trong khóa: ${sessionCount ?? "chọn đủ ngày, giờ và thứ học để tính"}${selectedCourse.session_count == null ? "" : `/${selectedCourse.session_count} buổi của khóa`}`} />}
             <Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled || Boolean(scheduleError)}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
           </>;
         }}
