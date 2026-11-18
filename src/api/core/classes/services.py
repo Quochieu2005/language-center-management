@@ -109,8 +109,8 @@ def _weekday_number(value: date) -> int:
 def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int | None) -> list[date]:
     if expected_count is not None and not 1 <= expected_count <= 500:
         raise ClassInvalid("Số buổi của khóa học phải nằm trong khoảng 1 đến 500.")
-    if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 2 or day > 6 for day in weekdays):
-        raise ClassInvalid("Lịch học chỉ được chọn các ngày từ Thứ 2 đến Thứ 6, không chọn trùng.")
+    if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 1 or day > 7 for day in weekdays):
+        raise ClassInvalid("Lịch học phải chọn ngày từ Chủ nhật đến Thứ 7 và không được chọn trùng.")
     dates: list[date] = []
     current = start
     while current <= end and (expected_count is None or len(dates) < expected_count):
