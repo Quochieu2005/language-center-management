@@ -11,6 +11,7 @@ const weekdays = [2, 3, 4, 5, 6, 7, 1].map((value) => ({ value, label: value ===
 const durationText = (course: ClassCourseOption) => course.duration_value == null || !course.duration_unit
   ? "Chưa cập nhật thời lượng"
   : `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(Number(course.duration_value))} ${course.duration_unit === "thang" ? "tháng" : "ngày"}`;
+const money = new Intl.NumberFormat("vi-VN");
 const dayMs = 24 * 60 * 60 * 1000;
 const todayVietnam = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
 const parseDate = (value: string) => {
@@ -273,7 +274,7 @@ export default function ClassesPage() {
       <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id}>
         {({ getFieldValue }) => {
           const selectedCourse = courseOptions.find((course) => course.course_id === getFieldValue("course_id"));
-          return selectedCourse ? <Alert type="info" showIcon title={`${selectedCourse.name} · ${selectedCourse.subject_name} · ${selectedCourse.level} — Thời lượng: ${durationText(selectedCourse)}${selectedCourse.session_count ? ` · ${selectedCourse.session_count} buổi` : ""}`} /> : null;
+          return selectedCourse ? <Alert type="info" showIcon title={`${selectedCourse.name} · ${selectedCourse.subject_name} · ${selectedCourse.level} — Thời lượng: ${durationText(selectedCourse)}${selectedCourse.session_count ? ` · ${selectedCourse.session_count} buổi` : ""}`} description={`Học phí chuẩn cả khóa: ${money.format(selectedCourse.standard_fee)} ₫`} /> : null;
         }}
       </Form.Item>
       <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>

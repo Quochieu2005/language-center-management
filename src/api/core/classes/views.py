@@ -367,10 +367,10 @@ class ClassCourseOptionsView(_ClassApiView):
     @extend_schema(
         operation_id="class_course_options",
         tags=["Xếp lớp"],
-        summary="Liệt kê khóa học và thời lượng tại site",
+        summary="Liệt kê khóa học, học phí và thời lượng tại site",
         description=(
             "Đọc LOCAL từ KhoaHoc và MonHoc của site được chọn. Admin Big gửi site_code; "
-            "Admin Small/Tư vấn & xếp lớp chỉ đọc site trong phiên. Dùng để chọn khóa học khi mở lớp."
+            "Admin Small/Tư vấn & xếp lớp chỉ đọc site trong phiên. Dùng để chọn khóa học, xem học phí chuẩn và tính lịch khi mở lớp."
         ),
         parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
         responses={

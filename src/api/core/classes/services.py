@@ -254,7 +254,7 @@ def list_class_course_options(*, site_code: str) -> dict[str, Any]:
         _active_site(cursor, site_code)
         cursor.execute(
             "SELECT k.ma_khoa_hoc, k.ten_khoa_hoc, m.ten_mon, k.trinh_do, "
-            "k.so_buoi, k.thoi_luong_so, k.thoi_luong_don_vi "
+            "k.so_buoi, k.thoi_luong_so, k.thoi_luong_don_vi, k.hoc_phi_chuan "
             "FROM dbo.KhoaHoc k JOIN dbo.MonHoc m ON m.ma_mon = k.ma_mon "
             "ORDER BY m.ten_mon, k.ten_khoa_hoc, k.ma_khoa_hoc"
         )
@@ -271,6 +271,7 @@ def list_class_course_options(*, site_code: str) -> dict[str, Any]:
                 "session_count": None if row[4] is None else int(row[4]),
                 "duration_value": row[5],
                 "duration_unit": None if row[6] is None else str(row[6]),
+                "standard_fee": int(row[7]),
             }
             for row in rows
         ],

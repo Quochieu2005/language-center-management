@@ -14,7 +14,7 @@ export type ClassRow = {
 export type ClassCourseOption = {
   course_id: string; name: string; subject_name: string; level: string;
   session_count: number | null; duration_value: number | string | null;
-  duration_unit: "thang" | "ngay" | null;
+  duration_unit: "thang" | "ngay" | null; standard_fee: number;
 };
 export type ClassCourseOptionList = { site_code: string; count: number; results: ClassCourseOption[] };
 export type RoomRow = { room_id: string; site_code: string; name: string; capacity: number; status: string; class_count: number; student_count: number };
