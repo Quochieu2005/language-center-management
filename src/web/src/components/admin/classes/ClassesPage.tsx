@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, TimePicker, message } from "antd";
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, TimePicker, message } from "antd";
 import { academicsApi, type ClassRow, type EnrollmentRow, type RoomRow, type SessionRow } from "@/lib/api/academics";
 import { adminApi, type Student, type Teacher } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";
@@ -226,7 +226,14 @@ export default function ClassesPage() {
       <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>
       <Form.Item name="room_id" label="Phòng" rules={[{ required: true }]}><Select loading={operationLoading} options={rooms.filter((x) => x.status === "hoat_dong").map((x) => ({ value: x.room_id, label: `${x.name} · tối đa ${x.capacity}` }))} /></Form.Item>
       <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item>
-      <Space wrap><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" /></Form.Item><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" /></Form.Item><Form.Item name="start_time" label="Giờ bắt đầu · Việt Nam (24 giờ)" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" /></Form.Item><Form.Item name="end_time" label="Giờ kết thúc · Việt Nam (24 giờ)" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" /></Form.Item></Space>
+      <Row gutter={16}>
+        <Col xs={24} sm={12}><Form.Item name="start_date" label="Ngày bắt đầu" rules={[{ required: true }]}><Input type="date" /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="end_date" label="Ngày kết thúc" rules={[{ required: true }]}><Input type="date" /></Form.Item></Col>
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} sm={12}><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="end_time" label="Giờ kết thúc" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
+      </Row>
       <Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item>
       </>}
       <Button type="primary" htmlType="submit" block disabled={editingClass ? false : operationSubmitDisabled}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
