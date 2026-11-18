@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, time, timedelta
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from functools import wraps
 from typing import Any
 
@@ -11,7 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 
-from core.academics.tuition_installments import create_default_tuition_installment
+from core.academics.tuition_installments import add_calendar_months, create_default_tuition_installment
 from core.auth.service_common import AuthInfrastructureUnavailable, _acquire_named_lock
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
@@ -106,6 +107,33 @@ def _weekday_number(value: date) -> int:
     return (value.weekday() + 1) % 7 + 1
 
 
+def _course_end_date(start: date, duration_value: Any, duration_unit: Any) -> date:
+    try:
+        duration = Decimal(str(duration_value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ClassInvalid("Khóa học chưa có thời lượng hợp lệ.") from exc
+    if not duration.is_finite() or duration <= 0:
+        raise ClassInvalid("Khóa học chưa có thời lượng hợp lệ.")
+    try:
+        if duration_unit == "ngay":
+            if duration != duration.to_integral_value():
+                raise ClassInvalid("Thời lượng khóa học tính theo ngày phải là số nguyên.")
+            return start + timedelta(days=int(duration) - 1)
+        if duration_unit != "thang":
+            raise ClassInvalid("Khóa học chưa có đơn vị thời lượng hợp lệ.")
+
+        whole_months = int(duration)
+        boundary = add_calendar_months(start, whole_months)
+        fraction = duration - whole_months
+        if fraction:
+            next_boundary = add_calendar_months(start, whole_months + 1)
+            extra_days = ((next_boundary - boundary).days * fraction).to_integral_value(rounding=ROUND_CEILING)
+            boundary += timedelta(days=int(extra_days))
+        return boundary - timedelta(days=1)
+    except (OverflowError, ValueError) as exc:
+        raise ClassInvalid("Thời lượng khóa học vượt giới hạn ngày có thể tạo lịch.") from exc
+
+
 def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int | None) -> list[date]:
     if expected_count is not None and not 1 <= expected_count <= 500:
         raise ClassInvalid("Số buổi của khóa học phải nằm trong khoảng 1 đến 500.")
@@ -113,7 +141,7 @@ def _session_dates(start: date, end: date, weekdays: list[int], expected_count: 
         raise ClassInvalid("Lịch học phải chọn ngày từ Chủ nhật đến Thứ 7 và không được chọn trùng.")
     dates: list[date] = []
     current = start
-    while current <= end and (expected_count is None or len(dates) < expected_count):
+    while current <= end:
         if _weekday_number(current) in weekdays:
             dates.append(current)
             if len(dates) > 500:
@@ -122,7 +150,10 @@ def _session_dates(start: date, end: date, weekdays: list[int], expected_count: 
     if not dates:
         raise ClassInvalid("Khoảng ngày không có buổi học nào khớp với các thứ đã chọn.")
     if expected_count is not None and len(dates) != expected_count:
-        raise ClassInvalid("Khoảng ngày đã chọn không đủ buổi theo lịch và số buổi của khóa học.")
+        raise ClassInvalid(
+            f"Lịch đã chọn tạo ra {len(dates)} buổi; khóa học yêu cầu {expected_count} buổi. "
+            "Hãy điều chỉnh khoảng ngày hoặc các thứ học."
+        )
     return dates
 
 
@@ -304,7 +335,8 @@ def create_class(*, site_code: str, actor_id: str, remote_ip: str, data: dict[st
         with connections[alias].cursor() as cursor:
             _active_site(cursor, site_code)
             cursor.execute(
-                "SELECT so_buoi FROM dbo.KhoaHoc WITH (UPDLOCK, HOLDLOCK) WHERE ma_khoa_hoc = %s",
+                "SELECT so_buoi, thoi_luong_so, thoi_luong_don_vi "
+                "FROM dbo.KhoaHoc WITH (UPDLOCK, HOLDLOCK) WHERE ma_khoa_hoc = %s",
                 [data["course_id"]],
             )
             course = cursor.fetchone()
@@ -313,6 +345,11 @@ def create_class(*, site_code: str, actor_id: str, remote_ip: str, data: dict[st
             expected_sessions = None if course[0] is None else int(course[0])
             if expected_sessions is not None and expected_sessions > 500:
                 raise ClassInvalid("Số buổi khóa học vượt giới hạn tạo lịch tự động của API.")
+            latest_end_date = _course_end_date(data["start_date"], course[1], course[2])
+            if data["end_date"] > latest_end_date:
+                raise ClassInvalid(
+                    f"Ngày kết thúc phải nằm trong thời lượng khóa học, không muộn hơn {latest_end_date.isoformat()}."
+                )
             generated_dates = _session_dates(
                 data["start_date"], data["end_date"], data["weekdays"], expected_sessions
             )
