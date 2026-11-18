@@ -266,20 +266,30 @@ export default function ClassesPage() {
     <Card title={`Lớp học · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Space wrap>{canEnroll && <Button disabled={!canStartOperation} onClick={() => openOperation("move")}>Chuyển lớp</Button>}{canEnroll && <Button disabled={!canStartOperation} onClick={() => openOperation("enroll")}>Đăng ký học</Button>}{canAdministerClasses && <Button type="primary" onClick={() => openOperation("class")} disabled={!canStartOperation}>Mở lớp</Button>}</Space>}>
       <Table rowKey="class_id" loading={loading} columns={columns} dataSource={classes} scroll={{ x: 1000 }} />
     </Card>
-    <Modal title={editingClass ? "Sửa lớp" : "Tạo lớp và lịch"} open={modal === "class"} onCancel={() => { setModal(null); setEditingClass(null); classForm.resetFields(); }} footer={null} width={700} destroyOnHidden><Form form={classForm} layout="vertical" onFinish={createClass}>
+    <Modal title={editingClass ? "Sửa lớp" : "Tạo lớp và lịch"} open={modal === "class"} onCancel={() => { setModal(null); setEditingClass(null); classForm.resetFields(); }} footer={null} width={editingClass ? 700 : 1000} destroyOnHidden><Form form={classForm} layout="vertical" onFinish={createClass}>
       {operationSiteField}{operationAlert}
-      <Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item>
-      {editingClass ? <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item> : <>
-      <Form.Item name="course_id" label="Khóa học" rules={[{ required: true, message: "Chọn khóa học." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} placeholder="Chọn khóa học tại cơ sở" notFoundContent={operationLoading ? "Đang tải khóa học..." : "Cơ sở chưa có khóa học"} options={courseOptions.map((course) => ({ value: course.course_id, label: `${course.name} · ${course.subject_name} · ${course.level} · ${durationText(course)}` }))} /></Form.Item>
+      {editingClass ? <Row gutter={16}>
+        <Col xs={24} sm={12}><Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item></Col>
+      </Row> : <>
+      <Row gutter={16}>
+        <Col xs={24} sm={12}><Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input maxLength={120} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="course_id" label="Khóa học" rules={[{ required: true, message: "Chọn khóa học." }]}><Select showSearch optionFilterProp="label" loading={operationLoading} placeholder="Chọn khóa học tại cơ sở" notFoundContent={operationLoading ? "Đang tải khóa học..." : "Cơ sở chưa có khóa học"} options={courseOptions.map((course) => ({ value: course.course_id, label: `${course.name} · ${course.subject_name} · ${course.level} · ${durationText(course)}` }))} /></Form.Item></Col>
+      </Row>
       <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id}>
         {({ getFieldValue }) => {
           const selectedCourse = courseOptions.find((course) => course.course_id === getFieldValue("course_id"));
           return selectedCourse ? <Alert type="info" showIcon title={`${selectedCourse.name} · ${selectedCourse.subject_name} · ${selectedCourse.level} — Thời lượng: ${durationText(selectedCourse)}${selectedCourse.session_count ? ` · ${selectedCourse.session_count} buổi` : ""}`} description={`Học phí chuẩn cả khóa: ${money.format(selectedCourse.standard_fee)} ₫`} /> : null;
         }}
       </Form.Item>
-      <Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item>
-      <Form.Item name="room_id" label="Phòng" rules={[{ required: true }]}><Select loading={operationLoading} options={rooms.filter((x) => x.status === "hoat_dong").map((x) => ({ value: x.room_id, label: `${x.name} · tối đa ${x.capacity}` }))} /></Form.Item>
-      <Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item>
+      <Row gutter={16}>
+        <Col xs={24} sm={12}><Form.Item name="teacher_id" label="Giáo viên" rules={[{ required: true }]}><Select loading={operationLoading} options={teachers.map((x) => ({ value: x.teacher_id, label: `${x.full_name} · ${x.teacher_id}` }))} /></Form.Item></Col>
+        <Col xs={24} sm={12}><Form.Item name="room_id" label="Phòng" rules={[{ required: true }]}><Select loading={operationLoading} options={rooms.filter((x) => x.status === "hoat_dong").map((x) => ({ value: x.room_id, label: `${x.name} · tối đa ${x.capacity}` }))} /></Form.Item></Col>
+      </Row>
+      <Row gutter={16}>
+        <Col xs={24} md={6}><Form.Item name="capacity" label="Sĩ số tối đa" rules={[{ required: true }]}><InputNumber min={1} max={300} style={{ width: "100%" }} /></Form.Item></Col>
+        <Col xs={24} md={18}><Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item></Col>
+      </Row>
       <Form.Item noStyle shouldUpdate={(previous, current) => previous.course_id !== current.course_id || previous.start_date !== current.start_date || previous.end_date !== current.end_date || JSON.stringify(previous.weekdays) !== JSON.stringify(current.weekdays)}>
         {({ getFieldValue }) => {
           const selectedCourse = courseOptions.find((course) => course.course_id === getFieldValue("course_id"));
@@ -311,7 +321,6 @@ export default function ClassesPage() {
         <Col xs={24} sm={12}><Form.Item name="start_time" label="Giờ bắt đầu" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
         <Col xs={24} sm={12}><Form.Item name="end_time" label="Giờ kết thúc" rules={[{ required: true }]}><TimePicker format="HH:mm" use12Hours={false} placeholder="HH:mm" style={{ width: "100%" }} /></Form.Item></Col>
       </Row>
-      <Form.Item name="weekdays" label="Ngày học trong tuần" rules={[{ required: true }]}><Checkbox.Group options={weekdays} /></Form.Item>
             {selectedCourse && <Alert type={scheduleError ? "warning" : "info"} showIcon title={scheduleError || `Ngày kết thúc tối đa: ${latestEndDate || "chưa tính được"} · Số buổi theo lịch: ${sessionCount ?? "chọn ngày và thứ học để tính"}${selectedCourse.session_count == null ? "" : `/${selectedCourse.session_count} buổi của khóa`}`} />}
             <Button type="primary" htmlType="submit" block disabled={operationSubmitDisabled || Boolean(scheduleError)}>{editingClass ? "Lưu thay đổi" : "Tạo lớp"}</Button>
           </>;
