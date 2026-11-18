@@ -335,7 +335,7 @@ flowchart LR
     SiteRouter["Bộ định tuyến cơ sở"] -->|cập nhật đăng ký và sĩ số| SQLServer_CSDL_Site["SQL Server của cơ sở"]
 ```
 
-Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Lớp đích phải thuộc cùng cơ sở và còn chỗ; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
+Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Trên form, nhân viên chọn lớp hiện tại để xem phòng/lịch và roster học viên theo họ tên/mã; sau đó chọn lớp đích cùng khóa học, còn chỗ và thấy rõ phòng/lịch. Lớp đích phải thuộc cùng cơ sở; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
 
 ### 5.3. Thu hoặc hoàn học phí
 

@@ -405,7 +405,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 **Người dùng:** Admin Big chọn một site; Admin Small hoặc Tư vấn & xếp lớp tại site được giao. Kế toán & Lễ tân chỉ xem đăng ký/lớp. **Kiểu:** LOCAL. **Bảng:** HocVien, DangKy, LopHoc, Logs.
 
-1. Nhân viên chọn đăng ký hiện hành và lớp đích.
+1. Nhân viên chọn lớp hiện tại; giao diện hiển thị phòng và lịch, rồi tải roster đăng ký còn hiệu lực để chọn học viên theo họ tên/mã học viên. Mã đăng ký được giữ làm giá trị gửi API. Danh sách lớp đích hiển thị phòng/lịch và chỉ gợi ý lớp cùng khóa học còn chỗ.
 2. API xác nhận học viên/đăng ký/lớp cùng site, lớp đích còn chỗ, lịch phù hợp, đăng ký chưa hoàn tất/hủy/chuyển đi và không tạo bản ghi trùng.
 3. Cập nhật quan hệ lớp của DangKy, sĩ số lớp cũ/mới và nhật ký trong một transaction cục bộ.
 4. Trả lớp cũ/mới và trạng thái đăng ký sau cập nhật.
