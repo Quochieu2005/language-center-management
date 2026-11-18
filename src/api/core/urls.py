@@ -49,6 +49,7 @@ from core.students.views import (
 )
 from core.classes.views import (
     ClassCollectionView,
+    ClassCourseOptionsView,
     ClassDetailView,
     ClassRosterView,
     ClassSessionsView,
@@ -187,6 +188,7 @@ urlpatterns = [
     path("admin/students/<str:slug>/", StudentAdminDetailView.as_view(), name="student-admin-delete"),
     path("admin/students/<str:slug>/account/", StudentAccountProvisionView.as_view(), name="student-account-issue"),
     path("admin/classes/", ClassCollectionView.as_view(), name="class-list-create"),
+    path("admin/classes/course-options/", ClassCourseOptionsView.as_view(), name="class-course-options"),
     path("admin/rooms/", RoomCollectionView.as_view(), name="room-list-create"),
     path("admin/rooms/<str:room_id>/", RoomDetailView.as_view(), name="room-detail"),
     path("admin/classes/<str:class_id>/", ClassDetailView.as_view(), name="class-detail"),

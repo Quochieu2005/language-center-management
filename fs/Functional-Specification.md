@@ -380,12 +380,12 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, có `site_code` trên mỗi dòng và trả `complete=false`/`missing_sites` khi thiếu site. Khi bộ lọc đang ở `Toàn hệ thống`, thao tác ghi yêu cầu chọn site cụ thể; API chỉ ghi `LOCAL`. Admin Small và Tư vấn có thể mở lớp, đăng ký/xếp lớp và phân công giáo viên; Kế toán & Lễ tân chỉ xem lớp và roster. Danh sách chọn giáo viên được đọc riêng tại site thao tác qua `GET /admin/teachers/assignment-options/`; nhân viên dùng site từ phiên đăng nhập và chỉ nhận mã cùng họ tên của giáo viên đang dạy, không nhận thông tin liên hệ/tài khoản. Tư vấn được sửa tên/sĩ số lớp trong giới hạn sức chứa; chỉ được hủy lớp `sap_mo` chưa có đăng ký và mọi buổi còn ở tương lai, trạng thái `du_kien`. Hủy mềm đặt `LopHoc.trang_thai='huy'`, giữ nguyên `LopHoc`, `BuoiHoc` và `Logs`; nếu có đăng ký hoặc lịch sử buổi học, API từ chối. Không JOIN xuyên site.
 
-1. Nhân viên chọn khóa học, giáo viên, phòng, sức chứa, ngày bắt đầu/kết thúc, thứ trong tuần và khung giờ.
+1. Nhân viên chọn khóa học từ danh sách `KhoaHoc` tại site thao tác qua `GET /admin/classes/course-options/`; mỗi lựa chọn hiển thị tên khóa, môn, trình độ và thời lượng lấy từ dữ liệu khóa học (số tháng hoặc ngày). Sau đó chọn giáo viên, phòng, sức chứa, ngày bắt đầu/kết thúc, một hoặc nhiều ngày từ Thứ 2 đến Chủ nhật, và khung giờ theo giờ Việt Nam định dạng 24 giờ (`HH:mm`).
 2. API kiểm tra tất cả dữ liệu thuộc site, giáo viên đang dạy, phòng khả dụng, ngày/giờ hợp lệ và không trùng lịch giáo viên/phòng.
 3. Tạo LopHoc và các BuoiHoc theo mẫu lịch trong một transaction cục bộ.
 4. Trả danh sách buổi đã tạo để nhân viên kiểm tra.
 
-**Nghiệm thu:** không có buổi ngoài khoảng ngày; giờ hiển thị 24 tiếng Việt Nam; ngày kết thúc trước ngày bắt đầu bị từ chối; xung đột không tạo lớp/buổi một phần.
+**Nghiệm thu:** danh sách khóa học và thời lượng lấy từ CSDL đúng site, không nhập tay mã khóa; khóa được chọn hiển thị thời lượng theo dữ liệu tháng/ngày; không có buổi ngoài khoảng ngày; đủ 7 ngày trong tuần được sinh đúng ngày; giờ hiển thị và lưu theo giờ Việt Nam định dạng 24 tiếng; ngày kết thúc trước ngày bắt đầu bị từ chối; xung đột không tạo lớp/buổi một phần.
 
 ### FS-ROOM-01 — Quản lý phòng học
 
@@ -405,7 +405,7 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 **Người dùng:** Admin Big chọn một site; Admin Small hoặc Tư vấn & xếp lớp tại site được giao. Kế toán & Lễ tân chỉ xem đăng ký/lớp. **Kiểu:** LOCAL. **Bảng:** HocVien, DangKy, LopHoc, Logs.
 
-1. Nhân viên chọn đăng ký hiện hành và lớp đích.
+1. Nhân viên chọn lớp hiện tại; giao diện hiển thị phòng và lịch, rồi tải roster đăng ký còn hiệu lực để chọn học viên theo họ tên/mã học viên. Mã đăng ký được giữ làm giá trị gửi API. Danh sách lớp đích hiển thị phòng/lịch và chỉ gợi ý lớp cùng khóa học còn chỗ.
 2. API xác nhận học viên/đăng ký/lớp cùng site, lớp đích còn chỗ, lịch phù hợp, đăng ký chưa hoàn tất/hủy/chuyển đi và không tạo bản ghi trùng.
 3. Cập nhật quan hệ lớp của DangKy, sĩ số lớp cũ/mới và nhật ký trong một transaction cục bộ.
 4. Trả lớp cũ/mới và trạng thái đăng ký sau cập nhật.

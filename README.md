@@ -335,7 +335,7 @@ flowchart LR
     SiteRouter["Bộ định tuyến cơ sở"] -->|cập nhật đăng ký và sĩ số| SQLServer_CSDL_Site["SQL Server của cơ sở"]
 ```
 
-Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Lớp đích phải thuộc cùng cơ sở và còn chỗ; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
+Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Trên form, nhân viên chọn lớp hiện tại để xem phòng/lịch và roster học viên theo họ tên/mã; sau đó chọn lớp đích cùng khóa học, còn chỗ và thấy rõ phòng/lịch. Lớp đích phải thuộc cùng cơ sở; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
 
 ### 5.3. Thu hoặc hoàn học phí
 
@@ -543,7 +543,7 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Admin Small và Tư vấn mở lớp tại site được giao; danh sách giáo viên phân công đọc `LOCAL` tại site trong phiên qua `/api/v1/admin/teachers/assignment-options/` và chỉ trả mã, họ tên của giáo viên đang dạy. Kế toán & Lễ tân chỉ xem lớp và roster. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải khóa học, giáo viên/phòng theo site đã chọn. Khóa học được chọn từ `GET /api/v1/admin/classes/course-options/`, đọc `KhoaHoc` và `MonHoc` tại site; danh sách và thông tin sau khi chọn hiển thị tên khóa, môn, trình độ cùng thời lượng theo dữ liệu (tháng/ngày). Admin Small và Tư vấn mở lớp tại site được giao; danh sách giáo viên phân công đọc `LOCAL` tại site trong phiên qua `/api/v1/admin/teachers/assignment-options/` và chỉ trả mã, họ tên của giáo viên đang dạy. Kế toán & Lễ tân chỉ xem lớp và roster. Lịch cho chọn đủ ngày từ Thứ 2 đến Chủ nhật; giờ bắt đầu/kết thúc dùng `HH:mm` theo giờ Việt Nam (`Asia/Ho_Chi_Minh`), không chuyển múi giờ trên trình duyệt. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
 
 Tư vấn được sửa tên lớp hoặc sĩ số tối đa tại đúng site; API từ chối lớp đã kết thúc/hủy, sĩ số thấp hơn số đăng ký, hoặc vượt sức chứa phòng. Tư vấn có thể hủy mềm lớp `sap_mo` khi chưa có đăng ký và mọi buổi vẫn ở tương lai, trạng thái `du_kien`; `LopHoc`, `BuoiHoc` và `Logs` được giữ lại. Kế toán & Lễ tân chỉ đọc và không dùng các thao tác lớp/đăng ký.
 

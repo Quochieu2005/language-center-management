@@ -109,8 +109,8 @@ def _weekday_number(value: date) -> int:
 def _session_dates(start: date, end: date, weekdays: list[int], expected_count: int | None) -> list[date]:
     if expected_count is not None and not 1 <= expected_count <= 500:
         raise ClassInvalid("Số buổi của khóa học phải nằm trong khoảng 1 đến 500.")
-    if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 2 or day > 6 for day in weekdays):
-        raise ClassInvalid("Lịch học chỉ được chọn các ngày từ Thứ 2 đến Thứ 6, không chọn trùng.")
+    if not weekdays or len(set(weekdays)) != len(weekdays) or any(day < 1 or day > 7 for day in weekdays):
+        raise ClassInvalid("Lịch học phải chọn ngày từ Chủ nhật đến Thứ 7 và không được chọn trùng.")
     dates: list[date] = []
     current = start
     while current <= end and (expected_count is None or len(dates) < expected_count):
@@ -213,6 +213,36 @@ def _class_item(row: tuple[Any, ...]) -> dict[str, Any]:
         "start_time": row[15],
         "end_time": row[16],
         "status": str(row[17]),
+    }
+
+
+@_translate_errors
+def list_class_course_options(*, site_code: str) -> dict[str, Any]:
+    connection = get_site_connection(site_code)
+    with connection.cursor() as cursor:
+        _active_site(cursor, site_code)
+        cursor.execute(
+            "SELECT k.ma_khoa_hoc, k.ten_khoa_hoc, m.ten_mon, k.trinh_do, "
+            "k.so_buoi, k.thoi_luong_so, k.thoi_luong_don_vi "
+            "FROM dbo.KhoaHoc k JOIN dbo.MonHoc m ON m.ma_mon = k.ma_mon "
+            "ORDER BY m.ten_mon, k.ten_khoa_hoc, k.ma_khoa_hoc"
+        )
+        rows = cursor.fetchall()
+    return {
+        "site_code": site_code,
+        "count": len(rows),
+        "results": [
+            {
+                "course_id": str(row[0]),
+                "name": str(row[1]),
+                "subject_name": str(row[2]),
+                "level": str(row[3]),
+                "session_count": None if row[4] is None else int(row[4]),
+                "duration_value": row[5],
+                "duration_unit": None if row[6] is None else str(row[6]),
+            }
+            for row in rows
+        ],
     }
 
 

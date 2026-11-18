@@ -13,6 +13,7 @@ from core.academics.common import AcademicError, global_site_list
 from core.auth.authentication import AuthCookieAuthentication
 from core.classes.mutations import delete_class, update_class
 from core.classes.serializers import (
+    ClassCourseOptionListSerializer,
     ClassCreateSerializer,
     ClassDeleteResponseSerializer,
     ClassDetailResponseSerializer,
@@ -50,6 +51,7 @@ from core.classes.services import (
     create_class,
     delete_room,
     get_class,
+    list_class_course_options,
     list_class_students,
     list_class_sessions,
     list_classes,
@@ -357,6 +359,41 @@ def _validate_record_id(value: str):
     if not _SITE_RECORD_ID.fullmatch(value):
         return Response({"detail": "Mã bản ghi không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
     return None
+
+
+class ClassCourseOptionsView(_ClassApiView):
+    throttle_scope = "class_management"
+
+    @extend_schema(
+        operation_id="class_course_options",
+        tags=["Xếp lớp"],
+        summary="Liệt kê khóa học và thời lượng tại site",
+        description=(
+            "Đọc LOCAL từ KhoaHoc và MonHoc của site được chọn. Admin Big gửi site_code; "
+            "Admin Small/Tư vấn & xếp lớp chỉ đọc site trong phiên. Dùng để chọn khóa học khi mở lớp."
+        ),
+        parameters=[OpenApiParameter("site_code", str, OpenApiParameter.QUERY)],
+        responses={
+            200: ClassCourseOptionListSerializer,
+            400: OpenApiResponse(description="Admin Big phải chọn site_code."),
+            403: OpenApiResponse(description="Vai trò không có quyền mở lớp hoặc vượt phạm vi site."),
+            409: OpenApiResponse(description="Cơ sở không hoạt động."),
+            503: OpenApiResponse(description="CSDL site không sẵn sàng."),
+        },
+    )
+    def get(self, request):
+        query = ClassSiteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        site_code, error = _site_scope(
+            request.user, query.validated_data.get("site_code"), allowed_roles=_CLASS_WRITE_ROLES
+        )
+        if error:
+            return error
+        try:
+            result = list_class_course_options(site_code=site_code)
+        except (ClassNotFound, ClassConflict, ClassInvalid, ClassSiteUnavailable, ClassInfrastructureUnavailable) as exc:
+            return _error_response(exc)
+        return Response(result)
 
 
 class ClassCollectionView(_ClassApiView):
