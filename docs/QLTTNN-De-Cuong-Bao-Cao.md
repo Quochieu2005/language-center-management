@@ -277,7 +277,7 @@ Sơ đồ logic là client/server: người dùng ở máy trạm gọi ứng d�
 1. Nguồn chuẩn cho site là bảng `CoSo` nhân bản; Coordinator chọn các dòng `hoat_dong` và đối chiếu cấu hình kết nối.
 2. Ghi chung luôn đi qua một module. Trước khi ghi phải xác nhận toàn bộ site hoạt động sẵn sàng; thiếu một site thì từ chối.
 3. Các bản ghi nhân bản có `phien_ban`, `cap_nhat_luc`; đối soát định kỳ phát hiện site cũ và đưa dữ liệu về bản mới nhất theo quy tắc được chốt.
-4. `Logs` ghi audit và ACK đồng bộ theo site, không ghi bí mật. ACK runtime hiện được áp dụng cho thay đổi `MonHoc`; không coi đây là bằng chứng mọi bảng dùng chung đã có replication.
+4. `Logs` ghi audit và ACK đồng bộ theo site, không ghi bí mật. biên nhận Publisher hiện được áp dụng cho thay đổi `MonHoc`; không coi đây là bằng chứng mọi bảng dùng chung đã có replication.
 5. Tư vấn tạo đề nghị `cho_duyet` và sự kiện append-only tại CSDL nguồn; Admin Big dùng Global Query đọc hộp thư toàn hệ thống, còn Admin Small chỉ thấy đề nghị nguồn/site nhận và có thể quyết định đề nghị gửi tới site mình. Quyết định được ghi tại nguồn. Chỉ sau khi duyệt mới tạo hồ sơ đích, giữ nguyên tài khoản, đánh dấu bản nguồn `da_chuyen_di`, ghi thông báo nhân sự tại đích và phục hồi tiến về phía trước nếu bị dừng giữa chừng. Tư vấn xếp lớp/phòng thủ công. Không xóa hồ sơ đích đã commit. Global Query thống kê áp dụng quy tắc một hồ sơ hiện hành theo trạng thái/bước. Xem [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md) để biết trình tự và các điểm lỗi.
 
 Luồng này dùng các transaction cục bộ tại từng CSDL với Coordinator phục hồi tiến về phía trước. Không mô tả là ACID nguyên tử giữa hai CSDL; báo cáo kết quả kiểm thử theo trạng thái từng site, sự kiện đã ghi, cách retry và quy tắc thống kê khi giao dịch còn `dang_xu_ly`.
@@ -296,7 +296,7 @@ Theo README, đây là kiến trúc **Client/Server có Coordinator**: máy tr�
 
 #### Publication/Replication và tránh hai cơ chế ghi
 
-Ít nhất một phương pháp replication phải được triển khai và chứng minh truyền thay đổi. YC-03 chọn replication tầng ứng dụng cho `MonHoc` làm phương pháp tối thiểu: Admin Big gửi một yêu cầu, Coordinator cập nhật từng CSDL site riêng và ghi ACK `Logs` trong cùng transaction cục bộ. Source cũng có service ghi `KhoaHoc`, nhưng không cần mở rộng phạm vi YC-03 để chứng minh mức tối thiểu. Chưa bật SQL Server Publication; không cấu hình hai cơ chế ghi trùng cùng bảng. Nếu nhóm mở rộng sang Publication hoặc bảng dùng chung khác, phải chốt publisher/distributor/subscriber, article, hướng đồng bộ, lịch/độ trễ và xử lý xung đột trước khi triển khai.
+YC-03 chọn SQL Server transactional Publication cho MonHoc: Publisher mặc định Q1; API chỉ ghi Publisher, SQL Server chuyển tới Subscriber; Logs tại Publisher chỉ chứng minh commit nguồn. Có ảnh UPDATE/phục hồi Q1 → Q7 do người dùng cung cấp; TD và API/UI mới cần kiểm chứng. [Phân vai và bằng chứng](MonHoc-SQL-Replication.md).
 
 README hiện yêu cầu ghi đồng bộ vào mọi site hoạt động và từ chối nếu thiếu site. Cơ chế Publication mặc định của môi trường cần được kiểm tra có đạt được hợp đồng này không; báo cáo phải mô tả cấu hình và kết quả thực đo, không chỉ chụp wizard đã tạo.
 

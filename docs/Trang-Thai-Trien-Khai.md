@@ -15,7 +15,7 @@
 | Chức năng | Trạng thái source | Phân loại/phạm vi | Bằng chứng còn thiếu |
 |---|---|---|---|
 | Định tuyến site và phân mảnh nghiệp vụ | Có Site Router, cấu hình alias theo site, schema/migration có ràng buộc site; các bảng học viên/lớp và bảng con được lưu theo site | `LOCAL`; bảng con phân mảnh dẫn xuất theo bảng cha | Chạy đối chiếu phân mảnh trên các database hiện dùng, chứng minh đầy đủ, tái thiết và không giao nhau bằng dữ liệu/kết quả TC-SITE-01, TC-FRAG-01 |
-| Danh mục dùng chung | Có API/service ghi `MonHoc` và `KhoaHoc` qua Coordinator; seed chỉ là nạp ban đầu. Luồng YC-03 tối thiểu được chọn là `MonHoc` | `REPLICATED-WRITE`; bản sao nằm trong từng database site | TC-REP-01 cần lưu thay đổi thật và đọc lại từng bản sao; TC-SYNC-01 còn cần outage/recovery trên SQL Server thật, retry và đối soát |
+| Danh mục dùng chung | MonHoc dùng SQL Server transactional Publication; API chỉ ghi Publisher cấu hình, lưu biên nhận Logs tại nguồn và đối soát Subscriber. KhoaHoc giữ fan-out riêng | `REPLICATED-WRITE` bất đồng bộ; không thêm DB tổng hợp | Ảnh người dùng ngày 20/11/2026 chứng minh UPDATE/phục hồi Q1 → Q7; API/UI writer mới, TD và INSERT/DELETE cần kiểm chứng live |
 | Blog và CMS Admin Big/Tư vấn | Có API public đọc danh mục/slug; Admin Big quản lý danh mục/bài; Tư vấn & xếp lớp được đọc và tạo/sửa/xuất bản bài, không xóa bài hoặc ghi danh mục; trang chi tiết công khai đọc nội dung qua API, danh sách `/blog` vẫn tĩnh | Public `GLOBAL`; CMS `REPLICATED-WRITE` với transaction riêng từng site, không phải ACID xuyên database; migration 36 đã chạy riêng trên Q1/Q7/TD, mỗi site có 3 danh mục và 3 bài mẫu | Source permission mới chưa chạy kiểm chứng; API public danh mục và 3 slug mẫu từng trả `200`, `complete=true`; còn cần kiểm tra quyền tư vấn, lỗi một site, retry/đối soát và đọc từng bản sao; chưa có bằng chứng TC-REP-01/TC-SYNC-01 |
 | Quản lý/danh sách cơ sở | Site Router đọc `CoSo`; chưa có API CRUD `CoSo` hoặc route công khai đọc danh sách cơ sở. `/branches` hiện hiển thị trạng thái dữ liệu chưa khả dụng | `CoSo` được phân loại là replicated trong schema, nhưng fan-out ghi runtime còn thiếu | Chốt luồng quản trị/danh sách cơ sở và bổ sung fan-out/đối chiếu theo schema trước khi tuyên bố cơ sở mới được provision tự động |
 | Đăng ký, mở lớp, xếp lớp, thu tại quầy | Có route, service và transaction cục bộ; đăng ký khóa học khóa học viên/lớp, kiểm tra sức chứa và ghi các bảng liên quan cùng transaction | `LOCAL` tại site sở hữu hồ sơ/lớp | Chạy nghiệp vụ trên dữ liệu kiểm thử của các site; concurrency hai phiên tranh chỗ cuối vẫn chưa có bằng chứng chấp nhận |
@@ -36,8 +36,8 @@
 | Mã kiểm chứng | Trạng thái được ghi trong tài liệu hiện có |
 |---|---|
 | TC-SITE-01 / TC-FRAG-01 | Schema và script hỗ trợ; phải lưu kết quả truy vấn từng database để chứng minh phân mảnh, không suy ra đạt từ ba DB |
-| TC-REP-01 | Có luồng `MonHoc` và kiểm tra retry trong môi trường rollback; cần demo thay đổi được giữ và đọc ở từng bản sao |
-| TC-SYNC-01 | Chưa có outage/recovery SQL Server thật, khôi phục kết nối, retry và đối soát |
+| TC-REP-01 | Có ảnh UPDATE MonHoc truyền Q1 → Q7 do người dùng cung cấp ngày 20/11/2026; API chỉ ghi Publisher, retry chỉ đối soát. TD và API/UI mới chưa kiểm chứng live |
+| TC-SYNC-01 | Người dùng cung cấp ảnh dừng/bật container Q7 và đọc thay đổi MonHoc đồng bộ bù từ Q1 ngày 20/11/2026. TD và API/UI writer mới chưa kiểm chứng live; xem [bằng chứng và giới hạn](MonHoc-SQL-Replication.md) |
 | TC-DTX-01 | Có luồng đề nghị/duyệt/Coordinator/retry; chưa có fault injection thật trước và sau commit đích |
 | TC-CON-01 | Có khóa/transaction bảo vệ sức chứa trong source; chưa chạy hai phiên SQL Server đồng thời tranh chỗ cuối |
 | TC-DQ-01 | Có ghi nhận API trả kết quả khi các site sẵn sàng; còn thiếu bằng chứng dữ liệu đối chiếu và trường hợp một site không phản hồi |

@@ -141,10 +141,10 @@ class SharedSubjectCollectionView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Tạo môn học dùng chung và nhân bản tới các site hoạt động",
         description=(
-            "Chỉ Admin Big. Tạo MonHoc và ACK append-only trong dbo.Logs ở từng CSDL site riêng, "
-            "mỗi site trong một transaction cục bộ. Bắt buộc Idempotency-Key; nếu một site lỗi "
-            "sau khi site khác đã commit, retry cùng key và body để tiếp tục. Đây là replication "
-            "tầng ứng dụng, không phải transaction ACID xuyên CSDL."
+            "Chỉ Admin Big. API ghi MonHoc và biên nhận Logs tại Publisher cấu hình; SQL Server "
+            "Publication truyền tới Subscriber. Sau commit, đọc từng site hoạt động để xác nhận. "
+            "Trả 202 nếu chưa nhận đủ; retry cùng key/body chỉ kiểm tra lại, không ghi lại. "
+            "Biên nhận tại Publisher không chứng minh Subscriber đã nhận. Không phải ACID xuyên site."
         ),
         parameters=[OpenApiParameter(
             "Idempotency-Key", str, OpenApiParameter.HEADER, required=True,
@@ -198,11 +198,10 @@ class SharedSubjectDetailView(APIView):
         tags=["Danh mục dùng chung"],
         summary="Cập nhật môn học và nhân bản tới các site hoạt động",
         description=(
-            "Chỉ Admin Big được ghi. Coordinator kiểm tra tất cả site hoạt động, khóa thao tác "
-            "cùng slug, rồi cập nhật MonHoc và ghi ACK append-only vào dbo.Logs trong cùng "
-            "transaction cục bộ tại từng CSDL. Bắt buộc gửi Idempotency-Key; nếu thiếu site "
-            "tạm thời ở giữa quá trình, API trả 202 complete=false và yêu cầu retry cùng key/body. "
-            "Đây là replication tầng ứng dụng, không phải SQL Server Publication/2PC."
+            "Chỉ Admin Big. API chỉ cập nhật MonHoc và biên nhận Logs tại Publisher; SQL Server "
+            "Publication chuyển bản sao. Kiểm tra mã, slug, nội dung và phiên bản từng site sau commit. "
+            "Trả 202 complete=false khi chưa nhận đủ. Retry cùng key/body chỉ đối soát, không tăng "
+            "phiên bản lần nữa. Không dùng AUTH_SESSION_SITE_CODE để chọn Publisher."
         ),
         parameters=[
             OpenApiParameter("slug", str, OpenApiParameter.PATH),
@@ -271,9 +270,9 @@ class SharedSubjectDetailView(APIView):
         summary="Xóa môn học dùng chung khỏi các site hoạt động",
         description=(
             "Chỉ Admin Big. Chỉ xóa khi không có khóa học nào tham chiếu môn tại bất kỳ site nào. "
-            "Mỗi site xóa MonHoc và ghi ACK append-only vào dbo.Logs trong transaction riêng. "
-            "Bắt buộc Idempotency-Key; khi kết quả một phần/chưa rõ, retry cùng key. Không tuyên bố "
-            "ACID nguyên tử xuyên CSDL."
+            "Chỉ xóa MonHoc và ghi biên nhận Logs tại Publisher trong transaction cục bộ; "
+            "SQL Server Publication truyền lệnh xóa. Bắt buộc Idempotency-Key. Trả 202 nếu còn bản sao "
+            "chưa mất; retry cùng key chỉ đối soát. Không tuyên bố ACID nguyên tử xuyên CSDL."
         ),
         parameters=[
             OpenApiParameter("slug", str, OpenApiParameter.PATH),

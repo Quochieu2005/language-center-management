@@ -274,13 +274,13 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big, Tư vấn & xếp lớp và Kế toán & Lễ tân có thể gửi yêu cầu xem/tạo/sửa/xóa khóa học dùng chung; Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+Môn học dùng SQL Server transactional Publication; API `publisher_subjects.py` chỉ ghi `MonHoc` và biên nhận `Logs` tại Publisher cấu hình bằng `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1). Sau commit API đọc từng site hoạt động để xác nhận, trả 202 nếu chưa đủ; retry cùng key/body chỉ đối soát, không ghi lại Subscriber. `AUTH_SESSION_SITE_CODE` chỉ chọn nơi lưu phiên/khóa điều phối hiện có, không chọn Publisher. `KhoaHoc` vẫn dùng fan-out riêng trong `course_services.py`, yêu cầu bản sao môn học đồng nhất trước khi ghi. Chi tiết và chuyển đổi: [MonHoc SQL replication](docs/MonHoc-SQL-Replication.md).
 
 Trang `/admin/courses` hiển thị `KhoaHoc.so_buoi` là số buổi chuẩn riêng với số buổi đã tạo cho từng lớp. Endpoint quản trị `/api/v1/admin/courses/class-sessions/` đọc `LopHoc` và `BuoiHoc` riêng tại từng site rồi tổng hợp trong API cho Admin Big (`GLOBAL`); Tư vấn và Kế toán chỉ đọc cơ sở trong phiên (`LOCAL`). Không ghi số buổi lớp ngược lên bản sao `KhoaHoc`.
 
 CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
-Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
+YC-03/YC-07: người dùng đã cung cấp ảnh UPDATE và đồng bộ bù `MonHoc` Q1 → Q7 qua Publication; API mới, INSERT/DELETE và TD chưa có bằng chứng live. Không bật lại API fan-out môn học song song Publication. Các bảng dùng chung khác không tự chuyển sang SQL replication.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -733,7 +733,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Tự động retry chuyển cơ sở | Source có route để Admin Big retry; nhóm cần quyết định có thêm worker/lịch tự động không, nhịp quét, timeout/backoff và cảnh báo giao dịch `dang_xu_ly` quá lâu |
-| Replication và đồng bộ | Source có replication tầng ứng dụng cho `MonHoc` và `KhoaHoc`; TC-REP-01/TC-SYNC-01 vẫn cần kết quả thay đổi được giữ, site lỗi, phục hồi và retry trên các DB site. Chưa bật SQL Server Publication |
+| Replication và đồng bộ | `MonHoc`: SQL Server Publication, API chỉ ghi Publisher và đối soát sau commit; ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7. API/UI sau chuyển đổi, TD, INSERT/DELETE còn cần kiểm chứng. `KhoaHoc` giữ fan-out tầng ứng dụng |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Source có khóa/transaction cho sức chứa; TC-CON-01 vẫn cần hai phiên SQL Server đồng thời tranh một chỗ cuối và kiểm tra không để dữ liệu dở dang |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |

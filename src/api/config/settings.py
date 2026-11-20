@@ -120,6 +120,7 @@ for _site_code, _site_config in _site_database_configs.items():
     SITE_DATABASE_ALIASES[_site_code] = _alias
 
 AUTH_SESSION_SITE_CODE = os.getenv("AUTH_SESSION_SITE_CODE", "").strip().upper()
+MONHOC_PUBLISHER_SITE_CODE = os.getenv("MONHOC_PUBLISHER_SITE_CODE", "Q1").strip().upper()
 if AUTH_SESSION_SITE_CODE and AUTH_SESSION_SITE_CODE not in SITE_DATABASE_ALIASES:
     raise ImproperlyConfigured(
         "AUTH_SESSION_SITE_CODE phải trỏ tới một site đã khai báo trong SITE_DATABASES_JSON."
