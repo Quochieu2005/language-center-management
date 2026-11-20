@@ -1,5 +1,7 @@
 # ĐỌC TRƯỚC KHI LÀM BẤT CỨ ĐIỀU GÌ
 
+Khi sửa phần môn học/báo cáo, đối chiếu [bảy tài liệu giảng viên](docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien), [ERD](docs/DATABASE_SCHEMA.md#erd) và [phân mảnh–ánh xạ–định vị](docs/DATABASE_SCHEMA.md#phan-manh). GV-06 yêu cầu lab ít nhất ba SQL Server; ba DB trên cùng instance chỉ là cấu hình phát triển. Không đưa bản nháp bài giảng hoặc secret vào Git; không tuyên bố eager replication/2PC từ Publication bất đồng bộ.
+
 ## Quy trình Git bắt buộc
 
 Áp dụng cho mọi thành viên và mọi tác nhân AI làm việc trong repository này. Không tự ý bỏ qua các bước sau.

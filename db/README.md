@@ -1,5 +1,7 @@
 # Khởi tạo CSDL phân tán
 
+Kiểm chứng và báo cáo: [script chỉ đọc từng site](README.md#kiem-chung-csdl), [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh), [đối chiếu tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Script 04 hiện từ chối CHECK/FK disabled/untrusted, trigger log bị tắt và thiếu CHECK site; không chỉ kiểm tra tên object. Đợt rà này không đổi schema, không tự chạy migration hay cấu hình Publication/Subscriber.
+
 Thư mục này chứa script SQL Server để dựng **ba CSDL riêng**, cùng schema nhưng lưu dữ liệu theo từng cơ sở. Cần SQL Server 2012 trở lên và SSMS có SQLCMD Mode. Đây là phần cài đặt vật lý ban đầu của Đề tài 10; nó không tạo một CSDL trung tâm có cột phân loại chi nhánh.
 
 ## Yêu cầu chung và giới hạn của bộ script
@@ -59,6 +61,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `40_enable_tuition_refunds.sql` | Thêm tham chiếu phiếu thu gốc và UUID idempotency vào `PhieuThu`; chạy riêng trên mọi site trước khi triển khai API hoàn học phí. Phiếu hoàn cũ không bị sửa; khoản có phiếu hoàn chưa đối chiếu sẽ bị API chặn hoàn tiếp. |
 | `41_merge_receptionist_into_accounting.sql` | Chuyển `NhanVien.chuc_vu='le_tan'` thành `'ke_toan'` và bỏ `le_tan` khỏi CHECK; chạy sau migration 37, trước code chức vụ gộp, trên mọi database site. |
 | `42_add_site_staff_notification_audience.sql` | Mở `ThongBao.doi_tuong` cho thông báo nội bộ tại site nhận; chạy trên mọi site đang hoạt động trước khi bật notification mới sau chuyển cơ sở. |
+| `43_enforce_contact_site_boundary.sql` | Sau migration 39: kiểm tra dữ liệu rồi thêm CHECK site cho liên hệ; dừng khi có dòng sai, không tự chuyển/xóa. Chạy lại an toàn. |
+| `44_revalidate_course_subject_fk.sql` | Kiểm tra khóa học thiếu môn cha và xác nhận lại FK. Với FK NOT FOR REPLICATION, chỉ dựng lại ánh xạ ma_mon không cascade như schema; không sửa dữ liệu hoặc Publication. |
 
 ## Chạy bằng SSMS
 
@@ -80,6 +84,14 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 
+## Bổ sung khi nâng cấp DB hiện có
+
+- Sao lưu từng DB và kiểm tra bản sao lưu trước khi sửa. Không chạy lại schema 01 trên DB có bảng.
+- Thiếu `TaiKhoan.google_subject`/`facebook_subject`: chạy migration 27. SQL phụ thuộc cột mới được biên dịch sau khi thêm cột; bảng OAuth cũ chỉ được bỏ sau khi chuyển và kiểm tra dữ liệu.
+- Thiếu `PhieuThu.ma_phieu_goc`/`khoa_idempotency`: chạy migration 40. Script thêm cấu trúc, không đổi số tiền hay lịch sử phiếu cũ.
+- Chạy 43 sau 39, rồi 44; xác minh bằng 04 và `verification/01_site_fragment_readonly.sql`. Hiện cần **17 CHECK site**: 16 từ migration 30 và CHECK liên hệ từ 43. Có dòng sai thì dừng để đối soát.
+- Script 04 kiểm tra thêm bảng Blog/liên hệ, cột ảnh/slug học viên, thời lượng khóa học và phiếu hoàn. Nó không thay kiểm chứng toàn bộ hợp đồng API hoặc giao dịch phân tán.
+
 ## Quy tắc dữ liệu
 
 - Mỗi cơ sở có một database riêng. Khóa ngoại chỉ trỏ tới bảng trong database đó; không có khóa ngoại hoặc JOIN giữa database của các cơ sở.
@@ -96,3 +108,37 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 - Giao dịch chuyển cơ sở gồm nhiều transaction cục bộ được điều phối qua hai database; schema hỗ trợ phục hồi tiến về phía trước và không tự tạo cam kết ACID nguyên tử xuyên database. Khi đích đã commit, không xóa hồ sơ đích để giả vờ hoàn tác; Coordinator phải hoàn tất bước nguồn khi kết nối hồi phục.
 
 Khi thay đổi cấu trúc, cập nhật `docs/DATABASE_SCHEMA.md` và README trong cùng thay đổi. Chi tiết chính sách dữ liệu nằm ở [schema](../docs/DATABASE_SCHEMA.md), luồng nghiệp vụ ở [README](../README.md).
+
+
+---
+
+<a id="kiem-chung-csdl"></a>
+
+## Kiểm chứng CSDL phục vụ báo cáo
+
+`verification/01_site_fragment_readonly.sql` chỉ đọc DB đã chọn. [02_contact_boundary_regression.sql](verification/02_contact_boundary_regression.sql) thử ghi sai site rồi rollback, chỉ chấp nhận DB kiểm thử `QLTTNN_TEST*`; không chạy trên DB vận hành. Script 02 cần schema/CoSo, migration 39/43 và một cơ sở khác tồn tại trong danh mục. Các script khởi tạo/migration trong `db/` có thao tác ghi; theo hướng dẫn triển khai ở trên. Dùng SSMS trên Windows hoặc VS Code mssql trên Mac.
+
+### TC-SITE-01 / TC-FRAG-01
+
+1. Chọn đúng kết nối và database, ví dụ Q1/`QLTTNN_Q1`; chạy [01_site_fragment_readonly.sql](verification/01_site_fragment_readonly.sql). Chạy lại trên Q7 và TD bằng kết nối riêng. Không đổi tên DB hay xóa bản cũ để lấy ảnh.
+2. Lưu các result set cùng thời gian, instance, site và danh sách mã lớp/đăng ký; script có `THROW` khi thiếu/tắt/untrusted CHECK lớp/đăng ký, dữ liệu sai mảnh hoặc thiếu cha. Không xuất thông tin cá nhân học viên.
+3. Ghi trước tập mã fixture dự kiến ở từng site. So hợp danh sách lớp thu được với tập kỳ vọng: không thiếu/thừa; các tập mã lớp không giao nhau; từng `DangKy` có lớp/học viên cùng site. `COUNT` bằng nhau hoặc ba mảnh rỗng không đủ bằng chứng đầy đủ/tái thiết.
+4. Chạy thêm [04_verify_database.sql](04_verify_database.sql) ở SQLCMD mode với `DatabaseName` phù hợp để kiểm tra schema tổng thể, CHECK/FK/trigger và `DBCC CHECKCONSTRAINTS`. Script 04 kiểm tra nhiều bảng hơn; nó không thay kiểm chứng nhiều site hoặc thử ghi sai.
+
+Chạy lúc không có giao dịch chuyển/đăng ký đang thay đổi fixture. Các lần SELECT riêng không tạo snapshot nguyên tử toàn hệ thống. Nếu có site không kết nối được, ghi site thiếu, không nhận bộ kết quả là đầy đủ.
+
+### TC-REP-01 / TC-SYNC-01
+
+Theo [MonHoc SQL Replication](../docs/MonHoc-SQL-Replication.md): tạo/sửa từ website/API đúng Publisher; đọc `ma_mon`, `slug`, `ten_mon`, `phien_ban` tại từng site. Chụp Replication Monitor và kết quả trước–sau; không ghi DML vào Subscriber. Khi API trả 202, dùng **cùng key/body** để đối soát, không tạo yêu cầu mới. Dừng/bật Q7 trong phiên demo riêng và ghi thời điểm bắt kịp; không coi cửa sổ chạy liên tục là bị treo khi Agent đang chờ giao dịch mới.
+
+Không chạy lại seed để “sửa” bản sao trong khi lấy bằng chứng; seed không chứng minh truyền thay đổi. Mô tả rõ TD hiện còn cùng Windows Q1. Không lấy script tạo Subscription có mật khẩu hoặc nội dung job command làm file bằng chứng.
+
+### TC-CON-01 / TC-DTX-01 / TC-DQ-01
+
+Theo [bộ YC/TC](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Cần các request/phiên độc lập trên fixture dành cho demo:
+
+- CON: hai học viên tranh lớp còn đúng một chỗ; bắt đầu đồng thời, giữ response của cả hai, kiểm tra sĩ số, đúng một đăng ký/học phí mới và rollback bên thất bại. Khóa ở source không thay bằng chứng cạnh tranh thật.
+- DTX: tư vấn gửi đề nghị, Big/Small đích duyệt; thử lỗi trước/sau commit đích, retry và đối chiếu nguồn/đích, lịch sử/tài khoản/thông báo. **Chưa có cơ chế MSDTC/2PC trong source**.
+- DQ: lấy số liệu từng DB rồi so API tổng hợp; thử mất một site và thấy cảnh báo thiếu. Không dùng tổng `dang_hoc` thuần khi chuyển đang phục hồi.
+
+Lưu bằng chứng theo mẫu `docs/evidence/<TC>/<ngày>/`: điều kiện đầu, fixture, người/máy/site, câu lệnh/request không secret, kết quả kỳ vọng/thực tế và ảnh/log. Chưa chạy phải ghi **chưa kiểm chứng**, không tạo kết quả mẫu giả.

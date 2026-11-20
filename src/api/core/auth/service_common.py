@@ -208,14 +208,23 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
     if account_role == "hoc_vien":
         sites = active_codes if active_codes is not None else active_site_codes()
         current_profiles = []
+        staged_transfer = False
         try:
             for code in sites:
                 with get_site_connection(code).cursor() as cursor:
                     cursor.execute(
                         """
-                        SELECT TOP (2) ma_hoc_vien, slug, ma_co_so
-                        FROM dbo.HocVien
-                        WHERE ma_tai_khoan = %s AND trang_thai IN ('dang_hoc', 'bao_luu')
+                        SELECT TOP (2) h.ma_hoc_vien, h.slug, h.ma_co_so,
+                            CASE WHEN h.trang_thai = 'bao_luu' AND EXISTS (
+                                SELECT 1 FROM dbo.LichSuChuyenCoSo e
+                                WHERE e.ma_hoc_vien = h.ma_hoc_vien AND e.site_ghi = h.ma_co_so
+                                  AND e.su_kien = 'tao_ho_so_dich'
+                                  AND NOT EXISTS (SELECT 1 FROM dbo.LichSuChuyenCoSo done
+                                      WHERE done.ma_chuyen = e.ma_chuyen AND done.site_ghi = e.site_ghi
+                                        AND done.su_kien = 'hoan_tat')
+                            ) THEN 1 ELSE 0 END AS transfer_staging
+                        FROM dbo.HocVien h
+                        WHERE h.ma_tai_khoan = %s AND h.trang_thai IN ('dang_hoc', 'bao_luu')
                         """,
                         [account_id],
                     )
@@ -225,6 +234,9 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
                 if rows:
                     if str(rows[0][2]).upper() != code:
                         raise AuthInfrastructureUnavailable
+                    if rows[0][3]:
+                        staged_transfer = True
+                        continue
                     current_profiles.append(
                         (str(rows[0][0]), str(rows[0][1]), str(rows[0][2]).upper())
                     )
@@ -234,6 +246,8 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
             raise AuthInfrastructureUnavailable from exc
 
         if len(current_profiles) != 1:
+            if staged_transfer:
+                raise AuthInfrastructureUnavailable
             return None
         profile_id, student_slug, current_site = current_profiles[0]
         return AuthenticatedUser(

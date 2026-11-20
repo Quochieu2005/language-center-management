@@ -14,19 +14,23 @@
 
 **Mục lục:** [Mô hình hoạt động tổng quát](#mô-hình-hoạt-động-tổng-quát) · [1. Bài toán](#1-bài-toán-trong-1-phút) · [2. Sơ đồ kiến trúc](#2-sơ-đồ-kiến-trúc-hệ-thống) · [3. Vai trò](#3-ai-được-làm-gì) · [4. Quy tắc phân tán](#4-dữ-liệu-và-quy-tắc-phân-tán) · [5. Luồng nghiệp vụ](#5-các-luồng-nghiệp-vụ) · [6. Demo](#6-kịch-bản-demo) · [7. Ngoài phạm vi](#7-ngoài-phạm-vi) · [8. Chức năng](#8-danh-sách-chức-năng) · [9. Stack và quyết định còn mở](#9-stack-và-quyết-định-còn-mở) · [10. Tiến độ](#10-tiến-độ) · [11. Hướng dẫn cho người triển khai](#11-hướng-dẫn-cho-người-triển-khai) · [12. Tốc độ tải trang và dữ liệu](#12-tốc-độ-tải-trang-và-dữ-liệu)
 
-**Tài liệu theo chủ đề:**
+<a id="tai-lieu-du-an"></a>
 
-- [Đặc tả chức năng và tiêu chí nghiệm thu](fs/README.md)
-- [Đặc tả yêu cầu giao diện và API](specs/README.md)
-- [Cấu trúc bảng và phân mảnh](docs/DATABASE_SCHEMA.md)
-- [Script khởi tạo ba CSDL SQL Server](db/README.md)
-- [Kiến trúc và định tuyến site](docs/QLTTNN-Kien-Truc.md)
-- [Mô hình dữ liệu và vị trí lưu](docs/QLTTNN-Du-Lieu.md)
-- [Hướng dẫn đọc và tổ chức source](docs/QLTTNN-Huong-Dan-Source.md)
-- [Giao dịch phân tán và phục hồi](docs/QLTTNN-Giao-Dich-Phan-Tan.md)
-- [Kế hoạch triển khai và kiểm chứng](docs/QLTTNN-Ke-Hoach-Trien-Khai.md)
-- [Quy trình làm việc nhóm](docs/QLTTNN-Lam-Viec-Nhom.md)
-- [Đề cương báo cáo cuối kỳ](docs/QLTTNN-De-Cuong-Bao-Cao.md)
+**README tổng và cách tra tài liệu**
+
+Đọc file này để nắm bài toán, quyền và luồng nghiệp vụ; sau đó mở đúng tài liệu theo việc đang làm. `docs/` không có README riêng. ERD/mô hình dữ liệu đã gộp vào schema; kiến trúc gộp vào hướng dẫn source; kế hoạch gộp vào tài liệu nhóm; nguồn giảng viên gộp vào đề cương báo cáo.
+
+| Cần làm gì? | Đọc ở đâu? |
+|---|---|
+| Tra bảng/cột, ERD, phân mảnh và vị trí dữ liệu | [DATABASE_SCHEMA](docs/DATABASE_SCHEMA.md) — [ERD](docs/DATABASE_SCHEMA.md#erd), [phân mảnh/ánh xạ](docs/DATABASE_SCHEMA.md#phan-manh) |
+| Sửa chức năng, API hoặc giao diện | [FS](fs/Functional-Specification.md), [API spec](specs/api.md), [UI spec](specs/ui-ux.md) |
+| Tìm module và cách chọn database/site | [Kiến trúc và source](docs/QLTTNN-Huong-Dan-Source.md) |
+| Dựng SQL Server/VPN và chạy script | [Kết nối/triển khai SQL Server](docs/QLTTNN-Huong-Dan-Ket-Noi-ZeroTier-SQL-Server.md), [DB/scripts và kiểm chứng](db/README.md); chạy ứng dụng theo [API](src/api/README.md), [web](src/web/README.md) |
+| Cấu hình nhân bản hoặc hiểu chuyển cơ sở | [MonHoc SQL Replication](docs/MonHoc-SQL-Replication.md), [giao dịch và phục hồi](docs/QLTTNN-Giao-Dich-Phan-Tan.md) |
+| Chia việc, tích hợp và theo dõi phần còn thiếu | [Làm việc nhóm/kế hoạch](docs/QLTTNN-Lam-Viec-Nhom.md), [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) |
+| Chạy demo và viết báo cáo theo bài giảng | [YC/TC và mẫu bằng chứng](docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md), [đề cương và đối chiếu 7 tài liệu giảng viên](docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) |
+
+**Giới hạn triển khai đã ghi nhận:** Q1/TD hiện cùng instance Windows, Q7 trên Docker Mac; TD chưa chuyển sang máy Minh Đức. GV-06 yêu cầu lab ít nhất ba SQL Server. Xem trạng thái kiểm chứng trước khi ghi kết luận báo cáo; số database không thay số instance/máy thật.
 
 ---
 
@@ -320,7 +324,7 @@ flowchart LR
 
 1. Chọn học viên đang thuộc cơ sở và khóa/lớp muốn đăng ký.
 2. Django kiểm tra quyền, trạng thái học viên, lớp có cùng `ma_co_so`, trạng thái lớp cho phép đăng ký và còn chỗ.
-3. Kiểm tra học viên chưa có đăng ký trùng còn hiệu lực.
+3. Kiểm tra học viên chưa có đăng ký trùng còn hiệu lực và không có giao dịch chuyển cơ sở đang `dang_xu_ly` tại nguồn. Kiểm tra chuyển cơ sở được thực hiện khi giữ khóa hồ sơ học viên, cùng ranh giới khóa với bước duyệt chuyển.
 4. Trong một giao dịch cục bộ, tạo `DangKy`, tạo `HocPhi`, cập nhật sĩ số lớp và ghi nhật ký.
 5. Nếu bất kỳ bước ghi nào lỗi, rollback cả giao dịch cục bộ và trả lỗi rõ ràng cho Next.js.
 

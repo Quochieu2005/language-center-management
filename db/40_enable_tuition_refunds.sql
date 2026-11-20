@@ -31,17 +31,17 @@ BEGIN TRY
         WHERE parent_object_id = OBJECT_ID(N'dbo.PhieuThu')
           AND name = N'FK_PhieuThu_PhieuGocCungCoSo'
     )
-        ALTER TABLE dbo.PhieuThu ADD CONSTRAINT FK_PhieuThu_PhieuGocCungCoSo
-            FOREIGN KEY (ma_phieu_goc, ma_co_so) REFERENCES dbo.PhieuThu(ma_phieu, ma_co_so);
+        EXEC(N'ALTER TABLE dbo.PhieuThu ADD CONSTRAINT FK_PhieuThu_PhieuGocCungCoSo
+            FOREIGN KEY (ma_phieu_goc, ma_co_so) REFERENCES dbo.PhieuThu(ma_phieu, ma_co_so);');
 
     IF NOT EXISTS (
         SELECT 1 FROM sys.indexes
         WHERE object_id = OBJECT_ID(N'dbo.PhieuThu')
           AND name = N'UX_PhieuThu_khoa_idempotency'
     )
-        CREATE UNIQUE INDEX UX_PhieuThu_khoa_idempotency
+        EXEC(N'CREATE UNIQUE INDEX UX_PhieuThu_khoa_idempotency
             ON dbo.PhieuThu (khoa_idempotency)
-            WHERE khoa_idempotency IS NOT NULL;
+            WHERE khoa_idempotency IS NOT NULL;');
 
     COMMIT TRANSACTION;
     PRINT N'Đã bật tham chiếu phiếu gốc và chống gửi lặp cho nghiệp vụ hoàn tại site này.';

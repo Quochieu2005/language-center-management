@@ -1,4 +1,6 @@
 
+
+Đối chiếu triển khai học phần xem [tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) và [ánh xạ site/dữ liệu](../docs/DATABASE_SCHEMA.md#phan-manh). MonHoc SQL transactional replication là bất đồng bộ; 200/201 sau đối soát không chứng minh commit nguyên tử xuyên site. Đợt rà này không đổi endpoint, quyền hay payload.
 # Đặc tả API
 
 ## Bổ sung hợp đồng thu/hoàn và lịch sử lớp — 20/11/2026
@@ -100,7 +102,11 @@ Lỗi validation trả `400` hoặc `422` cùng mã trường, ví dụ `{"error
 - Không xem escape HTML hay regex là biện pháp chống SQL injection. Validation giới hạn dữ liệu; parameterization ngăn dữ liệu bị diễn giải thành lệnh SQL.
 - Có kiểm thử với payload như `' OR 1=1--`, dấu nháy, wildcard và chuỗi dài; kết quả phải bị từ chối hoặc được xem là dữ liệu thuần, không mở rộng quyền/kết quả và không thay đổi dữ liệu ngoài ý muốn.
 
+Đăng ký lớp qua `POST /api/v1/admin/enrollments/` hoặc service ghi danh công khai là `LOCAL`: giữ khóa `HocVien` và trả `409` trước khi ghi nếu giao dịch chuyển tại nguồn đang `dang_xu_ly`. Bước duyệt chuyển giữ cùng khóa hồ sơ; đăng ký hoàn tất trước bước duyệt sẽ được tính vào kiểm tra công nợ. Khoản học phí bằng 0 được lưu và trả `tuition_status=da_dong`, khoản có phí mới tạo trả `chua_dong`.
+
 ## Bảo vệ đăng nhập, đăng ký và quên mật khẩu
+
+Xác thực học viên bỏ qua hồ sơ đích đang chờ hoàn tất chuyển (sự kiện `tao_ho_so_dich` chưa có `hoan_tat` tại site đích). Trong khoảng nguồn đã đóng và đích chưa kích hoạt, trả 503 thay vì 401; không xóa cookie vì lỗi tạm thời này. Không thay đổi giới hạn idle 3600 giây.
 
 ### Băm mật khẩu và phiên đăng nhập
 
@@ -401,7 +407,7 @@ Create trả `201`; GET/PATCH/DELETE và gửi email thành công trả `200`; l
 | `GET /api/v1/teacher/classes/{ma_lop}/sessions` | Giáo viên được phân công | `LOCAL` | Đọc `BuoiHoc` tại site của lớp |
 | `PUT /api/v1/teacher/sessions/{ma_buoi}/attendance` | Giáo viên được phân công | `LOCAL` | Tạo/cập nhật `DiemDanh` cho học viên có `DangKy` hợp lệ của lớp; một dòng cho mỗi cặp buổi/đăng ký |
 | `GET /api/v1/teacher/enrollments/{ma_dang_ky}/grades` | Giáo viên được phân công | `LOCAL` | Đọc điểm của đăng ký trong lớp mình dạy |
-| `GET /api/v1/teacher/enrollments/{ma_dang_ky}/grades/history` | Giáo viên được phân công; quản lý theo quyền | `LOCAL` | Đọc lịch sử chỉnh sửa điểm của đăng ký đúng lớp/site; không cho sửa lịch sử |
+| `GET /api/v1/teacher/enrollments/{ma_dang_ky}/grades/history` | Giáo viên được phân công; quản lý theo quyền | `LOCAL` | Đọc lịch sử chỉnh sửa điểm của đăng ký đúng lớp/site; `count` bằng số phần tử trong `results`; không cho sửa lịch sử |
 | `PUT /api/v1/enrollments/{ma_dang_ky}/grades/{loai_diem}` | Giáo viên được phân công; quản lý chỉ theo quyền | `LOCAL` | Ghi `Diem`; kiểm tra phân công, site, loại điểm và điểm 0–10; lưu nhật ký thay đổi |
 
 API không nhận `ma_giao_vien` từ body để quyết định quyền. Người ghi lấy từ phiên đã xác thực; API xác nhận giáo viên thuộc cùng site và được phân công vào đúng lớp/buổi.

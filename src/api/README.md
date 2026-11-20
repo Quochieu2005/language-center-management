@@ -1,5 +1,7 @@
 # Django API
 
+Dùng [mục lục tài liệu](../../README.md#tai-lieu-du-an) và [đối chiếu học phần](../../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) để lần từ yêu cầu tới source. Số DB không phải số instance; MonHoc ghi một Publisher rồi SQL Server truyền bản sao, Global Query hỏi từng DB và gộp tại Django. Không dùng unit test thay kiểm chứng nhiều máy.
+
 Thư mục này chứa API và Coordinator của hệ thống CSDL phân tán. Frontend Next.js nằm ở `../web`; trình duyệt chỉ gọi HTTP API và không kết nối trực tiếp tới SQL Server.
 
 ## Chạy lần đầu trên Windows
