@@ -100,7 +100,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 
 Giảng viên yêu cầu **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Đồ án chọn **3 site Q1, Q7, TD**; BT trong kịch bản mở rộng là site thứ tư. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh, nhưng phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
 
-Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Cơ chế replication ứng dụng cho `MonHoc` đã được chọn; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
+Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. `MonHoc` dùng SQL Server transactional Publication; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
 
 ### Sáu nghiệp vụ bắt buộc theo đề tài
 
@@ -280,7 +280,7 @@ Trang `/admin/courses` hiển thị `KhoaHoc.so_buoi` là số buổi chuẩn ri
 
 CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
-YC-03/YC-07: người dùng đã cung cấp ảnh UPDATE và đồng bộ bù `MonHoc` Q1 → Q7 qua Publication; API mới, INSERT/DELETE và TD chưa có bằng chứng live. Không bật lại API fan-out môn học song song Publication. Các bảng dùng chung khác không tự chuyển sang SQL replication.
+YC-03/YC-07: người dùng đã cung cấp ảnh UPDATE và đồng bộ bù `MonHoc` Q1 → Q7 qua Publication, cùng INSERT từ website tới Mac. Ngày 20/11/2026 đã bổ sung Subscription tới TD hiện có trên Windows và kiểm chứng API views thêm/sửa/xóa/retry với SQL Server thật, đủ Q1/Q7/TD; danh mục cuối `complete=true`. Chưa kiểm chứng trình duyệt end-to-end, outage TD hoặc chuyển TD sang máy Minh Đức; xem [kết quả và giới hạn](docs/MonHoc-SQL-Replication.md). Không bật lại API fan-out môn học song song Publication. Các bảng dùng chung khác không tự chuyển sang SQL replication.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -733,7 +733,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Tự động retry chuyển cơ sở | Source có route để Admin Big retry; nhóm cần quyết định có thêm worker/lịch tự động không, nhịp quét, timeout/backoff và cảnh báo giao dịch `dang_xu_ly` quá lâu |
-| Replication và đồng bộ | `MonHoc`: SQL Server Publication, API chỉ ghi Publisher và đối soát sau commit; ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7. API/UI sau chuyển đổi, TD, INSERT/DELETE còn cần kiểm chứng. `KhoaHoc` giữ fan-out tầng ứng dụng |
+| Replication và đồng bộ | `MonHoc`: SQL Server Publication; ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7 và INSERT từ website tới Mac. API views thêm/sửa/xóa/retry đã chạy với SQL thật đủ Q1/Q7/TD ngày 20/11/2026; TD hiện còn ở Windows. Browser end-to-end, outage TD và chuyển máy TD chưa kiểm chứng. `KhoaHoc` giữ fan-out tầng ứng dụng |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Source có khóa/transaction cho sức chứa; TC-CON-01 vẫn cần hai phiên SQL Server đồng thời tranh một chỗ cuối và kiểm tra không để dữ liệu dở dang |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |

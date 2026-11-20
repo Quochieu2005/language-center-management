@@ -54,13 +54,50 @@ Ngày 20/11/2026, Quốc Hiếu cung cấp ảnh SSMS: sửa `MH-ENG` tại Q1 �
 sang Q7 trên Mac; dừng container Q7, sửa tại Q1, bật lại Q7 và đọc thấy thay đổi;
 sau đó trả tên `Tiếng Anh` và đối chiếu hai bản sao. Đây là bằng chứng UPDATE và
 đồng bộ bù Q1 → Q7 do người dùng thực hiện, không phải kiểm thử API tự động.
-TD, INSERT/DELETE qua SQL replication, UI/API sau chuyển đổi, concurrency và
-distributed transaction vẫn cần kiểm chứng riêng. TD chưa nhận thay đổi thì API
-không được báo đã đồng bộ toàn hệ thống.
+Người dùng cũng cung cấp ảnh tạo `MH-TEST-Q7` trên website và đọc được tại SQL
+Server Q7 trên Mac bằng VS Code mssql. Đây là bằng chứng INSERT từ website tới
+Q7; lúc đó TD thiếu môn thử nên trang quản trị khóa ghi đúng chính sách đối soát.
 
 Kiểm tra code sau chuyển đổi: `manage.py test core.catalog --noinput` chạy 26
 tests thành công (gồm kiểm tra Publisher-only, session Q7 không đổi Publisher,
 retry không ghi lại, key/body/người dùng xung đột, đổi slug, chặn xóa khi có khóa
 học ở Q7, rollback khi biên nhận lỗi, xác nhận sau commit và phục hồi giả lập).
-Đây là kiểm thử giả lập, không thay thế runtime SQL nhiều site. Probe chỉ đọc
-thấy Publication ở Q1 và danh mục hiện khớp Q1/Q7/TD; chưa thử ghi bằng API mới.
+Đây là kiểm thử giả lập, không thay thế runtime SQL nhiều site.
+
+### Bổ sung TD hiện có và kiểm chứng API ngày 20/11/2026
+
+Theo lựa chọn của Quốc Hiếu, TD vẫn ở Windows `DESKTOP-CK4K90F`, database
+`QLTTNN_TD`; chưa chuyển sang máy Minh Đức. Đã lưu bản trước của `MonHoc` ngoài
+repository, đối chiếu từng dòng: hai môn cũ khớp hoàn toàn, chỉ thiếu
+`MH-TEST-Q7`. Bổ sung đúng dòng thiếu, không cập nhật/xóa môn cũ và không đụng
+`HocVien`, `LopHoc`, `DangKy`, `HocPhi` hoặc `.env`/comment của người dùng.
+
+Đã thêm push Subscription của `PUB_QLTTNN_MonHoc` tới database `QLTTNN_TD`
+trên cùng instance Windows, khởi tạo `replication support only` sau khi dữ liệu
+ban đầu khớp. Distribution Agent dùng Windows Authentication tại instance cục
+bộ. Không drop/truncate bảng, không tạo lại Publication Q7 và không nhân bản
+toàn bộ database. Việc bổ sung dữ liệu ban đầu tự nó không phải bằng chứng
+replication; thay đổi mới qua Publisher dưới đây mới kiểm chứng truyền dữ liệu.
+Quy trình khởi tạo tham chiếu [Microsoft Learn](https://learn.microsoft.com/en-us/sql/relational-databases/replication/initialize-a-subscription-manually).
+
+| Phép thử với môn tạm `MH-RT-8A293A34` | Kết quả thực tế |
+|---|---|
+| POST tạo tại API view | 202 khi chờ bản sao; retry cùng key đến 201, `complete=true`, `sites=[Q1,Q7,TD]`, phiên bản 1 |
+| PATCH tên/mô tả, thay slug | 202 → 200, đủ ba site, phiên bản 2 |
+| Retry PATCH sau hoàn tất | 200, `idempotent_replay=true`, phiên bản vẫn 2 |
+| Cùng key POST nhưng đổi body | 409, không ghi lại |
+| DELETE môn tạm chưa có khóa học | 202 → 200; đọc từng kết nối xác nhận mã đã mất tại cả ba site |
+| Danh sách cuối | `complete=true`, `missing_sites=[]`, `inconsistent_sites=[]`, giữ ba môn ban đầu kể cả môn thử do người dùng tạo |
+
+Phép thử gọi Django API views bằng `APIRequestFactory` với danh tính Admin Big
+được gán trong bộ chạy kiểm chứng, còn mọi đọc/ghi, commit và replication dùng
+SQL Server thật. Không giả lập service/connection và không bọc phép thử trong
+transaction rollback. Môn tạm được xóa qua chính API; biên nhận `Logs` giữ lại.
+Đây chưa phải kiểm thử cookie/CSRF, HTTP hoặc thao tác trình duyệt end-to-end.
+
+`manage.py test core.catalog --noinput`: 26 tests đạt. Bộ rộng hơn gồm catalog,
+classes, students, academics chạy 65 tests nhưng còn 1 failure/7 errors ở các
+test quyền lớp, học viên và fixture đăng nhập; không kết luận toàn bộ Q7 đã đạt.
+Concurrency tranh chỗ cuối và chuyển cơ sở có fault injection chưa kiểm chứng
+live trong đợt này. Khi chuyển TD sang máy Minh Đức phải cấu hình lại Subscriber
+và kiểm chứng kết nối/đồng bộ; Subscription TD hiện tại chỉ phục vụ bản Windows.

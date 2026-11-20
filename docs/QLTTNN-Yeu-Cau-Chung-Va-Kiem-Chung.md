@@ -132,6 +132,18 @@ Mỗi lần chạy ghi trong tài liệu kết quả tại `docs/evidence/<ma-ki
 
 Các kết quả trên không chứng minh replication cho `CoSo`/`KhoaHoc`, ACID xuyên site, SQL Server Publication, ba máy chủ vật lý hoặc hoàn tất mọi yêu cầu môn học. Không đánh dấu toàn bộ YC-01–YC-07 là đạt cho tới khi các thiếu sót trong bảng được chạy và lưu bằng chứng.
 
+### Bổ sung kiểm chứng ngày 20/11/2026
+
+Q7 hiện ở SQL Server container trên Mac Minh Khôi; Q1 và TD vẫn ở hai database
+riêng trên Windows Quốc Hiếu. Đã bổ sung Subscriber TD hiện có, kiểm chứng
+API views thêm/sửa/xóa `MonHoc` với commit và replication thật tới Q1/Q7/TD,
+retry không tăng phiên bản và key khác body bị 409. Kết quả cuối đủ ba bản sao;
+xem [TC-REP-01 và response](evidence/TC-REP-01/2026-11-20/README.md).
+Người dùng đã cung cấp ảnh outage/khôi phục Q7 truyền bù thay đổi. Chưa có
+browser end-to-end, outage TD, chuyển máy TD, concurrency hoặc fault injection
+chuyển cơ sở trong đợt này. Bảng ngày 29/10 ở trên là lịch sử, không phản ánh
+topology hiện tại. Không kết luận toàn bộ YC-01–YC-07 đã đạt.
+
 ## 7. Tài liệu phải khớp nhau
 
 - [AGENTS.md](../AGENTS.md): quy tắc bắt buộc cho thành viên/AI; giữ quy trình Git.
