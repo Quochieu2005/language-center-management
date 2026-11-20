@@ -244,6 +244,8 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 ### FS-AUTH-03 — Quên và đặt lại mật khẩu
 
+OTP hợp lệ phải băm mật khẩu và tạo job thành công. Khi phục hồi, khóa theo tài khoản tại coordinator, đọc lại trạng thái job sau khi lấy khóa và giữ khóa qua các bước ghi site/chốt job; worker cũ không được áp lại mật khẩu sau khi job đã hoàn tất. Các site vẫn commit cục bộ và retry tiến về phía trước, không phải ACID xuyên CSDL.
+
 **Người dùng:** Admin Big/Admin Small theo source hiện tại. **Phân tán:** tra cứu tài khoản trên các site; OTP/ledger lưu ở database kỹ thuật được cấu hình; mật khẩu được cập nhật tới các bản `TaiKhoan`.
 
 1. Người dùng gửi email/định danh đã đăng ký.
@@ -529,6 +531,8 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 **Nghiệm thu:** Kế toán & Lễ tân đọc đề nghị/công nợ tại site được giao nhưng không thể tạo/duyệt/từ chối/retry; chỉ Tư vấn tạo được đề nghị; Admin Big quyết định được mọi đề nghị, Admin Small site nhận chỉ quyết định đề nghị có đúng site đích và không retry; Tư vấn không quyết định/retry; giáo viên không được gửi hoặc quyết định; Admin Big và Admin Small site nhận quyết định đồng thời thì chỉ một quyết định thắng; quyết định idempotent; không gọi Coordinator chuyển nếu quyết định chưa commit.
 
 ### FS-TRF-03 — Thực hiện và phục hồi giao dịch chuyển
+
+Học viên được quay lại site từng học bằng hồ sơ cùng mã đang `da_chuyen_di`, đúng cơ sở gốc/tài khoản (hoặc hồ sơ cũ chưa có tài khoản) và có sự kiện đã rời site. Tái tiếp nhận giữ slug, đồng bộ metadata hiện hành từ nguồn, đặt `bao_luu` và ghi sự kiện nhận cho mã giao dịch mới trong cùng transaction đích. Không xóa/sửa lịch sử và không mở lại đăng ký cũ; sau hoàn tất tư vấn xếp lớp mới. Retry phải nhận lại đúng hồ sơ đã tiếp nhận, không sinh hồ sơ hay thông báo lần hai.
 
 **Người dùng:** Coordinator chạy sau khi Admin Big hoặc Admin Small tại site nhận duyệt; chỉ Admin Big được gọi route retry cho giao dịch chưa hoàn tất. **Kiểu:** DISTRIBUTED-TX giữa nguồn và đích. **Bảng:** GiaoDichChuyenCoSo tại nguồn; HocVien/DangKy tại nguồn; HocVien/ThongBao tại đích; LichSuChuyenCoSo tại site phát sinh.
 

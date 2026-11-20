@@ -1,5 +1,7 @@
 # Cấu trúc cơ sở dữ liệu
 
+Sửa 21/11/2026 không đổi schema: dùng `sp_getapplock` theo tài khoản cùng transaction coordinator để bảo vệ `GiaoDichDatLaiMatKhau` và đọc lại job trước áp `TaiKhoan` tại từng site. `UX_GiaoDichDatLaiMatKhau_dang_xu_ly` vẫn giới hạn một job pending/tài khoản. Khi chuyển quay lại site cũ, tái sử dụng `HocVien` đã `da_chuyen_di` đúng danh tính và có sự kiện rời site, giữ slug, ghi metadata/trạng thái staging cùng sự kiện mới trong `LichSuChuyenCoSo`. Không đổi mã học viên/tài khoản, không xóa các bảng con/lịch sử, không thêm CSDL trung tâm hoặc JOIN xuyên site.
+
 Sửa nghiệp vụ 20/11/2026 không đổi schema: `PhieuThu.ma_phieu` vẫn tối đa 24 ký tự, mã `{site}-PT-{key}` phải tính cả tiền tố; hoàn đối chiếu `ma_phieu_goc`. `DangKy` đã có `DiemDanh`/`Diem` không đổi `ma_lop`. Khi thay giáo viên, giữ nguyên `BuoiHoc.ma_giao_vien` lịch sử; quyền đọc theo giáo viên hiện tại của `LopHoc`, quyền ghi điểm danh vẫn yêu cầu cả lớp và buổi. Tất cả đọc/ghi trong đúng CSDL site qua Site Router.
 
 > Quản lý trung tâm đào tạo ngoại ngữ · CSDL phân tán · 3 cơ sở (Q1, Q7, TD)

@@ -462,6 +462,7 @@ def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None
             )
             current = cursor.fetchone()
             created = current is None
+            returning = False
             expected = (
                 snapshot["origin_site"], snapshot["account_id"], snapshot["full_name"],
                 snapshot["birth_date"], snapshot["gender"],
@@ -487,6 +488,39 @@ def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None
                      snapshot["email"], snapshot["address"], snapshot["enrolled_on"],
                      snapshot["avatar_public_id"], snapshot["avatar_secure_url"]],
                 )
+            elif not event_exists and str(current[-1]).lower() == "da_chuyen_di":
+                if current[1] != snapshot["origin_site"] or (
+                    current[2] is not None and current[2] != snapshot["account_id"]
+                ):
+                    raise AcademicConflict("Hồ sơ cũ không khớp danh tính học viên chuyển về.")
+                cursor.execute(
+                    """
+                    SELECT TOP (1) 1 FROM dbo.LichSuChuyenCoSo AS e
+                    WHERE e.ma_hoc_vien = %s AND e.site_ghi = %s AND e.co_so_nguon = %s
+                      AND e.su_kien = 'cap_nhat_ho_so_nguon'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM dbo.GiaoDichChuyenCoSo AS g
+                          WHERE g.ma_hoc_vien = %s AND g.co_so_nguon = %s
+                            AND g.trang_thai IN ('cho_duyet', 'dang_xu_ly')
+                      )
+                    """,
+                    [snapshot["student_id"], target_site, target_site, snapshot["student_id"], target_site],
+                )
+                if cursor.fetchone() is None:
+                    raise AcademicConflict("Chưa xác nhận hồ sơ cũ đã rời cơ sở và hoàn tất giao dịch trước.")
+                cursor.execute(
+                    """
+                    UPDATE dbo.HocVien
+                    SET ma_tai_khoan = %s, ho_ten = %s, ngay_sinh = %s, gioi_tinh = %s,
+                        sdt = %s, email = %s, dia_chi = %s, ngay_nhap_hoc = %s,
+                        avatar_public_id = %s, avatar_secure_url = %s, trang_thai = 'bao_luu'
+                    WHERE ma_hoc_vien = %s AND ma_co_so = %s AND trang_thai = 'da_chuyen_di'
+                    """,
+                    [*expected[1:], snapshot["student_id"], target_site],
+                )
+                if cursor.rowcount != 1:
+                    raise AcademicConflict("Hồ sơ cũ vừa thay đổi; hãy retry giao dịch chuyển về.")
+                returning = True
             else:
                 actual = tuple(current[1:-1])
                 if not event_exists or actual != expected or str(current[-1]).lower() not in {"bao_luu", "dang_hoc"}:
@@ -496,10 +530,12 @@ def _create_destination_profile(snapshot: dict[str, Any], actor_id: str) -> None
                 student_id=str(snapshot["student_id"]), source_site=str(snapshot["source_site"]),
                 target_site=target_site, event="tao_ho_so_dich", actor_id=actor_id,
             )
-            if created:
+            if created or returning:
                 _audit_transfer(
                     cursor, site_code=target_site, actor_id=actor_id,
-                    action="tao_ho_so_hoc_vien_chuyen_den", transfer_id=str(snapshot["transfer_id"]),
+                    action="tiep_nhan_lai_hoc_vien" if returning else "tao_ho_so_hoc_vien_chuyen_den",
+                    transfer_id=str(snapshot["transfer_id"]),
+                    before={"student_status": "da_chuyen_di"} if returning else None,
                     after={"student_id": snapshot["student_id"], "status": "bao_luu"},
                 )
 

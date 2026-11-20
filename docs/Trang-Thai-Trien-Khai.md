@@ -1,5 +1,12 @@
 # Trạng thái triển khai theo source
 
+## Sửa local xác thực và chuyển quay lại — 21/11/2026
+
+- Bổ sung import băm cho OTP hợp lệ. Helper phục hồi mật khẩu lấy khóa theo tài khoản tại coordinator, đọc lại job có khóa và giữ quyền điều phối đến hết các bước ghi site/chốt job, tránh worker cũ áp lại giá trị cũ. Transaction của coordinator có thể rollback khi site khác lỗi; các site đã commit vẫn được đối soát khi retry. Không phải ACID xuyên database.
+- Chuyển quay lại site cũ tái sử dụng `HocVien` đã `da_chuyen_di` đúng mã/cơ sở gốc/tài khoản (hoặc chưa có tài khoản), có sự kiện rời site và không còn giao dịch cũ đang mở tại đích. Giữ slug/lịch sử cũ, cập nhật metadata theo nguồn và ghi sự kiện tiếp nhận của giao dịch mới cùng transaction staging; sau đó dùng luồng kích hoạt/thông báo hiện có. Không xóa hoặc mở lại đăng ký cũ.
+- Test mới: `core.auth.test_password_recovery` dùng OTP mock, worker thật có lịch xen kẽ và kho dữ liệu/khóa giả; `core.academics.test_transfer_return` chạy Coordinator trên các DB SQLite tạm riêng, có lỗi sau commit đích/trước checkpoint và rollback sự kiện. Không chạy SQL Server thật, không sửa dữ liệu thật, chưa xác nhận concurrency SQL Server hoặc browser end-to-end. Không có migration mới.
+- Kết quả tại máy ngày 21/11/2026: `manage.py check` pass; `manage.py test core --noinput` **156/156 pass**, gồm 13 ca mới; `git diff --check` pass. Không đổi frontend và không chạy lại build/frontend trong đợt backend này.
+
 ## Sửa lỗi thu/hoàn và lịch sử lớp — 20/11/2026
 
 - Thu tại quầy: key tính theo giới hạn mã phiếu 24 ký tự gồm tiền tố site; API validate theo site đã xác thực. Frontend khóa gửi đồng thời, giữ key/body khi lỗi mạng và lưu lần chờ theo tài khoản/site/khoản phí trong `sessionStorage` để retry sau reload cùng tab. Nếu storage bị chặn, cảnh báo cần đối soát phiếu sau reload.
