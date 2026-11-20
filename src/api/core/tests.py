@@ -543,10 +543,12 @@ class AuthProfileSlugApiTests(SimpleTestCase):
 
     def test_auth_profile_reads_only_the_authenticated_user_slug(self):
         path = "/api/v1/auth/profile/admin-small-q7-manager-q7/"
-        response = self.client.get(path)
+        with patch("core.auth.views.get_admin_avatar_url", return_value=None) as avatar:
+            response = self.client.get(path)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["slug"], self.user.slug)
+        avatar.assert_called_once_with(self.user.account_id, self.user.role, self.user.site_code)
 
     def test_auth_profile_rejects_another_slug(self):
         response = self.client.get("/api/v1/auth/profile/another-account/")

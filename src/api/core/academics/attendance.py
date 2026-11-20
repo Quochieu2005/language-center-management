@@ -57,19 +57,23 @@ def list_teacher_sessions(*, site_code: str, teacher_id: str, class_id: str) -> 
             SELECT b.ma_buoi AS session_id, b.so_thu_tu AS sequence,
                    b.ngay_hoc AS session_date, b.gio_bat_dau AS start_time,
                    b.gio_ket_thuc AS end_time, b.ma_phong AS room_id,
-                   p.ten_phong AS room_name, b.trang_thai AS status, b.ghi_chu AS note
+                   p.ten_phong AS room_name, b.trang_thai AS status, b.ghi_chu AS note,
+                   b.ma_giao_vien AS session_teacher_id
             FROM dbo.BuoiHoc AS b
             INNER JOIN dbo.LopHoc AS l
                 ON l.ma_lop = b.ma_lop AND l.ma_co_so = b.ma_co_so
             LEFT JOIN dbo.PhongHoc AS p
                 ON p.ma_phong = b.ma_phong AND p.ma_co_so = b.ma_co_so
             WHERE b.ma_co_so = %s AND b.ma_lop = %s
-              AND b.ma_giao_vien = %s AND l.ma_giao_vien = %s
+              AND l.ma_giao_vien = %s
             ORDER BY b.ngay_hoc, b.gio_bat_dau, b.so_thu_tu
             """,
-            [site_code, class_id, teacher_id, teacher_id],
+            [site_code, class_id, teacher_id],
         )
-        return _items(cursor)
+        results = _items(cursor)
+        for row in results:
+            row["can_edit_attendance"] = str(row.pop("session_teacher_id")) == teacher_id
+        return results
 
 
 @translate_database_errors
@@ -78,14 +82,14 @@ def get_attendance_roster(*, site_code: str, teacher_id: str, session_id: str) -
     with connections[alias].cursor() as cursor:
         cursor.execute(
             """
-            SELECT b.ma_buoi, b.ma_lop, b.ngay_hoc, b.trang_thai
+            SELECT b.ma_buoi, b.ma_lop, b.ngay_hoc, b.trang_thai, b.ma_giao_vien
             FROM dbo.BuoiHoc AS b
             INNER JOIN dbo.LopHoc AS l
                 ON l.ma_lop = b.ma_lop AND l.ma_co_so = b.ma_co_so
             WHERE b.ma_co_so = %s AND b.ma_buoi = %s
-              AND b.ma_giao_vien = %s AND l.ma_giao_vien = %s
+              AND l.ma_giao_vien = %s
             """,
-            [site_code, session_id, teacher_id, teacher_id],
+            [site_code, session_id, teacher_id],
         )
         session = cursor.fetchone()
         if session is None:
@@ -113,6 +117,7 @@ def get_attendance_roster(*, site_code: str, teacher_id: str, session_id: str) -
             "class_id": str(session[1]),
             "session_date": session[2],
             "session_status": str(session[3]),
+            "can_edit_attendance": str(session[4]) == teacher_id,
             "site_code": site_code,
             "results": _items(cursor),
         }

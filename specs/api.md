@@ -1,6 +1,14 @@
 
 # Đặc tả API
 
+## Bổ sung hợp đồng thu/hoàn và lịch sử lớp — 20/11/2026
+
+- Thu tại quầy giữ mã phiếu `{site}-PT-{idempotency_key}` tối đa 24 ký tự. Key dài từ 8 đến `24 - len(site) - 4` ký tự; API validate sau khi xác định site từ quyền, frontend sinh key đúng giới hạn và giữ nguyên key/body khi thử lại sau lỗi mạng. Khóa nút trong lúc gửi; tải lại trang khi chưa rõ kết quả cần tra cứu phiếu trước khi thu mới.
+- Replay hoàn trả cùng mã phiếu và số còn có thể hoàn theo **phiếu thu gốc trừ tổng đã hoàn**, không lấy số tiền phiếu hoàn làm gốc.
+- Đổi lớp là `LOCAL`; từ chối bằng `409` nếu đăng ký đã có `DiemDanh` hoặc `Diem`, giữ nguyên đăng ký, sĩ số và lịch sử. Chọn lại đúng lớp hiện tại vẫn là thao tác không đổi.
+- Giáo viên hiện tại của lớp được đọc toàn bộ buổi và roster lịch sử tại site; người không còn được phân công lớp không được đọc. Danh sách buổi và roster có `can_edit_attendance`: chỉ đúng khi giáo viên hiện tại cũng đứng tên buổi. Quyền ghi vẫn kiểm tra cả lớp và buổi; không đổi người dạy trên buổi lịch sử và không cấp quyền sửa lịch sử cho giáo viên thay thế.
+- Không thay schema, cách phân mảnh hoặc Site Router; các thay đổi này không phải bằng chứng đã kiểm thử concurrency hay nhiều SQL Server.
+
 > Trạng thái: API Django có xác thực, quản trị và các nghiệp vụ chính trong source. Tài liệu gồm quy tắc yêu cầu, thiết kế endpoint và một số route đã triển khai; route thực tế nằm trong `src/api/core/urls.py`. Đối chiếu [ma trận trạng thái triển khai](../docs/Trang-Thai-Trien-Khai.md); OpenAPI/Swagger hoặc code không phải bằng chứng nghiệm thu phân tán.
 
 File này mô tả giao diện gọi API thế nào và API phải xử lý quyền, site, dữ liệu cùng lỗi ra sao. Yêu cầu màn hình nằm ở [`ui-ux.md`](ui-ux.md); luồng nghiệp vụ chuẩn nằm trong [`README.md`](../README.md); định nghĩa bảng nằm trong [`docs/DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).

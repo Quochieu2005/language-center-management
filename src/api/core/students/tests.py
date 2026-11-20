@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.auth.service_common import AuthInfrastructureUnavailable, AuthenticatedUser, _resolve_principal
@@ -168,7 +169,7 @@ class StudentPortalApiTests(SimpleTestCase):
 
     def test_shared_login_accepts_a_provisioned_student_role(self):
         self.client = APIClient()
-        with patch("core.auth.views.login_user", return_value=(self.student, "s" * 64, None)):
+        with patch("core.auth.views.login_user", return_value=(self.student, "s" * 64, timezone.now())):
             response = self.client.post(
                 reverse("core:auth-login"),
                 {"identifier": self.student.email, "password": "temporary"},
@@ -186,55 +187,48 @@ class StudentPortalApiTests(SimpleTestCase):
         self.assertEqual(response.status_code, 403)
         list_service.assert_not_called()
 
-    def test_admin_big_must_choose_site_to_list_students(self):
+    def test_admin_big_can_list_students_globally_without_selecting_site(self):
         self.client.force_authenticate(user=self.admin_big)
-        with patch("core.students.views.list_students") as list_service:
+        result = {"scope": "GLOBAL", "complete": True, "missing_sites": [], "count": 0, "results": []}
+        with patch("core.students.views.global_site_list", return_value=result) as global_list:
             response = self.client.get(reverse("core:student-admin-list"))
-        self.assertEqual(response.status_code, 400)
-        list_service.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), result)
+        self.assertEqual(global_list.call_args.kwargs["offset"], 0)
 
-    def test_admin_big_permanently_deletes_student_at_selected_site(self):
+    def test_admin_big_deletes_unused_student_profile_at_selected_site(self):
         self.client.force_authenticate(user=self.admin_big)
-        result = StudentDeleteResult(
-            slug="q7-hv-000001", site_code="Q7", deleted_site_count=3,
-            account_deleted=True,
-        )
-        with patch("core.students.views.delete_student", return_value=result) as delete:
+        result = {"student_id": "Q7-HV-000001", "slug": "q7-hv-000001", "site_code": "Q7", "deleted": True}
+        with patch("core.students.views.delete_student_profile", return_value=result) as delete:
             response = self.client.delete(
-                reverse("core:student-admin-delete", kwargs={"slug": result.slug}) + "?site_code=Q7",
+                reverse("core:student-admin-delete", kwargs={"slug": result["slug"]}) + "?site_code=Q7",
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["deleted"])
-        self.assertEqual(response.json()["deleted_site_count"], 3)
-        self.assertTrue(response.json()["account_deleted"])
+        self.assertEqual(response.json(), result)
         self.assertEqual(delete.call_args.kwargs["site_code"], "Q7")
 
     def test_admin_small_cannot_delete_student_at_another_site(self):
         self.client.force_authenticate(user=self.admin_small)
-        with patch("core.students.views.delete_student") as delete:
+        with patch("core.students.views.delete_student_profile") as delete:
             response = self.client.delete(
                 reverse("core:student-admin-delete", kwargs={"slug": "q1-hv-000001"}) + "?site_code=Q1",
             )
         self.assertEqual(response.status_code, 403)
         delete.assert_not_called()
 
-    def test_teacher_deletes_only_with_session_site_and_teacher_profile(self):
+    def test_teacher_cannot_delete_student_even_at_assigned_site(self):
         self.client.force_authenticate(user=self.teacher)
-        result = StudentDeleteResult(
-            slug="q7-hv-000001", site_code="Q7", deleted_site_count=3,
-            account_deleted=False,
-        )
-        with patch("core.students.views.delete_student", return_value=result) as delete:
+        with patch("core.students.views.delete_student_profile") as delete:
             response = self.client.delete(
-                reverse("core:student-admin-delete", kwargs={"slug": result.slug})
+                reverse("core:student-admin-delete", kwargs={"slug": "q7-hv-000001"})
             )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(delete.call_args.kwargs["site_code"], "Q7")
-        self.assertEqual(delete.call_args.kwargs["teacher_id"], "Q7-GV-000003")
+        self.assertEqual(response.status_code, 403)
+        delete.assert_not_called()
 
     def test_teacher_cannot_select_site_when_deleting_student(self):
         self.client.force_authenticate(user=self.teacher)
-        with patch("core.students.views.delete_student") as delete:
+        with patch("core.students.views.delete_student_profile") as delete:
             response = self.client.delete(
                 reverse("core:student-admin-delete", kwargs={"slug": "q7-hv-000001"}) + "?site_code=Q1",
             )
@@ -243,7 +237,7 @@ class StudentPortalApiTests(SimpleTestCase):
 
     def test_student_role_cannot_delete_another_student(self):
         self.client.force_authenticate(user=self.student)
-        with patch("core.students.views.delete_student") as delete:
+        with patch("core.students.views.delete_student_profile") as delete:
             response = self.client.delete(
                 reverse("core:student-admin-delete", kwargs={"slug": "other-student"})
             )

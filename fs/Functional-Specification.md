@@ -416,7 +416,11 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 
 **Nghiệm thu:** tổng sĩ số không âm/vượt sức chứa; không chuyển đăng ký qua site bằng chức năng đổi lớp; giữ lịch sử theo mô hình schema.
 
+Đổi sang lớp khác bị từ chối `409` nếu đăng ký đã có điểm danh hoặc điểm; không sửa lớp, sĩ số hoặc lịch sử. Chọn lại lớp hiện tại không làm thay đổi dữ liệu.
+
 ### FS-ATT-01 — Điểm danh buổi học
+
+Sau khi thay giáo viên, giáo viên hiện tại được xem buổi/roster cũ của lớp tại site, với `can_edit_attendance=false` nếu buổi đứng tên giáo viên cũ. API ghi vẫn yêu cầu đồng thời đúng giáo viên của lớp và của buổi; giáo viên không còn phụ trách lớp không được truy cập. Giữ nguyên phân công trên buổi lịch sử.
 
 **Người dùng:** giáo viên được phân công; nhân viên có quyền giám sát nếu được cấu hình. **Kiểu:** LOCAL. **Bảng:** BuoiHoc, DangKy, DiemDanh, Logs.
 
@@ -442,6 +446,8 @@ Danh sách lớp của Admin Big mặc định đọc từng CSDL site riêng, c
 **Nghiệm thu:** gửi lại cùng idempotency key và payload trả cùng kết quả; cùng key nhưng payload khác bị conflict; hai request cạnh tranh không thể thu vượt số dư; lỗi DB không để phiếu thu và HocPhi lệch nhau.
 
 **Giới hạn triển khai:** thu tại quầy dùng mã phiếu site-prefixed tạo từ idempotency key để nhận diện retry; chưa có request ledger riêng. Hoàn tiền dùng cột UUID idempotency mới trong `PhieuThu` sau migration 40. Cần kiểm chứng retry sau timeout trên SQL Server của từng site trước khi kết luận nghiệm thu.
+
+Mã phiếu thu tối đa 24 ký tự nên key dài 8 đến `24 - len(site) - 4` ký tự. Cùng biểu mẫu chưa xác nhận giữ key cũ khi retry; giao diện khóa gửi trong lúc chờ. Replay hoàn phải trả số còn có thể hoàn bằng tiền phiếu thu gốc trừ tổng đã hoàn, cùng nghĩa với lần hoàn đầu.
 
 ### FS-TUI-02 — Hoàn hoặc điều chỉnh học phí
 

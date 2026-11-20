@@ -317,6 +317,14 @@ def refund_tuition(
                 if not same_request:
                     raise AcademicConflict("Idempotency key đã được dùng cho nội dung khác.")
                 cursor.execute(
+                    "SELECT so_tien FROM dbo.PhieuThu "
+                    "WHERE ma_phieu = %s AND ma_co_so = %s AND ma_hoc_phi = %s AND loai = 'thu'",
+                    [receipt_id, site_code, tuition_id],
+                )
+                original = cursor.fetchone()
+                if original is None:
+                    raise AcademicNotFound
+                cursor.execute(
                     "SELECT COALESCE(SUM(so_tien), 0) FROM dbo.PhieuThu WHERE ma_co_so = %s AND ma_phieu_goc = %s",
                     [site_code, receipt_id],
                 )
@@ -326,7 +334,7 @@ def refund_tuition(
                 return {
                     "receipt_id": str(prior[0]), "original_receipt_id": receipt_id,
                     "tuition_id": tuition_id, "amount": amount,
-                    "refunded_amount": refunded, "refundable_amount": max(0, int(prior[3]) - refunded),
+                    "refunded_amount": refunded, "refundable_amount": max(0, int(original[0]) - refunded),
                     "amount_paid": amount_paid, "balance": balance,
                     "tuition_status": str(fee[3]), "site_code": site_code, "replayed": True,
                 }
