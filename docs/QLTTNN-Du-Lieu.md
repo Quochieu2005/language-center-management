@@ -15,7 +15,7 @@ Q1, Q7 và TD có cùng cấu trúc bảng, nhưng không gộp thành một CSD
 | Nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan` (gồm `google_subject`, `facebook_subject`) | Bản sao thống nhất ở mọi site đang `hoat_dong` |
 | Phân mảnh ngang nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `PhongHoc`, `LopHoc` | Dựa theo `ma_co_so` của bản ghi |
 | Phân mảnh ngang dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `PhieuThu`, `Diem` | Theo site của bảng cha, không tự định tuyến độc lập |
-| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái chuyển chỉ tại CSDL nguồn; sự kiện chuyển append-only tại site phát sinh; `Logs` nằm riêng ở từng CSDL, ACK replication `MonHoc` được ghi tại site nhận |
+| Cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `TokenDatLaiMatKhau`, `Logs` | Trạng thái chuyển chỉ tại CSDL nguồn; sự kiện chuyển append-only tại site phát sinh; `Logs` nằm riêng ở từng CSDL, biên nhận MonHoc chỉ ghi tại Publisher, không nhân bản Logs |
 
 Với bảng dẫn xuất, đọc bảng cha để biết site trước khi thao tác. Ví dụ: xác định site của lớp rồi mới truy cập đăng ký lớp đó. Không tạo foreign key xuyên site.
 

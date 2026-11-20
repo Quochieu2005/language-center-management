@@ -100,7 +100,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 
 Giảng viên yêu cầu **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Đồ án chọn **3 site Q1, Q7, TD**; BT trong kịch bản mở rộng là site thứ tư. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh, nhưng phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
 
-Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Cơ chế replication ứng dụng cho `MonHoc` đã được chọn; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
+Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. `MonHoc` dùng SQL Server transactional Publication; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
 
 ### Sáu nghiệp vụ bắt buộc theo đề tài
 
@@ -274,11 +274,13 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+Môn học dùng SQL Server transactional Publication; API `publisher_subjects.py` chỉ ghi `MonHoc` và biên nhận `Logs` tại Publisher cấu hình bằng `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1). Sau commit API đọc từng site hoạt động để xác nhận, trả 202 nếu chưa đủ; retry cùng key/body chỉ đối soát, không ghi lại Subscriber. `AUTH_SESSION_SITE_CODE` chỉ chọn nơi lưu phiên/khóa điều phối hiện có, không chọn Publisher. `KhoaHoc` vẫn dùng fan-out riêng trong `course_services.py`, yêu cầu bản sao môn học đồng nhất trước khi ghi. Chi tiết và chuyển đổi: [MonHoc SQL replication](docs/MonHoc-SQL-Replication.md).
+
+Trang `/admin/courses` hiển thị `KhoaHoc.so_buoi` là số buổi chuẩn riêng với số buổi đã tạo cho từng lớp. Endpoint quản trị `/api/v1/admin/courses/class-sessions/` đọc `LopHoc` và `BuoiHoc` riêng tại từng site rồi tổng hợp trong API cho Admin Big (`GLOBAL`); Tư vấn và Kế toán chỉ đọc cơ sở trong phiên (`LOCAL`). Không ghi số buổi lớp ngược lên bản sao `KhoaHoc`.
 
 CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
-Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
+YC-03/YC-07: người dùng đã cung cấp ảnh UPDATE và đồng bộ bù `MonHoc` Q1 → Q7 qua Publication, cùng INSERT từ website tới Mac. Ngày 20/11/2026 đã bổ sung Subscription tới TD hiện có trên Windows và kiểm chứng API views thêm/sửa/xóa/retry với SQL Server thật, đủ Q1/Q7/TD; danh mục cuối `complete=true`. Chưa kiểm chứng trình duyệt end-to-end, outage TD hoặc chuyển TD sang máy Minh Đức; xem [kết quả và giới hạn](docs/MonHoc-SQL-Replication.md). Không bật lại API fan-out môn học song song Publication. Các bảng dùng chung khác không tự chuyển sang SQL replication.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -708,7 +710,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
 | Chuyển cơ sở | Tư vấn tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Admin Big hoặc Admin Small site nhận duyệt/từ chối; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX`; Kế toán chỉ đọc tại site nguồn kèm công nợ lịch sử | Tư vấn đề nghị; Admin Big hoặc Admin Small đúng site nhận duyệt/từ chối; Kế toán xem read-only |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |
-| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
+| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big quản lý cơ sở/môn; Admin Big, Tư vấn & xếp lớp, Kế toán & Lễ tân quản lý khóa học |
 | Báo cáo | Thống kê theo site/toàn trung tâm, tra cứu log | `GLOBAL` | Admin Small, Admin Big |
 
 ---
@@ -731,7 +733,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Tự động retry chuyển cơ sở | Source có route để Admin Big retry; nhóm cần quyết định có thêm worker/lịch tự động không, nhịp quét, timeout/backoff và cảnh báo giao dịch `dang_xu_ly` quá lâu |
-| Replication và đồng bộ | Source có replication tầng ứng dụng cho `MonHoc` và `KhoaHoc`; TC-REP-01/TC-SYNC-01 vẫn cần kết quả thay đổi được giữ, site lỗi, phục hồi và retry trên các DB site. Chưa bật SQL Server Publication |
+| Replication và đồng bộ | `MonHoc`: SQL Server Publication; ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7 và INSERT từ website tới Mac. API views thêm/sửa/xóa/retry đã chạy với SQL thật đủ Q1/Q7/TD ngày 20/11/2026; TD hiện còn ở Windows. Browser end-to-end, outage TD và chuyển máy TD chưa kiểm chứng. `KhoaHoc` giữ fan-out tầng ứng dụng |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Source có khóa/transaction cho sức chứa; TC-CON-01 vẫn cần hai phiên SQL Server đồng thời tranh một chỗ cuối và kiểm tra không để dữ liệu dở dang |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |

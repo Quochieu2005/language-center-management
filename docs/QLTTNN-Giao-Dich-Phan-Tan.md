@@ -35,9 +35,9 @@ Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 3. Nếu thiếu site: từ chối, không cập nhật site nào.
 4. Ghi cùng thay đổi vào các site tham gia.
 5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
-6. Với luồng cập nhật `MonHoc` đã triển khai, ghi ACK cho từng site vào `Logs` cùng transaction cục bộ và dùng key/site để retry, đối soát. Không suy ra các luồng nhân bản khác đã có cơ chế này.
+6. Với MonHoc, API chỉ ghi Publisher và biên nhận Logs trong transaction cục bộ; SQL Server Publication chuyển Subscriber. Sau commit API đọc bản sao, retry cùng key chỉ đối soát. Không gọi đây là ACID xuyên CSDL.
 
-Các bước trên là hợp đồng cần áp dụng cho luồng replication. Đồ án đã chọn và triển khai replication tầng ứng dụng cho cập nhật `MonHoc`; route ghi rõ ở README mục 9. Các bảng dùng chung khác chưa có một cơ chế runtime chung đầy đủ. Nếu site lỗi sau bước tiền kiểm và đã có bản sao commit, ghi kết quả từng site, báo chưa hoàn tất và phục hồi/đối soát; không mô tả là không có bản sao nào đổi hoặc rollback toàn hệ thống. TC-REP-01 kiểm tra thay đổi truyền đến bản sao; TC-SYNC-01 kiểm tra lỗi trước ghi, giữa ghi và retry không trùng. Không dùng seed thủ công làm minh chứng replication.
+MonHoc dùng SQL Server Publication, KhoaHoc giữ fan-out riêng. Các quy tắc lỗi/retry phụ thuộc cơ chế: MonHoc không phát lại DML ở Subscriber, chỉ đọc xác nhận; KhoaHoc tiếp tục site chưa ACK. [Chính sách môn học](MonHoc-SQL-Replication.md). Seed không phải minh chứng replication.
 
 ## 3. Vai trò và dữ liệu đề nghị
 

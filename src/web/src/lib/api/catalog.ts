@@ -26,6 +26,24 @@ export type PublicCourseList = {
   results: PublicCourse[];
 };
 
+export type CourseClassSession = {
+  course_id: string;
+  class_id: string;
+  class_name: string;
+  class_status: string;
+  site_code: string;
+  session_count: number;
+};
+
+export type CourseClassSessionSummary = {
+  scope: "GLOBAL" | "LOCAL";
+  complete: boolean;
+  site_codes: string[];
+  missing_sites: string[];
+  count: number;
+  results: CourseClassSession[];
+};
+
 export type SharedSubject = {
   ma_mon: string;
   slug: string;
@@ -102,6 +120,7 @@ export type SharedCourseDeleteResult = {
 
 export const catalogApi = {
   publicCourses: () => apiRequest<PublicCourseList>("/courses/"),
+  courseClassSessions: () => apiRequest<CourseClassSessionSummary>("/admin/courses/class-sessions/"),
   sharedSubjects: () => apiRequest<SharedSubjectList>("/admin/shared/subjects/"),
   createSubject: (body: SharedSubjectCreateInput, idempotencyKey: string) =>
     apiRequest<SharedSubjectWriteResult>("/admin/shared/subjects/", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),

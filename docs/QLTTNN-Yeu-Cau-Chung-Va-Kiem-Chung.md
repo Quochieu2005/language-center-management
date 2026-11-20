@@ -33,12 +33,12 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 | Nội dung | Đã xác định trong thiết kế | Cần chốt/kiểm chứng |
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
-| Replication | YC-03 chọn replication tầng ứng dụng cho `MonHoc`; endpoint là `PATCH /api/v1/admin/shared/subjects/{slug}/`. Source hiện cũng có service ghi `KhoaHoc` | Đối chiếu update, `phien_ban`, ACK trong `Logs`, idempotency và retry. `CoSo` chưa có luồng ghi runtime đầy đủ; không bật Publication trùng cùng bảng. Code/seed chưa phải bằng chứng TC-REP-01/TC-SYNC-01 |
+| Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng đã chứng minh UPDATE/phục hồi Q1 → Q7; TD và POST/PATCH/DELETE qua API mới cần kiểm chứng. KhoaHoc giữ fan-out riêng |
 | Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |
 
-Replication tối thiểu đã chốt và code cho `MonHoc`: Coordinator gọi các DB site riêng; update và ACK `Logs` commit cùng transaction cục bộ, mỗi ACK định danh bởi idempotency key/site. Không thêm bảng hoặc DB. Đây không phải SQL Server Publication, không bảo đảm ACID nguyên tử xuyên các site; nếu một site lỗi giữa lượt ghi, API báo chưa hoàn tất và retry cùng key/body tiếp tục bản sao chưa ACK. Phạm vi các bảng dùng chung khác chưa hoàn thành. Transaction cục bộ đăng ký không thay thế YC-04; phục hồi chuyển cơ sở không thay thế YC-03.
+MonHoc chuyển sang SQL Server transactional Publication; API chỉ ghi Publisher và biên nhận Logs trong transaction cục bộ, sau commit đối soát các Subscriber. Đây là bất đồng bộ, không phải ACID xuyên site. [Chính sách, cutover và bằng chứng](MonHoc-SQL-Replication.md). Các kết quả thử fan-out cũ bên dưới là bằng chứng lịch sử trước chuyển đổi, không xác nhận writer mới.
 
 ## 4. Kịch bản kiểm chứng có thể chạy lại
 
@@ -64,10 +64,10 @@ Chạy trên dữ liệu kiểm thử riêng, không thử lỗi trên dữ li�
 
 1. Xác nhận Q1/Q7/TD đều hoạt động và có cùng môn học/`phien_ban`. Ghi trước giá trị ở từng DB; chọn môn thử phù hợp, không dùng dữ liệu thật quan trọng.
 2. Đăng nhập Admin Big; gửi `PATCH /api/v1/admin/shared/subjects/{slug}/` với `Idempotency-Key` mới và chỉ các trường cần đổi. Không chạy UPDATE thủ công từng DB.
-3. Đọc từng DB, so sánh `ma_mon`, `ten_mon`, `mo_ta`, `phien_ban`; trong `Logs`, đối chiếu một ACK `sync` cho mỗi site với cùng mã thao tác.
+3. Đọc từng DB, so sánh `ma_mon`, `slug`, `ten_mon`, `mo_ta`, `phien_ban`. Chỉ Publisher có biên nhận `Logs` cùng transaction thay đổi; không yêu cầu ACK Logs ở Subscriber. Nếu API trả 202, đợi Agent rồi retry cùng key/body để xác nhận complete; không tự UPDATE từng bản sao.
 4. Gửi lại chính xác request và cùng `Idempotency-Key`: phiên bản không tăng lần hai. Gửi body khác với key đó: API phải trả `409`.
 
-**Đạt khi:** mọi bản sao bắt buộc có nội dung/phiên bản giống nhau, có ACK tại từng DB; retry không tăng version lần hai. Chỉ nạp `02_seed_shared_catalog.sql` chưa đạt. Kiểm tra integration có rollback chứng minh luồng code và DB chạy được, nhưng cần lần demo lưu thay đổi thật trên dữ liệu thử và ảnh/log không nhạy cảm để làm bằng chứng báo cáo.
+**Đạt khi:** mọi bản sao bắt buộc có nội dung/phiên bản giống nhau; retry không tăng version lần hai. Biên nhận Publisher không tự chứng minh Subscriber đã nhận; cần đọc từng bản sao. Chỉ nạp `02_seed_shared_catalog.sql` chưa đạt. Kiểm thử API giả lập không thay thế dữ liệu thật: cần demo lưu thay đổi và ảnh/log không nhạy cảm. Ảnh SQL Q1 → Q7 ngày 20/11/2026 là bằng chứng UPDATE/phục hồi, chưa phải API/UI hoặc TD.
 
 ### TC-DTX-01 — Chuyển cơ sở và phục hồi
 
@@ -131,6 +131,18 @@ Mỗi lần chạy ghi trong tài liệu kết quả tại `docs/evidence/<ma-ki
 | TC-DQ-01 | Đã gọi thống kê qua API với ba site đang sẵn sàng và response đầy đủ | Cần lặp lại với dữ liệu có học viên tại các site và thử một site thiếu để lưu bằng chứng |
 
 Các kết quả trên không chứng minh replication cho `CoSo`/`KhoaHoc`, ACID xuyên site, SQL Server Publication, ba máy chủ vật lý hoặc hoàn tất mọi yêu cầu môn học. Không đánh dấu toàn bộ YC-01–YC-07 là đạt cho tới khi các thiếu sót trong bảng được chạy và lưu bằng chứng.
+
+### Bổ sung kiểm chứng ngày 20/11/2026
+
+Q7 hiện ở SQL Server container trên Mac Minh Khôi; Q1 và TD vẫn ở hai database
+riêng trên Windows Quốc Hiếu. Đã bổ sung Subscriber TD hiện có, kiểm chứng
+API views thêm/sửa/xóa `MonHoc` với commit và replication thật tới Q1/Q7/TD,
+retry không tăng phiên bản và key khác body bị 409. Kết quả cuối đủ ba bản sao;
+xem [TC-REP-01 và response](evidence/TC-REP-01/2026-11-20/README.md).
+Người dùng đã cung cấp ảnh outage/khôi phục Q7 truyền bù thay đổi. Chưa có
+browser end-to-end, outage TD, chuyển máy TD, concurrency hoặc fault injection
+chuyển cơ sở trong đợt này. Bảng ngày 29/10 ở trên là lịch sử, không phản ánh
+topology hiện tại. Không kết luận toàn bộ YC-01–YC-07 đã đạt.
 
 ## 7. Tài liệu phải khớp nhau
 

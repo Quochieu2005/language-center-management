@@ -57,7 +57,7 @@ Gọi từng cơ sở đang hoạt động, thực hiện truy vấn cục bộ 
 
 Chỉ service đồng bộ dùng chung được ghi bảng nhân bản. Xác định tất cả site `hoat_dong`; nếu site nào không sẵn sàng thì từ chối trước khi tuyên bố thành công. Thao tác bao gồm tạo/sửa/đóng danh mục, tài khoản, hoặc cập nhật trạng thái site theo luồng README.
 
-Không rải `for each site: UPDATE` trong từng màn hình. API có service ghi nhân bản riêng cho `MonHoc` và `KhoaHoc`, cập nhật từng CSDL site và ghi ACK append-only vào `Logs` trong transaction cục bộ; retry tiếp tục site chưa ACK. `CoSo` chưa có fan-out runtime đầy đủ, còn một số luồng `TaiKhoan` dùng cơ chế riêng. Chưa có một writer duy nhất bao phủ mọi bảng dùng chung. Đây không phải commit ACID nguyên tử xuyên database; các kịch bản outage/recovery vẫn cần kiểm chứng.
+MonHoc chỉ ghi qua `core/catalog/publisher_subjects.py` tại Publisher cấu hình, SQL Server Publication chuyển bản sao; retry API chỉ đối soát. KhoaHoc giữ fan-out và ACK riêng. Không ghi trực tiếp MonHoc ở Subscriber. [Chi tiết](MonHoc-SQL-Replication.md).
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 

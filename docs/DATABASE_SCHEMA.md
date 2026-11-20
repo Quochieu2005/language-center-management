@@ -60,7 +60,7 @@ Bảng nhân bản có thêm 2 cột để **đối soát** khi 3 site bị lệ
 
 - **YC-02 / TC-FRAG-01:** dùng `LopHoc` làm ví dụ mảnh ngang: mảnh tại site S gồm các dòng `ma_co_so = S`; `DangKy` dẫn xuất theo site của lớp cha. Đọc riêng từng DB để kiểm tra không có dòng sai site/thiếu cha; hợp kết quả tại công cụ kiểm thử hoặc API phải đúng tập lớp dự kiến, không thiếu/thừa và không trùng khóa giữa các mảnh. Không tạo JOIN/FK xuyên DB hoặc lưu hợp các mảnh vào DB trung tâm.
 - Các bảng phân mảnh được định vị theo site, nhưng `HocVien` có bản lịch sử sau chuyển và có thể tạm có hai dòng vật lý `dang_hoc`. Chứng minh không giao nhau bằng mảnh lớp; thống kê học viên phải chọn bản hiện hành theo trạng thái giao dịch, không đòi xóa bản lịch sử để đạt tiêu chí.
-- **YC-03 / TC-REP-01:** phương pháp tối thiểu được chọn là replication tầng ứng dụng cho `MonHoc` qua route source `PATCH /api/v1/admin/shared/subjects/{slug}/`. Source cũng có service tạo/sửa/xóa `KhoaHoc`. Mỗi DB site giữ bản riêng; mỗi cập nhật ghi ACK `Logs` trong transaction cục bộ. Seed giống nhau không phải bằng chứng replication; TC-REP-01 cần đọc từng bản sao sau thay đổi thật.
+- **YC-03 / TC-REP-01:** `MonHoc` dùng SQL Server transactional Publication, chỉ Publisher được ghi qua API; các site khác nhận bản sao. Mặc định Publisher Q1, cấu hình độc lập session. `KhoaHoc` giữ cơ chế fan-out riêng. [Chính sách và bằng chứng](MonHoc-SQL-Replication.md).
 - **YC-07 / TC-SYNC-01:** lỗi được trả `complete=false`/HTTP 202 với `missing_sites`; retry cùng key và body chỉ ghi site chưa có ACK. Cùng key khác body hoặc bản sao lệch trả conflict để đối soát. Cơ chế không cần thêm bảng; kiểm tra outage qua mạng thật vẫn là bước chưa hoàn tất.
 - `db/30_enforce_site_fragment_boundaries.sql` thêm 16 ràng buộc `CHECK` cho từng CSDL site để SQL Server chặn ghi nhầm mảnh. Script kiểm tra dữ liệu hiện có trước khi thêm ràng buộc, chạy riêng trên từng DB và không tạo database/bảng.
 
@@ -210,7 +210,7 @@ Ký hiệu: **PK** khóa chính · **FK** khóa ngoại · **UQ** duy nhất · 
 | `ma_mon` | FK → `MonHoc` | |
 | `ten_khoa_hoc` | | |
 | `trinh_do` | | A1..C2 / N5..N1 / ... |
-| `so_buoi` | | Tổng số buổi theo chương trình khóa học; lưu riêng, không suy ra chỉ từ số tháng. Khi mở lớp, API đối chiếu tổng này với số ngày học tính từ khoảng ngày và các thứ đã chọn |
+| `so_buoi` | | Tổng số buổi chuẩn theo chương trình khóa học; lưu riêng, không suy ra chỉ từ số tháng. Khi mở lớp, API đối chiếu tổng này với số ngày học tính từ khoảng ngày và các thứ đã chọn. Không ghi đè bằng số buổi đã tạo của một lớp; số buổi từng lớp được đếm từ `BuoiHoc` tại site sở hữu lớp |
 | `thoi_luong_so` | `DECIMAL(7,2)`, nullable | Số tháng (cho phép tối đa 2 chữ số thập phân, ví dụ 3,5) hoặc số ngày nguyên |
 | `thoi_luong_don_vi` | `VARCHAR(10)`, nullable | `thang` hoặc `ngay`; nếu là ngày thì số lượng phải nguyên |
 | `hoc_phi_chuan` | | Số tiền |
@@ -557,7 +557,7 @@ Source dùng bảng này cho OTP reset mật khẩu quản trị: mã 6 số ch�
 
 **Xóa vĩnh viễn Admin Small:** Admin Big có thể xóa vật lý dòng `Admin`, các bản sao `TaiKhoan`, phiên, token/giao dịch đặt lại mật khẩu còn gắn tài khoản và ảnh Cloudinary. Chạy `db/32_allow_admin_small_hard_delete.sql` riêng tại từng site trước khi bật thao tác này. Migration bỏ FK tới `TaiKhoan` ở các cột người thao tác của `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, `DiemDanh` và bảng log cũ để giữ nguyên mã người thao tác trong lịch sử; không xóa các dòng lịch sử. FK `YeuCauThanhToan_TaiKhoan` vẫn được giữ; nếu còn yêu cầu thanh toán tham chiếu tài khoản thì API từ chối xóa. Hồ sơ `HocVien`/`GiaoVien`/`NhanVien` hoặc giao dịch chuyển cơ sở đang mở cũng khiến thao tác bị từ chối. Mỗi site commit độc lập, có dấu retry trong `Logs`; đây là `REPLICATED-WRITE`, không phải ACID xuyên CSDL.
 
-Với `MonHoc`, mỗi site ghi một dòng `Logs` có `loai_log='sync'`, `bang_tac_dong='MonHoc'`, `ma_ban_ghi`, `site_dich`, `ket_qua='thanh_cong'`, JSON trước/sau và tài khoản Admin Big. `ma_log` xác định theo khóa idempotency và site. Dòng ACK và cập nhật `MonHoc` nằm trong cùng transaction cục bộ, nên một site không thể có ACK thành công nếu update ở site đó rollback. `Logs` là nơi ghi ACK của từng bản sao, không phải database trung tâm.
+Với `MonHoc`, chỉ Publisher ghi biên nhận `Logs` (`ma_log = MHSQL-<SHA256(key)>`, `loai_log=sync`, JSON chứa `mechanism=sql-publication`, action, request hash và after; `du_lieu_cu` chứa before). Biên nhận và thay đổi `MonHoc` commit trong cùng transaction cục bộ. Không nhân bản `Logs`, không tạo ACK tại Subscriber; complete được xác định bằng cách đọc bản sao sau commit. Retry cùng người dùng/key/route/body chỉ đối soát. Không thêm bảng/cột; các ACK fan-out cũ được giữ làm lịch sử, không dùng để retry writer mới.
 
 ---
 

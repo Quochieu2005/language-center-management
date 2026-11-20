@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-20",
+  "mode": "Django API views + live SQL Server, forced test identity; no browser login",
+  "record_id": "MH-RT-8A293A34",
+  "steps": [
+    {
+      "method": "post",
+      "statuses": [
+        202,
+        202,
+        202,
+        202,
+        201
+      ],
+      "result": {
+        "ma_mon": "MH-RT-8A293A34",
+        "mo_ta": "Runtime create test",
+        "phien_ban": 1,
+        "slug": "kiem-chung-sql-mh-rt-8a293a34",
+        "ten_mon": "Kiem chung SQL MH-RT-8A293A34",
+        "complete": true,
+        "sites": [
+          "Q1",
+          "Q7",
+          "TD"
+        ],
+        "missing_sites": [],
+        "idempotent_replay": true
+      }
+    },
+    {
+      "method": "patch",
+      "statuses": [
+        202,
+        202,
+        202,
+        202,
+        202,
+        200
+      ],
+      "result": {
+        "ma_mon": "MH-RT-8A293A34",
+        "mo_ta": "Runtime update test",
+        "phien_ban": 2,
+        "slug": "kiem-chung-sql-mh-rt-8a293a34-updated",
+        "ten_mon": "Kiem chung SQL MH-RT-8A293A34 updated",
+        "complete": true,
+        "sites": [
+          "Q1",
+          "Q7",
+          "TD"
+        ],
+        "missing_sites": [],
+        "idempotent_replay": true
+      }
+    },
+    {
+      "method": "delete",
+      "statuses": [
+        202,
+        202,
+        202,
+        202,
+        202,
+        200
+      ],
+      "result": {
+        "ma_mon": "MH-RT-8A293A34",
+        "slug": "kiem-chung-sql-mh-rt-8a293a34-updated",
+        "deleted": true,
+        "complete": true,
+        "sites": [
+          "Q1",
+          "Q7",
+          "TD"
+        ],
+        "missing_sites": [],
+        "idempotent_replay": true
+      }
+    }
+  ],
+  "key_conflict_status": 409,
+  "replay_version": 2,
+  "final_catalog": {
+    "scope": "GLOBAL",
+    "complete": true,
+    "site_codes": [
+      "Q1",
+      "Q7",
+      "TD"
+    ],
+    "missing_sites": [],
+    "inconsistent_sites": [],
+    "count": 3,
+    "results": [
+      {
+        "ma_mon": "MH-ENG",
+        "slug": "tieng-anh",
+        "ten_mon": "Tiếng Anh",
+        "mo_ta": "Danh mục môn học dùng chung",
+        "phien_ban": 1
+      },
+      {
+        "ma_mon": "MH-JPN",
+        "slug": "tieng-nhat",
+        "ten_mon": "Tiếng Nhật",
+        "mo_ta": "Danh mục môn học dùng chung",
+        "phien_ban": 1
+      },
+      {
+        "ma_mon": "MH-TEST-Q7",
+        "slug": "mon-kiem-tra-q7",
+        "ten_mon": "Môn kiểm tra Q7",
+        "mo_ta": "Kiểm tra website truyền dữ liệu sang Mac",
+        "phien_ban": 1
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
-import { catalogApi, type PublicCourse, type PublicCourseList, type SharedCourseCreateInput, type SharedCoursePatchInput, type SharedSubjectList } from "@/lib/api/catalog";
+import { catalogApi, type CourseClassSession, type CourseClassSessionSummary, type PublicCourse, type PublicCourseList, type SharedCourseCreateInput, type SharedCoursePatchInput, type SharedSubjectList } from "@/lib/api/catalog";
 import { ApiError } from "@/lib/api/client";
 import styles from "./CoursesPage.module.scss";
 
@@ -38,6 +38,8 @@ export default function CoursesPage() {
   const { message, modal: confirmModal } = App.useApp();
   const [catalog, setCatalog] = useState<PublicCourseList | null>(null);
   const [subjects, setSubjects] = useState<SharedSubjectList | null>(null);
+  const [classSessions, setClassSessions] = useState<CourseClassSessionSummary | null>(null);
+  const [classSessionsError, setClassSessionsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -56,12 +58,20 @@ export default function CoursesPage() {
     setError("");
     setCatalog(null);
     setSubjects(null);
+    setClassSessions(null);
+    setClassSessionsError("");
     try {
-      const [courseResult, subjectResult] = await Promise.all([
-        catalogApi.publicCourses(), catalogApi.sharedSubjects(),
+      const [courseResult, subjectResult, sessionResult] = await Promise.all([
+        catalogApi.publicCourses(),
+        catalogApi.sharedSubjects(),
+        catalogApi.courseClassSessions().catch((reason) => {
+          setClassSessionsError(reason instanceof Error ? reason.message : "Không tải được số buổi theo lớp.");
+          return null;
+        }),
       ]);
       setCatalog(courseResult);
       setSubjects(subjectResult);
+      setClassSessions(sessionResult);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được danh mục khóa học."); }
     finally { setLoading(false); }
@@ -136,12 +146,22 @@ export default function CoursesPage() {
   };
 
   const canWrite = Boolean(catalog?.complete && subjects?.complete && !pending && !loading);
+  const sessionsByCourse = new Map<string, CourseClassSession[]>();
+  for (const item of classSessions?.results || []) {
+    const sessions = sessionsByCourse.get(item.course_id) || [];
+    sessions.push(item);
+    sessionsByCourse.set(item.course_id, sessions);
+  }
 
   const columns = [
     { title: "Khóa học", dataIndex: "name", render: (name: string, row: PublicCourse) => <><strong>{name}</strong><br /><span>{row.course_id} · {row.slug}</span></> },
     { title: "Môn học", dataIndex: "subject_name", render: (name: string, row: PublicCourse) => <>{name}<br /><span>{row.subject_id}</span></> },
     { title: "Trình độ", dataIndex: "level" },
-    { title: "Số buổi học", dataIndex: "session_count", render: (value: number | null) => value == null ? "Chưa chốt" : `${value} buổi` },
+    { title: "Số buổi chuẩn", dataIndex: "session_count", render: (value: number | null) => value == null ? "Chưa chốt" : `${value} buổi` },
+    { title: "Số buổi đã xếp theo lớp", render: (_: unknown, row: PublicCourse) => {
+      const classes = sessionsByCourse.get(row.course_id) || [];
+      return classes.length ? <Space orientation="vertical" size="small">{classes.map((item) => <span key={`${item.site_code}-${item.class_id}`}>{item.site_code} · {item.class_name} ({item.class_id}) · {item.session_count} buổi</span>)}</Space> : "Chưa có lớp";
+    } },
     { title: "Thời gian hoàn thành", render: (_: unknown, row: PublicCourse) => row.thoi_luong_so && row.thoi_luong_don_vi ? `${durationNumber.format(Number(row.thoi_luong_so))} ${row.thoi_luong_don_vi === "thang" ? "tháng" : "ngày"}` : "Chưa cập nhật" },
     { title: "Học phí chuẩn", dataIndex: "standard_fee", render: (value: number) => `${money.format(value)} ₫` },
     { title: "Cơ sở đang mở lớp", render: (_: unknown, row: PublicCourse) => row.branches.length ? <Space wrap size="small">{row.branches.map((branch) => <Tag key={branch.site_code}>{branch.site_code} · {branch.open_class_count} lớp</Tag>)}</Space> : "Chưa có lớp mở" },
@@ -150,13 +170,15 @@ export default function CoursesPage() {
 
   return <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
     {error && <Alert type="error" showIcon title={error} />}
+    {classSessionsError && <Alert type="warning" showIcon title="Không tải được số buổi theo lớp" description={classSessionsError} />}
+    {classSessions && !classSessions.complete && <Alert type="warning" showIcon title="Số buổi lớp mới tải được một phần" description={`Thiếu site: ${classSessions.missing_sites.join(", ") || "không xác định"}.`} />}
     {catalog && <>
       {!catalog.complete && <Alert type="warning" showIcon title="Danh mục chưa đồng nhất giữa các cơ sở. Tạm khóa thao tác ghi để tránh làm lệch bản sao." description={`Site thiếu: ${catalog.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${catalog.inconsistent_sites.join(", ") || "không có"}.`} />}
       {subjects && !subjects.complete && <Alert type="warning" showIcon title="Danh sách môn học chưa đối chiếu đủ các cơ sở. Tạm khóa tạo/sửa khóa học." description={`Site thiếu: ${subjects.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${subjects.inconsistent_sites.join(", ") || "không có"}.`} />}
       {pending && <Alert type="warning" showIcon title="Yêu cầu đồng bộ chưa hoàn tất" description={<Space orientation="vertical"><span>Giữ nguyên nội dung và mã yêu cầu để tránh tạo thao tác trùng. Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định; API chưa xác nhận kết quả"}.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
     </>}
     <Card title={`Quản lý khóa học${catalog ? ` · ${catalog.count}` : ""}`} extra={<Button type="primary" onClick={create} disabled={!canWrite}>Tạo khóa học</Button>}>
-      <Table rowKey="course_id" loading={loading} columns={columns} dataSource={catalog?.results || []} scroll={{ x: 1050 }} locale={{ emptyText: <Empty description={error ? "Không tải được dữ liệu từ các cơ sở" : "Chưa có khóa học"} /> }} />
+      <Table rowKey="course_id" loading={loading} columns={columns} dataSource={catalog?.results || []} scroll={{ x: 1400 }} locale={{ emptyText: <Empty description={error ? "Không tải được dữ liệu từ các cơ sở" : "Chưa có khóa học"} /> }} />
     </Card>
     <Modal title={editing ? `Sửa khóa học · ${editing.course_id}` : "Tạo khóa học dùng chung"} open={modal} afterOpenChange={(open) => { if (open) { formScrollRef.current?.scrollTo({ top: 0 }); if (editing) void form.validateFields(["ma_khoa_hoc"]).catch(() => undefined); } }} onCancel={() => { setModal(false); setSubjectPickerOpen(false); }} footer={null} width="min(920px, calc(100vw - 32px))" styles={{ body: { padding: 0, overflow: "hidden" } }} destroyOnHidden>
       <div ref={formScrollRef} style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto", overflowX: "hidden", padding: 24 }}>
@@ -197,7 +219,7 @@ export default function CoursesPage() {
             <Input value={courseSlug} readOnly placeholder="Nhập tên khóa học để xem slug" />
           </Form.Item>
           <Form.Item name="trinh_do" label="Trình độ" rules={[{ required: true, max: 30 }]}><Input maxLength={30} placeholder="IELTS 6.5" /></Form.Item>
-          <Form.Item name="so_buoi" label="Số buổi tham khảo (không bắt buộc)" extra="Có thể để trống. Khi xếp lớp, số buổi thực tế được tính theo ngày bắt đầu/kết thúc và các thứ đã chọn."><InputNumber min={1} max={32767} precision={0} style={{ width: "100%" }} placeholder="Để trống nếu chưa chốt" /></Form.Item>
+          <Form.Item name="so_buoi" label="Số buổi chuẩn theo chương trình (không bắt buộc)" extra="Đây là số buổi chuẩn của khóa; số buổi đã tạo được hiển thị riêng theo từng lớp."><InputNumber min={1} max={32767} precision={0} style={{ width: "100%" }} placeholder="Để trống nếu chưa chốt" /></Form.Item>
           <Form.Item name="thoi_luong_so" label="Thời gian hoàn thành" extra="Tháng có thể nhập tối đa 2 số lẻ, ví dụ 3,5; ngày phải là số nguyên." dependencies={["thoi_luong_don_vi"]} rules={[{ required: !editing, message: "Nhập số tháng hoặc ngày." }, { validator: (_, value: number | undefined) => {
             const unit = form.getFieldValue("thoi_luong_don_vi");
             if (editing && value == null && !unit) return Promise.resolve();

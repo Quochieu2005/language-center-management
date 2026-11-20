@@ -329,17 +329,18 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 ### FS-SITE-01 — Quản lý cơ sở và danh mục dùng chung
 
-**Người dùng:** Admin Big. **Phân tán:** đọc/ghi CoSo, MonHoc, KhoaHoc bằng Replicated-Write.
+**Người dùng:** Admin Big quản lý cơ sở và môn học; Admin Big, Tư vấn & xếp lớp, Kế toán & Lễ tân xem và quản lý khóa học. **Phân tán:** đọc/ghi `CoSo`, `MonHoc`, `KhoaHoc` bằng Replicated-Write; số buổi từng lớp đọc theo site.
 
-1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái.
+1. Admin Big tạo hoặc cập nhật cơ sở, môn học, khóa học, giá chuẩn và trạng thái. Tư vấn & xếp lớp và Kế toán & Lễ tân được xem, tạo, sửa, xóa khóa học dùng chung; không được tạo/sửa/xóa môn học hoặc cơ sở.
 2. API kiểm tra mã ổn định, quan hệ môn-khóa, miền dữ liệu và không cho đóng site đang có nghiệp vụ mở mà chưa xử lý. Mã khóa học tối đa 30 ký tự, bắt đầu bằng chữ in hoa, tiếp theo là chữ in hoa/chữ số; có thể có các đoạn bổ sung ngăn bằng dấu gạch nối đơn. Giao diện chuẩn hóa mã thành chữ in hoa; cùng mã phải được giữ nhất quán trên mọi site.
-3. API danh mục môn học có đọc toàn cục và tạo/cập nhật/xóa đồng bộ qua các site đang hoạt động; API khóa học có tạo/cập nhật/xóa `KhoaHoc` theo cùng mô hình, kiểm tra môn học tồn tại giống nhau trên mọi site trước khi ghi. Mỗi site ghi ACK vào `Logs` trong transaction cục bộ. Runtime replication cho thay đổi `CoSo` và việc gom các luồng `TaiKhoan` về service chung vẫn còn thiếu. Cơ chế tại tầng API chưa thay cho bằng chứng kiểm chứng dữ liệu thực tế ở nhiều site.
+3. API môn học đọc toàn cục; chỉ Admin Big tạo/sửa/xóa. API chỉ ghi Publisher và biên nhận Logs cùng transaction, SQL Server Publication truyền MonHoc tới Subscriber. Sau commit đối soát tất cả site hoạt động; 202 nếu còn thiếu/lệch/chậm. Retry cùng người dùng/key/route/body không ghi lại hoặc tăng phiên bản; key khác nội dung trả 409. Xóa cần đủ site, không có KhoaHoc tham chiếu và khóa điều phối cùng API khóa học. `KhoaHoc` giữ fan-out từng site và kiểm tra môn đồng nhất trước ghi. [Chi tiết](../docs/MonHoc-SQL-Replication.md).
 4. Thời lượng khóa học lưu số tháng với tối đa hai chữ số thập phân (ví dụ `3,5 tháng`); nếu chọn ngày thì số lượng phải là số nguyên. API, ràng buộc SQL và các bản sao `KhoaHoc` phải áp dụng cùng quy tắc.
 5. `so_buoi` là tổng số buổi theo chương trình đào tạo và được nhập riêng với thời lượng tháng/ngày. Không tự tính số buổi từ số tháng nếu chưa có tần suất học mỗi tuần.
-6. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
-7. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
+6. Số buổi đã tạo cho mỗi lớp được đếm từ `BuoiHoc` tại CSDL site sở hữu lớp. Màn quản lý khóa học hiển thị số chuẩn `KhoaHoc.so_buoi` riêng với số buổi theo từng lớp; lịch của một lớp không được ghi đè hoặc nhân bản ngược lên số chuẩn dùng chung.
+7. Site mới chỉ chuyển sang hoat_dong sau khi tạo database riêng, cài schema, nạp bản sao danh mục, kiểm tra kết nối và cấu hình tài khoản quyền tối thiểu.
+8. Site đóng cửa ngừng nhận giao dịch mới nhưng giữ dữ liệu lịch sử theo quy tắc lưu trữ.
 
-**Nghiệm thu:** thiếu cấu hình hoặc lỗi một site được hiển thị cụ thể; không có trạng thái thành công toàn phần giả; các site sau đồng bộ có cùng mã và phiên bản. Đối với `MonHoc`, retry cùng `Idempotency-Key` và body tiếp tục site chưa ACK; cùng key khác body bị từ chối. Phải chạy TC-REP-01/TC-SYNC-01 trước khi kết luận đạt toàn phần.
+**Nghiệm thu:** API từ chối quyền sửa danh mục cơ sở/môn học đối với Tư vấn và Kế toán, đồng thời cho ba vai trò được nêu quản lý khóa học; thiếu cấu hình hoặc lỗi một site được hiển thị cụ thể; không có trạng thái thành công toàn phần giả; các site sau đồng bộ có cùng mã và phiên bản. Màn khóa học tách số buổi chuẩn với số BuoiHoc theo từng lớp; Admin Big thấy kết quả GLOBAL có cảnh báo site thiếu, nhân viên chỉ thấy LOCAL tại site của phiên. Đối với `MonHoc`, retry cùng người dùng, route, `Idempotency-Key` và body chỉ đối soát lại các bản sao sau commit Publisher; cùng key khác body bị từ chối. Phải chạy TC-REP-01/TC-SYNC-01 trước khi kết luận đạt toàn phần.
 
 ### FS-STU-01 — Quản lý hồ sơ học viên tại cơ sở
 
@@ -558,7 +559,7 @@ Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
 
 **Người dùng:** hệ thống ghi tự động; Admin Big đọc toàn cục, Admin Small đọc site được giao theo chính sách. **Kiểu:** Local theo site phát sinh; Global khi Admin Big xem nhiều site.
 
-`Logs` lưu audit và ACK đồng bộ theo site; source có luồng replication cho `MonHoc` (được chọn làm YC-03 tối thiểu) và service riêng cho `KhoaHoc`, ghi ACK cùng transaction cập nhật từng bản sao. `CoSo` chưa có fan-out runtime đầy đủ và các luồng `TaiKhoan` chưa gom về một writer chung. Các cơ chế cần TC-REP-01/TC-SYNC-01 chạy thật; nhật ký chuyển nằm ở `LichSuChuyenCoSo` và chỉ append-only.
+`Logs` lưu audit theo site; với MonHoc chỉ có biên nhận Publisher, không phải ACK nhận của các Subscriber. KhoaHoc giữ ACK fan-out riêng; LichSuChuyenCoSo vẫn append-only. Xem [chính sách môn học](../docs/MonHoc-SQL-Replication.md).
 
 Không ghi password/hash, token, cookie, header xác thực, secret Cloudinary/SMTP/OAuth/SQL, PAN/CVV hay payload thanh toán thô. Không trả nội dung nội bộ trong lỗi API.
 

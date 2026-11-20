@@ -7,7 +7,7 @@ Thư mục này chứa script SQL Server để dựng **ba CSDL riêng**, cùng 
 Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phân mảnh, replication, transaction và đồng bộ; chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency và một distributed query. Các nhóm được chọn kiểu phân mảnh phù hợp. Xem [yêu cầu chung](../README.md#yêu-cầu-chung-áp-dụng-cho-mọi-đề-tài) và [kịch bản demo](../README.md#6-kịch-bản-demo) trong README chính.
 
 - Schema/seed/verify hỗ trợ TC-SITE-01 và TC-FRAG-01; đọc riêng từng DB để đối chiếu mảnh và dữ liệu cha/con.
-- `02_seed_shared_catalog.sql` chỉ nạp ban đầu. Runtime replication tối thiểu cho `MonHoc` dùng `PATCH /api/v1/admin/shared/subjects/{slug}/`, Admin Big và ACK trong `Logs`; outage/recovery qua mạng thật vẫn phải chạy TC-SYNC-01.
+- `02_seed_shared_catalog.sql` chỉ nạp ban đầu. MonHoc dùng SQL Server transactional Publication: chỉ Publisher ghi qua API; Logs giữ biên nhận Publisher. Không thêm schema/migration; phải cấu hình Subscription ngoài API cho mọi site hoạt động. [Hướng dẫn và giới hạn](../docs/MonHoc-SQL-Replication.md).
 - Bảng trạng thái/sự kiện hỗ trợ Coordinator, không tự chạy distributed transaction hoặc bảo đảm ACID xuyên site. TC-DTX-01 cần nghiệp vụ nguồn/đích và cơ chế đã chốt chạy thật.
 - TC-CON-01 cần hai phiên cạnh tranh chỗ cuối, cơ chế bảo vệ sức chứa và đọc lại `LopHoc`/`DangKy`/`HocPhi`; các ràng buộc/verify cục bộ không đủ thay bài thử này.
 - TC-DQ-01 cần đọc các DB rồi tổng hợp tại API; không thay bằng JOIN xuyên DB. Chạy xong script khởi tạo chưa có nghĩa đã đạt toàn bộ yêu cầu môn học.
