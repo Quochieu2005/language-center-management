@@ -1,6 +1,10 @@
-# Quy trình làm việc nhóm
+# Làm việc nhóm và kế hoạch triển khai
 
-Tài liệu này giúp năm thành viên phối hợp làm một hệ thống có nhiều CSDL và nhiều phần code. Nó bổ sung cách làm việc cho [README chính](../README.md); không thay đổi nghiệp vụ hoặc quyết định kỹ thuật trong README và [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
+**Tra nhanh:** [Phân công](#2-phân-công-theo-năm-luồng-công-việc) · [Sở hữu tài liệu](#4-quyền-sở-hữu-tài-liệu-và-tránh-xung-đột) · [Quy trình Git/PR](#5-nhịp-làm-việc-và-tích-hợp) · [Kế hoạch triển khai/demo](#ke-hoach-trien-khai). Tổng quan dự án xem [README gốc](../README.md).
+
+Ưu tiên lab/báo cáo theo [đối chiếu giảng viên](QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien): hoàn tất ba instance/máy (Q1 Quốc Hiếu, Q7 Minh Khôi, TD Minh Đức), lưu ánh xạ/cấp phát và bằng chứng TC. TD hiện vẫn cùng Windows Q1; phân công là mục tiêu, không phải kết quả đã chạy. Không đổi toàn bộ cơ chế sang ví dụ QLDSV/hàng không hoặc tự triển khai 2PC khi chưa chốt.
+
+Tài liệu này gom quy trình phối hợp và kế hoạch triển khai, giúp năm thành viên phối hợp làm một hệ thống có nhiều CSDL và nhiều phần code. Nó bổ sung cách làm việc cho [README chính](../README.md); không thay đổi nghiệp vụ hoặc quyết định kỹ thuật trong README và [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 
 ## 1. Nguyên tắc cả nhóm cùng nắm
 
@@ -24,7 +28,7 @@ Nhóm gán tên thật vào các vai trò dưới đây. Đây là đề xuất 
 | D. Học viên và nghiệp vụ cơ sở | Hồ sơ, lớp, đăng ký/đổi lớp, học phí/phiếu thu, quy tắc cùng site | Cùng A xác nhận FK cục bộ; cùng B dùng đúng router; cùng E đối chiếu điểm danh |
 | E. Học tập, báo cáo và demo | Buổi học, điểm danh, điểm, thống kê, nhật ký màn hình và kịch bản demo | Cùng D thống nhất đăng ký/buổi học; cùng B gộp thống kê; cùng cả nhóm kiểm tra quyền |
 
-Chuyển cơ sở là công việc liên chức năng: B làm điều phối; A xác định lưu trạng thái và ràng buộc DB; D bảo đảm trạng thái học viên/lớp; C kiểm tra Admin Small chỉ tạo đề nghị còn Admin Big mới duyệt/từ chối; E kiểm tra hộp thư Global Query, nhật ký, lịch sử và thống kê sau chuyển. Cả nhóm có thể review kịch bản lỗi; Pull Request vẫn phải được trưởng nhóm Quốc Hiếu kiểm tra và merge theo quy trình ở mục 5.
+Chuyển cơ sở là công việc liên chức năng: B làm điều phối; A xác định lưu trạng thái và ràng buộc DB; D bảo đảm trạng thái học viên/lớp; C kiểm tra chỉ Tư vấn tạo đề nghị, Admin Big hoặc Admin Small tại site nhận duyệt/từ chối đúng phạm vi; E kiểm tra hộp thư Global Query, thông báo site nhận, giữ tài khoản, nhật ký, lịch sử và thống kê sau chuyển. Cả nhóm có thể review kịch bản lỗi; Pull Request vẫn phải được trưởng nhóm Quốc Hiếu kiểm tra và merge theo quy trình ở mục 5.
 
 Mỗi vai trò chịu trách nhiệm phần giao diện của domain mình nếu có giao diện. Không dồn toàn bộ frontend vào một người ở cuối dự án.
 
@@ -66,11 +70,8 @@ Nếu chưa trả lời được ranh giới commit/rollback hoặc site tham gi
 |---|---|---|
 | `README.md` | B điều phối thay đổi; người làm nghiệp vụ gửi patch/nội dung | Đổi luồng, quyền, loại thao tác, tiến độ hoặc quyết định đã chốt |
 | `docs/DATABASE_SCHEMA.md` | A | Đổi bảng, cột, khóa, trạng thái, quan hệ hoặc phân mảnh |
-| `docs/QLTTNN-Kien-Truc.md` | B | Đổi thành phần hoặc định tuyến đã thống nhất |
-| `docs/QLTTNN-Du-Lieu.md` | A | Khi thay đổi phân mảnh/quan hệ ở schema |
 | `docs/QLTTNN-Huong-Dan-Source.md` | B | Khi module/interface hoặc quy tắc truy cập thay đổi |
 | `docs/QLTTNN-Giao-Dich-Phan-Tan.md` | B + A | Khi chốt giao thức commit, trạng thái hoặc recovery |
-| `docs/QLTTNN-Ke-Hoach-Trien-Khai.md` | Người tích hợp | Khi thứ tự/gate hoặc demo thay đổi |
 | `docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md` | B + A/E và người làm kịch bản | Khi tiêu chí, phương pháp kiểm chứng hoặc bằng chứng thay đổi |
 | `docs/QLTTNN-Lam-Viec-Nhom.md` | Cả nhóm thống nhất | Khi thay đổi người sở hữu hoặc quy tắc phối hợp |
 
@@ -152,3 +153,47 @@ Ví dụ: nếu PR #1 đã được mở/push và sau đó tác giả push thêm
 - [ ] Với dữ liệu dùng chung/chuyển cơ sở, đã thử lỗi giữa chừng và đường phục hồi.
 - [ ] README/schema/docs khớp với source đã merge.
 - [ ] Với phần phân tán liên quan, FS/API/UI và mã YC/TC khớp nhau; bằng chứng thể hiện thao tác thật trên các site hoặc hai phiên cạnh tranh, không chỉ mock/seed.
+
+
+---
+
+<a id="ke-hoach-trien-khai"></a>
+
+## 8. Kế hoạch triển khai và tiêu chí hoàn tất
+
+Các giai đoạn dưới đây là kế hoạch, không thay [trạng thái đã kiểm chứng](Trang-Thai-Trien-Khai.md). Chốt các quyết định còn mở tại README mục 9 trước phần code phụ thuộc; tiêu chí hoàn tất task và PR ở mục 6–7 của tài liệu này.
+
+### 8.1. Các giai đoạn và đầu ra
+
+| Giai đoạn | Công việc | Bằng chứng/đầu ra để chuyển bước |
+|---|---|---|
+| A. Chốt cấu hình triển khai | Ghi phiên bản/cấu hình SQL Server, cách đặt từng site, cấu hình Django và quy trình chạy Next.js/Django | Quyết định được ghi, mọi thành viên có thể dựng cùng môi trường |
+| B. CSDL | Tạo các CSDL riêng; chạy cùng schema; tạo dữ liệu demo khác nhau theo site và seed danh mục ban đầu | TC-SITE-01/TC-FRAG-01: kết nối riêng và phân mảnh đúng; seed chưa chứng minh replication runtime |
+| C. Django Coordinator API | Site Router, danh sách cơ sở hoạt động, Global Query, logging và nền giao dịch | Không hard-code số site; truy vấn biết nguồn; site mất kết nối được báo rõ |
+| D. Quyền và dữ liệu dùng chung | Đăng nhập, phân quyền, tài khoản, quên mật khẩu, danh mục, phương pháp replication và đồng bộ | TC-REP-01/TC-SYNC-01: truyền thay đổi thật, đối soát sau lỗi; không báo hoàn tất khi thiếu site |
+| E. Nghiệp vụ cơ sở | Mở lớp, sinh lịch, đăng ký, đổi lớp, học phí, điểm danh, điểm; kiểm soát concurrency | Rollback cùng site; TC-CON-01: hai phiên tranh chỗ cuối chỉ một yêu cầu thắng |
+| F. Nghiệp vụ toàn cục | Thống kê, tra cứu học viên, nhật ký nhiều site | Kết quả gộp; cảnh báo site thiếu; không đếm `da_chuyen_di` |
+| G. Chuyển cơ sở | Đề nghị Tư vấn, duyệt/từ chối của Admin Big hoặc Admin Small tại cơ sở nhận, Global Query, transaction, retry và phục hồi | Chứng minh chỉ Tư vấn tạo đề nghị, chờ duyệt, từ chối, đúng phạm vi người duyệt; giữ nguyên tài khoản, thông báo tại đích; lỗi trước khi tạo đích và restart sau khi tạo đích |
+| H. Hoàn thiện | Giao diện, kiểm thử tích hợp, demo, ảnh cài đặt, báo cáo và slide | Kịch bản demo có thể chạy lại từ đầu; tài liệu khớp source thực tế |
+
+Đây là nhóm giai đoạn để quản lý tích hợp; danh sách chức năng theo thứ tự chi tiết vẫn là README mục 10.
+
+### 8.2. Ma trận kiểm chứng theo loại nghiệp vụ
+
+| Loại | Kịch bản thành công | Kịch bản lỗi bắt buộc | Điều kiện đạt |
+|---|---|---|---|
+| `LOCAL` | Đăng ký ở Q1 tạo đăng ký, học phí, tăng sĩ số, ghi log | Ép lỗi ở từng bước sau khi bắt đầu giao dịch | Rollback toàn bộ; chỉ Q1 thay đổi khi thành công |
+| `GLOBAL` | Đếm học viên tại từng site rồi cộng | Một site timeout | Hiện phần có được, nêu site thiếu và đánh dấu chưa đầy đủ |
+| `REPLICATED-WRITE` | Sửa khóa học khi mọi site hoạt động | Một site không kết nối hoặc lỗi giữa chừng | Từ chối trước khi bắt đầu nếu site không sẵn sàng; nếu lỗi giữa chừng có recovery, không để lệch âm thầm |
+| `DISTRIBUTED-TX` | Chuyển học viên hết nợ từ Q1 sang Q7 | Q7 không sẵn sàng trước khi tạo hồ sơ đích; tiến trình dừng sau khi đích tạo xong | Nhánh đầu không đổi Q1; nhánh sau resume phần nguồn; chỉ một bản được tính là đang học sau recovery |
+| Concurrency (`LOCAL`, YC-05) | Hai học viên khác nhau tranh chỗ cuối của cùng lớp | Hai phiên chạy chồng lấp tại vùng kiểm tra/cập nhật sức chứa | Đúng một yêu cầu thành công; không vượt sĩ số, không có đăng ký/học phí dở dang; ghi cơ chế và bằng chứng cạnh tranh |
+
+### 8.3. Kịch bản demo bảo vệ
+
+Theo bảng README mục 6, chạy đủ các kịch bản nghiệp vụ, gồm 21 kịch bản hiện được liệt kê: phân mảnh; nghiệp vụ cục bộ; quyền; thống kê; nhân bản; đề nghị/duyệt/chuyển và phục hồi; tài khoản; nhật ký; thêm site BT; cạnh tranh chỗ cuối; đồng bộ sau lỗi; tái thiết mảnh và thống kê thiếu site. Đồng thời đối chiếu đủ **TC-SITE-01, TC-FRAG-01, TC-REP-01, TC-DTX-01, TC-CON-01, TC-DQ-01, TC-SYNC-01**. Không thay bài concurrency bằng hai yêu cầu tuần tự hoặc bài replication bằng seed giống nhau. Dùng dữ liệu mẫu của [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md), không sửa cứng dữ liệu demo vào ứng dụng.
+
+### 8.4. Bằng chứng cài đặt
+
+Theo đúng hướng dẫn giảng viên, lưu ảnh/script chứng minh cấu hình mạng hoặc VPN/Remote Desktop, kết nối server, cài SQL Server và quản trị bằng SSMS, kiểm tra Agent nếu áp dụng, Linked Server/Publication nếu được yêu cầu, truy vấn trước/sau đồng bộ và giao dịch thử. Ghi phiên bản Next.js/Django và cách API kết nối từng CSDL. Bảng mã ảnh và nội dung cần chụp theo từng mục 3.1–3.7 nằm trong [đề cương báo cáo](QLTTNN-De-Cuong-Bao-Cao.md). Tài liệu này không khẳng định bước nào đã cài xong; ghi nhận theo trạng thái thực tế.
+
+Ngoài ảnh cấu hình công cụ, **bắt buộc** lưu bằng chứng phương pháp replication đang truyền thay đổi, distributed transaction hai site, concurrency hai phiên, distributed query và phân mảnh. Đồng bộ phải có lỗi/phục hồi. Việc một công cụ cụ thể không được chọn không cho phép bỏ bằng chứng kỹ thuật tương ứng. Dùng mẫu ghi kết quả ở tài liệu YC/TC; chưa chạy thì ghi “Chưa kiểm chứng”.

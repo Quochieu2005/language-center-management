@@ -1,4 +1,6 @@
-# Hướng dẫn đọc và tổ chức source
+# Kiến trúc, định tuyến site và hướng dẫn source
+
+**Tra nhanh:** [Luồng yêu cầu](#1-luồng-một-yêu-cầu) · [Module](#2-trách-nhiệm-module) · [Kiểu nghiệp vụ](#3-cách-xử-lý-từng-loại-nghiệp-vụ) · [Cấu trúc source](#5-cấu-trúc-source-hiện-có) · [Cấu hình/vòng đời site](#dinh-tuyen-site). Tổng quan dự án xem [README gốc](../README.md).
 
 Tài liệu này giải thích kiến trúc và cách lần theo source cho thành viên. Stack là **Next.js frontend**, **Django REST API/Coordinator** và **SQL Server**; **SSMS** dùng để quản trị/kiểm tra CSDL. Chuyển cơ sở có route retry do Admin Big gọi; worker/lịch chạy nền tự động chưa được xác nhận trong source. Ghi catalog dùng chung có service cho `MonHoc` và `KhoaHoc`; các nghiệp vụ khác có cơ chế riêng, không giả định đã gom vào một replication service tổng quát.
 
@@ -57,11 +59,11 @@ Gọi từng cơ sở đang hoạt động, thực hiện truy vấn cục bộ 
 
 Chỉ service đồng bộ dùng chung được ghi bảng nhân bản. Xác định tất cả site `hoat_dong`; nếu site nào không sẵn sàng thì từ chối trước khi tuyên bố thành công. Thao tác bao gồm tạo/sửa/đóng danh mục, tài khoản, hoặc cập nhật trạng thái site theo luồng README.
 
-Không rải `for each site: UPDATE` trong từng màn hình. API có service ghi nhân bản riêng cho `MonHoc` và `KhoaHoc`, cập nhật từng CSDL site và ghi ACK append-only vào `Logs` trong transaction cục bộ; retry tiếp tục site chưa ACK. `CoSo` chưa có fan-out runtime đầy đủ, còn một số luồng `TaiKhoan` dùng cơ chế riêng. Chưa có một writer duy nhất bao phủ mọi bảng dùng chung. Đây không phải commit ACID nguyên tử xuyên database; các kịch bản outage/recovery vẫn cần kiểm chứng.
+MonHoc chỉ ghi qua `core/catalog/publisher_subjects.py` tại Publisher cấu hình, SQL Server Publication chuyển bản sao; retry API chỉ đối soát. KhoaHoc giữ fan-out và ACK riêng. Không ghi trực tiếp MonHoc ở Subscriber. [Chi tiết](MonHoc-SQL-Replication.md).
 
 ### Chuyển cơ sở gồm `LOCAL` → `GLOBAL` → `DISTRIBUTED-TX`
 
-Admin Small chỉ tạo đề nghị tại site mình phụ trách (`LOCAL`). Admin Big đọc hộp thư bằng cách hỏi từng CSDL site rồi gộp ở Django (`GLOBAL`); quyết định được ghi về CSDL nguồn bằng transaction cục bộ. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
+Chỉ Tư vấn & xếp lớp tạo đề nghị tại site mình phụ trách (`LOCAL`); Kế toán & Lễ tân chỉ xem. Admin Big đọc hộp thư toàn cục; Admin Small ở site được giao chỉ thấy đề nghị phát sinh tại site mình hoặc gửi tới site mình (`GLOBAL` đọc có phạm vi, quyết định ghi cục bộ tại nguồn). Admin Big hoặc Admin Small site nhận có thể duyệt/từ chối, còn Admin Small nguồn không thể duyệt vì không phải site đích. Chỉ khi đề nghị đã được duyệt (`dang_xu_ly`) thì Transfer Coordinator mới phối hợp đúng hai site: nguồn và đích (`DISTRIBUTED-TX`). Sau khi hoàn tất, site nhận có thông báo cho nhân viên và Tư vấn chọn lớp/phòng thủ công; hồ sơ đích giữ nguyên tài khoản học viên. Chi tiết trạng thái và lỗi ở [QLTTNN-Giao-Dich-Phan-Tan.md](QLTTNN-Giao-Dich-Phan-Tan.md).
 
 ## 4. Mã giả cho bốn kiểu thao tác
 
@@ -146,7 +148,7 @@ addCourse(actor, course):
     return success
 ```
 
-`sharedDataWriter` là một điểm vào duy nhất, không nằm lặp lại trong `catalogs`, `accounts`, `sites`. Cơ chế commit khi có lỗi giữa chừng chưa chốt; người làm module không được tự thay hợp đồng thành ghi một nơi rồi để nền đồng bộ sau.
+`sharedDataWriter` là mã giả cho trách nhiệm đồng bộ, không phải một class/package đã có. KhoaHoc dùng service fan-out và ACK theo từng transaction cục bộ. MonHoc có writer riêng tại Publisher và SQL Server truyền bất đồng bộ; không áp dụng mã giả fan-out để ghi MonHoc vào Subscriber. Tiền kiểm không bảo đảm mọi site cùng commit; sau một phần commit phải trả trạng thái chưa hoàn tất và phục hồi theo chính sách của bảng.
 
 YC-03/YC-07 bắt buộc chốt phương pháp truyền thay đổi, lưu tiến trình/ACK, phiên bản và cách retry/đối soát trước khi triển khai. Tiền kiểm mọi site sẵn sàng không loại trừ site lỗi ngay sau đó. Nếu đã có bản sao commit, giữ kết quả từng site và báo chưa hoàn tất đến khi phục hồi; không tự giả định toàn bộ đã rollback. TC-REP-01 chứng minh truyền thay đổi thật; TC-SYNC-01 chứng minh lỗi/phục hồi. Seed ba DB và cấu hình kết nối không thay thế hai bài này.
 
@@ -155,35 +157,33 @@ Khi ghi `TaiKhoan`, trước khi tạo mới kiểm tra `ten_dang_nhap` và `ema
 ### Đề nghị và duyệt: một site ghi, nhiều site đọc
 
 ```text
-requestTransfer(actor, studentId, destination, reason, idempotencyKey):
-    require actor is active Admin Small
+requestTransfer(actor, studentSlug, destination, reason):
+    require actor is active Tu van & xep lop
     source = actor.assigned_site                 # derive from server-side identity
     require destination != source
-    current = globalQueries.locateCurrentStudent(studentId)
-    require current.site == source
     db = router.connectionFor(source)
     return db.transaction(tx):
-        student = students.findForUpdate(tx, studentId)
+        student = students.findBySlugForUpdate(tx, studentSlug, source)
         verify student belongs to source and is dang_hoc
         verify no outstanding tuition and destination is active
         verify no open request/transfer for student at the current source
         request = insertTransfer(status="cho_duyet", step="cho_duyet",
-                                 requester=actor, reason=reason,
-                                 idempotencyKey=idempotencyKey)
+                                 requester=actor, reason=reason)
         appendEvent(tx, request, "de_nghi")
         return request
 
 listPendingTransferRequests(actor):
-    require actor is active Admin Big
+    require actor is Admin Big or Admin Small
     sites = sitesWithStatus("hoat_dong")
     results = query each site database for status="cho_duyet"
-    return mergeAtApplication(results, sitesThatFailed)
+    return mergeAtApplicationAndFilterByRole(results, actor, sitesThatFailed)
 
 decideTransfer(actor, sourceFromInbox, requestId, decision, rejectionReason):
-    require actor is active Admin Big
+    require actor is active Admin Big or Admin Small
     db = router.connectionFor(sourceFromInbox)
     return db.transaction(tx):
         request = transfers.findForUpdate(tx, requestId)
+        require actor is Admin Big or actor.assigned_site == request.destination
         require request.co_so_nguon == sourceFromInbox
         require request.status == "cho_duyet"
         if decision == "reject":
@@ -213,7 +213,7 @@ executeApprovedTransfer(requestId, source, destination):
     verifyBothSitesAndCompleteAtSource(tx)
 ```
 
-`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Coordinator không bắt đầu với `cho_duyet` hoặc `tu_choi`, chỉ xử lý `dang_xu_ly`; source cho Admin Big gọi route retry. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Nếu đích đã commit rồi ứng dụng dừng, lần retry đối chiếu trạng thái mở ở nguồn với sự kiện có cùng `ma_chuyen` tại đích và làm nốt nguồn. Không tạo hồ sơ đích lần hai, không xóa đích. Dùng `khoa_chong_lap`, unique index trên học viên đang mở và `rowversion` để chặn gửi trùng/cạnh tranh. Đây là điều phối phục hồi tiến về phía trước bằng các transaction cục bộ, không khẳng định ACID nguyên tử xuyên CSDL; Global Query xử lý bản hiện hành theo mục 7 của tài liệu giao dịch phân tán.
+`GiaoDichChuyenCoSo` chỉ lưu tại nguồn; `LichSuChuyenCoSo` append-only và được ghi cùng thao tác cục bộ ở site nơi xảy ra. Coordinator không bắt đầu với `cho_duyet` hoặc `tu_choi`, chỉ xử lý `dang_xu_ly`; source cho Admin Big gọi route retry. Nếu đích chưa commit, giữ nguyên nguồn; retry lỗi kết nối hoặc kết thúc `that_bai` khi lỗi nghiệp vụ dứt điểm. Sau commit đích, retry đối chiếu sự kiện cùng `ma_chuyen` rồi hoàn tất nguồn, không tạo/xóa đích lần nữa. Source dùng transaction, khóa `UPDLOCK/HOLDLOCK`, khóa điều phối và unique index đề nghị đang mở; DDL có `rowversion` nhưng không khẳng định service đã dùng optimistic compare-and-swap trên cột đó. POST đề nghị chưa nhận Idempotency-Key; đề nghị mở trùng bị từ chối, khác replay theo key. Đây là phục hồi tiến về phía trước, không phải ACID nguyên tử xuyên CSDL; Global Query chọn bản hiện hành theo mục 7 tài liệu giao dịch.
 
 ## 5. Cấu trúc source hiện có
 
@@ -260,3 +260,51 @@ Không log mật khẩu/token, kể cả trong exception. Mọi thao tác cần 
 Mỗi thay đổi phải nêu: loại nghiệp vụ; site đọc/ghi; bảng ảnh hưởng; quyền cần kiểm tra; ranh giới transaction; nhật ký; hành vi khi site lỗi; và docs/schema có thay đổi không. Checklist hoàn tất và cách chia người làm ở [QLTTNN-Lam-Viec-Nhom.md](QLTTNN-Lam-Viec-Nhom.md).
 
 Nếu thay đổi phục vụ YC-01–YC-07, ghi mã YC/TC, bằng chứng thực tế và phần chưa kiểm chứng. Rà đồng thời FS, API và UI để lỗi cạnh tranh/thiếu site/đang phục hồi có cùng ý nghĩa. Transaction cục bộ của đăng ký không thay cho distributed transaction giữa nguồn và đích.
+
+
+---
+
+<a id="dinh-tuyen-site"></a>
+
+## 8. Cấu hình và vòng đời site
+
+Nguồn xác định site có hai phần:
+
+| Nguồn | Chứa thông tin gì | Quy tắc |
+|---|---|---|
+| Bảng `CoSo` đã nhân bản | Mã, tên và trạng thái cơ sở | Cơ sở `hoat_dong` nhận truy vấn và tham gia ghi dùng chung |
+| Cấu hình kết nối của Coordinator | Mã cơ sở ánh xạ tới địa chỉ và thông tin kết nối CSDL | Bí mật kết nối không lưu trong bảng nghiệp vụ hoặc commit vào repo |
+
+Site Router đối chiếu các cơ sở `hoat_dong` với cấu hình khi service lấy danh sách/kết nối; không khẳng định đã có preflight mọi database ngay lúc khởi động Django. Thiếu cấu hình/kết nối phải được báo theo hợp đồng endpoint (từ chối ghi hoặc trả danh sách chưa đầy đủ), không âm thầm bỏ site. Không lặp ba lần, không viết cứng Q1/Q7/TD trong logic nghiệp vụ.
+
+Trạng thái site:
+
+| Trạng thái | Nhận truy vấn? | Tham gia ghi dùng chung? | Ý nghĩa |
+|---|:---:|:---:|---|
+| `chuan_bi` | Không | Không | Đang tạo CSDL và chép bản dùng chung |
+| `hoat_dong` | Có | Có | Đang vận hành |
+| `dong_cua` | Không | Không | Ngừng nhận yêu cầu, vẫn giữ lịch sử |
+
+### 8.1. Thêm hoặc đóng một site
+
+Luồng thêm site theo README 5.14:
+
+1. Tạo CSDL mới với cùng bộ schema; khai báo cấu hình kết nối ở Coordinator.
+2. Thêm site ở trạng thái `chuan_bi` vào bảng `CoSo` nhân bản để các site đang chạy biết site mới.
+3. Khởi tạo các bản sao dùng chung theo [schema mục 3](DATABASE_SCHEMA.md#3-dữ-liệu-nằm-ở-đâu), gồm danh mục, tài khoản và Blog; riêng `MonHoc` cấu hình Subscriber theo chính sách Publication, không thêm writer trực tiếp. Đối soát dữ liệu/phiên bản trước khi mở site.
+4. Chỉ khi đồng nhất mới kích hoạt `hoat_dong` qua ghi nhân bản tới mọi site, bao gồm site mới.
+5. Tạo tài khoản quản lý/nhân viên/giáo viên tại cơ sở mới; sau đó site mới nhận dữ liệu nghiệp vụ.
+
+Site `chuan_bi` chưa nhận truy vấn và chưa nằm trong tập ghi đủ. Không đánh dấu hoạt động trước khi chép xong, nếu không thống kê và ghi dùng chung sẽ hỏi một CSDL chưa sẵn sàng. Khi đóng site: xử lý các đề nghị `cho_duyet`/giao dịch `dang_xu_ly`, chuyển học viên đi theo nghiệp vụ chuyển cơ sở, đổi trạng thái thành `dong_cua` qua ghi nhân bản, giữ nguyên dữ liệu và lịch sử.
+
+Không suy ra site hiện tại của học viên từ tiền tố mã. Học viên chuyển site nhưng giữ mã tạo ban đầu; tìm bản `dang_hoc` bằng truy vấn toàn cục.
+
+### 8.2. Trách nhiệm kiểm chứng của các module
+
+- Site Router và repository chịu trách nhiệm YC-01/YC-02: kết nối riêng, truy cập đúng mảnh và cha/con cùng site.
+- Module dữ liệu dùng chung chịu trách nhiệm YC-03/YC-07: phương pháp replication cụ thể, ACK/phiên bản, lỗi giữa chừng và đối soát; một điểm vào ghi không đồng nghĩa dùng DB nghiệp vụ trung tâm. Không vừa fan-out ghi từ API vừa để Publication ghi lại cùng bảng.
+- Coordinator chuyển cơ sở chịu trách nhiệm YC-04: hai site, trạng thái bền vững, lỗi trước/sau commit và phục hồi. Mức bảo đảm hiện tại là phục hồi tiến về phía trước; nếu tiêu chí giảng viên yêu cầu DBMS quản lý giao dịch, phải chốt cơ chế bổ sung, không gọi thiết kế hiện tại là ACID xuyên site.
+- Service đăng ký cùng transaction SQL Server chịu trách nhiệm YC-05: kiểm tra/cập nhật chỗ cuối an toàn trước hai phiên cạnh tranh. Frontend chỉ phản hồi trạng thái xung đột.
+- Global Query chịu trách nhiệm YC-06: tổng hợp kết quả đọc tại API, chọn học viên hiện hành và thông báo site thiếu; không giả định snapshot chung giữa các site.
+
+Quyền từng vai trò theo [README tổng mục 3](../README.md#3-ai-được-làm-gì); không duy trì thêm ma trận quyền trùng ở tài liệu kiến trúc. Quyết định chưa chốt và giới hạn giao dịch theo [README mục 9](../README.md#9-stack-và-quyết-định-còn-mở). Bố trí máy và mảnh dữ liệu xem [schema mục 3](DATABASE_SCHEMA.md#3-dữ-liệu-nằm-ở-đâu).

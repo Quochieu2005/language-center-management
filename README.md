@@ -1,5 +1,7 @@
 # Quản lý trung tâm đào tạo ngoại ngữ
 
+Đợt sửa thu/hoàn và lịch sử lớp 20/11/2026: key thu tính cả tiền tố để mã phiếu không quá 24 ký tự, retry giữ cùng key; replay hoàn dùng tiền phiếu thu gốc. Đăng ký đã có điểm/điểm danh không được đổi lớp. Giáo viên hiện tại xem được buổi lịch sử của lớp, chỉ ghi điểm danh buổi đứng tên mình. Đây là thay đổi `LOCAL` tại site sở hữu qua Site Router, không có migration mới; xem [hợp đồng API](specs/api.md#bổ-sung-hợp-đồng-thuhoàn-và-lịch-sử-lớp--20112026) và [trạng thái kiểm chứng](docs/Trang-Thai-Trien-Khai.md).
+
 > Đề tài 10 · Môn Cơ sở dữ liệu phân tán · Ba cơ sở ban đầu: Quận 1 (Q1), Quận 7 (Q7), Thủ Đức (TD).
 >
 > Đây là README chính của dự án. Tài liệu giải thích kiến trúc, nghiệp vụ và cách nhóm tổ chức source. Cấu trúc bảng, khóa, ràng buộc và phân mảnh nằm tại [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md).
@@ -12,19 +14,23 @@
 
 **Mục lục:** [Mô hình hoạt động tổng quát](#mô-hình-hoạt-động-tổng-quát) · [1. Bài toán](#1-bài-toán-trong-1-phút) · [2. Sơ đồ kiến trúc](#2-sơ-đồ-kiến-trúc-hệ-thống) · [3. Vai trò](#3-ai-được-làm-gì) · [4. Quy tắc phân tán](#4-dữ-liệu-và-quy-tắc-phân-tán) · [5. Luồng nghiệp vụ](#5-các-luồng-nghiệp-vụ) · [6. Demo](#6-kịch-bản-demo) · [7. Ngoài phạm vi](#7-ngoài-phạm-vi) · [8. Chức năng](#8-danh-sách-chức-năng) · [9. Stack và quyết định còn mở](#9-stack-và-quyết-định-còn-mở) · [10. Tiến độ](#10-tiến-độ) · [11. Hướng dẫn cho người triển khai](#11-hướng-dẫn-cho-người-triển-khai) · [12. Tốc độ tải trang và dữ liệu](#12-tốc-độ-tải-trang-và-dữ-liệu)
 
-**Tài liệu theo chủ đề:**
+<a id="tai-lieu-du-an"></a>
 
-- [Đặc tả chức năng và tiêu chí nghiệm thu](fs/README.md)
-- [Đặc tả yêu cầu giao diện và API](specs/README.md)
-- [Cấu trúc bảng và phân mảnh](docs/DATABASE_SCHEMA.md)
-- [Script khởi tạo ba CSDL SQL Server](db/README.md)
-- [Kiến trúc và định tuyến site](docs/QLTTNN-Kien-Truc.md)
-- [Mô hình dữ liệu và vị trí lưu](docs/QLTTNN-Du-Lieu.md)
-- [Hướng dẫn đọc và tổ chức source](docs/QLTTNN-Huong-Dan-Source.md)
-- [Giao dịch phân tán và phục hồi](docs/QLTTNN-Giao-Dich-Phan-Tan.md)
-- [Kế hoạch triển khai và kiểm chứng](docs/QLTTNN-Ke-Hoach-Trien-Khai.md)
-- [Quy trình làm việc nhóm](docs/QLTTNN-Lam-Viec-Nhom.md)
-- [Đề cương báo cáo cuối kỳ](docs/QLTTNN-De-Cuong-Bao-Cao.md)
+**README tổng và cách tra tài liệu**
+
+Đọc file này để nắm bài toán, quyền và luồng nghiệp vụ; sau đó mở đúng tài liệu theo việc đang làm. `docs/` không có README riêng. ERD/mô hình dữ liệu đã gộp vào schema; kiến trúc gộp vào hướng dẫn source; kế hoạch gộp vào tài liệu nhóm; nguồn giảng viên gộp vào đề cương báo cáo.
+
+| Cần làm gì? | Đọc ở đâu? |
+|---|---|
+| Tra bảng/cột, ERD, phân mảnh và vị trí dữ liệu | [DATABASE_SCHEMA](docs/DATABASE_SCHEMA.md) — [ERD](docs/DATABASE_SCHEMA.md#erd), [phân mảnh/ánh xạ](docs/DATABASE_SCHEMA.md#phan-manh) |
+| Sửa chức năng, API hoặc giao diện | [FS](fs/Functional-Specification.md), [API spec](specs/api.md), [UI spec](specs/ui-ux.md) |
+| Tìm module và cách chọn database/site | [Kiến trúc và source](docs/QLTTNN-Huong-Dan-Source.md) |
+| Dựng SQL Server/VPN và chạy script | [Kết nối/triển khai SQL Server](docs/QLTTNN-Huong-Dan-Ket-Noi-ZeroTier-SQL-Server.md), [DB/scripts và kiểm chứng](db/README.md); chạy ứng dụng theo [API](src/api/README.md), [web](src/web/README.md) |
+| Cấu hình nhân bản hoặc hiểu chuyển cơ sở | [MonHoc SQL Replication](docs/MonHoc-SQL-Replication.md), [giao dịch và phục hồi](docs/QLTTNN-Giao-Dich-Phan-Tan.md) |
+| Chia việc, tích hợp và theo dõi phần còn thiếu | [Làm việc nhóm/kế hoạch](docs/QLTTNN-Lam-Viec-Nhom.md), [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) |
+| Chạy demo và viết báo cáo theo bài giảng | [YC/TC và mẫu bằng chứng](docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md), [đề cương và đối chiếu 7 tài liệu giảng viên](docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) |
+
+**Giới hạn triển khai đã ghi nhận:** Q1/TD hiện cùng instance Windows, Q7 trên Docker Mac; TD chưa chuyển sang máy Minh Đức. GV-06 yêu cầu lab ít nhất ba SQL Server. Xem trạng thái kiểm chứng trước khi ghi kết luận báo cáo; số database không thay số instance/máy thật.
 
 ---
 
@@ -71,9 +77,9 @@ flowchart TB
 | `LOCAL` | Chọn đúng một CSDL theo phạm vi tài khoản hoặc site chứa dữ liệu | Nhân viên Q1 đăng ký học viên vào lớp tại Q1 |
 | `GLOBAL` | Lấy danh sách site đang hoạt động, truy vấn riêng từng CSDL cần đọc; API kiểm tra và gộp kết quả | Admin Big mở hộp thư đề nghị chuyển hoặc xem thống kê toàn trung tâm |
 | `REPLICATED-WRITE` | Gửi thay đổi tới mọi site đang hoạt động theo một chính sách đồng bộ tập trung | Cập nhật môn học hoặc khóa học dùng chung |
-| `DISTRIBUTED-TX` | Điều phối các bước tại CSDL nguồn và CSDL đích, lưu trạng thái để có thể phục hồi | Chuyển học viên sau khi Admin Big duyệt đề nghị |
+| `DISTRIBUTED-TX` | Điều phối các bước tại CSDL nguồn và CSDL đích, lưu trạng thái để có thể phục hồi | Chuyển học viên sau khi Admin Big hoặc Admin Small tại site nhận duyệt đề nghị do Tư vấn gửi |
 
-**Quy trình chuyển cơ sở có hai giai đoạn nghiệp vụ:** Admin Small tạo đề nghị tại cơ sở mình phụ trách; đề nghị và trạng thái `cho_duyet` được lưu ở CSDL nguồn. Admin Big mở hộp thư bằng `GLOBAL`: API hỏi từng CSDL site rồi tổng hợp danh sách, không có CSDL hộp thư trung tâm. Quyết định duyệt hoặc từ chối được ghi lại tại nguồn. Chỉ đề nghị đã duyệt mới được Coordinator thực hiện bằng `DISTRIBUTED-TX` giữa nguồn và đích. Nếu từ chối, hồ sơ học viên vẫn ở nguồn và không tạo dữ liệu tại đích. Xem chi tiết các bước và phục hồi tại [5.5. Chuyển học viên sang cơ sở khác](#55-chuyển-học-viên-sang-cơ-sở-khác).
+**Quy trình chuyển cơ sở có hai giai đoạn nghiệp vụ:** chỉ Tư vấn & xếp lớp tạo đề nghị tại cơ sở mình phụ trách; đề nghị và trạng thái `cho_duyet` được lưu ở CSDL nguồn. Admin Big mở hộp thư bằng `GLOBAL`; Admin Small ở site nhận truy vấn các CSDL nguồn nhưng chỉ thấy đề nghị gửi tới site mình và đề nghị phát sinh tại site mình. Không có CSDL hộp thư trung tâm. Admin Big hoặc Admin Small tại site nhận có thể duyệt/từ chối; quyết định được ghi ở nguồn. Chỉ đề nghị đã duyệt mới được Coordinator thực hiện bằng `DISTRIBUTED-TX` giữa nguồn và đích. Khi hoàn tất, hệ thống ghi thông báo cục bộ ở site nhận cho Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp để tư vấn chọn lớp/phòng thủ công. Hồ sơ đích giữ nguyên `ma_tai_khoan`; không tạo lại tài khoản hoặc mật khẩu. Nếu từ chối, hồ sơ học viên vẫn ở nguồn và không tạo dữ liệu tại đích. Xem chi tiết các bước và phục hồi tại [5.5. Chuyển học viên sang cơ sở khác](#55-chuyển-học-viên-sang-cơ-sở-khác).
 
 Các nút Q1, Q7 và TD trong sơ đồ là ba CSDL riêng ban đầu, không phải ba phân vùng trong một CSDL chung. Danh sách site tham gia lấy từ dữ liệu cơ sở đang `hoat_dong` và cấu hình kết nối; khi thêm cơ sở, hệ thống không được giả định rằng luôn chỉ có ba site. Các mũi tên từ CSDL quay về API biểu diễn kết quả được trả qua ứng dụng, không phải JOIN hay khóa ngoại xuyên CSDL.
 
@@ -100,7 +106,7 @@ Thiết kế bắt buộc dùng **ba CSDL độc lập**, cùng cấu trúc bả
 
 Giảng viên yêu cầu **2–4 site**, triển khai tối thiểu **phân mảnh, replication, transaction và đồng bộ dữ liệu**. Đồ án chọn **3 site Q1, Q7, TD**; BT trong kịch bản mở rộng là site thứ tư. Không bắt buộc các nhóm dùng cùng kiểu phân mảnh, nhưng phải chứng minh ít nhất **1 phương pháp phân mảnh + 1 phương pháp replication + 1 distributed transaction + 1 tình huống concurrency + 1 distributed query**.
 
-Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. Cơ chế replication ứng dụng cho `MonHoc` đã được chọn; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
+Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sung. Mục 6 của README liệt kê các kịch bản demo và điều kiện cần chứng minh. Có ba DB, cùng dữ liệu seed hay có trang web chưa đủ chứng minh replication/giao dịch phân tán. `MonHoc` dùng SQL Server transactional Publication; các chi tiết vận hành, mức bảo đảm distributed transaction và môi trường triển khai còn phải thống nhất/kiểm chứng, không làm các yêu cầu trở thành tùy chọn.
 
 ### Sáu nghiệp vụ bắt buộc theo đề tài
 
@@ -109,7 +115,7 @@ Các mục này là yêu cầu bắt buộc, không phải chức năng bổ sun
 | Đăng ký khóa học | [5.1. Đăng ký khóa học](#51-đăng-ký-khóa-học) | `HocVien`, `LopHoc`, `DangKy`, `HocPhi`; đọc danh mục `MonHoc`/`KhoaHoc` | `LOCAL`: định tuyến tới cơ sở học viên/lớp; đăng ký và khoản học phí được lưu cùng site với lớp |
 | Quản lý hồ sơ học viên (hỗ trợ vận hành) | [FS-STU-01](fs/Functional-Specification.md#fs-stu-01--quản-lý-hồ-sơ-học-viên-tại-cơ-sở) | `HocVien`, `Logs`; khi cấp tài khoản thêm `TaiKhoan` | Tạo/sửa/xóa hồ sơ và metadata ảnh Cloudinary là `LOCAL` tại một site; slug tạo từ họ tên, chỉ duy nhất trong site; cấp tài khoản theo thao tác riêng là `REPLICATED-WRITE` cho `TaiKhoan` và ghi liên kết cục bộ; không xóa lịch sử đã phát sinh |
 | Xếp lớp | [5.2. Xếp hoặc đổi lớp](#52-xếp-hoặc-đổi-lớp) | `HocVien`, `LopHoc`, `DangKy` | `LOCAL`: kiểm tra học viên và lớp trong cùng site; không JOIN xuyên cơ sở |
-| Chuyển cơ sở | [5.5. Chuyển học viên sang cơ sở khác](#55-chuyển-học-viên-sang-cơ-sở-khác) | `GiaoDichChuyenCoSo`, `HocVien`, `DangKy`, `LichSuChuyenCoSo` | Admin Small đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; chỉ sau duyệt mới chạy `DISTRIBUTED-TX` giữa nguồn và đích |
+| Chuyển cơ sở | [5.5. Chuyển học viên sang cơ sở khác](#55-chuyển-học-viên-sang-cơ-sở-khác) | `GiaoDichChuyenCoSo`, `HocVien`, `DangKy`, `LichSuChuyenCoSo`, `ThongBao` | Tư vấn đề nghị `LOCAL`; Admin Big xem `GLOBAL`, Admin Small site nhận xem hộp thư đã lọc; Big hoặc Small site nhận quyết định ghi `LOCAL` tại nguồn; sau đó chạy `DISTRIBUTED-TX` và ghi thông báo `LOCAL` tại đích |
 | Đóng học phí | [5.3. Thu hoặc hoàn học phí](#53-thu-hoặc-hoàn-học-phí) | `DangKy`, `HocPhi`, `PhieuThu` | `LOCAL`: ghi nhận khoản thu tại site chứa đăng ký; kiểm tra số dư và quyền trước khi ghi |
 | Quản lý điểm | [5.4. Nhập và sửa điểm](#54-nhập-và-sửa-điểm) | `DangKy`, `Diem`, `LopHoc`, `GiaoVien` | `LOCAL`: chỉ ghi điểm tại site của lớp, sau khi kiểm tra phân công và quyền |
 | Thống kê học viên theo cơ sở | [5.6. Thống kê học viên theo cơ sở/toàn hệ thống](#56-thống-kê-học-viên-theo-cơ-sởtoàn-hệ-thống) | `HocVien` | `LOCAL` khi thống kê một site; `GLOBAL` khi thống kê nhiều site và gộp kết quả trong API |
@@ -193,7 +199,7 @@ Nếu cơ sở đang `hoat_dong` nhưng thiếu cấu hình kết nối, Django 
 
 ### 3.1. Phân biệt Admin Big và Admin Small
 
-**Admin Big** giữ quyền quản trị toàn hệ thống: tạo/đóng cơ sở, phân công Admin Small, quản lý dữ liệu dùng chung, xem thống kê toàn trung tâm và duyệt hoặc từ chối đề nghị chuyển học viên giữa các cơ sở. Sau khi duyệt, Coordinator mới chạy giao dịch phân tán. **Admin Small** điều hành cơ sở được giao và là người tạo đề nghị chuyển học viên từ cơ sở mình; Admin Small có thể theo dõi kết quả nhưng không thể tự duyệt đề nghị. Các việc thường ngày khác gồm giám sát nhân sự, lớp/lịch, hồ sơ học viên, đăng ký, học phí, điểm danh, điểm và báo cáo tại cơ sở. Mỗi cơ sở phải có người phụ trách Admin Small.
+**Admin Big** giữ quyền quản trị toàn hệ thống: tạo/đóng cơ sở, phân công Admin Small, quản lý dữ liệu dùng chung, xem thống kê toàn trung tâm và duyệt hoặc từ chối mọi đề nghị chuyển học viên. **Admin Small** điều hành site được giao; chỉ **Tư vấn & xếp lớp** có thể tạo đề nghị tại site nguồn. Admin Small tại site nhận xem đề nghị gửi tới site mình và có thể duyệt/từ chối chúng; retry giao dịch vẫn chỉ dành cho Admin Big. Sau khi được duyệt, Coordinator chạy giao dịch phân tán. Khi chuyển hoàn tất, site nhận thông báo cho Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp để tư vấn chọn lớp/phòng thủ công. Hồ sơ học viên giữ nguyên liên kết tài khoản và mật khẩu. Các việc thường ngày khác gồm giám sát nhân sự, lớp/lịch, hồ sơ học viên, đăng ký, học phí, điểm danh, điểm và báo cáo tại cơ sở. Mỗi cơ sở phải có người phụ trách Admin Small.
 
 Trong schema hiện tại, `TaiKhoan.vai_tro` gồm `admin_big`, `nhan_vien`, `giao_vien`, `hoc_vien`. Admin Small đăng nhập bằng tài khoản `nhan_vien`, nhưng hồ sơ quyền được xác định qua `Admin.loai_admin = admin_small` và `ma_co_so`; không nhầm hồ sơ Admin Small với hồ sơ nhân viên tại `NhanVien`. Nhân viên nghiệp vụ hiện dùng `NhanVien.chuc_vu` gồm `ke_toan` (hiển thị “Kế toán & Lễ tân”) và `tu_van` (hiển thị “Tư vấn & xếp lớp”); migration 41 chuyển dữ liệu `le_tan` cũ sang `ke_toan`.
 
@@ -208,9 +214,9 @@ flowchart LR
 | Nhóm người dùng | Phạm vi | Quyền chính |
 |---|---|---|
 | Admin Big | Toàn hệ thống | Mặc định xem danh sách học viên, nhân viên, giáo viên, lớp và học phí qua Global Query; mỗi dòng nêu site và kết quả phải cảnh báo site thiếu. Có thể lọc về một site. Thao tác ghi hồ sơ/lớp chọn site cụ thể hoặc dùng site của bản ghi; quản trị cơ sở và dữ liệu dùng chung; phân công Admin Small; cấp tài khoản học viên theo thao tác riêng; xem thống kê/log và hộp thư đề nghị toàn cục, duyệt/từ chối đề nghị chuyển |
-| Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; tạo đề nghị chuyển và theo dõi đề nghị thuộc site mình; không duyệt đề nghị hoặc truy cập site khác |
-| Kế toán & Lễ tân | Một site | Tiếp nhận tại quầy; mở lớp, phân công giáo viên, đăng ký/lớp; thu/hoàn học phí, xem công nợ/biên nhận; chỉ đọc học viên trong biểu mẫu đăng ký, không quản lý hồ sơ/phòng |
-| Tư vấn & xếp lớp | Một site | Tra cứu danh sách học viên, hỗ trợ tư vấn, mở lớp, phân công giáo viên, đăng ký/xếp lớp, nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
+| Admin Small | Một site được phân công | Điều hành nghiệp vụ tại site mình; tạo/sửa/xóa hồ sơ học viên theo quy tắc giữ lịch sử; cấp tài khoản học viên sau thao tác riêng; xem đề nghị phát sinh tại site mình và đề nghị gửi tới site mình; duyệt/từ chối đề nghị có site đích là site mình; không tạo đề nghị, retry hoặc truy cập nghiệp vụ site khác |
+| Kế toán & Lễ tân | Một site | Chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ tại site; gửi email nhắc phí; xem đề nghị chuyển cùng công nợ lịch sử ở nguồn. Kế toán vẫn xem phiếu thu và thu/hoàn; không tạo/sửa/hủy phòng/lớp/hồ sơ, đăng ký/xếp lớp hoặc sửa kế hoạch đóng |
+| Tư vấn & xếp lớp | Một site | CRUD hồ sơ học viên tại site được giao nhưng không cấp tài khoản; mở lớp, phân công giáo viên, đăng ký/xếp lớp; sửa tên/sĩ số lớp và hủy mềm lớp đủ điều kiện; CRUD phòng; xem công nợ, gửi nhắc phí và sửa kế hoạch đóng; tạo đề nghị chuyển và xem công nợ lịch sử tại nguồn, không duyệt/từ chối/retry; nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung |
 | Giáo viên | Các lớp được phân công | Xem lớp/buổi học, nhập hoặc sửa điểm theo quyền, điểm danh |
 | Học viên | Admin có thể tạo tài khoản theo thao tác riêng trong FS-STU-01; portal tự phục vụ/SePay chưa được chốt cho đồ án | Cấp tài khoản không đồng nghĩa bật portal; chỉ mở portal sau khi nhóm thống nhất và đồng bộ tài liệu |
 
@@ -274,11 +280,13 @@ flowchart LR
     DongBoDuLieuChung["Đồng bộ dữ liệu chung"] -->|đối chiếu phiên bản| DoiSoat["Đối soát dữ liệu"]
 ```
 
-API runtime replication cho `MonHoc` hiện nằm trong `src/api/core/catalog/services.py`; luồng `KhoaHoc` nằm trong `src/api/core/catalog/course_services.py`. Admin Big gửi một yêu cầu, Coordinator kiểm tra các site hoạt động, cập nhật từng CSDL riêng và ghi ACK append-only vào `Logs` trong cùng transaction cục bộ. Khóa học chỉ được tạo/sửa khi `MonHoc` cùng mã và cùng dữ liệu có mặt trên mọi site đang hoạt động. Nếu chưa đủ site, API không báo hoàn tất; gọi lại cùng key/body sẽ tiếp tục những site chưa ACK. Đây là replication ở tầng ứng dụng, không phải SQL Server Publication.
+Môn học dùng SQL Server transactional Publication; API `publisher_subjects.py` chỉ ghi `MonHoc` và biên nhận `Logs` tại Publisher cấu hình bằng `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1). Sau commit API đọc từng site hoạt động để xác nhận, trả 202 nếu chưa đủ; retry cùng key/body chỉ đối soát, không ghi lại Subscriber. `AUTH_SESSION_SITE_CODE` chỉ chọn nơi lưu phiên/khóa điều phối hiện có, không chọn Publisher. `KhoaHoc` vẫn dùng fan-out riêng trong `course_services.py`, yêu cầu bản sao môn học đồng nhất trước khi ghi. Chi tiết và chuyển đổi: [MonHoc SQL replication](docs/MonHoc-SQL-Replication.md).
+
+Trang `/admin/courses` hiển thị `KhoaHoc.so_buoi` là số buổi chuẩn riêng với số buổi đã tạo cho từng lớp. Endpoint quản trị `/api/v1/admin/courses/class-sessions/` đọc `LopHoc` và `BuoiHoc` riêng tại từng site rồi tổng hợp trong API cho Admin Big (`GLOBAL`); Tư vấn và Kế toán chỉ đọc cơ sở trong phiên (`LOCAL`). Không ghi số buổi lớp ngược lên bản sao `KhoaHoc`.
 
 CMS Blog dùng cùng chính sách fan-out nhưng gói trong `src/api/core/blog/write_services.py`: Admin Big tạo/sửa/xóa danh mục và bài viết qua một writer, mỗi site ghi transaction cục bộ và ACK trong `Logs`. Nếu một site lỗi sau khi site khác commit, API trả incomplete để retry cùng key, route và payload; không hoàn tác các site đã commit và không cam kết ACID xuyên database.
 
-Phạm vi tối thiểu YC-03 có đường truyền thay đổi cho `MonHoc`; API khóa học cũng có luồng nhân bản runtime riêng. Chưa được hiểu là mọi bảng dùng chung đã có runtime replication: luồng ghi `CoSo` chưa hoàn chỉnh và một số luồng `TaiKhoan` còn tự thực hiện fan-out. Kết quả code chưa chứng minh dữ liệu đã được đồng bộ thành công trên môi trường nhiều site; cần chạy kịch bản kiểm chứng và không bật song song SQL Server Publication trên cùng bảng.
+YC-03/YC-07: người dùng đã cung cấp ảnh UPDATE và đồng bộ bù `MonHoc` Q1 → Q7 qua Publication, cùng INSERT từ website tới Mac. Ngày 20/11/2026 đã bổ sung Subscription tới TD hiện có trên Windows và kiểm chứng API views thêm/sửa/xóa/retry với SQL Server thật, đủ Q1/Q7/TD; danh mục cuối `complete=true`. Chưa kiểm chứng trình duyệt end-to-end, outage TD hoặc chuyển TD sang máy Minh Đức; xem [kết quả và giới hạn](docs/MonHoc-SQL-Replication.md). Không bật lại API fan-out môn học song song Publication. Các bảng dùng chung khác không tự chuyển sang SQL replication.
 
 ### 4.4. Các quy tắc không được phá vỡ
 
@@ -302,7 +310,7 @@ Mọi luồng bắt đầu ở giao diện web, gửi yêu cầu tới API, qua 
 
 ### 5.1. Đăng ký khóa học
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp tại site của học viên.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small hoặc Tư vấn & xếp lớp tại site của học viên. Kế toán & Lễ tân chỉ tra cứu, không đăng ký.
 
 ```mermaid
 flowchart LR
@@ -316,7 +324,7 @@ flowchart LR
 
 1. Chọn học viên đang thuộc cơ sở và khóa/lớp muốn đăng ký.
 2. Django kiểm tra quyền, trạng thái học viên, lớp có cùng `ma_co_so`, trạng thái lớp cho phép đăng ký và còn chỗ.
-3. Kiểm tra học viên chưa có đăng ký trùng còn hiệu lực.
+3. Kiểm tra học viên chưa có đăng ký trùng còn hiệu lực và không có giao dịch chuyển cơ sở đang `dang_xu_ly` tại nguồn. Kiểm tra chuyển cơ sở được thực hiện khi giữ khóa hồ sơ học viên, cùng ranh giới khóa với bước duyệt chuyển.
 4. Trong một giao dịch cục bộ, tạo `DangKy`, tạo `HocPhi`, cập nhật sĩ số lớp và ghi nhật ký.
 5. Nếu bất kỳ bước ghi nào lỗi, rollback cả giao dịch cục bộ và trả lỗi rõ ràng cho Next.js.
 
@@ -324,7 +332,7 @@ Không gửi học viên sang site khác để đăng ký lớp; nếu học ở
 
 ### 5.2. Xếp hoặc đổi lớp
 
-**Loại:** `LOCAL` · **Ai làm:** Admin Small, Kế toán & Lễ tân hoặc Tư vấn & xếp lớp.
+**Loại:** `LOCAL` · **Ai làm:** Admin Small hoặc Tư vấn & xếp lớp. Kế toán & Lễ tân chỉ xem lớp và roster.
 
 ```mermaid
 flowchart LR
@@ -335,7 +343,7 @@ flowchart LR
     SiteRouter["Bộ định tuyến cơ sở"] -->|cập nhật đăng ký và sĩ số| SQLServer_CSDL_Site["SQL Server của cơ sở"]
 ```
 
-Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Lớp đích phải thuộc cùng cơ sở và còn chỗ; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
+Django đọc đăng ký hiện tại, lớp đích, sĩ số và lịch tại cùng site. Trên form, nhân viên chọn lớp hiện tại để xem phòng/lịch và roster học viên theo họ tên/mã; sau đó chọn lớp đích cùng khóa học, còn chỗ và thấy rõ phòng/lịch. Lớp đích phải thuộc cùng cơ sở; hệ thống cập nhật đăng ký, sĩ số lớp cũ/mới và nhật ký trong một giao dịch cục bộ. Không tự chuyển đăng ký hoặc lịch sử sang CSDL site khác.
 
 ### 5.3. Thu hoặc hoàn học phí
 
@@ -376,18 +384,21 @@ Django xác nhận giáo viên được dạy lớp đó, học viên có đăng
 
 ### 5.5. Chuyển học viên sang cơ sở khác
 
-**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư và quyết định `GLOBAL` → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Admin Small đề nghị; Admin Big duyệt hoặc từ chối.
+**Loại:** tạo đề nghị `LOCAL` tại nguồn → hộp thư `GLOBAL` cho Admin Big và hộp thư lọc theo site nhận cho Admin Small → quyết định `LOCAL` tại nguồn → sau khi duyệt mới chạy `DISTRIBUTED-TX` · **Ai làm:** Tư vấn & xếp lớp đề nghị; Admin Big hoặc Admin Small tại site nhận duyệt/từ chối; Kế toán & Lễ tân chỉ xem đề nghị tại site được giao.
+
+Kế toán & Lễ tân và Tư vấn & xếp lớp có quyền xem học viên đã chuyển, cơ sở nguồn/đích, trạng thái và tổng phải thu/đã thu/còn nợ tại CSDL nguồn. Chỉ Tư vấn có thể tạo đề nghị tại site được giao; Admin Small chỉ xem đề nghị tại site nguồn/đích được phép. Admin Small tại site nhận được duyệt/từ chối đề nghị gửi đến mình; chỉ Admin Big được retry. Số liệu học phí lấy cùng CSDL nguồn từ `DangKy`/`HocPhi`; không JOIN sang DB đích.
 
 ```mermaid
 flowchart TD
-    Admin_Small["Admin Small tại nguồn"] -->|chọn học viên, cơ sở đích, nhập lý do| GiaoDienWeb["GiaoDienWeb"]
+    NguoiDeNghi["Tư vấn & xếp lớp tại nguồn"] -->|chọn học viên, cơ sở đích, nhập lý do| GiaoDienWeb["GiaoDienWeb"]
     GiaoDienWeb -->|gửi đề nghị| API["API / Coordinator"]
     API -->|xác thực vai trò và lấy site từ tài khoản| PhanQuyen["Phân quyền"]
     PhanQuyen -->|Site Router ghi tại nguồn| DeNghi["GiaoDichChuyenCoSo: cho_duyet"]
     DeNghi -->|cùng transaction cục bộ| SuKienDeNghi["LichSuChuyenCoSo: de_nghi"]
     Admin_Big["Admin Big"] -->|mở hộp thư toàn hệ thống| TruyVanToanCuc["Global Query: hỏi từng CSDL site"]
     TruyVanToanCuc -->|đọc các đề nghị chờ duyệt| DeNghi
-    Admin_Big -->|duyệt hoặc từ chối| GiaoDienWeb
+    Admin_Big -->|duyệt hoặc từ chối mọi đề nghị| GiaoDienWeb
+    Admin_Small["Admin Small tại site nhận"] -->|duyệt hoặc từ chối đề nghị gửi tới site mình| GiaoDienWeb
     GiaoDienWeb -->|gửi quyết định kèm mã đề nghị| API
     API -->|định tuyến về đúng CSDL nguồn| SiteRouter["Bộ định tuyến cơ sở"]
     SiteRouter -->|ghi quyết định + sự kiện| QuyetDinh["CSDL nguồn"]
@@ -397,13 +408,13 @@ flowchart TD
     DieuPhoiChuyenCoSo -->|transaction cục bộ tại đích| CoSoDich["CSDL cơ sở đích"]
 ```
 
-1. Admin Small tại cơ sở nguồn chọn học viên, cơ sở đích và nhập lý do. Django lấy cơ sở nguồn từ phạm vi tài khoản đăng nhập; không tin `co_so_nguon` do trình duyệt gửi lên và không suy site từ tiền tố mã học viên.
-2. API dùng Global Query xác định bản `dang_hoc` hiện hành, xác nhận bản đó thuộc site của Admin Small, rồi kiểm tra không có đề nghị/giao dịch đang mở, không còn nợ, site đích khác nguồn và đang `hoat_dong`. Trong transaction cục bộ tại nguồn, tạo `GiaoDichChuyenCoSo` ở trạng thái `cho_duyet` cùng sự kiện append-only `de_nghi`. Học viên vẫn thuộc nguồn, chưa tạo bản đích và vẫn được tính ở thống kê nguồn. Unique index tại nguồn và bước định vị hiện hành toàn cục ngăn tạo đề nghị trùng ở các site khác nhau.
-3. Admin Big mở hộp thư đề nghị. Django dùng Global Query đọc các CSDL site riêng rồi gộp danh sách ở tầng ứng dụng; không có bảng hộp thư trung tâm. Nếu một site không truy cập được, hộp thư phải báo kết quả chưa đầy đủ; không thể duyệt đề nghị của site nguồn đang mất kết nối.
-4. Khi Admin Big duyệt, API định tuyến về CSDL nguồn theo mã đề nghị và kiểm tra lại học viên còn đang học, công nợ, trạng thái cơ sở đích, kết nối hai site và không có giao dịch đang mở khác. Trong transaction cục bộ tại nguồn, đổi trạng thái sang `dang_xu_ly`, bước `da_tiep_nhan`, ghi tài khoản/thời điểm quyết định và sự kiện `duyet`. Việc kiểm tra lại là bắt buộc vì dữ liệu có thể đổi trong lúc chờ.
-5. Nếu Admin Big từ chối, ghi `tu_choi`, tài khoản/thời điểm và lý do từ chối cùng sự kiện `tu_choi` tại nguồn. Hồ sơ học viên không đổi; đề nghị kết thúc và được giữ để tra cứu. Admin Small có thể gửi một đề nghị mới sau đó.
-6. Chỉ sau quyết định duyệt, Coordinator mới tạo hồ sơ cùng mã ở site đích và sự kiện `tao_ho_so_dich` trong cùng transaction cục bộ tại đích. Metadata avatar Cloudinary (nếu có) được sao chép cùng hồ sơ; file không di chuyển khỏi Cloudinary và bản metadata nguồn vẫn được giữ cho lịch sử. Sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich` ở nguồn.
-7. Trong một transaction cục bộ tại nguồn, đánh dấu học viên `da_chuyen_di`, đóng đăng ký/lớp cũ, cập nhật `buoc_cuoi = da_cap_nhat_nguon` và thêm sự kiện `cap_nhat_ho_so_nguon`. Sau khi đối chiếu hai site, cập nhật trạng thái giao dịch `hoan_tat` và ghi sự kiện cuối ở nguồn.
+1. Tư vấn & xếp lớp tại cơ sở nguồn chọn học viên, cơ sở đích đang hoạt động và nhập lý do. Django lấy cơ sở nguồn từ phạm vi tài khoản đăng nhập; không tin `co_so_nguon` do trình duyệt gửi lên và không suy site từ tiền tố mã học viên.
+2. API dùng Global Query xác định bản `dang_hoc` hiện hành, xác nhận bản đó thuộc site của người đề nghị, rồi kiểm tra không có đề nghị/giao dịch đang mở, không còn nợ, site đích khác nguồn và đang `hoat_dong`. Trong transaction cục bộ tại nguồn, tạo `GiaoDichChuyenCoSo` ở trạng thái `cho_duyet` cùng sự kiện append-only `de_nghi`. Học viên vẫn thuộc nguồn, chưa tạo bản đích và vẫn được tính ở thống kê nguồn. Unique index tại nguồn và bước định vị hiện hành toàn cục ngăn tạo đề nghị trùng ở các site khác nhau.
+3. Admin Big mở hộp thư toàn hệ thống. Admin Small ở site nhận cũng đọc các CSDL nguồn qua API nhưng chỉ được trả đề nghị phát sinh tại site mình hoặc có site đích là site của phiên. Không có bảng hộp thư trung tâm. Nếu site nguồn không truy cập được, hộp thư báo chưa đầy đủ và không cho quyết định đề nghị chưa tải được.
+4. Admin Big hoặc Admin Small tại site nhận duyệt; API định tuyến về CSDL nguồn theo mã đề nghị và xác thực lại quyền (Small phải đúng site đích), học viên còn đang học, công nợ, trạng thái site đích, kết nối hai site và không có giao dịch đang mở khác. Trong transaction cục bộ tại nguồn, đổi trạng thái sang `dang_xu_ly`, bước `da_tiep_nhan`, ghi tài khoản/thời điểm quyết định và sự kiện `duyet`. Việc kiểm tra lại là bắt buộc vì dữ liệu có thể đổi trong lúc chờ.
+5. Admin Big hoặc Admin Small tại site nhận từ chối thì ghi `tu_choi`, tài khoản/thời điểm và lý do cùng sự kiện `tu_choi` tại nguồn. Hồ sơ học viên không đổi; đề nghị kết thúc và được giữ để tra cứu. Tư vấn tại nguồn có thể gửi đề nghị mới sau đó.
+6. Chỉ sau quyết định duyệt, Coordinator mới tạo hồ sơ cùng mã ở site đích và sự kiện `tao_ho_so_dich` trong cùng transaction cục bộ tại đích. Giữ nguyên `ma_tai_khoan` để thông tin đăng nhập/mật khẩu không đổi. Metadata avatar Cloudinary (nếu có) được sao chép cùng hồ sơ; file không di chuyển khỏi Cloudinary và bản metadata nguồn vẫn được giữ cho lịch sử. Sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich` ở nguồn.
+7. Trong một transaction cục bộ tại nguồn, đánh dấu học viên `da_chuyen_di`, đóng đăng ký/lớp cũ, cập nhật `buoc_cuoi = da_cap_nhat_nguon` và thêm sự kiện `cap_nhat_ho_so_nguon`. Sau khi đối chiếu hai site, cập nhật trạng thái giao dịch `hoan_tat` và ghi sự kiện cuối ở nguồn. Trong transaction kích hoạt hồ sơ đích, ghi thông báo idempotent tại `ThongBao` với audience `site_staff`; Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp ở site nhận đọc được thông báo và Tư vấn chọn lớp/phòng phù hợp thủ công.
 
 Khi đề nghị còn `cho_duyet`, các nghiệp vụ tại nguồn vẫn có thể tiếp tục; vì vậy Admin Big phải kiểm tra lại điều kiện lúc duyệt. Sau khi đã duyệt và trạng thái là `dang_xu_ly`, API chặn đăng ký/thu phí/nhập điểm cho học viên ở cả hai site đến khi phục hồi hoàn tất. Không xóa bản nguồn. Vì hai CSDL commit riêng, sau khi tạo đích và trước khi cập nhật nguồn có thể tồn tại hai dòng vật lý `dang_hoc`; không tuyên bố đây là transaction ACID nguyên tử xuyên hai CSDL. Coordinator phục hồi tiến về phía trước sau khi đích đã commit. `LichSuChuyenCoSo` chỉ thêm sự kiện; chỉ `GiaoDichChuyenCoSo` là trạng thái hiện tại có thể cập nhật. Chi tiết lỗi, retry và kiểm chứng nằm trong [docs/QLTTNN-Giao-Dich-Phan-Tan.md](docs/QLTTNN-Giao-Dich-Phan-Tan.md).
 
@@ -424,7 +435,7 @@ flowchart LR
 
 | Điểm dừng | Kết quả phải đảm bảo sau phục hồi |
 |---|---|
-| Đề nghị đang chờ duyệt (`trang_thai = cho_duyet`) | Chưa tạo bản đích; bản nguồn vẫn `dang_hoc`, tiếp tục được tính tại nguồn; Coordinator chỉ chạy sau khi Admin Big duyệt |
+| Đề nghị đang chờ duyệt (`trang_thai = cho_duyet`) | Chưa tạo bản đích; bản nguồn vẫn `dang_hoc`, tiếp tục được tính tại nguồn; Coordinator chỉ chạy sau khi Admin Big hoặc Admin Small site nhận duyệt |
 | Trước khi tạo bản đích (`buoc_cuoi = da_tiep_nhan`) | Bản nguồn vẫn `dang_hoc`; lỗi nghiệp vụ dứt điểm có thể kết thúc `that_bai`; lỗi kết nối thì giữ giao dịch để thử lại |
 | Đích đã commit, nguồn chưa cập nhật (`buoc_cuoi = da_tao_ho_so_dich`) | Giữ `dang_xu_ly` và phục hồi tiến về phía trước; Global Query tính bản nguồn, tạm ẩn bản đích |
 | Nguồn đã cập nhật (`buoc_cuoi = da_cap_nhat_nguon`) | Transaction nguồn đã đổi nguồn thành `da_chuyen_di`; Global Query tính bản đích |
@@ -468,7 +479,7 @@ flowchart LR
 
 Đăng nhập bằng tên đăng nhập/email và mật khẩu, phiên có thể thu hồi, idle timeout và các route OAuth Google/Facebook đã có code. OAuth hiện chỉ cho học viên có subject liên kết trước; cấu hình provider và kiểm thử với app thật còn phụ thuộc môi trường. Tra cứu tài khoản/subject đọc các CSDL site riêng, liên kết subject cập nhật bản sao `TaiKhoan`; không tự tạo tài khoản hoặc tự ghép qua email. Admin có thể cấp tài khoản học viên theo thao tác riêng tại FS-STU-01; portal tự phục vụ và OAuth học viên vẫn chưa được tính là phạm vi đồ án. Không có CSDL identity trung tâm hay JOIN xuyên site. Xem [trạng thái triển khai](docs/Trang-Thai-Trien-Khai.md) và [API spec](specs/api.md).
 
-Phiên đăng nhập hết hạn sau **60 phút không có hoạt động người dùng thật**. Backend kiểm tra hạn và thu hồi phiên; endpoint `/auth/activity/` là đường gia hạn tường minh, frontend không được gọi nó bằng polling/health check. Mỗi thiết bị có phiên riêng. Trạng thái phiên hiện được lưu tại CSDL site cấu hình `AUTH_SESSION_SITE_CODE`, không phải CSDL nghiệp vụ trung tâm; site này ngừng hoạt động có thể ảnh hưởng đăng nhập và xác thực phiên toàn hệ thống. Việc đồng bộ hoạt động giữa các tab, cảnh báo trước hạn và chuyển hướng giao diện sau khi hết phiên cần được kiểm chứng/hoàn thiện ở frontend.
+Phiên đăng nhập hết hạn sau **60 phút không có hoạt động người dùng thật**. Backend kiểm tra hạn và thu hồi phiên; endpoint `/auth/activity/` là đường gia hạn tường minh, frontend không được gọi nó bằng polling/health check. Mỗi thiết bị có phiên riêng. Khi tải lại trang, frontend khôi phục danh tính qua `/auth/session/` mà không gia hạn phiên; bộ đếm dựa trên `expires_at` và hỏi API khi tới hạn. Trong bước phục hồi chỉ `401` kết thúc trạng thái đăng nhập; lỗi mạng/5xx cho phép thử xác minh lại. Trạng thái phiên hiện được lưu tại CSDL site cấu hình `AUTH_SESSION_SITE_CODE`, không phải CSDL nghiệp vụ trung tâm; site này ngừng hoạt động có thể ảnh hưởng đăng nhập và xác thực phiên toàn hệ thống. Đồng bộ hoạt động giữa các tab và cảnh báo trước hạn vẫn cần được kiểm chứng/hoàn thiện.
 
 ### 5.8. Quên và đặt lại mật khẩu
 
@@ -521,7 +532,7 @@ flowchart LR
     HoSoNhanVien["Hồ sơ nhân viên"] -->|chọn cơ sở làm việc| SiteRouter["Bộ định tuyến cơ sở"]
 ```
 
-Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên có hai chức vụ `ke_toan` (“Kế toán & Lễ tân”) và `tu_van` (“Tư vấn & xếp lớp”); migration 41 chuyển các hồ sơ `le_tan` hiện có sang `ke_toan`. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Kế toán & Lễ tân dùng quyền mở lớp, phân công giáo viên, đăng ký/lớp và học phí/thu/hoàn; chỉ tra cứu học viên trong form đăng ký, không mở trang quản lý hồ sơ hoặc phòng. Tư vấn có hộp thư liên hệ và được tạo/sửa/xuất bản bài Blog dùng chung, nhưng không xóa bài hoặc sửa danh mục. Blog article write là `REPLICATED-WRITE` đến mọi site hoạt động, không giới hạn theo cơ sở nhân viên.
+Admin Big cấp tài khoản Admin Small và giáo viên theo quy trình riêng. API nhân viên cho Admin Big chọn một site đang hoạt động; Admin Small chỉ được xem/tạo/sửa/ngưng/xóa nhân viên trong site của mình. Form tạo nhân viên có hai chức vụ `ke_toan` (“Kế toán & Lễ tân”) và `tu_van` (“Tư vấn & xếp lớp”); migration 41 chuyển các hồ sơ `le_tan` hiện có sang `ke_toan`. Không nhầm chức vụ nhân viên với hồ sơ Admin Small (`Admin.loai_admin=admin_small`). Kế toán & Lễ tân chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ tại site; có thể gửi nhắc phí, xem báo cáo tài chính/phiếu thu và thu/hoàn; không ghi phòng/lớp/hồ sơ, không đăng ký/xếp lớp hoặc đổi kế hoạch đóng. Tư vấn được CRUD hồ sơ học viên và phòng tại site được giao nhưng không cấp tài khoản; mở lớp, phân công giáo viên, đăng ký/xếp lớp; sửa tên/sĩ số và hủy mềm lớp đủ điều kiện; xem/nhắc công nợ và chỉ đổi kế hoạch đóng; tạo đề nghị chuyển, xem công nợ lịch sử tại nguồn nhưng không duyệt/từ chối/retry. Cả hai vai trò chỉ dùng dữ liệu của site được giao cho nghiệp vụ cục bộ. Tư vấn có hộp thư liên hệ và được tạo/sửa/xuất bản bài Blog dùng chung, nhưng không xóa bài hoặc sửa danh mục. Blog article write là `REPLICATED-WRITE` đến mọi site hoạt động, không giới hạn theo cơ sở nhân viên.
 
 Tạo nhân viên ghi `NhanVien` ở site công tác và nhân bản `TaiKhoan`; ảnh tùy chọn được tải trực tiếp lên Cloudinary, còn metadata ảnh cập nhật trong các bản sao `TaiKhoan`. Email cấp tài khoản dùng email làm thông tin đăng nhập chính; người nhận không cần username được sinh tự động, dù API vẫn nhận username thay thế. Danh sách nhân viên là `LOCAL` theo cơ sở đang chọn và hiển thị email, username, số điện thoại cùng `site_code`; sau khi tạo, giao diện chọn đúng site vừa tạo và tải lại danh sách. API dùng mật khẩu khởi tạo trong cấu hình backend, chỉ lưu hash, không trả mật khẩu và buộc đổi ở lần đăng nhập đầu; tạo nhân viên chỉ ghi trạng thái chờ gửi vào `Logs`, còn Admin Big/Admin Small bấm `Gửi mật khẩu` để chủ động gửi email một lần. Gửi thành công hoặc kết quả SMTP chưa rõ thì khóa gửi lại; chỉ SMTP xác nhận thất bại mới cho thử lại. Sửa chỉ cập nhật họ tên, điện thoại, chức vụ và audit trong transaction cục bộ; email/tên đăng nhập thuộc danh tính tài khoản nhân bản, còn site là vị trí phân mảnh nên không đổi tại đây. Nút trạng thái chỉ cho `active` → `inactive`; thao tác `Ngưng` thu hồi phiên nhưng không đổi tình trạng làm việc `NhanVien`, và không có nút kích hoạt lại. Nút `Xóa vĩnh viễn` xóa tài khoản, phiên, token reset và ảnh ở các bản sao; nếu hồ sơ đã được phiếu thu tham chiếu thì gỡ liên kết tài khoản, giữ hồ sơ nghỉ việc để bảo toàn chứng từ, còn hồ sơ chưa có phiếu thu được xóa vật lý. Logs và phiếu thu được giữ; site lỗi thì không báo hoàn tất và gọi lại cùng slug để tiếp tục. Các CSDL commit riêng, không phải ACID xuyên site. Chi tiết hợp đồng nằm trong [FS](fs/Functional-Specification.md), [API spec](specs/api.md) và [schema](docs/DATABASE_SCHEMA.md).
 
@@ -540,13 +551,17 @@ flowchart LR
     MoLopSinhLich["Mở lớp và tạo lịch"] -->|tạo buổi học| TaoBuoiHoc["Tạo buổi học"]
 ```
 
-Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải giáo viên/phòng theo site đã chọn. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. Kiểm tra khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch. Thử các trường hợp trùng lịch, vượt sức chứa và thiếu giáo viên trước khi demo.
+Admin Big có thể mở lớp khi danh sách đang ở phạm vi `Toàn hệ thống`; biểu mẫu yêu cầu chọn cơ sở cụ thể và tải khóa học, giáo viên/phòng theo site đã chọn. Khóa học được chọn từ `GET /api/v1/admin/classes/course-options/`, đọc `KhoaHoc` và `MonHoc` tại site; danh sách và thông tin sau khi chọn hiển thị tên khóa, môn, trình độ, thời lượng, số buổi chương trình và học phí chuẩn. Khi chọn ngày bắt đầu hoặc đổi khóa, giao diện tự điền ngày kết thúc đúng theo toàn bộ thời lượng khóa; tháng lẻ được quy đổi theo tỷ lệ ngày của tháng kế tiếp và ngày cuối được tính bao gồm. API kiểm tra lại ngày kết thúc chính xác trước khi ghi. Sau khi chọn đủ ngày bắt đầu/kết thúc, giờ bắt đầu/kết thúc và các thứ học, giao diện đếm và hiện tổng số buổi dự kiến trong thời lượng khóa; nếu khóa có `so_buoi`, lịch phải khớp chính xác số buổi đó. Admin Small và Tư vấn mở lớp tại site được giao; danh sách giáo viên phân công đọc `LOCAL` tại site trong phiên qua `/api/v1/admin/teachers/assignment-options/` và chỉ trả mã, họ tên của giáo viên đang dạy. Kế toán & Lễ tân chỉ xem lớp và roster. Lịch cho chọn đủ ngày từ Thứ 2 đến Chủ nhật; giờ bắt đầu/kết thúc dùng `HH:mm` theo giờ Việt Nam (`Asia/Ho_Chi_Minh`), không chuyển múi giờ trên trình duyệt. Phòng được quản lý riêng tại `/admin/rooms`; trang lớp chỉ chọn phòng đang hoạt động. Các thao tác ghi vẫn chỉ tác động một CSDL site. API tự xác minh thời lượng, số buổi, khóa học, giáo viên, phòng, sức chứa và lịch định mở thuộc cùng cơ sở. Không cho trùng giáo viên/phòng trong cùng khung giờ. Khi hợp lệ, tạo lớp và sinh danh sách buổi học theo lịch.
+
+Tư vấn được sửa tên lớp hoặc sĩ số tối đa tại đúng site; API từ chối lớp đã kết thúc/hủy, sĩ số thấp hơn số đăng ký, hoặc vượt sức chứa phòng. Tư vấn có thể hủy mềm lớp `sap_mo` khi chưa có đăng ký và mọi buổi vẫn ở tương lai, trạng thái `du_kien`; `LopHoc`, `BuoiHoc` và `Logs` được giữ lại. Kế toán & Lễ tân chỉ đọc và không dùng các thao tác lớp/đăng ký.
 
 ### 5.10.1. Quản lý phòng học
 
-**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small chỉ đọc site được phân công (`LOCAL`). Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
+**Đọc:** Admin Big dùng `GLOBAL` để truy vấn từng CSDL site hoạt động rồi tổng hợp tại API; có thể lọc một site. Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp chỉ đọc site được phân công (`LOCAL`). Danh sách có số lớp đang mở và số học viên duy nhất; mở rộng một phòng để xem roster theo lớp, trạng thái học phí (chưa có khoản phí/chưa đóng/đóng một phần/đã đóng) và số phải thu/đã thu/còn nợ. Nếu Global Query thiếu site, API/UI trả và hiển thị `missing_sites`; không coi danh sách là đầy đủ.
 
-**Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
+Từ roster, người có quyền gửi email nhắc học phí theo lớp cho các học viên còn nợ. API tính dư nợ tại site, yêu cầu SMTP và dùng `Logs` để không gửi lặp cùng lớp/học viên trong ngày Việt Nam. SMTP chấp nhận không chứng minh thư đã tới inbox.
+
+**Ghi:** trang `/admin/rooms` cho Admin Big/Admin Small và Tư vấn & xếp lớp thêm, sửa tên/sức chứa/trạng thái hoặc xóa phòng tại đúng một site (`LOCAL`). Kế toán & Lễ tân chỉ xem. `PhongHoc` và `Logs` commit trong transaction của CSDL site đó. Tên phòng duy nhất trong site; sức chứa không được giảm dưới sĩ số tối đa của lớp đang tham chiếu. Chỉ xóa vật lý khi `LopHoc` và `BuoiHoc` không còn tham chiếu; nếu còn, API trả `409`. Mô hình dùng các cột `PhongHoc` hiện có, không tạo DB trung tâm, bảng mới hoặc khóa ngoại xuyên site.
 
 ### 5.11. Điểm danh buổi học
 
@@ -657,8 +672,8 @@ Admin Big xem hộp thư toàn hệ thống bằng `GLOBAL` qua truy vấn riên
 | 4 | Admin Big xem thống kê học viên toàn hệ thống | Django gọi từng CSDL, gộp kết quả; chỉ tính `dang_hoc` |
 | 5 | Thêm/sửa một khóa học dùng chung khi mọi site sẵn sàng | Bản sao ở mọi site hoạt động có cùng dữ liệu/phiên bản |
 | 6 | Làm một site không khả dụng rồi thử ghi dữ liệu dùng chung | Hệ thống không báo thành công khi chưa ghi đủ site theo chính sách |
-| 7 | Admin Small Q1 tạo đề nghị chuyển học viên sang Q7 | Đề nghị `cho_duyet` và sự kiện `de_nghi` nằm ở CSDL Q1; học viên vẫn `dang_hoc` tại Q1; chưa có hồ sơ Q7 |
-| 8 | Admin Small thử duyệt đề nghị hoặc gửi đề nghị cho học viên ngoài Q1 | API từ chối; quyền được kiểm tra ở Django dù gọi endpoint trực tiếp |
+| 7 | Tư vấn Q1 tạo đề nghị chuyển học viên sang Q7 | Đề nghị `cho_duyet` và sự kiện `de_nghi` nằm ở CSDL Q1; học viên vẫn `dang_hoc` tại Q1; chưa có hồ sơ Q7 |
+| 8 | Admin Small thử tạo đề nghị hoặc Admin Small Q1 thử duyệt đề nghị Q1→Q7 | API từ chối; chỉ Tư vấn tạo, Admin Small chỉ quyết định khi site phiên trùng site đích |
 | 9 | Admin Big mở hộp thư, duyệt đề nghị Q1→Q7 | Global Query đọc từng CSDL site; quyết định và sự kiện `duyet` lưu ở Q1; giao dịch phân tán sau đó hoàn tất đúng hai site |
 | 10 | Admin Big từ chối một đề nghị chuyển | Trạng thái `tu_choi`, người duyệt/thời điểm/lý do và sự kiện được lưu tại nguồn; hồ sơ học viên không đổi |
 | 11 | Đặt Q7 thành `dong_cua` trước khi duyệt đề nghị | API không cho duyệt; đề nghị vẫn `cho_duyet` để Big quyết định sau hoặc từ chối; hồ sơ Q1 vẫn `dang_hoc` |
@@ -695,12 +710,13 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 |---|---|---|---|
 | Tài khoản | Đăng nhập, đăng xuất, quên/đặt lại mật khẩu | `GLOBAL`, `REPLICATED-WRITE` | Người dùng nội bộ |
 | Quản trị | Tạo tài khoản, khóa/mở tài khoản, phân công Admin Small | `REPLICATED-WRITE` + `LOCAL` | Admin Big |
-| Học viên | Tra cứu danh sách, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small; Tư vấn & xếp lớp tra cứu; Kế toán & Lễ tân thao tác đăng ký/lớp theo quyền API và chỉ đọc danh sách trong form đăng ký |
-| Học phí | Thu/hoàn, xem số dư và biên nhận | `LOCAL` | Kế toán & Lễ tân; Admin Small giám sát theo quyền |
+| Học viên | Quản lý hồ sơ, đăng ký khóa học, đổi lớp | `LOCAL` | Admin Small/Tư vấn CRUD hồ sơ tại site; Kế toán & Lễ tân chỉ đọc; cấp tài khoản dành cho Admin; Tư vấn đăng ký/xếp lớp, Kế toán không đăng ký |
+| Phòng, lớp và roster | Xem phòng/lớp/học viên/công nợ; quản lý phòng; sửa/hủy lớp an toàn; gửi nhắc phí | `LOCAL` đọc/ghi đúng site; email ghi `Logs` tại site | Kế toán & Lễ tân chỉ đọc; Tư vấn CRUD phòng, mở/sửa/hủy lớp theo điều kiện, xem roster/công nợ |
+| Học phí | Xem công nợ, nhắc phí, kế hoạch đóng; thu/hoàn | `LOCAL` | Kế toán thu/hoàn và xem phiếu; Tư vấn chỉ xem/nhắc và sửa kế hoạch đóng |
 | Học tập | Mở lớp, sinh lịch, điểm danh, nhập/sửa điểm | `LOCAL` | Admin Small, giáo viên |
-| Chuyển cơ sở | Admin Small tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX` | Admin Small đề nghị; Admin Big duyệt/từ chối |
+| Chuyển cơ sở | Tư vấn tạo đề nghị `LOCAL`; Admin Big xem/ra quyết định `GLOBAL`; Admin Big hoặc Admin Small site nhận duyệt/từ chối; Coordinator chỉ chuyển sau khi duyệt bằng `DISTRIBUTED-TX`; Kế toán chỉ đọc tại site nguồn kèm công nợ lịch sử | Tư vấn đề nghị; Admin Big hoặc Admin Small đúng site nhận duyệt/từ chối; Kế toán xem read-only |
 | Liên hệ website | Khách gửi form tại cơ sở đã chọn; hộp thư và phản hồi `LOCAL` tại cơ sở | Admin Big xem `GLOBAL`; Admin Small và Tư vấn & xếp lớp xem/phản hồi site được giao |
-| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big |
+| Danh mục | Quản lý cơ sở, môn học, khóa học | `REPLICATED-WRITE` | Admin Big quản lý cơ sở/môn; Admin Big, Tư vấn & xếp lớp, Kế toán & Lễ tân quản lý khóa học |
 | Báo cáo | Thống kê theo site/toàn trung tâm, tra cứu log | `GLOBAL` | Admin Small, Admin Big |
 
 ---
@@ -723,7 +739,7 @@ Chạy các kịch bản nghiệp vụ này cùng TC-SITE-01, TC-FRAG-01, TC-REP
 | Cách đặt các site | Ba SQL Server trên ba máy/VM hay ba CSDL riêng trên một máy trong giai đoạn demo? |
 | Phiên bản/cấu hình SQL Server | Phiên bản, edition, authentication, TCP/IP, backup và quyền tài khoản dịch vụ là gì? |
 | Tự động retry chuyển cơ sở | Source có route để Admin Big retry; nhóm cần quyết định có thêm worker/lịch tự động không, nhịp quét, timeout/backoff và cảnh báo giao dịch `dang_xu_ly` quá lâu |
-| Replication và đồng bộ | Source có replication tầng ứng dụng cho `MonHoc` và `KhoaHoc`; TC-REP-01/TC-SYNC-01 vẫn cần kết quả thay đổi được giữ, site lỗi, phục hồi và retry trên các DB site. Chưa bật SQL Server Publication |
+| Replication và đồng bộ | `MonHoc`: SQL Server Publication; ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7 và INSERT từ website tới Mac. API views thêm/sửa/xóa/retry đã chạy với SQL thật đủ Q1/Q7/TD ngày 20/11/2026; TD hiện còn ở Windows. Browser end-to-end, outage TD và chuyển máy TD chưa kiểm chứng. `KhoaHoc` giữ fan-out tầng ứng dụng |
 | Cơ chế distributed transaction bắt buộc | Coordinator phục hồi hiện tại đáp ứng tiêu chí đánh giá nào? Nếu giảng viên yêu cầu giao dịch do DBMS quản lý, cần bổ sung cơ chế gì và kiểm thử ra sao? Không ghi đã có ACID/MSDTC/2PC khi chưa chứng minh |
 | Kiểm soát concurrency | Source có khóa/transaction cho sức chứa; TC-CON-01 vẫn cần hai phiên SQL Server đồng thời tranh một chỗ cuối và kiểm tra không để dữ liệu dở dang |
 | Công cụ triển khai vật lý | Cấu hình VPN/Remote Desktop, SQL Server Agent, Linked Server và Publication theo tài liệu cài đặt giảng viên; ghi phần đã cấu hình, phần cần xác nhận và bằng chứng thực tế |

@@ -1,0 +1,197 @@
+{
+  "executed_at": "2026-11-20T19:06:02.021876+07:00",
+  "scope": "Read-only SQL checks; not a complete fragment or multi-machine acceptance test",
+  "sites": [
+    {
+      "site": "Q1",
+      "scripts": [
+        {
+          "file": "db/04_verify_database.sql",
+          "status": "failed",
+          "sqlstate": "42000",
+          "error_code": "51026",
+          "master_guard": "passed"
+        },
+        {
+          "file": "db/verification/01_site_fragment_readonly.sql",
+          "status": "passed",
+          "result_sets": [
+            {
+              "columns": [
+                "instance_name",
+                "database_name",
+                "site_code",
+                "edition",
+                "product_version",
+                "sampled_at"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "name",
+                "table_name",
+                "is_disabled",
+                "is_not_trusted"
+              ],
+              "row_count": 16
+            },
+            {
+              "columns": [
+                "site_code",
+                "ma_lop",
+                "ma_co_so",
+                "ma_khoa_hoc",
+                "si_so_hien_tai",
+                "si_so_toi_da",
+                "trang_thai"
+              ],
+              "row_count": 0
+            },
+            {
+              "columns": [
+                "site_code",
+                "ma_dang_ky",
+                "ma_co_so",
+                "ma_lop",
+                "trang_thai"
+              ],
+              "row_count": 0
+            },
+            {
+              "columns": [
+                "site_code",
+                "class_count"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "site_code",
+                "enrollment_count"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "site_code",
+                "active_student_rows"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "result"
+              ],
+              "row_count": 1
+            }
+          ],
+          "master_guard": "passed"
+        }
+      ],
+      "instance": "DESKTOP-CK4K90F",
+      "database": "QLTTNN_Q1",
+      "class_count": 0,
+      "enrollment_count": 0
+    },
+    {
+      "site": "Q7",
+      "scripts": [],
+      "status": "not_completed",
+      "error_type": "OperationalError",
+      "sqlstate": "08001"
+    },
+    {
+      "site": "TD",
+      "scripts": [
+        {
+          "file": "db/04_verify_database.sql",
+          "status": "failed",
+          "sqlstate": "42000",
+          "error_code": "51026",
+          "master_guard": "passed"
+        },
+        {
+          "file": "db/verification/01_site_fragment_readonly.sql",
+          "status": "passed",
+          "result_sets": [
+            {
+              "columns": [
+                "instance_name",
+                "database_name",
+                "site_code",
+                "edition",
+                "product_version",
+                "sampled_at"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "name",
+                "table_name",
+                "is_disabled",
+                "is_not_trusted"
+              ],
+              "row_count": 16
+            },
+            {
+              "columns": [
+                "site_code",
+                "ma_lop",
+                "ma_co_so",
+                "ma_khoa_hoc",
+                "si_so_hien_tai",
+                "si_so_toi_da",
+                "trang_thai"
+              ],
+              "row_count": 0
+            },
+            {
+              "columns": [
+                "site_code",
+                "ma_dang_ky",
+                "ma_co_so",
+                "ma_lop",
+                "trang_thai"
+              ],
+              "row_count": 0
+            },
+            {
+              "columns": [
+                "site_code",
+                "class_count"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "site_code",
+                "enrollment_count"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "site_code",
+                "active_student_rows"
+              ],
+              "row_count": 1
+            },
+            {
+              "columns": [
+                "result"
+              ],
+              "row_count": 1
+            }
+          ],
+          "master_guard": "passed"
+        }
+      ],
+      "instance": "DESKTOP-CK4K90F",
+      "database": "QLTTNN_TD",
+      "class_count": 0,
+      "enrollment_count": 0
+    }
+  ]
+}

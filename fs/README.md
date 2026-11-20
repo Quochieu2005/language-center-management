@@ -1,5 +1,7 @@
 # Functional Specification (FS)
 
+Nối yêu cầu học phần với thiết kế và báo cáo qua [bảng đối chiếu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien), [ERD](../docs/DATABASE_SCHEMA.md#erd) và [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh). Sườn báo cáo không tự mở rộng quyền hoặc phạm vi nghiệp vụ đã chốt.
+
 Thư mục này chứa đặc tả chức năng của hệ thống Quản lý trung tâm đào tạo ngoại ngữ. Tài liệu mô tả người dùng được làm gì, điều kiện để thao tác hợp lệ, luồng xử lý, dữ liệu/site liên quan và cách nghiệm thu. Đây là yêu cầu thiết kế; nội dung trong FS không tự khẳng định chức năng đã có trong source.
 
 ## Tài liệu

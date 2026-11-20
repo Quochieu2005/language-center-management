@@ -1,5 +1,7 @@
 # Khởi tạo CSDL phân tán
 
+Kiểm chứng và báo cáo: [script chỉ đọc từng site](README.md#kiem-chung-csdl), [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh), [đối chiếu tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Script 04 hiện từ chối CHECK/FK disabled/untrusted, trigger log bị tắt và thiếu CHECK site; không chỉ kiểm tra tên object. Đợt rà này không đổi schema, không tự chạy migration hay cấu hình Publication/Subscriber.
+
 Thư mục này chứa script SQL Server để dựng **ba CSDL riêng**, cùng schema nhưng lưu dữ liệu theo từng cơ sở. Cần SQL Server 2012 trở lên và SSMS có SQLCMD Mode. Đây là phần cài đặt vật lý ban đầu của Đề tài 10; nó không tạo một CSDL trung tâm có cột phân loại chi nhánh.
 
 ## Yêu cầu chung và giới hạn của bộ script
@@ -7,7 +9,7 @@ Thư mục này chứa script SQL Server để dựng **ba CSDL riêng**, cùng 
 Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phân mảnh, replication, transaction và đồng bộ; chứng minh ít nhất một phương pháp phân mảnh, một phương pháp replication, một distributed transaction, một tình huống concurrency và một distributed query. Các nhóm được chọn kiểu phân mảnh phù hợp. Xem [yêu cầu chung](../README.md#yêu-cầu-chung-áp-dụng-cho-mọi-đề-tài) và [kịch bản demo](../README.md#6-kịch-bản-demo) trong README chính.
 
 - Schema/seed/verify hỗ trợ TC-SITE-01 và TC-FRAG-01; đọc riêng từng DB để đối chiếu mảnh và dữ liệu cha/con.
-- `02_seed_shared_catalog.sql` chỉ nạp ban đầu. Runtime replication tối thiểu cho `MonHoc` dùng `PATCH /api/v1/admin/shared/subjects/{slug}/`, Admin Big và ACK trong `Logs`; outage/recovery qua mạng thật vẫn phải chạy TC-SYNC-01.
+- `02_seed_shared_catalog.sql` chỉ nạp ban đầu. MonHoc dùng SQL Server transactional Publication: chỉ Publisher ghi qua API; Logs giữ biên nhận Publisher. Không thêm schema/migration; phải cấu hình Subscription ngoài API cho mọi site hoạt động. [Hướng dẫn và giới hạn](../docs/MonHoc-SQL-Replication.md).
 - Bảng trạng thái/sự kiện hỗ trợ Coordinator, không tự chạy distributed transaction hoặc bảo đảm ACID xuyên site. TC-DTX-01 cần nghiệp vụ nguồn/đích và cơ chế đã chốt chạy thật.
 - TC-CON-01 cần hai phiên cạnh tranh chỗ cuối, cơ chế bảo vệ sức chứa và đọc lại `LopHoc`/`DangKy`/`HocPhi`; các ràng buộc/verify cục bộ không đủ thay bài thử này.
 - TC-DQ-01 cần đọc các DB rồi tổng hợp tại API; không thay bằng JOIN xuyên DB. Chạy xong script khởi tạo chưa có nghĩa đã đạt toàn bộ yêu cầu môn học.
@@ -58,6 +60,9 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `39_add_contact_inbox.sql` | Thêm `YeuCauLienHe` để nhận form liên hệ tại từng site; cần `CoSo` và `Logs` có sẵn, chạy riêng trên mọi site trước khi bật form/API. Không tạo database trung tâm. |
 | `40_enable_tuition_refunds.sql` | Thêm tham chiếu phiếu thu gốc và UUID idempotency vào `PhieuThu`; chạy riêng trên mọi site trước khi triển khai API hoàn học phí. Phiếu hoàn cũ không bị sửa; khoản có phiếu hoàn chưa đối chiếu sẽ bị API chặn hoàn tiếp. |
 | `41_merge_receptionist_into_accounting.sql` | Chuyển `NhanVien.chuc_vu='le_tan'` thành `'ke_toan'` và bỏ `le_tan` khỏi CHECK; chạy sau migration 37, trước code chức vụ gộp, trên mọi database site. |
+| `42_add_site_staff_notification_audience.sql` | Mở `ThongBao.doi_tuong` cho thông báo nội bộ tại site nhận; chạy trên mọi site đang hoạt động trước khi bật notification mới sau chuyển cơ sở. |
+| `43_enforce_contact_site_boundary.sql` | Sau migration 39: kiểm tra dữ liệu rồi thêm CHECK site cho liên hệ; dừng khi có dòng sai, không tự chuyển/xóa. Chạy lại an toàn. |
+| `44_revalidate_course_subject_fk.sql` | Kiểm tra khóa học thiếu môn cha và xác nhận lại FK. Với FK NOT FOR REPLICATION, chỉ dựng lại ánh xạ ma_mon không cascade như schema; không sửa dữ liệu hoặc Publication. |
 
 ## Chạy bằng SSMS
 
@@ -75,8 +80,17 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 12. Trước khi bật form liên hệ/hộp thư quản trị, sao lưu rồi chạy `39_add_contact_inbox.sql` riêng trên Q1, Q7, TD và mọi site đang hoạt động; script cần `dbo.CoSo`/`dbo.Logs`, tạo bảng tại database đang chọn và không chuyển dữ liệu qua site khác. Cấu hình SMTP trong môi trường API để Admin gửi phản hồi; không đưa thông tin SMTP vào Git.
 13. Trước khi triển khai API hoàn học phí, sao lưu rồi chạy `40_enable_tuition_refunds.sql` riêng trên từng database site đang hoạt động. Migration chỉ thêm cột/ràng buộc/index tại DB đang chọn, không thay đổi phiếu đã ghi; xác nhận thành công trên đủ site trước khi bật thao tác hoàn. Đối chiếu thủ công các phiếu `loai='hoan'` cũ chưa có `ma_phieu_goc`; API sẽ từ chối hoàn tiếp cho khoản có các phiếu này đến khi được gắn đúng phiếu gốc.
 14. Trước khi triển khai chức vụ `Kế toán & Lễ tân`, dừng ghi nhân viên, sao lưu từng site rồi chạy `41_merge_receptionist_into_accounting.sql` lần lượt trên Q1, Q7, TD (và mọi site đang hoạt động). Script chỉ đổi chức vụ `le_tan` sang `ke_toan` trong đúng database đang chọn, thay CHECK trong transaction cục bộ, rồi in số nhân viên theo chức vụ. Xác nhận cả site hoàn tất trước khi bật API/UI mới; không chạy ở database trung tâm.
+15. Trước khi triển khai thông báo chuyển cơ sở cho nhân sự site, sao lưu và chạy `42_add_site_staff_notification_audience.sql` trên mọi site đang hoạt động. Migration chỉ mở rộng CHECK `ThongBao.doi_tuong`; kiểm tra kết quả trên đủ site trước khi bật code phát thông báo.
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
+
+## Bổ sung khi nâng cấp DB hiện có
+
+- Sao lưu từng DB và kiểm tra bản sao lưu trước khi sửa. Không chạy lại schema 01 trên DB có bảng.
+- Thiếu `TaiKhoan.google_subject`/`facebook_subject`: chạy migration 27. SQL phụ thuộc cột mới được biên dịch sau khi thêm cột; bảng OAuth cũ chỉ được bỏ sau khi chuyển và kiểm tra dữ liệu.
+- Thiếu `PhieuThu.ma_phieu_goc`/`khoa_idempotency`: chạy migration 40. Script thêm cấu trúc, không đổi số tiền hay lịch sử phiếu cũ.
+- Chạy 43 sau 39, rồi 44; xác minh bằng 04 và `verification/01_site_fragment_readonly.sql`. Hiện cần **17 CHECK site**: 16 từ migration 30 và CHECK liên hệ từ 43. Có dòng sai thì dừng để đối soát.
+- Script 04 kiểm tra thêm bảng Blog/liên hệ, cột ảnh/slug học viên, thời lượng khóa học và phiếu hoàn. Nó không thay kiểm chứng toàn bộ hợp đồng API hoặc giao dịch phân tán.
 
 ## Quy tắc dữ liệu
 
@@ -86,7 +100,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 - `DanhMucBlog`/`BaiVietBlog` có mặt tại từng site; migration 36 khởi tạo cùng ba bài mẫu. API public đọc `GLOBAL`; CMS Admin Big và Tư vấn & xếp lớp ghi bài theo `REPLICATED-WRITE` tại từng site, còn quản lý danh mục/xóa bài chỉ dành cho Admin Big. API lưu ACK trong `Logs`. Migration seed không phải cơ chế replication runtime. Nếu một site bị thiếu hoặc lệch Blog, API phải báo incomplete/conflict thay vì coi như bản sao đúng.
 - Script seed danh mục là thao tác nạp ban đầu, chưa phải đồng bộ runtime. Source có service `REPLICATED-WRITE` cho `MonHoc` và `KhoaHoc`; `CoSo` chưa có fan-out runtime đầy đủ. Không lấy seed, code hoặc unit test làm bằng chứng TC-REP-01/TC-SYNC-01; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
 - Các bảng nghiệp vụ và bảng con được lưu tại site tương ứng. Cột `ma_co_so` trên bảng con là khóa phân mảnh để database kiểm tra các quan hệ cùng site bằng khóa ngoại ghép.
-- `GiaoDichChuyenCoSo` chỉ có bản ghi trong database của site nguồn; Admin Small tạo đề nghị `cho_duyet` tại đó, Admin Big quyết định qua Coordinator, và Coordinator chỉ thực hiện khi đã duyệt. Source có route để Admin Big retry; worker/lịch retry chạy nền chưa được xác nhận. Bảng lưu người đề nghị, người quyết định và lý do; unique index giới hạn mỗi học viên còn tối đa một đề nghị/giao dịch mở. `LichSuChuyenCoSo` là nhật ký append-only tại nơi hành động xảy ra (nguồn hoặc đích); `ma_chuyen` chỉ dùng để đối chiếu giữa hai database, không tạo khóa ngoại xuyên site.
+- `GiaoDichChuyenCoSo` chỉ có bản ghi trong database của site nguồn; chỉ Tư vấn & xếp lớp tạo đề nghị `cho_duyet` tại đó. Admin Big hoặc Admin Small tại site đích quyết định; Coordinator chỉ thực hiện sau khi đã duyệt. Khi hoàn tất, `ThongBao` được ghi trong transaction cục bộ tại site đích với audience `site_staff`; Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp ở site nhận xem được để bắt đầu xếp lớp/phòng. Source có route để Admin Big retry; worker/lịch retry chạy nền chưa được xác nhận. Hồ sơ đích giữ nguyên `ma_tai_khoan`; không tạo lại tài khoản, đổi thông tin đăng nhập hay mật khẩu. Bảng lưu người đề nghị, người quyết định và lý do; unique index giới hạn mỗi học viên còn tối đa một đề nghị/giao dịch mở. `LichSuChuyenCoSo` là nhật ký append-only tại nơi hành động xảy ra (nguồn hoặc đích); `ma_chuyen` chỉ dùng để đối chiếu giữa hai database, không tạo khóa ngoại xuyên site.
 - Ràng buộc duy nhất xuyên database (ví dụ tên đăng nhập/email) và quy tắc một tài khoản chỉ gắn với một hồ sơ nhân sự được Coordinator/API kiểm tra; một database site không thể tự bảo đảm các quy tắc đó cho những database còn lại.
 - Các sequence `Seq_*` chỉ cấp số thứ tự từ 1 đến 999999. Django/API phải ghép mã site và mã loại, ví dụ `Q1-HV-000001`; số có thể bị khuyết nếu một giao dịch lấy sequence rồi rollback, điều này bình thường.
 - `ma_mon` và `ma_khoa_hoc` là mã danh mục dùng chung ổn định, không tạo sequence riêng theo site. `CoSo.ma_co_so` chính là mã cơ sở `Q1`, `Q7`, `TD`.
@@ -94,3 +108,37 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 - Giao dịch chuyển cơ sở gồm nhiều transaction cục bộ được điều phối qua hai database; schema hỗ trợ phục hồi tiến về phía trước và không tự tạo cam kết ACID nguyên tử xuyên database. Khi đích đã commit, không xóa hồ sơ đích để giả vờ hoàn tác; Coordinator phải hoàn tất bước nguồn khi kết nối hồi phục.
 
 Khi thay đổi cấu trúc, cập nhật `docs/DATABASE_SCHEMA.md` và README trong cùng thay đổi. Chi tiết chính sách dữ liệu nằm ở [schema](../docs/DATABASE_SCHEMA.md), luồng nghiệp vụ ở [README](../README.md).
+
+
+---
+
+<a id="kiem-chung-csdl"></a>
+
+## Kiểm chứng CSDL phục vụ báo cáo
+
+`verification/01_site_fragment_readonly.sql` chỉ đọc DB đã chọn. [02_contact_boundary_regression.sql](verification/02_contact_boundary_regression.sql) thử ghi sai site rồi rollback, chỉ chấp nhận DB kiểm thử `QLTTNN_TEST*`; không chạy trên DB vận hành. Script 02 cần schema/CoSo, migration 39/43 và một cơ sở khác tồn tại trong danh mục. Các script khởi tạo/migration trong `db/` có thao tác ghi; theo hướng dẫn triển khai ở trên. Dùng SSMS trên Windows hoặc VS Code mssql trên Mac.
+
+### TC-SITE-01 / TC-FRAG-01
+
+1. Chọn đúng kết nối và database, ví dụ Q1/`QLTTNN_Q1`; chạy [01_site_fragment_readonly.sql](verification/01_site_fragment_readonly.sql). Chạy lại trên Q7 và TD bằng kết nối riêng. Không đổi tên DB hay xóa bản cũ để lấy ảnh.
+2. Lưu các result set cùng thời gian, instance, site và danh sách mã lớp/đăng ký; script có `THROW` khi thiếu/tắt/untrusted CHECK lớp/đăng ký, dữ liệu sai mảnh hoặc thiếu cha. Không xuất thông tin cá nhân học viên.
+3. Ghi trước tập mã fixture dự kiến ở từng site. So hợp danh sách lớp thu được với tập kỳ vọng: không thiếu/thừa; các tập mã lớp không giao nhau; từng `DangKy` có lớp/học viên cùng site. `COUNT` bằng nhau hoặc ba mảnh rỗng không đủ bằng chứng đầy đủ/tái thiết.
+4. Chạy thêm [04_verify_database.sql](04_verify_database.sql) ở SQLCMD mode với `DatabaseName` phù hợp để kiểm tra schema tổng thể, CHECK/FK/trigger và `DBCC CHECKCONSTRAINTS`. Script 04 kiểm tra nhiều bảng hơn; nó không thay kiểm chứng nhiều site hoặc thử ghi sai.
+
+Chạy lúc không có giao dịch chuyển/đăng ký đang thay đổi fixture. Các lần SELECT riêng không tạo snapshot nguyên tử toàn hệ thống. Nếu có site không kết nối được, ghi site thiếu, không nhận bộ kết quả là đầy đủ.
+
+### TC-REP-01 / TC-SYNC-01
+
+Theo [MonHoc SQL Replication](../docs/MonHoc-SQL-Replication.md): tạo/sửa từ website/API đúng Publisher; đọc `ma_mon`, `slug`, `ten_mon`, `phien_ban` tại từng site. Chụp Replication Monitor và kết quả trước–sau; không ghi DML vào Subscriber. Khi API trả 202, dùng **cùng key/body** để đối soát, không tạo yêu cầu mới. Dừng/bật Q7 trong phiên demo riêng và ghi thời điểm bắt kịp; không coi cửa sổ chạy liên tục là bị treo khi Agent đang chờ giao dịch mới.
+
+Không chạy lại seed để “sửa” bản sao trong khi lấy bằng chứng; seed không chứng minh truyền thay đổi. Mô tả rõ TD hiện còn cùng Windows Q1. Không lấy script tạo Subscription có mật khẩu hoặc nội dung job command làm file bằng chứng.
+
+### TC-CON-01 / TC-DTX-01 / TC-DQ-01
+
+Theo [bộ YC/TC](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Cần các request/phiên độc lập trên fixture dành cho demo:
+
+- CON: hai học viên tranh lớp còn đúng một chỗ; bắt đầu đồng thời, giữ response của cả hai, kiểm tra sĩ số, đúng một đăng ký/học phí mới và rollback bên thất bại. Khóa ở source không thay bằng chứng cạnh tranh thật.
+- DTX: tư vấn gửi đề nghị, Big/Small đích duyệt; thử lỗi trước/sau commit đích, retry và đối chiếu nguồn/đích, lịch sử/tài khoản/thông báo. **Chưa có cơ chế MSDTC/2PC trong source**.
+- DQ: lấy số liệu từng DB rồi so API tổng hợp; thử mất một site và thấy cảnh báo thiếu. Không dùng tổng `dang_hoc` thuần khi chuyển đang phục hồi.
+
+Lưu bằng chứng theo mẫu `docs/evidence/<TC>/<ngày>/`: điều kiện đầu, fixture, người/máy/site, câu lệnh/request không secret, kết quả kỳ vọng/thực tế và ảnh/log. Chưa chạy phải ghi **chưa kiểm chứng**, không tạo kết quả mẫu giả.
