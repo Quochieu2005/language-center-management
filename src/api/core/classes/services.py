@@ -867,6 +867,15 @@ def assign_enrollment_to_class(
                     "remaining_seats": max(0, int(counts[1]) - int(counts[0])), "changed": False,
                 }
 
+            cursor.execute(
+                "SELECT TOP (1) 1 FROM dbo.DiemDanh WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_co_so = %s AND ma_dang_ky = %s "
+                "UNION ALL SELECT TOP (1) 1 FROM dbo.Diem WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_co_so = %s AND ma_dang_ky = %s",
+                [site_code, enrollment_id, site_code, enrollment_id],
+            )
+            if cursor.fetchone() is not None:
+                raise ClassConflict("Đăng ký đã có điểm hoặc điểm danh; không thể đổi lớp để giữ lịch sử.")
             _acquire_named_lock(cursor, f"qlttnn:student:{site_code}:{student_id}")
             _lock_class_rows(cursor, site_code, {old_class_id, target_class_id})
             cursor.execute(

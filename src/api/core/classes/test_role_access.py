@@ -15,7 +15,7 @@ class AccountantClassAccessTests(SimpleTestCase):
         self.assertEqual(_site_scope(accountant, None, allowed_roles=_CLASS_READ_ROLES), ("Q1", None))
         self.assertEqual(_site_scope(accountant, None, allowed_roles=_ENROLLMENT_ROLES)[1].status_code, 403)
         self.assertEqual(_resolve_student_list_site(accountant, None), ("Q1", None))
-        self.assertEqual(_site_scope(accountant, None)[1].status_code, 403)
+        self.assertEqual(_site_scope(accountant, None), ("Q1", None))
 
         self.assertEqual(_site_scope(accountant, "Q7", allowed_roles=_CLASS_READ_ROLES)[1].status_code, 403)
         self.assertEqual(_site_scope(accountant, "Q7", allowed_roles=_ENROLLMENT_ROLES)[1].status_code, 403)

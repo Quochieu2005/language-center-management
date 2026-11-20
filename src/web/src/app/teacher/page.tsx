@@ -17,6 +17,7 @@ function TeacherPortal() {
   const [classes, setClasses] = useState<ApiRow[]>([]);
   const [sessions, setSessions] = useState<ApiRow[]>([]);
   const [roster, setRoster] = useState<ApiRow[]>([]);
+  const [attendanceEditable, setAttendanceEditable] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, { status?: string; note?: string }>>({});
   const [gradeRecord, setGradeRecord] = useState<ApiRow | null>(null);
   const [gradeData, setGradeData] = useState<ApiRow | null>(null);
@@ -33,20 +34,20 @@ function TeacherPortal() {
   }, []);
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) void load(); }); return () => { cancelled = true; }; }, [load]);
   const chooseClass = async (row: ApiRow) => {
-    setActiveClass(row); setActiveSession(null); setRoster([]);
+    setActiveClass(row); setActiveSession(null); setRoster([]); setAttendanceEditable(false);
     try { setSessions((await academicsApi.teacherSessions(String(row.class_id))).results); }
     catch (reason) { setError(msg(reason)); }
   };
   const chooseSession = async (row: ApiRow) => {
-    setActiveSession(row); setError("");
+    setActiveSession(row); setError(""); setRoster([]); setAttendanceEditable(false);
     try {
       const result = await academicsApi.attendance(String(row.session_id));
-      const rows = asRows(result.results); setRoster(rows);
+      const rows = asRows(result.results); setRoster(rows); setAttendanceEditable(result.can_edit_attendance === true);
       setAttendance(Object.fromEntries(rows.map((item) => [String(item.enrollment_id), { status: typeof item.attendance_status === "string" ? item.attendance_status : undefined, note: typeof item.note === "string" ? item.note : "" }])));
     } catch (reason) { setError(msg(reason)); }
   };
   const saveAttendance = async () => {
-    if (!activeSession) return;
+    if (!activeSession || !attendanceEditable) return;
     const incomplete = roster.some((row) => !attendance[String(row.enrollment_id)]?.status);
     if (incomplete) { message.warning("Chọn trạng thái điểm danh cho từng học viên trước khi lưu."); return; }
     try {
@@ -76,7 +77,7 @@ function TeacherPortal() {
     {error && <Alert type="error" showIcon title={error} />}
     <Card title="Lớp được phân công"><ApiDataTable rows={classes} loading={loading} emptyText="Chưa được phân công lớp" rowKey={(row) => String(row.class_id)} onRow={(row) => ({ onClick: () => void chooseClass(row) })} />{classes.length > 0 && <Select placeholder="Chọn lớp để xem buổi học" style={{ width: "100%", marginTop: 12 }} value={activeClass ? String(activeClass.class_id) : undefined} onChange={(value) => { const found = classes.find((row) => String(row.class_id) === value); if (found) void chooseClass(found); }} options={classes.map((row) => ({ value: String(row.class_id), label: `${String(row.name || row.class_name || row.class_id)} · ${String(row.site_code || "")}` }))} />}</Card>
     {activeClass && <Card title={`Buổi học · ${String(activeClass.name || activeClass.class_name || activeClass.class_id)}`}><Table rowKey={(row) => String(row.session_id)} dataSource={sessions} columns={sessionColumns} pagination={{ pageSize: 8 }} scroll={{ x: 750 }} /></Card>}
-    {activeSession && <Card title={`Điểm danh · ${String(activeSession.session_date || "")}`} extra={<Button type="primary" onClick={() => void saveAttendance()}>Lưu điểm danh</Button>}><Table rowKey={(row) => String(row.enrollment_id)} dataSource={roster} pagination={false} scroll={{ x: 850 }} columns={[{ title: "Học viên", dataIndex: "student_name" }, { title: "Mã đăng ký", dataIndex: "enrollment_id" }, { title: "Trạng thái", render: (_: unknown, row: ApiRow) => <Select value={attendance[String(row.enrollment_id)]?.status} placeholder="Chọn trạng thái" options={attendanceOptions} onChange={(value) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], status: value } }))} style={{ width: 180 }} /> }, { title: "Ghi chú", render: (_: unknown, row: ApiRow) => <Input maxLength={500} value={attendance[String(row.enrollment_id)]?.note} onChange={(event) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], note: event.target.value } }))} /> }, { title: "Điểm", render: (_: unknown, row: ApiRow) => <Button onClick={() => void openGrade(row)}>Xem / nhập điểm</Button> }]} /></Card>}
+    {activeSession && <Card title={`Điểm danh · ${String(activeSession.session_date || "")}`} extra={<Button type="primary" disabled={!attendanceEditable} onClick={() => void saveAttendance()}>Lưu điểm danh</Button>}>{!attendanceEditable && <Alert type="info" showIcon title="Buổi học chỉ đọc; bạn không được sửa điểm danh của buổi do giáo viên khác phụ trách." style={{ marginBottom: 12 }} />}<Table rowKey={(row) => String(row.enrollment_id)} dataSource={roster} pagination={false} scroll={{ x: 850 }} columns={[{ title: "Học viên", dataIndex: "student_name" }, { title: "Mã đăng ký", dataIndex: "enrollment_id" }, { title: "Trạng thái", render: (_: unknown, row: ApiRow) => <Select disabled={!attendanceEditable} value={attendance[String(row.enrollment_id)]?.status} placeholder="Chọn trạng thái" options={attendanceOptions} onChange={(value) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], status: value } }))} style={{ width: 180 }} /> }, { title: "Ghi chú", render: (_: unknown, row: ApiRow) => <Input disabled={!attendanceEditable} maxLength={500} value={attendance[String(row.enrollment_id)]?.note} onChange={(event) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], note: event.target.value } }))} /> }, { title: "Điểm", render: (_: unknown, row: ApiRow) => <Button onClick={() => void openGrade(row)}>Xem / nhập điểm</Button> }]} /></Card>}
     <Modal title={`Điểm · ${String(gradeRecord?.student_name || "Học viên")}`} open={Boolean(gradeRecord)} onCancel={() => setGradeRecord(null)} footer={null} width={760}><Form form={form} layout="inline" onFinish={saveGrade}><Form.Item name="grade_type" rules={[{ required: true }]}><Select placeholder="Loại điểm" style={{ width: 160 }} options={gradeTypes.map((value) => ({ value, label: value.replaceAll("_", " ") }))} /></Form.Item><Form.Item name="score" rules={[{ required: true }]}><InputNumber min={0} max={10} step={0.25} placeholder="0–10" /></Form.Item><Button type="primary" htmlType="submit">Lưu điểm</Button></Form><Tabs style={{ marginTop: 20 }} items={[{ key: "grades", label: "Điểm hiện tại", children: <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(gradeData, null, 2)}</pre> }, { key: "history", label: "Lịch sử", children: <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(gradeHistory, null, 2)}</pre> }]} /></Modal>
   </Space></main>;
 }

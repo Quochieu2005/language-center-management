@@ -140,12 +140,12 @@ class TuitionReceiptCreateView(_TuitionApiView):
         invalid = validate_record_id(tuition_id)
         if invalid:
             return invalid
-        serializer = TuitionReceiptSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
         try:
             site = _tuition_site(request, request.query_params.get("site_code"))
             if request.user.role != "ke_toan":
                 return Response({"detail": "Chỉ tài khoản kế toán gắn với hồ sơ nhân viên được phép ghi phiếu thu."}, status=403)
+            serializer = TuitionReceiptSerializer(data=request.data, context={"site_code": site})
+            serializer.is_valid(raise_exception=True)
             result = collect_tuition(
                 site_code=site, tuition_id=tuition_id, actor_id=request.user.account_id,
                 employee_id=str(request.user.profile_id or ""), role=request.user.role,

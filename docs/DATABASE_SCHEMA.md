@@ -1,5 +1,7 @@
 # Cấu trúc cơ sở dữ liệu
 
+Sửa nghiệp vụ 20/11/2026 không đổi schema: `PhieuThu.ma_phieu` vẫn tối đa 24 ký tự, mã `{site}-PT-{key}` phải tính cả tiền tố; hoàn đối chiếu `ma_phieu_goc`. `DangKy` đã có `DiemDanh`/`Diem` không đổi `ma_lop`. Khi thay giáo viên, giữ nguyên `BuoiHoc.ma_giao_vien` lịch sử; quyền đọc theo giáo viên hiện tại của `LopHoc`, quyền ghi điểm danh vẫn yêu cầu cả lớp và buổi. Tất cả đọc/ghi trong đúng CSDL site qua Site Router.
+
 > Quản lý trung tâm đào tạo ngoại ngữ · CSDL phân tán · 3 cơ sở (Q1, Q7, TD)
 >
 > File này chỉ nói về **bảng, phân mảnh và ràng buộc dữ liệu**.

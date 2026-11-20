@@ -82,6 +82,12 @@ class TuitionReceiptSerializer(StrictSerializer):
     note = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
     allowed_fields = {"idempotency_key", "amount", "payment_method", "note"}
 
+    def validate_idempotency_key(self, value):
+        site = self.context.get("site_code")
+        if site and len(f"{site}-PT-{value}") > 24:
+            raise serializers.ValidationError("Key quá dài sau khi cộng tiền tố mã phiếu của cơ sở.")
+        return value
+
     def validate_note(self, value):
         if re.search(r"(?:\d[ -]?){13,19}", value):
             raise serializers.ValidationError("Không nhập dữ liệu thẻ hoặc thông tin thanh toán nhạy cảm vào ghi chú.")

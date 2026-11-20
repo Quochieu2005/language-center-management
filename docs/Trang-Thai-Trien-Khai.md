@@ -1,5 +1,12 @@
 # Trạng thái triển khai theo source
 
+## Sửa lỗi thu/hoàn và lịch sử lớp — 20/11/2026
+
+- Thu tại quầy: key tính theo giới hạn mã phiếu 24 ký tự gồm tiền tố site; API validate theo site đã xác thực. Frontend khóa gửi đồng thời, giữ key/body khi lỗi mạng và lưu lần chờ theo tài khoản/site/khoản phí trong `sessionStorage` để retry sau reload cùng tab. Nếu storage bị chặn, cảnh báo cần đối soát phiếu sau reload.
+- Replay hoàn tiền tính số còn được hoàn từ phiếu thu gốc. Đổi lớp bị chặn `409` khi đã có điểm/điểm danh để giữ lịch sử. Giáo viên hiện tại đọc được các buổi cũ của lớp nhưng không sửa điểm danh buổi đứng tên giáo viên khác (`can_edit_attendance=false`); người ngoài lớp vẫn bị chặn.
+- Không có migration mới, không chỉnh dữ liệu SQL Server thật. Bộ hồi quy backend: `core.academics.test_audit_regressions`; frontend: `node --test tests/tuition-collection.test.mjs` tại `src/web`. Test dùng mock/SQLite tạm hoặc handler frontend với API giả; không thay thế browser end-to-end, kiểm tra SQL Server, concurrency hoặc fault injection nhiều site.
+- Các test học viên/auth cũ được cập nhật theo service, quyền xóa hồ sơ và Global Query hiện tại; không nới quyền production để làm test qua.
+
 Đối chiếu source và tài liệu ngày **2026-11-17**. Tài liệu này ghi nhận code hiện có trong repo; nó không xác nhận API/SQL Server đang chạy, không xác nhận một tính năng đã được nhóm duyệt phạm vi, và không thay thế bằng chứng nghiệm thu môn học.
 
 ## Kiến trúc đang được triển khai

@@ -9,8 +9,22 @@ import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 
 type RefundValues = { receipt_id: string; amount: number; payment_method: "tien_mat" | "chuyen_khoan" | "the"; reason: string };
 type RefundAttempt = { signature: string; idempotencyKey: string; values: RefundValues };
+type ReceiptValues = { amount: number; payment_method: "tien_mat" | "chuyen_khoan" | "the"; note?: string };
+type ReceiptAttempt = { signature: string; key: string; values: ReceiptValues };
 type TuitionStatusFilter = "all" | "con_no" | "chua_dong" | "dong_mot_phan" | "da_dong" | "hoan_tien";
 const tuitionPageSize = 20;
+
+function readReceiptAttempt(storageKey: string): ReceiptAttempt | undefined {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null") as ReceiptAttempt | null;
+    const values = saved?.values;
+    if (saved && values && typeof saved.key === "string" && /^[a-f0-9]{8,24}$/.test(saved.key)
+      && Number.isSafeInteger(values.amount) && values.amount > 0
+      && ["tien_mat", "chuyen_khoan", "the"].includes(values.payment_method)
+      && (values.note === undefined || typeof values.note === "string")
+      && saved.signature === JSON.stringify([values.amount, values.payment_method, values.note || ""])) return saved;
+  } catch { /* Invalid or unavailable session storage leaves the in-memory retry intact. */ }
+}
 
 export default function TuitionPage() {
   const { user } = useSession();
@@ -27,6 +41,9 @@ export default function TuitionPage() {
   const [refundReceipts, setRefundReceipts] = useState<TuitionReceipt[]>([]);
   const [refundReceiptId, setRefundReceiptId] = useState("");
   const refundAttempts = useRef<Record<string, RefundAttempt>>({});
+  const receiptAttempts = useRef<Record<string, ReceiptAttempt>>({});
+  const receiptBusy = useRef(false);
+  const [receiptSubmitting, setReceiptSubmitting] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -66,15 +83,32 @@ export default function TuitionPage() {
     } catch (reason) { setSummary(null); setSummaryError(toMessage(reason)); }
   }, [site]);
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) { void load(); void loadSummary(); } }); return () => { cancelled = true; }; }, [load, loadSummary]);
-  const collect = async (values: { amount: number; payment_method: "tien_mat" | "chuyen_khoan" | "the"; note?: string }) => {
-    if (!site || !active) return;
+  const collect = async (values: ReceiptValues) => {
+    if (!site || !active || !user || receiptBusy.current) return;
+    const storageKey = `qlttnn.receipt:${user.account_id}:${active.site_code}:${active.tuition_id}`;
+    const signature = JSON.stringify([values.amount, values.payment_method, values.note || ""]);
+    const previous = receiptAttempts.current[active.tuition_id] || readReceiptAttempt(storageKey);
+    const attempt = previous?.signature === signature ? previous : {
+      signature, key: crypto.randomUUID().replaceAll("-", "").slice(0, 24 - active.site_code.length - 4), values,
+    };
+    receiptAttempts.current[active.tuition_id] = attempt;
+    try { sessionStorage.setItem(storageKey, JSON.stringify(attempt)); }
+    catch {
+      // shortcut: blocked session storage limits safe receipt retry to this open page; reconcile receipts after reload.
+      message.warning("Trình duyệt không lưu được lần thu đang chờ; không tải lại trang trước khi xác nhận hoặc tra cứu phiếu.");
+    }
+    receiptBusy.current = true;
+    setReceiptSubmitting(true);
     try {
-      const key = crypto.randomUUID().replaceAll("-", "").slice(0, 24);
-      const result = await academicsApi.collectTuition(active.tuition_id, active.site_code, { ...values, idempotency_key: key });
+      const result = await academicsApi.collectTuition(active.tuition_id, active.site_code, { ...values, idempotency_key: attempt.key });
       const email = result.invoice_email && typeof result.invoice_email === "object" ? String((result.invoice_email as Record<string, unknown>).status || "") : "";
       message.success(email === "sent" || email === "already_sent" ? "Đã ghi nhận khoản thu và gửi hóa đơn qua email." : "Đã ghi nhận khoản thu. Trạng thái gửi email được API trả về; kiểm tra dữ liệu trước khi thu lại.");
+      delete receiptAttempts.current[active.tuition_id];
+      try { sessionStorage.removeItem(storageKey); }
+      catch { /* A stale key replays the confirmed receipt instead of collecting again. */ }
       setModal(null); setActive(null); receiptForm.resetFields(); void load(); void loadSummary();
-    } catch (reason) { message.error(`${toMessage(reason)} Nếu kết quả không rõ, tải lại danh sách/tra cứu phiếu trước khi gửi khoản thu mới.`); }
+    } catch (reason) { message.error(`${toMessage(reason)} Gửi lại cùng biểu mẫu để xác nhận phiếu; tra cứu trước khi nhập khoản thu mới.`); }
+    finally { receiptBusy.current = false; setReceiptSubmitting(false); }
   };
   const savePlan = async (values: { payment_mode: "full" | "monthly"; installment_count?: 3 | 6 | 9 | 12; first_due_date: string }) => {
     if (!site || !active) return;
@@ -145,7 +179,7 @@ export default function TuitionPage() {
     { title: "Học viên", dataIndex: "student_name" }, { title: "Lớp", dataIndex: "class_name" }, { title: "Cơ sở", dataIndex: "site_code" },
     { title: "Tổng học phí", dataIndex: "total_due", render: (v: number) => money(v) }, { title: "Đã thu", dataIndex: "amount_paid", render: (v: number) => money(v) }, { title: "Còn lại", dataIndex: "balance", render: (v: number) => money(v) },
     { title: "Trạng thái", dataIndex: "status", render: (v: string) => <Tag color={v === "da_dong" ? "green" : v === "dong_mot_phan" ? "gold" : "red"}>{v}</Tag> },
-    { title: "Thao tác", render: (_: unknown, row: TuitionRow) => <Space wrap>{canCollect && <Button size="small" onClick={() => { setActive(row); setModal("receipt"); }}>Thu tiền</Button>}{canRefund && row.amount_paid > 0 && <Button size="small" danger disabled={refundLoading || refundSubmitting} onClick={() => void openRefund(row)}>Hoàn tiền</Button>}{canManagePlan && <Button size="small" onClick={() => { setActive(row); setModal("plan"); void academicsApi.installments(row.tuition_id, row.site_code).then((data) => planForm.setFieldsValue(data)).catch((e) => message.error(toMessage(e))); }}>Kế hoạch đóng</Button>}{canViewReceipts && <Button size="small" onClick={() => void openInvoice(row)}>Hóa đơn</Button>}{canSendReminder && <Button size="small" onClick={() => void sendReminder(row)}>Nhắc học phí</Button>}</Space> },
+    { title: "Thao tác", render: (_: unknown, row: TuitionRow) => <Space wrap>{canCollect && <Button size="small" onClick={() => { receiptForm.resetFields(); const pending = receiptAttempts.current[row.tuition_id] || readReceiptAttempt(`qlttnn.receipt:${user?.account_id}:${row.site_code}:${row.tuition_id}`); if (pending) receiptForm.setFieldsValue(pending.values); setActive(row); setModal("receipt"); }} disabled={receiptSubmitting}>Thu tiền</Button>}{canRefund && row.amount_paid > 0 && <Button size="small" danger disabled={refundLoading || refundSubmitting} onClick={() => void openRefund(row)}>Hoàn tiền</Button>}{canManagePlan && <Button size="small" onClick={() => { setActive(row); setModal("plan"); void academicsApi.installments(row.tuition_id, row.site_code).then((data) => planForm.setFieldsValue(data)).catch((e) => message.error(toMessage(e))); }}>Kế hoạch đóng</Button>}{canViewReceipts && <Button size="small" onClick={() => void openInvoice(row)}>Hóa đơn</Button>}{canSendReminder && <Button size="small" onClick={() => void sendReminder(row)}>Nhắc học phí</Button>}</Space> },
   ];
   return <Card title={`Học phí · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Button onClick={() => { void load(); void loadSummary(); }}>Tải lại</Button>}>
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
@@ -171,7 +205,7 @@ export default function TuitionPage() {
       }} onSearch={(value) => { setSearch(value.trim()); setOffset(0); }} style={{ width: 320 }} />
     </Space>
     <Table rowKey="tuition_id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 1100 }} locale={{ emptyText: count !== 0 ? undefined : error ? "Không tải được danh sách học phí." : summaryError ? "Chưa xác định được công nợ; hãy tải lại." : summary?.totals.tuition_accounts === 0 ? "Chưa có khoản học phí. Khoản phí phát sinh khi học viên được đăng ký vào lớp." : statusFilter === "con_no" && !search ? "Hiện không có khoản học phí còn nợ." : "Không có khoản học phí phù hợp với bộ lọc." }} pagination={{ current: Math.floor(offset / tuitionPageSize) + 1, pageSize: tuitionPageSize, total: count, showSizeChanger: false, showTotal: (total) => `${total} khoản học phí`, onChange: (page) => setOffset((page - 1) * tuitionPageSize) }} />
-    <Modal title={`Ghi nhận thanh toán${active ? ` · ${active.student_name}` : ""}`} open={modal === "receipt"} onCancel={() => setModal(null)} footer={null} destroyOnHidden><Form form={receiptForm} layout="vertical" onFinish={collect}><Form.Item label="Còn phải đóng"><Input value={active ? money(active.balance) : ""} disabled /></Form.Item><Form.Item name="amount" label="Số tiền nhận (đồng)" rules={[{ required: true }]}><InputNumber min={1} max={active?.balance || undefined} precision={0} style={{ width: "100%" }} /></Form.Item><Form.Item name="payment_method" label="Phương thức" rules={[{ required: true }]}><Select options={[{ value: "tien_mat", label: "Tiền mặt" }, { value: "chuyen_khoan", label: "Chuyển khoản" }, { value: "the", label: "Thẻ" }]} /></Form.Item><Form.Item name="note" label="Ghi chú"><Input maxLength={500} /></Form.Item><Button type="primary" htmlType="submit" block>Ghi phiếu thu</Button></Form></Modal>
+    <Modal title={`Ghi nhận thanh toán${active ? ` · ${active.student_name}` : ""}`} open={modal === "receipt"} onCancel={() => { if (!receiptBusy.current) setModal(null); }} closable={!receiptSubmitting} maskClosable={!receiptSubmitting} footer={null} destroyOnHidden><Form form={receiptForm} layout="vertical" onFinish={collect}><Form.Item label="Còn phải đóng"><Input value={active ? money(active.balance) : ""} disabled /></Form.Item><Form.Item name="amount" label="Số tiền nhận (đồng)" rules={[{ required: true }]}><InputNumber min={1} max={active?.balance || undefined} precision={0} style={{ width: "100%" }} /></Form.Item><Form.Item name="payment_method" label="Phương thức" rules={[{ required: true }]}><Select options={[{ value: "tien_mat", label: "Tiền mặt" }, { value: "chuyen_khoan", label: "Chuyển khoản" }, { value: "the", label: "Thẻ" }]} /></Form.Item><Form.Item name="note" label="Ghi chú"><Input maxLength={500} /></Form.Item><Button type="primary" htmlType="submit" block loading={receiptSubmitting}>Ghi phiếu thu</Button></Form></Modal>
     <Modal title="Kế hoạch học phí" open={modal === "plan"} onCancel={() => setModal(null)} footer={null} destroyOnHidden><Form form={planForm} layout="vertical" onFinish={savePlan}><Form.Item name="payment_mode" label="Cách đóng" rules={[{ required: true }]}><Select options={[{ value: "full", label: "Đóng một lần" }, { value: "monthly", label: "Chia theo tháng" }]} /></Form.Item><Form.Item noStyle shouldUpdate>{({ getFieldValue }) => getFieldValue("payment_mode") === "monthly" ? <Form.Item name="installment_count" label="Số tháng" rules={[{ required: true }]}><Select options={[3, 6, 9, 12].map((n) => ({ value: n, label: `${n} tháng` }))} /></Form.Item> : null}</Form.Item><Form.Item name="first_due_date" label="Ngày đến hạn đầu tiên" rules={[{ required: true }]}><Input type="date" min={new Date().toLocaleDateString("en-CA")} /></Form.Item><Button type="primary" htmlType="submit" block>Lưu kế hoạch</Button></Form></Modal>
     <Modal title={`Hoàn học phí${active ? ` · ${active.student_name}` : ""}`} open={modal === "refund"} onCancel={() => { if (!refundSubmitting) setModal(null); }} closable={!refundSubmitting} maskClosable={!refundSubmitting} footer={null} destroyOnHidden>
       <Form form={refundForm} layout="vertical" onFinish={refund}>

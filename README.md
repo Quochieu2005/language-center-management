@@ -1,5 +1,7 @@
 # Quản lý trung tâm đào tạo ngoại ngữ
 
+Đợt sửa thu/hoàn và lịch sử lớp 20/11/2026: key thu tính cả tiền tố để mã phiếu không quá 24 ký tự, retry giữ cùng key; replay hoàn dùng tiền phiếu thu gốc. Đăng ký đã có điểm/điểm danh không được đổi lớp. Giáo viên hiện tại xem được buổi lịch sử của lớp, chỉ ghi điểm danh buổi đứng tên mình. Đây là thay đổi `LOCAL` tại site sở hữu qua Site Router, không có migration mới; xem [hợp đồng API](specs/api.md#bổ-sung-hợp-đồng-thuhoàn-và-lịch-sử-lớp--20112026) và [trạng thái kiểm chứng](docs/Trang-Thai-Trien-Khai.md).
+
 > Đề tài 10 · Môn Cơ sở dữ liệu phân tán · Ba cơ sở ban đầu: Quận 1 (Q1), Quận 7 (Q7), Thủ Đức (TD).
 >
 > Đây là README chính của dự án. Tài liệu giải thích kiến trúc, nghiệp vụ và cách nhóm tổ chức source. Cấu trúc bảng, khóa, ràng buộc và phân mảnh nằm tại [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md).
