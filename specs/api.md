@@ -3,6 +3,13 @@
 Đối chiếu triển khai học phần xem [tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) và [ánh xạ site/dữ liệu](../docs/DATABASE_SCHEMA.md#phan-manh). MonHoc SQL transactional replication là bất đồng bộ; 200/201 sau đối soát không chứng minh commit nguyên tử xuyên site. Đợt rà này không đổi endpoint, quyền hay payload.
 # Đặc tả API
 
+## Sửa khôi phục mật khẩu và chuyển quay lại — 21/11/2026
+
+- OTP hợp lệ phải đi qua bước băm mật khẩu và tạo job; lỗi thiếu import không được che bằng mock toàn bộ service trong test.
+- Helper phục hồi mật khẩu giữ khóa theo `ma_tai_khoan` trong transaction coordinator từ lúc đọc lại job đến khi áp từng site và chốt hoàn tất. Worker chỉ dùng hash/trạng thái đọc **sau khi lấy khóa**; job đã hoàn tất không được áp lại. Giữ unique index một job pending/tài khoản, ghi từng site có thể retry; không tuyên bố ACID xuyên CSDL.
+- Chuyển về site từng học: tái sử dụng hồ sơ cùng mã học viên đã `da_chuyen_di` khi khớp cơ sở gốc, tài khoản cũ khớp hoặc chưa được cấp, có sự kiện rời site trước đó và không còn giao dịch cũ đang mở tại đích. Giữ slug tại đích; cập nhật metadata hiện hành từ nguồn, chuyển sang `bao_luu`, ghi `tao_ho_so_dich` cho giao dịch mới trong cùng transaction. Không xóa hay tái kích hoạt đăng ký/điểm/học phí/điểm danh cũ. Hồ sơ không đủ bằng chứng hoặc sai danh tính vẫn trả xung đột.
+- Retry lần chuyển quay lại nhận diện bằng sự kiện của đúng giao dịch mới; không tạo hồ sơ/thông báo trùng. Sau khi nguồn đã chuyển, kích hoạt bản đích như luồng hiện có; giữ nguyên quyền tạo/duyệt/retry và route.
+
 ## Bổ sung hợp đồng thu/hoàn và lịch sử lớp — 20/11/2026
 
 - Thu tại quầy giữ mã phiếu `{site}-PT-{idempotency_key}` tối đa 24 ký tự. Key dài từ 8 đến `24 - len(site) - 4` ký tự; API validate sau khi xác định site từ quyền, frontend sinh key đúng giới hạn và giữ nguyên key/body khi thử lại sau lỗi mạng. Khóa nút trong lúc gửi; tải lại trang khi chưa rõ kết quả cần tra cứu phiếu trước khi thu mới.

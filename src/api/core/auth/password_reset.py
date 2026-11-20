@@ -7,6 +7,7 @@ import secrets
 import uuid
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
 from django.db import DatabaseError, connections, transaction
@@ -199,49 +200,57 @@ def request_admin_password_reset(email: str, remote_ip: str) -> None:
 def _apply_password_reset_transaction(transaction_id, site_codes: tuple[str, ...]) -> None:
     coordinator_alias = auth_session_alias()
     try:
-        with connections[coordinator_alias].cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT ma_tai_khoan, mat_khau_moi_bam, trang_thai
-                FROM dbo.GiaoDichDatLaiMatKhau
-                WHERE ma_giao_dich = %s
-                """,
-                [transaction_id],
-            )
-            job = cursor.fetchone()
-        if job is None or str(job[2]).lower() == "hoan_tat":
-            return
-        account_id, new_password_hash = str(job[0]), str(job[1])
-
-        # Each site commits locally; the coordinator row makes this forward-only
-        # operation retryable if a site is unavailable during the replica write.
-        for site_code in site_codes:
-            site_alias = get_site_database_alias(site_code)
-            with transaction.atomic(using=site_alias):
-                with connections[site_alias].cursor() as cursor:
-                    cursor.execute(
-                        """
-                        UPDATE dbo.TaiKhoan
-                        SET mat_khau = %s,
-                            bat_buoc_doi_mat_khau = 0,
-                            ngay_doi_mat_khau_cuoi = SYSUTCDATETIME(),
-                            phien_ban = phien_ban + 1,
-                            cap_nhat_luc = SYSUTCDATETIME()
-                        WHERE ma_tai_khoan = %s
-                          AND (CONVERT(VARBINARY(510), mat_khau) <> CONVERT(VARBINARY(510), %s)
-                               OR bat_buoc_doi_mat_khau = 1)
-                        """,
-                        [new_password_hash, account_id, new_password_hash],
-                    )
-                    cursor.execute(
-                        "SELECT COUNT_BIG(*), MIN(mat_khau) FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s",
-                        [account_id],
-                    )
-                    count, actual_hash = cursor.fetchone()
-                    if int(count) != 1 or not hmac.compare_digest(str(actual_hash), new_password_hash):
-                        raise AuthInfrastructureUnavailable
-
         with transaction.atomic(using=coordinator_alias):
+            with connections[coordinator_alias].cursor() as cursor:
+                cursor.execute(
+                    "SELECT ma_tai_khoan FROM dbo.GiaoDichDatLaiMatKhau WHERE ma_giao_dich = %s",
+                    [transaction_id],
+                )
+                identity = cursor.fetchone()
+                if identity is None:
+                    return
+                # Re-read under the account lock: another worker may have finished this job.
+                _acquire_named_lock(cursor, f"qlttnn-password-account:{identity[0]}")
+                cursor.execute(
+                    """
+                    SELECT ma_tai_khoan, mat_khau_moi_bam, trang_thai
+                    FROM dbo.GiaoDichDatLaiMatKhau WITH (UPDLOCK, HOLDLOCK)
+                    WHERE ma_giao_dich = %s
+                    """,
+                    [transaction_id],
+                )
+                job = cursor.fetchone()
+            if job is None or str(job[2]).lower() == "hoan_tat":
+                return
+            account_id, new_password_hash = str(job[0]), str(job[1])
+
+            # Site commits remain local; retries reconcile hashes after a partial failure.
+            for site_code in site_codes:
+                site_alias = get_site_database_alias(site_code)
+                with transaction.atomic(using=site_alias):
+                    with connections[site_alias].cursor() as cursor:
+                        cursor.execute(
+                            """
+                            UPDATE dbo.TaiKhoan
+                            SET mat_khau = %s,
+                                bat_buoc_doi_mat_khau = 0,
+                                ngay_doi_mat_khau_cuoi = SYSUTCDATETIME(),
+                                phien_ban = phien_ban + 1,
+                                cap_nhat_luc = SYSUTCDATETIME()
+                            WHERE ma_tai_khoan = %s
+                              AND (CONVERT(VARBINARY(510), mat_khau) <> CONVERT(VARBINARY(510), %s)
+                                   OR bat_buoc_doi_mat_khau = 1)
+                            """,
+                            [new_password_hash, account_id, new_password_hash],
+                        )
+                        cursor.execute(
+                            "SELECT COUNT_BIG(*), MIN(mat_khau) FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s",
+                            [account_id],
+                        )
+                        count, actual_hash = cursor.fetchone()
+                        if int(count) != 1 or not hmac.compare_digest(str(actual_hash), new_password_hash):
+                            raise AuthInfrastructureUnavailable
+
             with connections[coordinator_alias].cursor() as cursor:
                 cursor.execute(
                     """
