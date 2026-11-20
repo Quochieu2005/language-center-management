@@ -1,5 +1,7 @@
 # Web — Quản lý trung tâm đào tạo ngoại ngữ
 
+Đọc [mục lục tài liệu](../../README.md#tai-lieu-du-an) và [đối chiếu học phần](../../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) khi lấy ảnh báo cáo. Một website dùng chung được mở từ Windows/Mac; vị trí DB do backend cấu hình, không do máy mở trình duyệt hay công cụ SSMS quyết định.
+
 Frontend dùng Next.js App Router và TypeScript. Đây là một website dùng chung: người dùng đăng nhập tại cùng một điểm vào, sau đó giao diện hiển thị theo vai trò và quyền API trả về.
 
 ## Công nghệ

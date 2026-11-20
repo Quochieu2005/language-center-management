@@ -7,7 +7,9 @@
 - Không có migration mới, không chỉnh dữ liệu SQL Server thật. Bộ hồi quy backend: `core.academics.test_audit_regressions`; frontend: `node --test tests/tuition-collection.test.mjs` tại `src/web`. Test dùng mock/SQLite tạm hoặc handler frontend với API giả; không thay thế browser end-to-end, kiểm tra SQL Server, concurrency hoặc fault injection nhiều site.
 - Các test học viên/auth cũ được cập nhật theo service, quyền xóa hồ sơ và Global Query hiện tại; không nới quyền production để làm test qua.
 
-Đối chiếu source và tài liệu ngày **2026-11-17**. Tài liệu này ghi nhận code hiện có trong repo; nó không xác nhận API/SQL Server đang chạy, không xác nhận một tính năng đã được nhóm duyệt phạm vi, và không thay thế bằng chứng nghiệm thu môn học.
+Bổ sung căn cứ học phần và giới hạn triển khai tại [đối chiếu giảng viên](QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Hiện có ba CSDL trên hai instance (Q1/TD cùng Windows, Q7 Docker Mac); chưa đủ ba server cuối cùng theo GV-06. Đợt rà tài liệu không tự chuyển TD hoặc bật thêm cơ chế giao dịch DBMS.
+
+Đối chiếu source và tài liệu ngày **2026-11-20**; kết quả từng mục giữ đúng ngày/phạm vi của bằng chứng gốc. Tài liệu này ghi nhận code hiện có trong repo; nó không xác nhận API/SQL Server đang chạy, không xác nhận một tính năng đã được nhóm duyệt phạm vi, và không thay thế bằng chứng nghiệm thu môn học.
 
 ## Kiến trúc đang được triển khai
 
@@ -40,6 +42,8 @@
 
 ## Phân biệt code và bằng chứng môn học
 
+Lần kiểm tra chỉ đọc mới ngày 20/11/2026: [TC-SITE-01 — kết quả và lỗi](evidence/TC-SITE-01/2026-11-20/README.md). Q1/TD chạy được kiểm tra mảnh cục bộ nhưng chưa có lớp/đăng ký để chứng minh tái thiết; verify schema tổng thể dừng ở cấu trúc OAuth thiếu. TD còn FK KhoaHoc–MonHoc chưa trusted; Q7 chưa kết nối được trong lần này. Các kết quả MonHoc trước đó giữ nguyên ngày/phạm vi, không suy ra hiện tại cả ba site đang sẵn sàng.
+
 | Mã kiểm chứng | Trạng thái được ghi trong tài liệu hiện có |
 |---|---|
 | TC-SITE-01 / TC-FRAG-01 | Schema và script hỗ trợ; phải lưu kết quả truy vấn từng database để chứng minh phân mảnh, không suy ra đạt từ ba DB |
@@ -65,3 +69,7 @@
 - Schema khởi tạo và migration: [`db/`](../db/README.md), [`docs/DATABASE_SCHEMA.md`](DATABASE_SCHEMA.md)
 - Yêu cầu và bằng chứng môn học: [`docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md`](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md)
 - Luồng nghiệp vụ và các quyết định phân tán: [`README.md`](../README.md), [`fs/Functional-Specification.md`](../fs/Functional-Specification.md), [`specs/api.md`](../specs/api.md), [`specs/ui-ux.md`](../specs/ui-ux.md)
+
+## Sửa schema cục bộ ngày 20/11/2026
+
+Q1/TD đã được backup và áp dụng migration 27/40/43/44; script 04 và kiểm tra mảnh cục bộ qua. Xem [kết quả sau sửa](evidence/TC-SITE-01/2026-11-20/db-fix-results.json). Q7 chưa kết nối được nên chưa áp dụng; không kết luận schema toàn hệ thống đồng nhất hoặc đã đạt kiểm chứng phân tán.

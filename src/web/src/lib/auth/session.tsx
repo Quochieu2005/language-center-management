@@ -60,15 +60,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setRestoreAttempt((attempt) => attempt + 1);
   }, []);
   const refreshProfile = useCallback(async () => {
+    const version = authMutationVersion.current;
     const slug = sessionStorage.getItem("qlttnn.account-slug");
     if (!slug) { setUser(null); setExpiresAt(null); return; }
     const result = await authApi.profile(slug);
+    if (version !== authMutationVersion.current) return;
     setUser(result.user);
     setExpiresAt((current) => keepLaterExpiry(current, result.expires_at));
   }, []);
   const signOut = useCallback(async () => {
-    try { if (user) await authApi.logout(); } finally { clearSession(); router.replace("/login"); }
-  }, [clearSession, router, user]);
+    authMutationVersion.current += 1;
+    try { await authApi.logout(); }
+    catch (error) {
+      if (!(error instanceof ApiError && error.status === 401)) throw error;
+    }
+    clearSession();
+    router.replace("/login");
+  }, [clearSession, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,9 +108,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       if (now - lastActivity.current < 45_000) return;
       lastActivity.current = now;
+      const version = authMutationVersion.current;
       authApi.activity().then(({ expires_at }) => {
+        if (version !== authMutationVersion.current) return;
         setExpiresAt((current) => keepLaterExpiry(current, expires_at));
       }).catch((error: unknown) => {
+        if (version !== authMutationVersion.current) return;
         if (error instanceof ApiError && error.status === 401) { clearSession(); router.replace("/login"); }
       });
     };
@@ -121,14 +132,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !expiresAt) return;
     let cancelled = false;
+    const version = authMutationVersion.current;
     const timer = window.setTimeout(() => {
       void authApi.session().then(({ user: sessionUser, expires_at }) => {
-        if (cancelled) return;
+        if (cancelled || version !== authMutationVersion.current) return;
         setUser(sessionUser);
         setExpiresAt((current) => keepLaterExpiry(current, expires_at));
         setRestoreError(false);
       }).catch((error: unknown) => {
-        if (cancelled) return;
+        if (cancelled || version !== authMutationVersion.current) return;
         if (error instanceof ApiError && error.status === 401) { clearSession(); router.replace("/login"); }
         else setRestoreError(true);
       });

@@ -148,8 +148,6 @@ export default function ClassesPage() {
 
   useEffect(() => {
     if (modal !== "move" || !actionSite || !sourceClassId) {
-      setMoveEnrollments([]);
-      setMoveRosterLoading(false);
       return;
     }
     let cancelled = false;
@@ -171,7 +169,7 @@ export default function ClassesPage() {
         if (!cancelled) setMoveRosterLoading(false);
       }
     };
-    void loadRoster();
+    queueMicrotask(() => { if (!cancelled) void loadRoster(); });
     return () => { cancelled = true; };
   }, [actionSite, modal, sourceClassId]);
 

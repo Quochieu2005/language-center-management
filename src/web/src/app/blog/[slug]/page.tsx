@@ -22,11 +22,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { slug } = await params;
+  let article = null;
   try {
     const { result } = await getPublicArticle(slug);
-    return <ArticlePage article={result} />;
+    article = result;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
-    return <ArticlePage article={null} />;
   }
+  return <ArticlePage article={article} />;
 }

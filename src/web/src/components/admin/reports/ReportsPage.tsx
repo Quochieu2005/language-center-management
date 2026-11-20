@@ -26,7 +26,11 @@ function StudentCountsReport({ isAdminSmall }: { isAdminSmall: boolean }) {
       setError(reason instanceof Error ? reason.message : "Không tải được báo cáo.");
     } finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void load(); });
+    return () => { cancelled = true; };
+  }, [load]);
   return <Card title="Thống kê học viên theo cơ sở" extra={<Button onClick={() => void load()}>Tải lại</Button>} style={{ marginBottom: 16 }}>
     {error && <Alert type="warning" showIcon title={error} description="Giữ nguyên trạng thái thiếu site; không xem số liệu một phần là tổng đầy đủ." style={{ marginBottom: 16 }} />}
     {data && <>
@@ -48,7 +52,11 @@ function TuitionFinanceReport() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được báo cáo tài chính."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void load(); });
+    return () => { cancelled = true; };
+  }, [load]);
   return <Card title="Báo cáo tài chính học phí" extra={<Button onClick={() => void load()}>Tải lại</Button>}>
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     {data && <>

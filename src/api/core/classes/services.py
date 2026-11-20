@@ -485,6 +485,14 @@ def register_student_to_class(
                 raise ClassNotFound("Không tìm thấy học viên tại cơ sở đã chọn.")
             if str(student[0]).lower() != "dang_hoc":
                 raise ClassConflict("Chỉ học viên đang học mới được đăng ký lớp.")
+            # The student row lock also serializes this check with transfer approval.
+            cursor.execute(
+                "SELECT TOP (1) 1 FROM dbo.GiaoDichChuyenCoSo "
+                "WHERE ma_hoc_vien = %s AND co_so_nguon = %s AND trang_thai = 'dang_xu_ly'",
+                [student_id, site_code],
+            )
+            if cursor.fetchone() is not None:
+                raise ClassConflict("Học viên đang chuyển cơ sở; không thể đăng ký lớp mới tại nguồn.")
 
             cursor.execute(
                 """
@@ -593,6 +601,7 @@ def register_student_to_class(
             enrollment_id = _next_identifier(cursor, site_code, "DK", "enrollment")
             tuition_id = _next_identifier(cursor, site_code, "HP", "tuition")
             amount_due = target[5]
+            tuition_status = "da_dong" if int(amount_due) == 0 else "chua_dong"
             cursor.execute(
                 "INSERT INTO dbo.DangKy (ma_dang_ky, ma_co_so, ma_hoc_vien, ma_lop, trang_thai) "
                 "VALUES (%s, %s, %s, %s, 'da_dang_ky')",
@@ -607,7 +616,7 @@ def register_student_to_class(
                 """,
                 [
                     tuition_id, site_code, enrollment_id, amount_due,
-                    "da_dong" if int(amount_due) == 0 else "chua_dong",
+                    tuition_status,
                 ],
             )
             create_default_tuition_installment(
@@ -627,7 +636,7 @@ def register_student_to_class(
         "enrollment_id": enrollment_id, "student_id": student_id,
         "class_id": class_id, "course_id": course_id, "tuition_id": tuition_id,
         "amount_due": amount_due, "enrollment_status": "da_dang_ky",
-        "tuition_status": "chua_dong", "site_code": site_code,
+        "tuition_status": tuition_status, "site_code": site_code,
         "current_count": current_count, "remaining_seats": capacity - current_count,
         "created": True,
     }

@@ -9,6 +9,42 @@ BEGIN
     ;THROW 51020, N'Hãy chọn một CSDL site, không chạy trong system database.', 1;
 END;
 
+/* Current application structures, including migrations added after the base schema. */
+DECLARE @required_tables table (name sysname PRIMARY KEY);
+INSERT @required_tables VALUES
+    (N'CoSo'), (N'MonHoc'), (N'KhoaHoc'), (N'TaiKhoan'), (N'Admin'),
+    (N'HocVien'), (N'GiaoVien'), (N'NhanVien'), (N'PhongHoc'), (N'LopHoc'),
+    (N'BuoiHoc'), (N'DangKy'), (N'HocPhi'), (N'DotHocPhi'), (N'PhieuThu'),
+    (N'Diem'), (N'DiemDanh'), (N'GiaoDichChuyenCoSo'), (N'LichSuChuyenCoSo'),
+    (N'PhienDangNhap'), (N'TokenDatLaiMatKhau'), (N'GiaoDichDatLaiMatKhau'),
+    (N'Logs'), (N'ThongBao'), (N'DanhMucBlog'), (N'BaiVietBlog'), (N'YeuCauLienHe');
+IF EXISTS (SELECT 1 FROM @required_tables WHERE OBJECT_ID(N'dbo.' + name, N'U') IS NULL)
+BEGIN
+    SELECT name AS missing_table FROM @required_tables
+    WHERE OBJECT_ID(N'dbo.' + name, N'U') IS NULL;
+    THROW 51407, N'Thiếu bảng ứng dụng hiện hành; đối chiếu DB README và migration liên quan.', 1;
+END;
+
+DECLARE @required_columns table (table_name sysname, column_name sysname);
+INSERT @required_columns VALUES
+    (N'TaiKhoan', N'avatar_public_id'), (N'TaiKhoan', N'avatar_secure_url'),
+    (N'HocVien', N'avatar_public_id'), (N'HocVien', N'avatar_secure_url'),
+    (N'HocVien', N'slug'), (N'KhoaHoc', N'thoi_luong_so'), (N'KhoaHoc', N'thoi_luong_don_vi'),
+    (N'PhieuThu', N'ma_phieu_goc'), (N'PhieuThu', N'khoa_idempotency'),
+    (N'DanhMucBlog', N'slug'), (N'DanhMucBlog', N'ten_danh_muc'),
+    (N'BaiVietBlog', N'slug'), (N'BaiVietBlog', N'ma_danh_muc_blog'),
+    (N'BaiVietBlog', N'noi_dung'), (N'BaiVietBlog', N'ngay_xuat_ban_utc'),
+    (N'YeuCauLienHe', N'ma_co_so'), (N'YeuCauLienHe', N'khoa_chong_lap'),
+    (N'YeuCauLienHe', N'payload_hash'), (N'YeuCauLienHe', N'noi_dung_phan_hoi'),
+    (N'YeuCauLienHe', N'ma_nguoi_phan_hoi'), (N'YeuCauLienHe', N'phan_hoi_luc_utc');
+IF EXISTS (SELECT 1 FROM @required_columns
+           WHERE COL_LENGTH(N'dbo.' + table_name, column_name) IS NULL)
+BEGIN
+    SELECT table_name, column_name AS missing_column FROM @required_columns
+    WHERE COL_LENGTH(N'dbo.' + table_name, column_name) IS NULL;
+    THROW 51408, N'Thiếu cột avatar/khóa học/phiếu hoàn/Blog/liên hệ; đối chiếu migration.', 1;
+END;
+
 IF (SELECT COUNT(*) FROM sys.tables
     WHERE schema_id = SCHEMA_ID(N'dbo')
       AND name IN (N'HocVien', N'LopHoc', N'GiaoVien', N'MonHoc', N'DangKy', N'HocPhi', N'Diem',
@@ -21,9 +57,9 @@ IF COL_LENGTH(N'dbo.TaiKhoan', N'google_subject') IS NULL
    OR COL_LENGTH(N'dbo.TaiKhoan', N'facebook_subject') IS NULL
    OR OBJECT_ID(N'dbo.TaiKhoanLienKetOAuth', N'U') IS NOT NULL
    OR NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.TaiKhoan')
-                  AND name = N'UX_TaiKhoan_google_subject' AND is_unique = 1)
+                  AND name = N'UX_TaiKhoan_google_subject' AND is_unique = 1 AND is_disabled = 0)
    OR NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.TaiKhoan')
-                  AND name = N'UX_TaiKhoan_facebook_subject' AND is_unique = 1)
+                  AND name = N'UX_TaiKhoan_facebook_subject' AND is_unique = 1 AND is_disabled = 0)
    OR NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.TaiKhoan')
                   AND name = N'CK_TaiKhoan_google_subject')
    OR NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'dbo.TaiKhoan')
@@ -40,7 +76,9 @@ END;
 
 IF COL_LENGTH(N'dbo.TokenDatLaiMatKhau', N'so_lan_sai') IS NULL
    OR OBJECT_ID(N'dbo.GiaoDichDatLaiMatKhau', N'U') IS NULL
-   OR NOT EXISTS (SELECT 1 FROM sys.triggers WHERE name = N'TR_Logs_AppendOnly')
+   OR NOT EXISTS (SELECT 1 FROM sys.triggers
+                  WHERE parent_id = OBJECT_ID(N'dbo.Logs')
+                    AND name = N'TR_Logs_AppendOnly' AND is_disabled = 0)
 BEGIN
     ;THROW 51124, N'Thiếu cấu trúc OTP hoặc trigger bảo vệ Logs. Chạy migration OTP và 26_consolidate_logs_and_remove_notification_reads.sql trên site này.', 1;
 END;
@@ -92,7 +130,7 @@ END;
 
 IF (SELECT COUNT(*) FROM sys.triggers
     WHERE parent_id = OBJECT_ID(N'dbo.LichSuChuyenCoSo')
-      AND name = N'TR_LichSuChuyenCoSo_AppendOnly') <> 1
+      AND name = N'TR_LichSuChuyenCoSo_AppendOnly' AND is_disabled = 0) <> 1
 BEGIN
     ;THROW 51022, N'Thiếu trigger bảo vệ nhật ký chuyển cơ sở append-only.', 1;
 END;
@@ -117,6 +155,26 @@ IF (SELECT COUNT(*) FROM sys.indexes
       AND name IN (N'UX_GiaoDichChuyenCoSo_khoa_chong_trung', N'IX_GiaoDichChuyenCoSo_hang_cho_duyet')) <> 2
 BEGIN
     ;THROW 51025, N'Thiếu index giới hạn đề nghị đang mở hoặc phục vụ hộp thư chờ duyệt.', 1;
+END;
+
+/* Không báo đạt khi constraint còn tên nhưng đã bị tắt hoặc chưa kiểm tra dữ liệu cũ. */
+IF EXISTS (SELECT 1 FROM sys.check_constraints
+           WHERE schema_id = SCHEMA_ID(N'dbo') AND (is_disabled = 1 OR is_not_trusted = 1))
+   OR EXISTS (SELECT 1 FROM sys.foreign_keys
+              WHERE schema_id = SCHEMA_ID(N'dbo') AND (is_disabled = 1 OR is_not_trusted = 1))
+BEGIN
+    ;THROW 51405, N'Có CHECK/FK bị tắt hoặc chưa trusted. Đối soát dữ liệu rồi WITH CHECK CHECK tại đúng site; không bỏ qua lỗi để chụp báo cáo.', 1;
+END;
+
+IF (SELECT COUNT(*) FROM sys.check_constraints
+    WHERE schema_id = SCHEMA_ID(N'dbo')
+      AND name = N'CK_' + OBJECT_NAME(parent_object_id) + N'_site_local'
+      AND OBJECT_NAME(parent_object_id) IN
+          (N'HocVien', N'GiaoVien', N'NhanVien', N'Admin', N'PhongHoc', N'LopHoc',
+           N'BuoiHoc', N'DangKy', N'HocPhi', N'DotHocPhi', N'GiaoDichChuyenCoSo',
+           N'LichSuChuyenCoSo', N'PhieuThu', N'Diem', N'DiemDanh', N'ThongBao', N'YeuCauLienHe')) <> 17
+BEGIN
+    ;THROW 51406, N'Thiếu CHECK bảo vệ mảnh site. Đối chiếu migration 30 và 43 tại site này.', 1;
 END;
 
 SELECT DB_NAME() AS database_dang_kiem_tra;

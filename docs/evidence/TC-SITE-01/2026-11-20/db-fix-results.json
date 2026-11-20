@@ -1,0 +1,45 @@
+{
+  "executed_at": "2026-11-20T22:07:00.464104+07:00",
+  "migrations": [
+    "27",
+    "40",
+    "43",
+    "44"
+  ],
+  "scope": "Local schema repairs and verification; no API/browser or distributed acceptance test",
+  "results": [
+    {
+      "scratch_tests": "passed",
+      "cases": [
+        "legacy OAuth upgrade",
+        "migration replay",
+        "verify positive",
+        "missing Blog rejected",
+        "missing avatar rejected",
+        "disabled boundary rejected",
+        "wrong-site contact rejected",
+        "untrusted FK rejected"
+      ]
+    },
+    {
+      "site": "Q1",
+      "backup_verified": true,
+      "status": "applied_and_verified"
+    },
+    {
+      "site": "Q7",
+      "status": "not_completed",
+      "error_type": "OperationalError",
+      "error_code": null
+    },
+    {
+      "site": "TD",
+      "backup_verified": true,
+      "status": "applied_and_verified"
+    }
+  ],
+  "additional_tests": [
+    "Contact boundary regression SQL passed on disposable QLTTNN_TEST database",
+    "NOT FOR REPLICATION FK upgraded and migration replayed on disposable database"
+  ]
+}

@@ -2,6 +2,8 @@
 
 ## Quyết định triển khai
 
+Liên hệ lý thuyết GV-03: đây là **lazy/centralized, một nơi ghi**, không phải eager/quorum/multi-master. Xem [đối chiếu tài liệu giảng viên](QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien) và [sơ đồ cấp phát](DATABASE_SCHEMA.md#phan-manh). Từ “transactional” không tự bảo đảm ACID giữa các database.
+
 `MonHoc` chuyển từ fan-out tại API sang transactional replication của SQL Server.
 Publisher được cấu hình bằng `MONHOC_PUBLISHER_SITE_CODE` (mặc định `Q1`), độc lập
 với `AUTH_SESSION_SITE_CODE`. Danh sách site bắt buộc lấy từ `CoSo.hoat_dong`,

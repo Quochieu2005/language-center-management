@@ -371,7 +371,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
     {isEmployeeView
       ? <Table<Employee> rowKey="employee_id" loading={loading} columns={employeeColumns} dataSource={employees} scroll={{ x: 1000 }} />
       : <Table<AdminSmall> rowKey="account_id" loading={loading} columns={adminColumns} dataSource={admins} scroll={{ x: 760 }} />}
-    <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} width="min(760px, calc(100vw - 32px))" onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} destroyOnHidden closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting} styles={{ body: { maxHeight: "calc(100dvh - 140px)", overflowY: "auto" } }}>
+    <Modal title={isEmployeeView ? "Tạo nhân viên" : "Tạo Admin Small"} open={creating} width="min(760px, calc(100vw - 32px))" onCancel={() => { if (!submitting) { setCreating(false); resetCreateForm(); } }} footer={null} forceRender closable={!submitting} mask={{ closable: !submitting }} keyboard={!submitting} styles={{ body: { maxHeight: "calc(100dvh - 140px)", overflowY: "auto" } }}>
       <Form form={form} layout="vertical" onFinish={submit}>
         <Row gutter={[16, 0]}>
           <Col span={24}>

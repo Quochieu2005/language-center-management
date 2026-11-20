@@ -30,10 +30,10 @@ Trong source hiện tại, Coordinator chạy sau quyết định duyệt và Ad
 
 Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 
-1. Xác thực Admin Big và kiểm tra quyền.
+1. Xác thực và kiểm tra quyền của từng bảng: MonHoc chỉ Admin Big; khóa học còn có Tư vấn/Kế toán theo hợp đồng hiện có.
 2. Đọc danh sách cơ sở `hoat_dong`; xác nhận mọi site có cấu hình kết nối và sẵn sàng.
 3. Nếu thiếu site: từ chối, không cập nhật site nào.
-4. Ghi cùng thay đổi vào các site tham gia.
+4. Ghi theo chính sách bảng: MonHoc chỉ DML tại Publisher; KhoaHoc/Blog/tài khoản dùng service bản sao riêng, không cùng Publication.
 5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
 6. Với MonHoc, API chỉ ghi Publisher và biên nhận Logs trong transaction cục bộ; SQL Server Publication chuyển Subscriber. Sau commit API đọc bản sao, retry cùng key chỉ đối soát. Không gọi đây là ACID xuyên CSDL.
 
@@ -166,7 +166,7 @@ Nếu không đọc được CSDL nguồn để biết trạng thái giao dịch
 3. Admin Big đọc hộp thư từ nhiều site; khi một site không truy cập được, API/UI báo danh sách chưa đầy đủ.
 4. Admin Big hoặc Admin Small site nhận duyệt: lưu quyết định ở nguồn, thực hiện chuyển đúng hai site, giữ `ma_tai_khoan`, ghi đúng một thông báo cục bộ tại đích và không đếm trùng.
 5. Admin Big hoặc Admin Small site nhận từ chối: lưu lý do/sự kiện; hồ sơ học viên vẫn `dang_hoc` ở nguồn.
-6. Hai quyết định đồng thời hoặc tạo đề nghị trùng: chỉ một đề nghị/giao dịch mở được chấp nhận; retry cùng idempotency key không tạo bản ghi thứ hai.
+6. Hai quyết định đồng thời hoặc tạo đề nghị trùng: chỉ một đề nghị/giao dịch mở được chấp nhận. POST tạo đề nghị hiện không nhận Idempotency-Key; gửi lại khi đã có đề nghị mở trả xung đột, không phải replay response theo key. Route retry tiến trình chuyển dùng mã giao dịch đã lưu và không tạo hồ sơ đích thứ hai.
 7. Điều kiện đổi trong lúc chờ duyệt (phát sinh công nợ, học viên đổi trạng thái, site đích đóng): API không bắt đầu chuyển dựa trên kiểm tra cũ.
 8. Đích lỗi trước commit: giữ nguồn và retry hoặc kết thúc `that_bai` theo loại lỗi.
 9. Ứng dụng dừng sau khi đích commit: route retry đối chiếu sự kiện rồi hoàn tất nguồn, không tạo đích lần hai.

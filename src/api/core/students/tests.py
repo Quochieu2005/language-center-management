@@ -286,7 +286,7 @@ class StudentPortalApiTests(SimpleTestCase):
             "Q7-TK-000100", "hv-q7-student", "account-slug", "student@example.com",
             "bcrypt-hash", "hoc_vien", "Q7", "hoat_dong", 1, 1,
         )
-        results = [[], [("Q7-HV-000001", "q7-hv-000001", "Q7")], []]
+        results = [[], [("Q7-HV-000001", "q7-hv-000001", "Q7", 0)], []]
 
         class Cursor:
             def __enter__(self):

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, App, Button, Card, Empty, Form, Input, Modal, Space, Table, Tag, Typography } from "antd";
+import { Alert, App, Button, Card, Empty, Form, Input, Modal, Space, Table, Typography } from "antd";
 import { catalogApi, type SharedSubject, type SharedSubjectCreateInput, type SharedSubjectList, type SharedSubjectPatchInput } from "@/lib/api/catalog";
 import { ApiError } from "@/lib/api/client";
 

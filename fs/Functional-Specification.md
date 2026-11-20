@@ -259,6 +259,8 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 ### FS-AUTH-04 — Tự đăng xuất sau 1 giờ không hoạt động
 
+Khôi phục phiên không coi lỗi hạ tầng là hết phiên. Khi chuyển cơ sở, hồ sơ đích `bao_luu` có sự kiện `tao_ho_so_dich` nhưng chưa `hoan_tat` chưa được dùng để xác thực; nếu chưa có hồ sơ hiện hành thì trả 503 để thử lại, không trả 401 làm mất phiên. Phản hồi bất đồng bộ của phiên cũ không được cập nhật hoặc xóa phiên đăng nhập mới. Đăng xuất thủ công chỉ xóa trạng thái frontend sau khi máy chủ xác nhận thu hồi, hoặc trả 401 xác nhận phiên đã không còn hợp lệ; lỗi kết nối giữ trạng thái và cho phép thử lại.
+
 **Người dùng:** mọi tài khoản nội bộ đã đăng nhập: Admin Big, Admin Small, nhân viên, giáo viên. **Phân tán:** phiên là trạng thái kỹ thuật có thể thu hồi được lưu ở database site cấu hình `AUTH_SESSION_SITE_CODE`, không phải database nghiệp vụ trung tâm.
 
 **Quy tắc:**
@@ -365,9 +367,9 @@ Endpoint gửi mật khẩu đối chiếu các bản sao `TaiKhoan` đang hoạ
 
 1. Nhân viên có quyền tìm học viên và chọn khóa/lớp tại cùng site; Kế toán & Lễ tân chỉ tra cứu học viên, không gửi thao tác đăng ký.
 2. API lấy site từ phiên/quyền và định tuyến bằng Site Router; không nhận alias/database tùy ý từ client.
-3. API kiểm tra trạng thái học viên/lớp, sức chứa, lịch xung đột, đăng ký trùng và mức học phí theo dữ liệu server.
+3. API kiểm tra trạng thái học viên/lớp, sức chứa, lịch xung đột, đăng ký trùng và mức học phí theo dữ liệu server. Khi giữ khóa hồ sơ học viên, từ chối đăng ký mới nếu có giao dịch chuyển tại nguồn đang `dang_xu_ly`; bước duyệt chuyển cũng khóa hồ sơ này để không phát sinh công nợ mới sau khi duyệt.
 4. Trong một transaction cục bộ, tạo DangKy, tạo HocPhi, cập nhật sĩ số nếu schema lưu sĩ số tổng hợp, ghi nhật ký.
-5. API trả mã đăng ký và khoản học phí phát sinh.
+5. API trả mã đăng ký và khoản học phí phát sinh; trạng thái học phí khớp DB: `da_dong` nếu học phí bằng 0, ngược lại `chua_dong`.
 
 **Lỗi:** dữ liệu không hợp lệ hoặc lớp đầy thì không ghi gì; lỗi ở bất kỳ bước ghi nào rollback toàn bộ transaction; request lặp không tạo đăng ký/học phí lần hai.
 
@@ -630,7 +632,7 @@ Response thành công/lỗi cuối cùng được chốt trong specs/api.md. Res
 
 | Yêu cầu chung | Phần chức năng/thiết kế liên quan | Bằng chứng bắt buộc |
 |---|---|---|
-| YC-01: 2–4 site | FS-SITE-01, định tuyến và schema; mặc định 3 site | TC-SITE-01: DB/alias và topology thực tế |
+| YC-01: 2–4 site | FS-SITE-01, định tuyến và schema; mặc định 3 site | TC-SITE-01: DB/alias và topology; đối chiếu GV-06 trang 1 yêu cầu lab ít nhất ba SQL Server, không thay bằng ba DB cùng instance |
 | YC-02: phương pháp phân mảnh | FS-CLASS-01, FS-ENR-01; ngang `LopHoc`, dẫn xuất `DangKy` | TC-FRAG-01: đầy đủ, không giao nhau, tái thiết |
 | YC-03: phương pháp replication | FS-SITE-01, FS-ACC-01, FS-EMP-01; bảng dùng chung theo schema | TC-REP-01: một thay đổi thực tế truyền đến các bản sao |
 | YC-04: distributed transaction | FS-TRF-01/02/03 | TC-DTX-01: thay đổi hai site, lỗi trước/sau commit đích và recovery |
@@ -638,7 +640,9 @@ Response thành công/lỗi cuối cùng được chốt trong specs/api.md. Res
 | YC-06: distributed query | FS-REPORT-01; hộp thư FS-TRF-02 | TC-DQ-01: truy vấn từng site, gộp và thông báo site thiếu |
 | YC-07: đồng bộ | FS-SITE-01, FS-AUD-01 | TC-SYNC-01: site lỗi, retry/đối soát, không ghi trùng |
 
-Ma trận này bổ sung ma trận sáu nghiệp vụ ở mục 9; không thay thế yêu cầu chức năng nào. Các bước chi tiết nằm trong [tài liệu kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md).
+Ma trận này bổ sung ma trận sáu nghiệp vụ ở mục 9; không thay thế yêu cầu chức năng nào. Các bước chi tiết nằm trong [tài liệu kiểm chứng](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Nguồn và cách áp dụng từng PDF/PPTX của giảng viên nằm ở [bảng đối chiếu](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien).
+
+Tiêu chí thiết kế phục vụ báo cáo: có [ERD](../docs/DATABASE_SCHEMA.md#erd), lược đồ toàn cục/cục bộ, công thức phân mảnh với khóa cha–con, tập site cấp phát/hoạt động và [ánh xạ–định vị](../docs/DATABASE_SCHEMA.md#phan-manh). TC-FRAG-01 đối chiếu cả tập mã kỳ vọng, không chỉ COUNT bằng nhau hoặc các bảng rỗng. Kiểm tra DB phải phát hiện CHECK/FK disabled/untrusted và trigger log đã tắt, không coi tên object tồn tại là đủ. Các script chỉ đọc không thay thử ghi sai, cạnh tranh thật hoặc fault injection.
 
 ### Điều kiện hoàn tất
 

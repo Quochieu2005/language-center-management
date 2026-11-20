@@ -2,6 +2,8 @@
 
 Thu học phí giữ key/body cho lần gửi chưa rõ kết quả trong `sessionStorage`, tách theo tài khoản/site/khoản phí; khôi phục biểu mẫu khi mở lại kể cả sau reload cùng tab và khóa gửi/đóng dialog trong lúc chờ. Nếu trình duyệt chặn lưu trữ thì cảnh báo và chỉ retry an toàn trong trang đang mở; sau reload phải tra cứu phiếu. Key phải vừa mã phiếu 24 ký tự sau khi cộng tiền tố site. Giáo viên hiện tại xem được buổi cũ của lớp: `can_edit_attendance=false` thì hiện trạng thái chỉ đọc, khóa trường trạng thái/ghi chú và nút lưu điểm danh. Không thay bố cục trang. Đổi lớp sau khi đã có điểm/điểm danh hiển thị lỗi `409` từ API và giữ dữ liệu cũ.
 
+Bằng chứng giao diện phải đi kèm dữ liệu/API theo [đối chiếu tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Màn hình web hoặc danh sách bằng nhau không tự chứng minh phân mảnh/replication/giao dịch; giữ cảnh báo chưa đủ site, 202 và trạng thái phục hồi đúng hợp đồng hiện có. Đợt rà này không đổi giao diện.
+
 > Trạng thái: Đặc tả thiết kế UI/UX. Frontend Next.js đã có các route được liệt kê tại mục 3.6; cấu trúc và hành vi trong tài liệu này vẫn là yêu cầu thiết kế, không tự chứng minh route đã hoàn thiện hoặc TC phân tán đã đạt. Đối chiếu từng chức năng với [ma trận trạng thái source và bằng chứng](../docs/Trang-Thai-Trien-Khai.md).
 
 Tài liệu quy định cách chia component, page, section, SCSS, SVG, nội dung trang công khai, đăng nhập/đăng ký dùng chung, khu vực làm việc theo chức vụ, responsive và cách kiểm tra giao diện. Đây là **một ứng dụng frontend**, không phải mỗi chức vụ một website riêng: người dùng vào cùng địa chỉ, dùng cùng màn hình đăng nhập; sau khi API xác thực, giao diện hiển thị đúng trang và thao tác theo quyền được cấp. Hợp đồng request/response thuộc [`api.md`](api.md); nghiệp vụ và kiến trúc phân tán thuộc [`README.md`](../README.md); cấu trúc bảng thuộc [`docs/DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).
@@ -303,6 +305,8 @@ flowchart TD
 7. Tài khoản nội bộ được Admin Big tạo qua quy trình hiện có; không hiển thị route kích hoạt `/auth/activate` khi source chưa có route đó. Quên mật khẩu dùng trang `/forgot-password` và luồng OTP; API chỉ lưu hash OTP, mặc định hết hạn sau 120 giây theo `PASSWORD_RESET_TIMEOUT`. Không hiển thị việc tài khoản/email có tồn tại hay không. Đổi mật khẩu đã xác thực dùng trang `/password/change`.
 
 #### Tự đăng xuất khi không hoạt động
+
+Frontend bỏ qua phản hồi gia hạn/đọc hồ sơ của phiên cũ sau khi đăng nhập hoặc đăng xuất. Logout lỗi mạng/503 phải báo chưa thu hồi được phiên và cho thử lại, không chuyển về đăng nhập như đã logout thành công. Request kiểm tra phiên khi khách chưa đăng nhập vẫn có thể trả 401 bình thường.
 
 - Sau đăng nhập, mọi vai trò dùng chung hạn idle **60 phút**. Tính hoạt động từ thao tác thực của người dùng; polling API, refresh tự động, tab để mở và reload không kéo dài phiên.
 - Đồng bộ bộ đếm giữa các tab cùng phiên. Có thể hiện cảnh báo ở phút 55 kèm nút “Tiếp tục phiên”; chỉ tiếp tục khi API xác nhận phiên chưa hết hạn.

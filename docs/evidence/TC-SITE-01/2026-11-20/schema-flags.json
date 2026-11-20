@@ -1,0 +1,47 @@
+[
+  {
+    "site": "Q1",
+    "google_column": false,
+    "facebook_column": false,
+    "legacy_oauth_table": false,
+    "unique_subject_indexes": 0,
+    "subject_checks": 0,
+    "disabled_or_untrusted": [],
+    "log_triggers": [
+      [
+        "TR_LichSuChuyenCoSo_AppendOnly",
+        false
+      ],
+      [
+        "TR_Logs_AppendOnly",
+        false
+      ]
+    ]
+  },
+  {
+    "site": "TD",
+    "google_column": false,
+    "facebook_column": false,
+    "legacy_oauth_table": false,
+    "unique_subject_indexes": 0,
+    "subject_checks": 0,
+    "disabled_or_untrusted": [
+      [
+        "KhoaHoc",
+        "FK_KhoaHoc_MonHoc",
+        false,
+        true
+      ]
+    ],
+    "log_triggers": [
+      [
+        "TR_Logs_AppendOnly",
+        false
+      ],
+      [
+        "TR_LichSuChuyenCoSo_AppendOnly",
+        false
+      ]
+    ]
+  }
+]

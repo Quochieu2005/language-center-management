@@ -1,5 +1,7 @@
 # Hướng dẫn kết nối các máy bằng ZeroTier và SQL Server
 
+Căn cứ bố trí vật lý và ảnh cần thu: [đối chiếu giảng viên](QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien), [ánh xạ/định vị](DATABASE_SCHEMA.md#phan-manh). VPN là đường mạng; TeamViewer/SSMS/VS Code là công cụ khách. Chuyển/restore DB và cấu hình API/Subscription là các bước riêng, không tự xảy ra khi join VPN.
+
 > Hướng dẫn hiện dùng ZeroTier. Các địa chỉ mạng là giá trị động, luôn lấy giá trị mới nhất từ ZeroTier Central.
 >
 > Hướng dẫn này dành cho nhóm triển khai đồ án CSDL phân tán. Làm phần mạng trên từng máy, phần SQL Server trên máy giữ CSDL, rồi thử kết nối từ máy khác.
@@ -324,4 +326,4 @@ Không ghi bước là đã cài, đã kết nối hoặc đã đồng bộ nế
 - [Microsoft Learn — cấu hình cổng TCP cố định](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-a-server-to-listen-on-a-specific-tcp-port?view=sql-server-ver17)
 - [Microsoft Learn — cài SQL Server Database Engine](https://learn.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server-from-the-installation-wizard-setup?view=sql-server-ver17)
 - [Đề cương báo cáo của nhóm](QLTTNN-De-Cuong-Bao-Cao.md)
-- [Kiến trúc CSDL phân tán của nhóm](QLTTNN-Kien-Truc.md)
+- [Kiến trúc CSDL phân tán của nhóm](QLTTNN-Huong-Dan-Source.md#dinh-tuyen-site)

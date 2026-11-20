@@ -161,7 +161,8 @@ def list_grade_history(*, site_code: str, teacher_id: str, enrollment_id: str) -
             """,
             [site_code, site_code, enrollment_id],
         )
+        results = _dict_rows(cursor)
         return {
             "site_code": site_code, "enrollment_id": enrollment_id,
-            "count": 0, "results": _dict_rows(cursor),
+            "count": len(results), "results": results,
         }

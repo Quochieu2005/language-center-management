@@ -1,5 +1,7 @@
 # Yêu cầu chung và kịch bản kiểm chứng CSDL phân tán
 
+Đối chiếu các file gốc và mục/trang tại [bảng tham khảo giảng viên](QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). GV-06 trang 1 bổ sung yêu cầu lab ít nhất ba SQL Server: TC-SITE-01 phải ghi số instance/máy thật; ba database trên một instance chưa đạt bố trí này. TC-FRAG-01 dùng [script chỉ đọc](../db/README.md#kiem-chung-csdl) và [lược đồ phân tán](DATABASE_SCHEMA.md#phan-manh).
+
 Tài liệu này ghi yêu cầu chung do giảng viên giao, áp dụng cùng sáu nghiệp vụ của Đề tài 10. Đây là tiêu chí phải triển khai và kiểm chứng, không phải xác nhận hệ thống đã đạt. [README](../README.md) mô tả kiến trúc/nghiệp vụ; [schema](DATABASE_SCHEMA.md) quy định bảng; [FS](../fs/Functional-Specification.md) và [API/UI specs](../specs/README.md) quy định hành vi cần xây dựng.
 
 ## 1. Yêu cầu chung của giảng viên
@@ -33,7 +35,7 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 | Nội dung | Đã xác định trong thiết kế | Cần chốt/kiểm chứng |
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
-| Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng đã chứng minh UPDATE/phục hồi Q1 → Q7; TD và POST/PATCH/DELETE qua API mới cần kiểm chứng. KhoaHoc giữ fan-out riêng |
+| Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7; evidence ngày 20/11/2026 có API views CRUD/retry SQL thật đủ Q1/Q7/TD. Còn browser end-to-end, outage TD và TD trên máy Minh Đức; KhoaHoc giữ fan-out riêng |
 | Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |
@@ -143,12 +145,12 @@ Người dùng đã cung cấp ảnh outage/khôi phục Q7 truyền bù thay đ
 browser end-to-end, outage TD, chuyển máy TD, concurrency hoặc fault injection
 chuyển cơ sở trong đợt này. Bảng ngày 29/10 ở trên là lịch sử, không phản ánh
 topology hiện tại. Không kết luận toàn bộ YC-01–YC-07 đã đạt.
-
+z
 ## 7. Tài liệu phải khớp nhau
 
 - [AGENTS.md](../AGENTS.md): quy tắc bắt buộc cho thành viên/AI; giữ quy trình Git.
 - [README](../README.md), [FS](../fs/Functional-Specification.md): phạm vi 2–4 site, năm nội dung chứng minh, đồng bộ và tiêu chí nghiệm thu.
-- [Schema](DATABASE_SCHEMA.md), [mô hình dữ liệu](QLTTNN-Du-Lieu.md), [db/README](../db/README.md): phân mảnh, bản sao, ràng buộc và giới hạn của seed/verify cục bộ.
-- [Kiến trúc](QLTTNN-Kien-Truc.md), [source](QLTTNN-Huong-Dan-Source.md), [giao dịch](QLTTNN-Giao-Dich-Phan-Tan.md): trách nhiệm module, commit, cạnh tranh và phục hồi.
+- [Schema, ERD và mô hình dữ liệu](DATABASE_SCHEMA.md), [DB/scripts](../db/README.md): phân mảnh, bản sao, ràng buộc và giới hạn của seed/verify cục bộ.
+- [Kiến trúc và source](QLTTNN-Huong-Dan-Source.md), [giao dịch](QLTTNN-Giao-Dich-Phan-Tan.md): trách nhiệm module, commit, cạnh tranh và phục hồi.
 - [API](../specs/api.md), [UI](../specs/ui-ux.md): API quyết định kết quả; UI thể hiện xung đột, đang xử lý, chưa đồng bộ và kết quả thiếu site.
-- [Kế hoạch](QLTTNN-Ke-Hoach-Trien-Khai.md), [làm việc nhóm](QLTTNN-Lam-Viec-Nhom.md), [đề cương](QLTTNN-De-Cuong-Bao-Cao.md), [hướng dẫn mạng](QLTTNN-Huong-Dan-Ket-Noi-ZeroTier-SQL-Server.md): người phụ trách, trình tự chạy, ảnh và bằng chứng cần thu.
+- [Làm việc nhóm và kế hoạch](QLTTNN-Lam-Viec-Nhom.md), [đề cương](QLTTNN-De-Cuong-Bao-Cao.md), [hướng dẫn mạng](QLTTNN-Huong-Dan-Ket-Noi-ZeroTier-SQL-Server.md): người phụ trách, trình tự chạy, ảnh và bằng chứng cần thu.
