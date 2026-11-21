@@ -27,7 +27,9 @@ export default function LoginPage() {
       void Promise.resolve().then(() => {
         setSocialBusy("session");
         return authApi.session();
-      }).then(({ user, expires_at }) => {
+      }).then((session) => {
+        if (!session) throw new Error("Không có phiên đăng nhập.");
+        const { user, expires_at } = session;
         signIn(user, expires_at);
         if (user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
         router.replace(homeForRole(user.role));

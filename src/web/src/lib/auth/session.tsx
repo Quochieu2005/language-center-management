@@ -81,13 +81,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const version = authMutationVersion.current;
-    authApi.session().then(({ user: sessionUser, expires_at }) => {
-      if (!cancelled && version === authMutationVersion.current) {
-        sessionStorage.setItem("qlttnn.account-slug", sessionUser.slug);
-        setUser(sessionUser);
-        setExpiresAt((current) => keepLaterExpiry(current, expires_at));
-        setRestoreError(false);
-      }
+    authApi.session().then((session) => {
+      if (cancelled || version !== authMutationVersion.current) return;
+      if (!session) { clearSession(); return; }
+      const { user: sessionUser, expires_at } = session;
+      sessionStorage.setItem("qlttnn.account-slug", sessionUser.slug);
+      setUser(sessionUser);
+      setExpiresAt((current) => keepLaterExpiry(current, expires_at));
+      setRestoreError(false);
     }).catch((error: unknown) => {
       if (cancelled || version !== authMutationVersion.current) return;
       if (error instanceof ApiError && error.status === 401) clearSession();
@@ -134,8 +135,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const version = authMutationVersion.current;
     const timer = window.setTimeout(() => {
-      void authApi.session().then(({ user: sessionUser, expires_at }) => {
+      void authApi.session().then((session) => {
         if (cancelled || version !== authMutationVersion.current) return;
+        if (!session) { clearSession(); router.replace("/login"); return; }
+        const { user: sessionUser, expires_at } = session;
         setUser(sessionUser);
         setExpiresAt((current) => keepLaterExpiry(current, expires_at));
         setRestoreError(false);

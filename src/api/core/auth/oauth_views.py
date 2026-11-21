@@ -262,12 +262,19 @@ class AuthSessionView(APIView):
     """Return the authenticated principal without putting a slug in a callback URL."""
 
     authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id="auth_session_read",
         tags=["Xác thực"],
         summary="Lấy thông tin tài khoản của phiên đăng nhập hiện tại",
-        responses={200: AuthProfileResponseSerializer, 401: OpenApiResponse(description="Phiên không hợp lệ hoặc hết hạn.")},
+        responses={
+            200: AuthProfileResponseSerializer,
+            204: OpenApiResponse(description="Chưa đăng nhập; không có cookie phiên."),
+            401: OpenApiResponse(description="Cookie phiên không hợp lệ hoặc đã hết hạn."),
+        },
     )
     def get(self, request):
+        if request.user is None or not request.user.is_authenticated:
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({"user": _serialized_user(request.user), "expires_at": _utc_datetime(request.auth.expires_at)})
