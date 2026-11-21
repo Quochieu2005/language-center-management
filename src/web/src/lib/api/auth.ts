@@ -25,6 +25,11 @@ export type AvatarUploadIntent = {
 export type OAuthProvider = "google" | "facebook";
 
 export const authApi = {
+  registrationSites: () => apiRequest<{ sites: { site_code: string; name: string }[]; registration_ready: boolean }>("/auth/register/"),
+  register: (body: { full_name: string; email: string; site_code: string; password: string; confirm_password: string }) =>
+    apiRequest<{ detail: string; replication_complete: boolean; replication_pending_sites: string[] }>(
+      "/auth/register/", { method: "POST", body: jsonBody(body) },
+    ),
   csrf: () => apiRequest<{ csrf_token: string }>("/auth/csrf/"),
   login: (identifier: string, password: string) =>
     apiRequest<LoginResponse>("/auth/login/", { method: "POST", body: jsonBody({ identifier, password }) }),

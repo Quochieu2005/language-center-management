@@ -299,6 +299,8 @@ class TeacherCollectionView(APIView):
         return Response(
             {
                 "teacher_id": result.teacher_id,
+                "replication_complete": not result.replication_pending_sites,
+                "replication_pending_sites": list(result.replication_pending_sites),
                 "account_id": result.account_id,
                 "site_code": result.site_code,
                 "account_status": "active",

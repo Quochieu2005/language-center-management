@@ -119,6 +119,7 @@ export type StudentProfileWrite = {
 };
 export type ApiPage<T> = PageResult<T> & { complete?: boolean; missing_sites?: string[]; site_codes?: string[] };
 export type AdminAvatarUploadIntent = AvatarUploadIntent;
+export type AccountReplication = { replication_complete: boolean; replication_pending_sites: string[] };
 
 export const adminApi = {
   studentCounts: (site_code?: string) => apiRequest<SiteCounts>(`/admin/reports/students-by-site/${query({ site_code })}`),
@@ -128,7 +129,7 @@ export const adminApi = {
       `/admin/admin-smalls/${query({ site_code, limit, offset })}`,
     ),
   createAdminSmall: (body: { full_name: string; email: string; site_code: string; username?: string; slug?: string; avatar_requested?: boolean }) =>
-    apiRequest<{ account_id: string; admin_id: string; username: string; email: string; site_code: string; slug: string; account_status: "active"; role: "admin_small"; must_change_password: boolean; credential_email_status: "ready" | "unknown"; avatar_setup_token: string | null }>("/admin/admin-smalls/", { method: "POST", body: jsonBody(body) }),
+    apiRequest<AccountReplication & { account_id: string; admin_id: string; username: string; email: string; site_code: string; slug: string; account_status: "active"; role: "admin_small"; must_change_password: boolean; credential_email_status: "ready" | "unknown"; avatar_setup_token: string | null }>("/admin/admin-smalls/", { method: "POST", body: jsonBody(body) }),
   sendAdminSmallCredentials: (accountId: string) =>
     apiRequest<{ detail: string; email: string; status: "sent" }>(`/admin/admin-smalls/${encodeURIComponent(accountId)}/credential-email/`, { method: "POST" }),
   adminSmallProfile: (slug: string) => apiRequest<Record<string, unknown>>(`/admin/admin-smalls/profile/${encodeURIComponent(slug)}/`),
@@ -158,7 +159,7 @@ export const adminApi = {
       `/admin/teachers/assignment-options/${query({ site_code, ...options })}`,
     ),
   createTeacher: (body: { site_code?: string; full_name: string; email: string; username?: string; slug?: string; phone?: string; avatar_requested?: boolean }) =>
-    apiRequest<Teacher & { must_change_password: boolean; avatar_setup_token: string | null }>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
+    apiRequest<Teacher & AccountReplication & { must_change_password: boolean; avatar_setup_token: string | null }>("/admin/teachers/", { method: "POST", body: jsonBody(body) }),
   sendTeacherCredentials: (slug: string, site_code: string) =>
     apiRequest<{ status: "sent"; email: string; detail: string }>(
       `/admin/teachers/${encodeURIComponent(slug)}/credential-email/${query({ site_code })}`,
@@ -182,7 +183,7 @@ export const adminApi = {
   employees: (site_code?: string, options: { job_title?: string; status?: string; search?: string; limit?: number; offset?: number } = {}) =>
     apiRequest<PageResult<Employee>>(`/admin/employees/${query({ site_code, ...options })}`),
   createEmployee: (body: { site_code?: string; full_name: string; email: string; username?: string; phone?: string; job_title: Employee["job_title"]; avatar_requested?: boolean }) =>
-    apiRequest<Employee & { must_change_password: boolean; credential_email_status: NonNullable<Employee["credential_email_status"]>; avatar_setup_token: string | null }>("/admin/employees/", { method: "POST", body: jsonBody(body) }),
+    apiRequest<Employee & AccountReplication & { must_change_password: boolean; credential_email_status: NonNullable<Employee["credential_email_status"]>; avatar_setup_token: string | null }>("/admin/employees/", { method: "POST", body: jsonBody(body) }),
   sendEmployeeCredentials: (accountId: string, site_code: string) =>
     apiRequest<{ detail: string; email: string; status: "sent" }>(
       `/admin/employees/${encodeURIComponent(accountId)}/credential-email/${query({ site_code })}`,
@@ -219,7 +220,7 @@ export const adminApi = {
       `/admin/students/${encodeURIComponent(slug)}/avatar/complete/${query({ site_code })}`, { method: "POST", body: jsonBody(body) },
     ),
   issueStudentAccount: (slug: string, site_code?: string) =>
-    apiRequest<{ username: string; email: string; email_sent: boolean; must_change_password: boolean }>(`/admin/students/${encodeURIComponent(slug)}/account/${query({ site_code })}`, { method: "POST", body: "{}" }),
+    apiRequest<AccountReplication & { username: string; email: string; email_sent: boolean; must_change_password: boolean }>(`/admin/students/${encodeURIComponent(slug)}/account/${query({ site_code })}`, { method: "POST", body: "{}" }),
   deleteStudent: (slug: string, site_code?: string) => apiRequest<{ student_id: string; slug: string; site_code: string; deleted: boolean }>(`/admin/students/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   updateSubject: (slug: string, body: { ten_mon?: string; mo_ta?: string | null }) =>
     apiRequest<Record<string, unknown>>(`/admin/shared/subjects/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),

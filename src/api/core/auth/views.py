@@ -143,8 +143,8 @@ class AuthLoginView(APIView):
             "Xác minh tài khoản đã được cấp trong TaiKhoan và tự xác định vai trò từ tài khoản "
             "cùng hồ sơ Admin, NhanVien, GiaoVien hoặc HocVien tương ứng. Hỗ trợ Admin Big, Admin Small, Kế toán & Lễ tân, "
             "Tư vấn & xếp lớp, giáo viên và học viên; không nhận vai trò hoặc cơ sở từ client. Hồ sơ học viên được "
-            "định vị bằng Global Query trên các site đang hoạt động; chỉ đăng nhập khi tìm thấy "
-            "đúng một hồ sơ hiện hành. "
+            "định vị tại site tài khoản trước, chỉ tìm các mảnh khác khi hồ sơ đã chuyển; "
+            "không đối chiếu mật khẩu ở mọi replica. "
             "Phiên được lưu tại site cấu hình AUTH_SESSION_SITE_CODE, gửi qua cookie HttpOnly "
             "và hết hạn sau 3600 giây không có hoạt động. Gọi GET /auth/csrf/ trước và gửi "
             "csrf_token trong header X-CSRFToken."
@@ -370,6 +370,8 @@ class AdminSmallCreateView(APIView):
                 "site_code": result.site_code,
                 "slug": result.slug,
                 "role": "admin_small",
+                "replication_complete": not result.replication_pending_sites,
+                "replication_pending_sites": list(result.replication_pending_sites),
                 "account_status": "active",
                 "must_change_password": result.must_change_password,
                 "credential_email_status": result.credential_email_status,
@@ -750,9 +752,9 @@ class AdminForgotPasswordView(APIView):
     @extend_schema(
         operation_id="admin_password_reset_request",
         tags=["Xác thực"],
-        summary="Gửi OTP đặt lại mật khẩu quản trị",
+        summary="Gửi OTP đặt lại mật khẩu quản trị hoặc học viên",
         description=(
-            "Chỉ gửi mã tới email đã đăng ký của Admin Big hoặc Admin Small. OTP 6 chữ số "
+            "Chỉ gửi mã tới email đã đăng ký của Admin Big, Admin Small hoặc học viên. OTP 6 chữ số "
             "được lưu dưới dạng HMAC, hết hạn sau 120 giây, chỉ dùng một lần; endpoint luôn "
             "trả cùng nội dung để không tiết lộ email có tồn tại hay không. Giới hạn tối đa "
             "10 yêu cầu/IP/giờ, 3 yêu cầu/email/giờ và 1 lần mỗi 60 giây cho cùng email/IP."
@@ -777,7 +779,7 @@ class AdminForgotPasswordView(APIView):
         return Response(
             {
                 "detail": (
-                    "Nếu email thuộc tài khoản quản trị hợp lệ, mã OTP sẽ được gửi. "
+                    "Nếu email thuộc tài khoản đủ điều kiện, mã OTP sẽ được gửi. "
                     "Mã có hiệu lực trong 2 phút."
                 )
             },
@@ -793,7 +795,7 @@ class AdminResetPasswordView(APIView):
     @extend_schema(
         operation_id="admin_password_reset_confirm",
         tags=["Xác thực"],
-        summary="Xác nhận OTP và đặt mật khẩu quản trị mới",
+        summary="Xác nhận OTP và đặt mật khẩu mới",
         description=(
             "Yêu cầu OTP còn hạn, chưa dùng và chưa vượt 5 lần nhập sai. Mật khẩu mới tối thiểu "
             "12 ký tự, được băm BCrypt-SHA256. Sau khi xác nhận, phiên cũ bị vô hiệu hóa và "

@@ -18,6 +18,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 
 | File | Mục đích |
 |---|---|
+| `45_account_replication_queue.sql` | Chỉ chạy tại authority: directory HMAC email, cờ bootstrap, outbox và trigger `TaiKhoan`. Chạy `manage.py seed_student_emails` khi đủ site online, rồi luôn chạy worker `sync_accounts`; [quy trình và giới hạn](../docs/Auth-Site-Isolation.md). |
 | `00_create_databases.sql` | Tạo `QLTTNN_Q1`, `QLTTNN_Q7`, `QLTTNN_TD` trên SQL Server hiện tại nếu chưa có. |
 | `01_create_schema.sql` | Tạo bảng, khóa, ràng buộc, chỉ mục và sequence trong **một** database đích. Chạy riêng một lần cho mỗi database. |
 | `02_seed_shared_catalog.sql` | Nạp cùng danh sách cơ sở và môn học vào database đích. Chạy cho cả ba database. Không thêm khóa học, tài khoản hoặc mật khẩu mẫu. |

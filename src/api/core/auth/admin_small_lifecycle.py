@@ -28,6 +28,7 @@ from core.sites.connections import UnknownSiteError, get_site_connection, get_si
 from core.slug_utils import make_slug
 from core.notifications.publisher import publish_notification
 from core.auth.admin_small_email import EMAIL_READY, record_credential_email_event
+from core.auth.account_replication import provisioning_sites, serialize_account_creation
 
 
 def _require_admin_small_temporary_password() -> str:
@@ -292,12 +293,13 @@ def _recover_admin_small_provisioning(
         raise AuthInfrastructureUnavailable from exc
 
 
+@serialize_account_creation
 def create_admin_small(
     *, email: str, full_name: str, site_code: str, username: str | None,
     admin_big_id: str, remote_ip: str, slug: str | None = None,
 ) -> AdminSmallProvisioningResult:
     temporary_password = _require_admin_small_temporary_password()
-    sites = active_site_codes()
+    sites = provisioning_sites(site_code)
     target_site = str(site_code).strip().upper()
     if target_site not in sites:
         raise AdminSmallSiteUnavailable

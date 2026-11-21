@@ -168,6 +168,7 @@ export default function TeachersPage() {
       } else {
         message.success("Đã tạo hồ sơ và tài khoản giáo viên. Chọn “Gửi thông tin cấp” khi muốn gửi email.");
       }
+      if (!created.replication_complete) message.warning(`Đang chờ đồng bộ tài khoản: ${created.replication_pending_sites.join(", ")}.`);
       resetCreateForm();
       setOpen(false);
       void load();

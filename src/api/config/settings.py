@@ -115,6 +115,9 @@ for _site_code, _site_config in _site_database_configs.items():
         "OPTIONS": {
             "driver": os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 18 for SQL Server"),
             "extra_params": _extra_params,
+            "connection_timeout": 5,
+            "connection_retries": 0,
+            "query_timeout": 15,
         },
     }
     SITE_DATABASE_ALIASES[_site_code] = _alias
@@ -181,6 +184,7 @@ REST_FRAMEWORK = {
         "shared_catalog_write": "30/min",
         "enrollment_create": "60/hour",
         "public_enrollment": "5/hour",
+        "register": "5/hour",
         "public_enrollment_email": "3/hour",
         "public_contact_write": "5/hour",
         "public_contact_email": "3/hour",

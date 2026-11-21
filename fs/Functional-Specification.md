@@ -49,7 +49,7 @@ Danh sách site không được đóng cứng trong code. Khi có thêm cơ sở
 
 ### 2.2. Ngoài phạm vi hiện được chốt
 
-- Portal tự phục vụ của học viên và thanh toán online chưa được duyệt vào phạm vi môn học. Source hiện có portal và tích hợp SePay. Admin quản lý hồ sơ và cấp tài khoản học viên theo thao tác riêng thuộc FS-STU-01; việc này không bật portal hoặc thanh toán online.
+- Theo yêu cầu chủ dự án 21/11/2026, bật phạm vi tài khoản học viên miễn phí, portal cơ bản và tự ghi danh theo FS-AUTH-REG. Thanh toán SePay và kiểm chứng OAuth thật giữ quyết định riêng; việc tạo tài khoản không tạo học phí hoặc xác nhận đã thanh toán.
 - Khẳng định transaction ACID nguyên tử xuyên hai SQL Server độc lập cho chuyển cơ sở. Thiết kế hiện tại là điều phối có trạng thái, idempotency và phục hồi tiến về phía trước.
 - Xóa cứng học viên đã có tài khoản, đăng ký hoặc lịch sử nghiệp vụ; với hồ sơ chưa phát sinh dữ liệu liên quan, FS-STU-01 cho phép xóa tại site sở hữu hồ sơ. Không xóa cứng phiếu thu, điểm, điểm danh hoặc lịch sử nghiệp vụ.
 
@@ -96,7 +96,7 @@ Quyền phải được xác định từ danh tính đã xác thực ở server
 | Kế toán & Lễ tân | Tài khoản nhân viên, chức vụ `ke_toan` (hồ sơ `le_tan` cũ được chuyển bằng migration 41) | Tại site được giao: chỉ xem phòng, lớp/roster, hồ sơ học viên và công nợ; gửi email nhắc phí; xem đề nghị chuyển cùng công nợ lịch sử tại nguồn. Kế toán được xem phiếu thu và ghi nhận thu/hoàn; không CRUD phòng/lớp/học viên, không đăng ký/xếp lớp hoặc sửa kế hoạch đóng |
 | Tư vấn & xếp lớp | Tài khoản nhân viên, chức vụ `tu_van` | Tại site được giao: CRUD hồ sơ học viên và phòng; tạo lớp, đăng ký/xếp lớp, phân công giáo viên, sửa tên/sĩ số lớp và hủy mềm lớp đủ điều kiện; xem công nợ, gửi email nhắc phí, chỉ sửa kế hoạch đóng; tạo đề nghị chuyển và xem đề nghị/công nợ lịch sử tại nguồn. Tiếp nhận/phản hồi liên hệ và tạo/sửa/xuất bản bài Blog dùng chung; không cấp tài khoản học viên, không duyệt/từ chối/retry chuyển cơ sở |
 | Giáo viên | TaiKhoan.vai_tro=giao_vien, liên kết hồ sơ GiaoVien | Lớp/buổi được phân công |
-| Học viên | Admin có thể cấp tài khoản theo FS-STU-01; portal tự phục vụ chưa được duyệt | Không đưa các trang portal/SePay vào phạm vi đã chốt |
+| Học viên | Tự đăng ký miễn phí hoặc Admin cấp theo FS-STU-01; portal cơ bản và tự ghi danh theo FS-AUTH-REG | Chỉ dữ liệu của hồ sơ từ phiên; SePay không được suy ra đã nghiệm thu |
 | Khách | Chưa xác thực | Xem nội dung công khai và gửi yêu cầu liên hệ tới cơ sở đang hoạt động |
 
 ### 4.1. Ma trận quyền chức năng
@@ -212,6 +212,12 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 **Nghiệm thu:** danh sách và chi tiết công khai lấy từ SQL Server, bài nháp/ẩn hoặc chưa đến ngày xuất bản không xuất hiện; nội dung thường vẫn hiển thị khi không có bảng/danh sách, còn Markdown bảng và danh sách đánh số hiển thị đúng khi có; HTML thô không được thực thi. Trình soạn thảo thêm được hàng bảng đúng số cột tại vị trí con trỏ. Slug bài viết mới tự sinh từ tiêu đề và vẫn có thể nhập tay; slug tùy chỉnh của bài cũ không tự đổi khi sửa tiêu đề. Ngày xuất bản chỉ có ngày, mặc định ngày tạo theo `Asia/Ho_Chi_Minh` và được lưu ở đầu ngày địa phương; có thể để trống để xuất bản ngay. Admin Big quản lý toàn bộ danh mục/bài viết; Tư vấn & xếp lớp đọc danh mục/bài và tạo/sửa/xuất bản bài nhưng không xóa bài hoặc ghi danh mục. API từ chối thao tác ngoài quyền; validation, slug trùng, danh mục đang được dùng, retry cùng key, site thiếu và bản sao lệch có phản hồi đúng. Kịch bản chạy trên các database site thật và bằng chứng replication/sync được ghi riêng; source hoặc seed không được tính là bằng chứng đã đạt.
 
+### FS-AUTH-REG — Tự đăng ký học viên miễn phí
+
+Chủ dự án chốt ngày 21/11/2026: khách tạo tài khoản `hoc_vien` bằng họ tên, email, cơ sở dự định học và mật khẩu tối thiểu 12 ký tự được xác nhận lại; không cho client chọn vai trò/quyền. Tạo hồ sơ học viên trước khi mua khóa học, không phát sinh `DangKy`/`HocPhi`. Không tự liên kết hồ sơ có sẵn chỉ vì email trùng. Sau đăng nhập, học viên chọn lớp tại site của mình; API lấy mã hồ sơ từ phiên. Portal cơ bản và tự ghi danh được đưa vào thay đổi này; SePay/OAuth thật vẫn cần kiểm chứng và quyết định riêng.
+
+Đăng nhập dùng authority cùng hồ sơ liên quan; cấp/tạo tài khoản ghi authority + site sở hữu, các replica còn lại nhận qua outbox. Nghiệm thu gồm site không liên quan offline, retry phục hồi không trùng tài khoản/khôi phục mật khẩu cũ, phản hồi các site chờ và CSRF/validation. Bootstrap email phải đọc đủ site một lần trước khi bật đăng ký; không giả dữ liệu site mất. Chi tiết và giới hạn HA tại [chính sách xác thực](../docs/Auth-Site-Isolation.md).
+
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
 **Người dùng:** Admin Big, Admin Small, nhân viên, giáo viên. **Phân tán:** tra cứu bản TaiKhoan nhân bản; xác thực tại API.
@@ -219,7 +225,7 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 **Điều kiện:** tài khoản tồn tại, mật khẩu khớp, trạng thái hoat_dong; Admin Big có ma_co_so NULL; nhân viên/giáo viên có site và hồ sơ hợp lệ.
 
 1. Người dùng nhập email và mật khẩu trên một cửa đăng nhập chung. API vẫn nhận tên đăng nhập như định danh tương thích cho tài khoản cũ.
-2. API chuẩn hóa định danh, áp rate limit, tìm tài khoản theo email hoặc tên đăng nhập trên các site theo cơ chế Global/định vị đã thống nhất, xác minh hash bcrypt.
+2. API chuẩn hóa định danh, áp rate limit, tìm tài khoản theo email hoặc tên đăng nhập tại authority cấu hình và xác minh hash bcrypt; không đối chiếu mọi replica trong đường đăng nhập.
 3. API kiểm tra trạng thái tài khoản, vai trò, site và hồ sơ nhân sự. Không cho client chọn vai trò.
 4. API tạo phiên đăng nhập an toàn; frontend chuyển người dùng đến workspace phù hợp.
 5. Ghi sự kiện đăng nhập thành công/thất bại ở nơi quy định, không ghi mật khẩu hoặc token.
@@ -246,12 +252,12 @@ Các mục dưới đây mô tả hành vi và tiêu chí nghiệm thu, không k
 
 OTP hợp lệ phải băm mật khẩu và tạo job thành công. Khi phục hồi, khóa theo tài khoản tại coordinator, đọc lại trạng thái job sau khi lấy khóa và giữ khóa qua các bước ghi site/chốt job; worker cũ không được áp lại mật khẩu sau khi job đã hoàn tất. Các site vẫn commit cục bộ và retry tiến về phía trước, không phải ACID xuyên CSDL.
 
-**Người dùng:** Admin Big/Admin Small theo source hiện tại. **Phân tán:** tra cứu tài khoản trên các site; OTP/ledger lưu ở database kỹ thuật được cấu hình; mật khẩu được cập nhật tới các bản `TaiKhoan`.
+**Người dùng:** Admin Big/Admin Small và học viên, kể cả tài khoản miễn phí chưa mua khóa học. **Phân tán:** tra cứu tài khoản tại authority; OTP/ledger cùng hash/phiên bản cập nhật tại đó, outbox đồng bộ các bản `TaiKhoan`.
 
 1. Người dùng gửi email/định danh đã đăng ký.
 2. API luôn trả thông báo chung; với tài khoản đủ điều kiện, tạo OTP 6 số một lần, lưu hash và hạn dùng theo `PASSWORD_RESET_TIMEOUT` (mặc định 120 giây), rồi gửi qua SMTP.
 3. Người dùng gửi OTP và mật khẩu mới; API kiểm tra mã, hạn, số lần sai, trạng thái và chính sách mật khẩu.
-4. API cập nhật hash bcrypt tới tất cả site hoạt động bằng service đồng bộ chung, đánh dấu token đã dùng và thu hồi phiên cũ.
+4. API cập nhật hash bcrypt và phiên bản tại authority, đánh dấu token đã dùng; phiên cũ bị vô hiệu và outbox chuyển snapshot hiện tại tới replica khi kết nối phục hồi.
 
 **Lỗi:** token sai/hết hạn/đã dùng không đổi mật khẩu; nếu replicated write chưa hoàn tất thì không báo thành công và lưu trạng thái để đối soát; giới hạn spam theo IP/email.
 
@@ -671,7 +677,7 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 | OPEN-01 | Chuẩn hóa response lỗi, pagination/filter/sort và idempotency thu/hoàn tại quầy; schema chưa có request ledger bền vững cho phiếu thu | `specs/api.md`, `PhieuThu`, giao diện thu phí |
 | OPEN-02 | Rate limit bền vững khi chạy nhiều worker và ngưỡng bcrypt theo benchmark | API settings/deployment |
 | OPEN-03 | Tiến trình/retry khi tạo tài khoản và hồ sơ site lỗi một phần; cần thống nhất cách vận hành, email và đối soát | `TaiKhoan`, hồ sơ site, Coordinator |
-| OPEN-04 | Có đưa portal tự phục vụ học viên vào phạm vi đồ án hay không; code/schema hiện có nhưng chưa được duyệt. Admin CRUD/cấp tài khoản đã tách riêng tại FS-STU-01 | README, schema, API, UI |
+| OPEN-04 | Chủ dự án chốt tài khoản miễn phí/portal cơ bản/tự ghi danh ngày 21/11/2026; còn bootstrap và kiểm chứng ba site thật theo FS-AUTH-REG, chưa nghiệm thu SePay/OAuth thật | README, schema, API, UI |
 | OPEN-05 | Phạm vi vận hành SePay, merchant/webhook/HTTPS và đối soát; schema/API đã có nhưng tích hợp mặc định tắt | `YeuCauThanhToan`, `SuKienThanhToan`, API/UI |
 | OPEN-06 | Cấu hình/tích hợp thật và chính sách dọn asset mồ côi cho Cloudinary; metadata avatar nằm trong `TaiKhoan` (nhân bản) và `HocVien` (site-local). Ảnh học viên có thể được cùng tham chiếu ở nguồn/đích sau chuyển nên chưa tự xóa asset cũ; không có `MediaAsset` | API media, `TaiKhoan`, `HocVien`, môi trường |
 | OPEN-07 | Bổ sung runtime replication cho `CoSo` và thống nhất một điểm vào cho mọi luồng ghi `TaiKhoan`; `MonHoc`/`KhoaHoc` đã có service | README, schema, service dùng chung |

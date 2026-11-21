@@ -125,7 +125,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 
 | Page | Sections chính | Mục tiêu |
 |---|---|---|
-| Đăng nhập | Nhận diện thương hiệu, form tài khoản/mật khẩu, nút Google/Facebook khi API và provider đã cấu hình, hiện/ẩn mật khẩu, quên mật khẩu, lỗi và trạng thái đang gửi | Một trang cho vai trò được API hỗ trợ; OAuth hiện chỉ dành cho học viên đã liên kết; không có chọn role hoặc tự đăng ký |
+| Đăng nhập | Form mật khẩu, OAuth đã liên kết, quên mật khẩu, lỗi/loading và liên kết đăng ký miễn phí | Vai trò do API dựng; form signup riêng `/register`, không cho chọn role |
 | Quên mật khẩu | Form email/tên đăng nhập, xác nhận đã nhận yêu cầu, giới hạn gửi lại và thông báo chung | Không tiết lộ tài khoản có tồn tại hay không; trạng thái gửi do API trả về |
 | Đặt lại mật khẩu | Form mật khẩu mới/xác nhận, tiêu chí hợp lệ, trạng thái token hết hạn/đã dùng/thành công | Token dùng một lần; không lưu/ghi token vào log hoặc analytics |
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
@@ -137,7 +137,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 | Chi tiết khóa học | Mô tả khóa, trình độ, số buổi, học phí chuẩn, lớp/lịch/cơ sở khả dụng, CTA | Hiểu nội dung và điều kiện trước khi liên hệ hoặc đăng ký theo luồng được nhóm chốt |
 | Cơ sở | Danh sách cơ sở, địa chỉ/liên hệ nếu có dữ liệu được duyệt, hướng dẫn xem lớp tại cơ sở | Chọn địa điểm học từ dữ liệu cơ sở đang hoạt động |
 
-**Chính sách đăng ký cần bám theo phạm vi README:** source có tài khoản và portal học viên, nhưng đăng ký tài khoản công khai không có route và không thuộc phạm vi môn học cho tới khi nhóm chốt. Tài khoản nội bộ do Admin Big cấp. Nếu sau này mở đăng ký công khai, API phải xác định rõ loại tài khoản được phép tạo; tuyệt đối không nhận `vai_tro`, chức vụ, cơ sở hoặc phạm vi quyền do trình duyệt tự chọn làm nguồn cấp quyền. CTA công khai mặc định là **“Xem khóa học”** hoặc **“Xem cơ sở”**; mọi CTA dẫn tới thao tác chưa có API phải được đánh dấu chờ thống nhất.
+**Chính sách chốt ngày 21/11/2026:** `/login` có liên kết **Đăng ký miễn phí** tới `/register`. Form gồm họ tên, email, cơ sở dự định học, mật khẩu tối thiểu 12 ký tự và xác nhận; không có chọn role/chức vụ/quyền. Chọn site chỉ xác định nơi ghi hồ sơ `hoc_vien`, không cấp quyền nhân viên. Hiển thị lỗi validation/xung đột chung, khóa khi gửi; thành công hướng sang đăng nhập. `registration_ready=false` hiển thị tạm ngưng và khóa gửi, không giả thành công khi bootstrap chưa đủ site. Tài khoản chưa có khóa học được hướng sang `/courses`; dialog ghi danh dùng hồ sơ từ phiên, chỉ chọn lớp tại site của mình. UI quản trị báo `replication_pending_sites` sau tạo/cấp tài khoản. Phạm vi phục hồi và giới hạn tại [Auth-Site-Isolation](../docs/Auth-Site-Isolation.md).
 
 ### 3.2. Khu vực làm việc sau đăng nhập
 
@@ -383,7 +383,8 @@ Các route dưới đây lấy từ `src/web/src/app/`. Đây là kiểm kê cod
 | `/branches` | Danh sách cơ sở | Cơ sở đang hoạt động, địa chỉ/liên hệ đã xác minh | Cần dữ liệu công khai từ API |
 | `/blog` và `/blog/[slug]` | Bài viết học tập | Danh mục, danh sách/chi tiết và hướng dẫn áp dụng | API đã có `GET /api/v1/blog/categories/` và `GET /api/v1/blog/{slug}/`; giao diện hiện chưa nối API và còn dùng dữ liệu tĩnh |
 | `/contact` | Gửi yêu cầu liên hệ | Form gửi họ tên, email, cơ sở đang hoạt động, điện thoại tùy chọn, tiêu đề và nội dung; báo lỗi/site thiếu và xác nhận sau khi API nhận | `GET /api/v1/contact/sites/` lấy site có thể nhận; `POST /api/v1/contact/` ghi `LOCAL` tại site khách chọn. Giữ dữ liệu khi lỗi và dùng lại `Idempotency-Key` khi retry cùng nội dung |
-| `/login` | Đăng nhập dùng chung | Form mật khẩu, lỗi và trạng thái gửi; OAuth chỉ khi provider được cấu hình | Route có trong source; API dựng role từ tài khoản, OAuth chỉ dành cho học viên đã liên kết; không tự đăng ký/chọn role |
+| `/login` | Đăng nhập dùng chung | Form mật khẩu, lỗi và trạng thái gửi; OAuth chỉ khi provider được cấu hình | API dựng role từ tài khoản; có liên kết đăng ký miễn phí |
+| `/register` | Tài khoản học viên miễn phí | Họ tên, email, site dự định học, mật khẩu và xác nhận; tạm ngưng/loading/error/success | Tạo trước khi mua khóa học, không chọn role; chỉ bật sau bootstrap email đầy đủ |
 | — (chưa có route kích hoạt) | Kích hoạt tài khoản nội bộ | Không hiển thị luồng mở liên kết/mời trong UI hiện tại | Admin chủ động gửi mật khẩu khởi tạo qua thao tác cấp tài khoản; không có token activation route |
 | `/forgot-password` | Quên/đặt lại mật khẩu | Nhập định danh, OTP và mật khẩu mới theo các bước của API; thông báo chung, lỗi/hết hạn/đã dùng | Route có trong source; OTP 6 số, hash ở DB, mặc định hết hạn sau 120 giây |
 | `/auth/register` | Đăng ký | Không hiển thị hoặc giữ trang thông báo chưa mở | Tắt cho tới khi nhóm duyệt đăng ký công khai và schema/API phù hợp |

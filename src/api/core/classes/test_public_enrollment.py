@@ -3,11 +3,15 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
+from rest_framework.test import APIClient
+from core.auth.service_common import AuthenticatedUser
 
 from core.classes import public_enrollment
 from core.classes.serializers import PublicEnrollmentCreateSerializer
 from core.classes.services import ClassConflict
 from core.classes.public_views import PublicEnrollmentEmailThrottle
+from core.students import identity
+from core.students.identity import StudentEmailConflict
 
 
 class PublicEnrollmentTests(SimpleTestCase):
@@ -51,8 +55,8 @@ class PublicEnrollmentTests(SimpleTestCase):
         enrollment_result = {"created": True}
 
         with (
-            patch.object(public_enrollment, "active_site_codes", return_value=("Q1", "Q7")),
-            patch.object(public_enrollment, "_sites_with_email", return_value=()),
+            patch.object(identity, "reserve_email", return_value="digest"),
+            patch.object(identity, "get_site_connection", return_value=connection),
             patch.object(public_enrollment, "get_site_database_alias", return_value="q1"),
             patch.object(public_enrollment, "connections", {"q1": connection}),
             patch.object(public_enrollment.transaction, "atomic", return_value=nullcontext()),
@@ -78,11 +82,33 @@ class PublicEnrollmentTests(SimpleTestCase):
 
     def test_registration_rejects_email_found_at_another_site(self):
         with (
-            patch.object(public_enrollment, "active_site_codes", return_value=("Q1", "Q7")),
-            patch.object(public_enrollment, "_sites_with_email", return_value=("Q7",)),
+            patch.object(identity, "reserve_email", side_effect=StudentEmailConflict("reserved elsewhere")),
         ):
             with self.assertRaises(ClassConflict):
                 public_enrollment.create_public_enrollment(
                     site_code="Q1", class_id="Q1-LH-000001", full_name="Nguyễn Văn A",
                     email="student@example.com", phone=None, remote_ip="127.0.0.1",
                 )
+
+    def test_authenticated_enrollment_uses_session_profile_instead_of_submitted_identity(self):
+        client = APIClient()
+        client.force_authenticate(AuthenticatedUser("ACCOUNT", "own@example.com", "own", "own", "hoc_vien", "Q1", "OWN-STUDENT"))
+        with patch("core.classes.public_views.register_student_to_class", return_value={"created": True}) as register:
+            response = client.post("/api/v1/public/enrollments/", {
+                "site_code": "Q1", "class_id": "Q1-LH-000001", "full_name": "Other person",
+                "email": "other@example.com",
+            }, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(register.call_args.kwargs["student_id"], "OWN-STUDENT")
+        self.assertEqual(register.call_args.kwargs["actor_id"], "ACCOUNT")
+
+    def test_authenticated_enrollment_cannot_write_another_site(self):
+        client = APIClient()
+        client.force_authenticate(AuthenticatedUser("ACCOUNT", "own@example.com", "own", "own", "hoc_vien", "Q1", "OWN-STUDENT"))
+        with patch("core.classes.public_views.register_student_to_class") as register:
+            response = client.post("/api/v1/public/enrollments/", {
+                "site_code": "TD", "class_id": "TD-LH-000001", "full_name": "Student",
+                "email": "own@example.com",
+            }, format="json")
+        self.assertEqual(response.status_code, 409)
+        register.assert_not_called()

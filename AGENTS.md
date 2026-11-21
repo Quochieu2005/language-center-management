@@ -1,5 +1,7 @@
 # ĐỌC TRƯỚC KHI LÀM BẤT CỨ ĐIỀU GÌ
 
+Chốt chủ dự án 21/11/2026: tự đăng ký học viên miễn phí, portal cơ bản và tự ghi danh được phép theo [chính sách xác thực khi site lỗi](docs/Auth-Site-Isolation.md). Đường đăng nhập chỉ đọc authority và hồ sơ liên quan; replica không liên quan offline không được chặn xác thực. Cấp tài khoản dùng authority + site sở hữu rồi outbox. Nội dung cũ ghi signup/portal cơ bản chưa được duyệt được thay bởi quyết định này; SePay và HA kho xác thực/API không được suy ra đã hoàn tất.
+
 Khi sửa phần môn học/báo cáo, đối chiếu [bảy tài liệu giảng viên](docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien), [ERD](docs/DATABASE_SCHEMA.md#erd) và [phân mảnh–ánh xạ–định vị](docs/DATABASE_SCHEMA.md#phan-manh). GV-06 yêu cầu lab ít nhất ba SQL Server; ba DB trên cùng instance chỉ là cấu hình phát triển. Không đưa bản nháp bài giảng hoặc secret vào Git; không tuyên bố eager replication/2PC từ Publication bất đồng bộ.
 
 ## Quy trình Git bắt buộc

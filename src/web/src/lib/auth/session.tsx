@@ -16,7 +16,7 @@ type SessionContextValue = {
   refreshProfile: () => Promise<void>;
 };
 const SessionContext = createContext<SessionContextValue | null>(null);
-const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/courses", "/branches", "/programs", "/blog", "/contact"];
+const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/courses", "/branches", "/programs", "/blog", "/contact"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/courses/") || pathname.startsWith("/blog/");
@@ -100,7 +100,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !restoreError && !isPublicPath(pathname)) router.replace("/login");
-    if (user && ["/login", "/forgot-password"].includes(pathname)) router.replace(homeForRole(user.role));
+    if (user && ["/login", "/register", "/forgot-password"].includes(pathname)) router.replace(homeForRole(user.role));
   }, [loading, pathname, restoreError, router, user]);
 
   useEffect(() => {

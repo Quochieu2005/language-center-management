@@ -112,7 +112,7 @@ def _password_reset_verify_retry_after(cursor, identifier_digest: str, ip_digest
 def _eligible_admin_from_email(email: str, site_codes: tuple[str, ...]):
     account = _replicated_account(email, site_codes)
     user = _resolve_principal(account, site_codes) if account is not None else None
-    if user is None or user.role not in {"admin_big", "admin_small"}:
+    if user is None or user.role not in {"admin_big", "admin_small", "hoc_vien"}:
         return None, None
     return account, user
 
@@ -224,8 +224,8 @@ def _apply_password_reset_transaction(transaction_id, site_codes: tuple[str, ...
                 return
             account_id, new_password_hash = str(job[0]), str(job[1])
 
-            # Site commits remain local; retries reconcile hashes after a partial failure.
-            for site_code in site_codes:
+            # Password authority and outbox commit together; offline replicas are retried by the worker.
+            for site_code in (settings.AUTH_SESSION_SITE_CODE,):
                 site_alias = get_site_database_alias(site_code)
                 with transaction.atomic(using=site_alias):
                     with connections[site_alias].cursor() as cursor:
@@ -288,7 +288,7 @@ def _resume_pending_password_resets() -> None:
         raise AuthInfrastructureUnavailable from exc
 
 def reset_admin_password(email: str, otp: str, new_password: str, remote_ip: str) -> bool:
-    """Consume a valid OTP and replicate the new bcrypt hash to all active sites."""
+    """Consume a valid OTP and commit the new hash with its replication queue at the authority."""
     normalized_email = email.strip().casefold()
     if not normalized_email or not remote_ip:
         raise ValueError("Thiếu email hoặc địa chỉ IP.")

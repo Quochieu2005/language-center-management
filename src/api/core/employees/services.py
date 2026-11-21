@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.auth.account_replication import provisioning_sites, serialize_account_creation
+
 import hashlib
 import json
 import uuid
@@ -79,6 +81,7 @@ class EmployeeProvisioningResult:
     phone: str | None
     credential_email_status: str
     must_change_password: bool = True
+    replication_pending_sites: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -281,12 +284,13 @@ def _recover_employee_provisioning(
 
 
 @_translate_errors
+@serialize_account_creation
 def create_employee(
     *, site_code: str, full_name: str, email: str, username: str | None,
     phone: str | None, job_title: str, actor_id: str, remote_ip: str,
 ) -> EmployeeProvisioningResult:
     temporary_password = _require_provisioning_configuration()
-    sites = active_site_codes()
+    sites = provisioning_sites(site_code)
     site = str(site_code).strip().upper()
     if site not in sites:
         raise ValueError("Cơ sở không tồn tại hoặc đang không hoạt động.")

@@ -15,6 +15,12 @@ from core.auth.service_common import AuthInfrastructureUnavailable
 
 
 class PasswordOtpTests(SimpleTestCase):
+    def test_free_student_account_can_recover_password_without_purchasing_a_course(self):
+        account = ("STUDENT-ACCOUNT",)
+        student = SimpleNamespace(account_id="STUDENT-ACCOUNT", role="hoc_vien")
+        with patch.object(resets, "_replicated_account", return_value=account), patch.object(resets, "_resolve_principal", return_value=student):
+            self.assertEqual(resets._eligible_admin_from_email("student@example.com", ("Q1",)), (account, student))
+
     def confirm(self, valid):
         cursor = MagicMock()
         cursor.__enter__.return_value = cursor
@@ -150,6 +156,7 @@ class _PasswordStore:
 
 class PasswordRecoveryLockTests(SimpleTestCase):
     def setUp(self):
+        self.enterContext(self.settings(AUTH_SESSION_SITE_CODE="Q1"))
         self.store = _PasswordStore()
         self.enterContext(patch.object(resets, "auth_session_alias", return_value="Q1"))
         self.enterContext(patch.object(resets, "get_site_database_alias", side_effect=lambda site: site))
@@ -181,20 +188,22 @@ class PasswordRecoveryLockTests(SimpleTestCase):
             worker.join(5)
         self.assertFalse(worker.is_alive())
         self.assertEqual(errors, [])
-        self.assertTrue(all(account[0] == "new-hash-fixture" for account in self.store.accounts.values()))
+        self.assertEqual(self.store.accounts["Q1"][0], "new-hash-fixture")
+        self.assertEqual(self.store.accounts["Q7"][0], "initial-hash-fixture")
         self.assertTrue(all(job[2] == "hoan_tat" and job[1] is None for job in self.store.jobs.values()))
-        self.assertEqual(sum(event[0] == "write" for event in self.store.events), 6)
+        self.assertEqual(sum(event[0] == "write" for event in self.store.events), 2)
 
     def test_partial_failure_leaves_job_retryable_and_does_not_bump_completed_replica_again(self):
-        self.store.fail_once_site = "TD"
+        self.store.fail_once_site = "Q1"
         with self.assertRaises(AuthInfrastructureUnavailable):
             resets._apply_password_reset_transaction("old", self.store.sites)
         self.assertEqual(self.store.jobs["old"][2], "dang_xu_ly")
-        self.assertEqual(self.store.accounts["Q7"], ["old-hash-fixture", 1])
+        self.assertEqual(self.store.accounts["Q7"], ["initial-hash-fixture", 0])
         self.assertEqual(self.store.accounts["Q1"], ["initial-hash-fixture", 0])
         resets._apply_password_reset_transaction("old", self.store.sites)
         self.assertEqual(self.store.jobs["old"][1:], [None, "hoan_tat"])
-        self.assertTrue(all(account == ["old-hash-fixture", 1] for account in self.store.accounts.values()))
+        self.assertEqual(self.store.accounts["Q1"], ["old-hash-fixture", 1])
+        self.assertEqual(self.store.accounts["Q7"], ["initial-hash-fixture", 0])
 
     def test_missing_or_completed_job_has_no_replica_writes(self):
         resets._apply_password_reset_transaction("missing", self.store.sites)

@@ -252,6 +252,7 @@ export default function StudentsPage({ initialSearch }: { initialSearch: string 
     try {
       const result = await adminApi.issueStudentAccount(row.slug, isAdminBig ? row.site_code : undefined);
       message.success(result.email_sent ? "Đã cấp tài khoản và gửi mật khẩu qua email." : "Đã xử lý cấp tài khoản.");
+      if (!result.replication_complete) message.warning(`Đang chờ đồng bộ tài khoản: ${result.replication_pending_sites.join(", ")}.`);
       setRows((current) => current.map((student) => student.student_id === row.student_id
         ? { ...student, account_issued: true, account_issue_eligible: false }
         : student));

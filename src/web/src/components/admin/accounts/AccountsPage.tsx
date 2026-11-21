@@ -127,6 +127,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           avatar_requested: Boolean(avatarFile),
         });
         createdEmployeeSite = createdEmployee.site_code;
+        if (!createdEmployee.replication_complete) message.warning(`Tài khoản đã dùng được tại cơ sở. Đang chờ đồng bộ: ${createdEmployee.replication_pending_sites.join(", ")}.`);
         const credentialNotice = createdEmployee.credential_email_status === "ready"
           ? "Bấm Gửi mật khẩu trong danh sách để gửi email một lần."
           : createdEmployee.credential_email_status === "sent"
@@ -171,6 +172,7 @@ export default function AccountsPage({ view }: AccountsPageProps) {
           site_code: values.site_code,
           avatar_requested: Boolean(avatarFile),
         });
+        if (!createdAccount.replication_complete) message.warning(`Tài khoản đã dùng được tại cơ sở. Đang chờ đồng bộ: ${createdAccount.replication_pending_sites.join(", ")}.`);
         if (avatarFile) {
           try {
             if (!createdAccount.avatar_setup_token) throw new Error("API không cấp quyền tải ảnh ban đầu.");
