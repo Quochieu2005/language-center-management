@@ -35,7 +35,7 @@ export const authApi = {
     apiRequest<{ account_id: string; role: Role; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
       `/auth/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
-  session: () => apiRequest<ProfileResponse>("/auth/session/"),
+  session: () => apiRequest<ProfileResponse | null>("/auth/session/"),
   oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
   startOAuthLink: (provider: OAuthProvider) =>
     apiRequest<{ authorization_url: string }>(`/auth/oauth/${provider}/start/`, { method: "POST", body: "{}" }),
