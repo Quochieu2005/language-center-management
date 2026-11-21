@@ -133,6 +133,8 @@ class EmployeeResponseSerializer(serializers.Serializer):
 
 
 class EmployeeCreateResponseSerializer(EmployeeResponseSerializer):
+    replication_complete = serializers.BooleanField()
+    replication_pending_sites = serializers.ListField(child=serializers.CharField())
     must_change_password = serializers.BooleanField()
     credential_email_status = serializers.ChoiceField(
         choices=("ready", "processing", "sent", "failed", "unknown", "changed"),

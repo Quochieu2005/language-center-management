@@ -89,6 +89,7 @@ class AdminSmallProvisioningResult:
     must_change_password: bool = True
     slug: str = ""
     credential_email_status: str = "ready"
+    replication_pending_sites: tuple[str, ...] = ()
 
 @dataclass(frozen=True)
 class AdminSmallDeletionResult:
@@ -119,7 +120,7 @@ def _read_catalog(site_code: str) -> tuple[tuple[str, str], ...]:
         return tuple((str(row[0]).upper(), str(row[1]).lower()) for row in cursor.fetchall())
 
 def active_site_codes() -> tuple[str, ...]:
-    """Read active sites from replicated CoSo and reject incomplete site copies."""
+    """Read the configured catalog without requiring every remote site to be online."""
     registry_site = getattr(settings, "AUTH_SESSION_SITE_CODE", "")
     try:
         registry_catalog = _read_catalog(registry_site)
@@ -128,61 +129,43 @@ def active_site_codes() -> tuple[str, ...]:
             raise AuthInfrastructureUnavailable
 
         for code in active_codes:
-            if _read_catalog(code) != registry_catalog:
-                raise AuthInfrastructureUnavailable
+            get_site_database_alias(code)
         return active_codes
     except (DatabaseError, KeyError, ImproperlyConfigured, UnknownSiteError) as exc:
         raise AuthInfrastructureUnavailable from exc
 
 def _replicated_account(identifier: str, site_codes: tuple[str, ...]):
-    replicas = []
-    for code in site_codes:
-        with get_site_connection(code).cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
-                               vai_tro, ma_co_so, trang_thai, phien_ban,
-                               bat_buoc_doi_mat_khau
-                FROM dbo.TaiKhoan
-                WHERE LOWER(email) = %s OR LOWER(ten_dang_nhap) = %s
-                """,
-                [identifier, identifier],
-            )
-            rows = cursor.fetchall()
-        if len(rows) > 1:
-            raise AuthInfrastructureUnavailable
-        replicas.append(tuple(rows[0]) if rows else None)
-
-    if not replicas or all(row is None for row in replicas):
-        return None
-    if any(row is None for row in replicas) or any(row != replicas[0] for row in replicas[1:]):
+    # Replicas are delivery targets, never a fallback for passwords or revoked access.
+    with get_site_connection(auth_session_site_code()).cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
+                           vai_tro, ma_co_so, trang_thai, phien_ban,
+                           bat_buoc_doi_mat_khau
+            FROM dbo.TaiKhoan
+            WHERE LOWER(email) = %s OR LOWER(ten_dang_nhap) = %s
+            """, [identifier, identifier],
+        )
+        rows = cursor.fetchall()
+    if len(rows) > 1:
         raise AuthInfrastructureUnavailable
-    return replicas[0]
+    return tuple(rows[0]) if rows else None
 
 def _replicated_account_by_id(account_id: str, site_codes: tuple[str, ...]):
-    replicas = []
-    for code in site_codes:
-        with get_site_connection(code).cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
-                               vai_tro, ma_co_so, trang_thai, phien_ban,
-                               bat_buoc_doi_mat_khau
-                FROM dbo.TaiKhoan
-                WHERE ma_tai_khoan = %s
-                """,
-                [account_id],
-            )
-            rows = cursor.fetchall()
-        if len(rows) > 1:
-            raise AuthInfrastructureUnavailable
-        replicas.append(tuple(rows[0]) if rows else None)
-
-    if not replicas or all(row is None for row in replicas):
-        return None
-    if any(row is None for row in replicas) or any(row != replicas[0] for row in replicas[1:]):
+    with get_site_connection(auth_session_site_code()).cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
+                           vai_tro, ma_co_so, trang_thai, phien_ban,
+                           bat_buoc_doi_mat_khau
+            FROM dbo.TaiKhoan
+            WHERE ma_tai_khoan = %s
+            """, [account_id],
+        )
+        rows = cursor.fetchall()
+    if len(rows) > 1:
         raise AuthInfrastructureUnavailable
-    return replicas[0]
+    return tuple(rows[0]) if rows else None
 
 def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
     """Resolve the user's effective role and site from trusted account/profile rows."""
@@ -207,12 +190,16 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
 
     if account_role == "hoc_vien":
         sites = active_codes if active_codes is not None else active_site_codes()
+        # The owning profile is sufficient; only search other fragments after a transfer.
+        sites = tuple(dict.fromkeys(([site_code] if site_code in sites else []) + list(sites)))
         current_profiles = []
         staged_transfer = False
+        missing_profile_sites = []
         try:
             for code in sites:
-                with get_site_connection(code).cursor() as cursor:
-                    cursor.execute(
+                try:
+                    with get_site_connection(code).cursor() as cursor:
+                        cursor.execute(
                         """
                         SELECT TOP (2) h.ma_hoc_vien, h.slug, h.ma_co_so,
                             CASE WHEN h.trang_thai = 'bao_luu' AND EXISTS (
@@ -226,9 +213,12 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
                         FROM dbo.HocVien h
                         WHERE h.ma_tai_khoan = %s AND h.trang_thai IN ('dang_hoc', 'bao_luu')
                         """,
-                        [account_id],
-                    )
-                    rows = cursor.fetchall()
+                            [account_id],
+                        )
+                        rows = cursor.fetchall()
+                except (DatabaseError, KeyError, ImproperlyConfigured, UnknownSiteError):
+                    missing_profile_sites.append(code)
+                    continue
                 if len(rows) > 1:
                     raise AuthInfrastructureUnavailable
                 if rows:
@@ -240,13 +230,15 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
                     current_profiles.append(
                         (str(rows[0][0]), str(rows[0][1]), str(rows[0][2]).upper())
                     )
+                    if code == site_code:
+                        break
         except AuthInfrastructureUnavailable:
             raise
         except (DatabaseError, KeyError, ImproperlyConfigured, UnknownSiteError) as exc:
             raise AuthInfrastructureUnavailable from exc
 
         if len(current_profiles) != 1:
-            if staged_transfer:
+            if staged_transfer or missing_profile_sites:
                 raise AuthInfrastructureUnavailable
             return None
         profile_id, student_slug, current_site = current_profiles[0]

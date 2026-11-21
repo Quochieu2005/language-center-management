@@ -1,4 +1,5 @@
 from django.urls import path
+from core.auth.registration_views import AuthRegisterView
 
 from core.auth.views import (
     AuthActivityView,
@@ -128,6 +129,7 @@ from core.media.views import (
 app_name = "core"
 
 urlpatterns = [
+    path("auth/register/", AuthRegisterView.as_view(), name="auth-register"),
     path("health/", health_check, name="health"),
     path("webhooks/sepay/", SePayWebhookView.as_view(), name="sepay-webhook"),
     path("auth/csrf/", CsrfTokenView.as_view(), name="auth-csrf"),

@@ -124,7 +124,9 @@ flowchart LR
 | Quan hệ | Nơi được ghi | Nơi lưu bản sao/mảnh | Cơ chế |
 |---|---|---|---|
 | `MonHoc` | Publisher `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1) | Mọi site hoạt động | SQL Server transactional push, bất đồng bộ; API chỉ đọc lại Subscriber để xác nhận |
-| `KhoaHoc`, `TaiKhoan`, `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; không phải cùng Publication MonHoc |
+| `KhoaHoc`, `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; không phải cùng Publication MonHoc |
+| `TaiKhoan` | Authority và site tạo hồ sơ theo quy trình cấp tài khoản | Mọi site hoạt động | Trigger/outbox tại authority, worker chuyển snapshot hiện tại; không dùng replica cũ để xác thực |
+| `DongBoTaiKhoan`, `DatChoEmailHocVien`, `TrangThaiKhoEmail` | Authority `AUTH_SESSION_SITE_CODE` | Chỉ authority | Trạng thái kỹ thuật theo migration 45; không chứa hợp hồ sơ nghiệp vụ; xem [quy trình khởi tạo](Auth-Site-Isolation.md) |
 | `CoSo` | Metadata vận hành theo quy trình provisioning | Bản sao các site | Chưa có API CRUD/provision runtime đầy đủ; không tuyên bố thêm site tự động |
 | Bảng nghiệp vụ phân mảnh/dẫn xuất | Site sở hữu bản ghi | Chính site đó | Transaction cục bộ; chuyển học viên là ngoại lệ được Coordinator điều phối |
 | `GiaoDichChuyenCoSo` | Nguồn | Nguồn | Trạng thái có thể cập nhật để phục hồi |
@@ -155,7 +157,7 @@ Không có mũi tên nhân bản mọi bảng học viên/phiếu thu. Distribut
 | R1 | Học viên chỉ đăng ký lớp **cùng cơ sở** với mình | Muốn học cơ sở khác → phải Chuyển cơ sở trước |
 | R2 | Bảng dẫn xuất luôn nằm cùng site với bảng cha | Mọi JOIN nghiệp vụ hằng ngày đều là JOIN cục bộ |
 | R3 | Bảng nhân bản chỉ được sửa qua writer được phép của bảng | Tiền kiểm thiếu site thì từ chối trước ghi; lỗi/độ trễ sau commit trả chưa hoàn tất. MonHoc chỉ ghi Publisher, không ghi bù Subscriber; đọc đủ bản sao mới báo hoàn tất |
-| R4 | `TaiKhoan.ten_dang_nhap` và `email` duy nhất **toàn hệ thống** | Lúc ghi phải kiểm tra lại trên mọi site đang hoạt động |
+| R4 | `TaiKhoan.ten_dang_nhap` và `email` duy nhất **toàn hệ thống** | Giữ namespace bằng khóa transaction ở authority khi tạo tài khoản; bản sao nhận qua outbox, xung đột phải đối soát |
 | R5 | **Không** có khóa ngoại vật lý xuyên site | Toàn vẹn xuyên site do tầng ứng dụng đảm bảo. FK tới bảng nhân bản vẫn kiểm tra cục bộ được |
 | R6 | **Không** JOIN trực tiếp giữa 2 site | Cần dữ liệu nhiều site → dùng Global Query, gộp ở tầng ứng dụng |
 | R7 | Đề nghị/trạng thái chuyển (`GiaoDichChuyenCoSo`) chỉ lưu tại CSDL nguồn; nhật ký (`Logs`, `LichSuChuyenCoSo`) chỉ **thêm**, không sửa/xóa trong luồng nghiệp vụ | Chỉ Tư vấn tạo đề nghị ở nguồn; Admin Big hoặc Admin Small tại site nhận quyết định qua Coordinator; chỉ giao dịch đã duyệt mới chạy giữa nguồn và đích |

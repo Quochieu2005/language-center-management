@@ -158,6 +158,8 @@ class EmployeeCollectionView(APIView):
                 "phone": result.phone,
                 "account_status": "active",
                 "employee_status": "dang_lam",
+                "replication_complete": not result.replication_pending_sites,
+                "replication_pending_sites": list(result.replication_pending_sites),
                 "avatar_secure_url": None,
                 "avatar_setup_token": avatar_setup_token,
                 "must_change_password": result.must_change_password,

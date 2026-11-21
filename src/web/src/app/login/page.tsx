@@ -27,7 +27,9 @@ export default function LoginPage() {
       void Promise.resolve().then(() => {
         setSocialBusy("session");
         return authApi.session();
-      }).then(({ user, expires_at }) => {
+      }).then((session) => {
+        if (!session) throw new Error("Không có phiên đăng nhập.");
+        const { user, expires_at } = session;
         signIn(user, expires_at);
         if (user.must_change_password) message.info("Tài khoản đang dùng mật khẩu do trung tâm cấp. Bạn có thể đổi mật khẩu khi thuận tiện.");
         router.replace(homeForRole(user.role));
@@ -62,11 +64,11 @@ export default function LoginPage() {
       setError(reason instanceof ApiError ? reason.message : "Không kết nối được API. Kiểm tra máy chủ và địa chỉ API.");
     } finally { setBusy(false); }
   };
-  return <AuthPageShell eyebrow="CỔNG ĐĂNG NHẬP" title="Chào mừng bạn trở lại." description="Dùng mật khẩu được cấp hoặc tài khoản Google/Facebook đã liên kết để tiếp tục.">
+  return <AuthPageShell eyebrow="CỔNG ĐĂNG NHẬP" title="Chào mừng bạn trở lại." description="Đăng nhập bằng tài khoản của bạn hoặc Google/Facebook đã liên kết.">
     <div className={styles.heading}>
-      <span className={styles.kicker}>TÀI KHOẢN NỘI BỘ</span>
+      <span className={styles.kicker}>TÀI KHOẢN CỦA BẠN</span>
       <Typography.Title level={2}>Đăng nhập</Typography.Title>
-      <Typography.Paragraph>Dùng email đã được cấp để đăng nhập.</Typography.Paragraph>
+      <Typography.Paragraph>Dùng email đã đăng ký hoặc được trung tâm cấp.</Typography.Paragraph>
     </div>
     {error && <Alert className={styles.error} type="error" showIcon title={error} />}
     <Form className={styles.form} layout="vertical" onFinish={submit} requiredMark={false} disabled={Boolean(socialBusy)}>
@@ -79,6 +81,7 @@ export default function LoginPage() {
       <div className={styles.formMeta}><span>Phiên đăng nhập an toàn</span><Link href="/forgot-password">Quên mật khẩu?</Link></div>
       <Button className={styles.submit} type="primary" htmlType="submit" loading={busy} block size="large">Đăng nhập <span aria-hidden="true">→</span></Button>
     </Form>
+    <p>Chưa có tài khoản? <Link href="/register">Đăng ký miễn phí</Link></p>
     <div className={styles.socialLogin}>
       <span>Hoặc tiếp tục với tài khoản đã liên kết</span>
       <Space wrap>

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from core.auth.account_replication import provisioning_sites, serialize_account_creation
+from core.students.identity import reserve_student_email
+
 import json
 import logging
 import uuid
@@ -66,6 +69,7 @@ class StudentAccountResult:
     email: str
     email_sent: bool
     must_change_password: bool = True
+    replication_pending_sites: tuple[str, ...] = ()
 
 
 def _translate_infrastructure_errors(function):
@@ -428,6 +432,7 @@ def get_admin_student_profile(*, site_code: str, student_slug: str) -> dict[str,
 
 
 @_translate_infrastructure_errors
+@reserve_student_email(StudentConflict)
 def create_student_profile(
     *, site_code: str, fields: dict[str, Any], actor_id: str, remote_ip: str,
 ) -> dict[str, Any]:
@@ -458,6 +463,7 @@ def create_student_profile(
 
 
 @_translate_infrastructure_errors
+@reserve_student_email(StudentConflict)
 def update_student_profile(
     *, site_code: str, student_slug: str, fields: dict[str, Any],
     actor_id: str, remote_ip: str,
@@ -588,9 +594,9 @@ def _ensure_account_replica(site_code: str, expected: tuple[Any, ...]) -> None:
                     INSERT INTO dbo.TaiKhoan
                         (ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro,
                          ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban)
-                    VALUES (%s, %s, %s, %s, %s, 'hoc_vien', %s, 1, 1, %s)
+                    VALUES (%s, %s, %s, %s, %s, 'hoc_vien', %s, %s, %s, %s)
                     """,
-                    [account_id, slug, username, email, password_hash, account_site, version],
+                    [account_id, slug, username, email, password_hash, account_site, status, forced, version],
                 )
             elif actual != normalized:
                 raise StudentConflict
@@ -681,10 +687,11 @@ def _student_account_result(account: tuple[Any, ...], student, site_code: str,
 
 
 @_translate_infrastructure_errors
+@serialize_account_creation
 def issue_student_account(
     *, site_code: str, student_slug: str, actor_id: str, remote_ip: str,
 ) -> StudentAccountResult:
-    sites = active_site_codes()
+    sites = provisioning_sites(site_code)
     target_site = _site_code(site_code)
     _verify_active_site(target_site, sites)
     student = _load_student_by_slug(target_site, student_slug)

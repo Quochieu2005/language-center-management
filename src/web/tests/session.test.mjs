@@ -14,7 +14,7 @@ function harness() {
   let stateIndex = 0, refIndex = 0;
   const storage = new Map([['qlttnn.account-slug', 'old']]);
   class ApiError extends Error { constructor(status) { super(); this.status = status; } }
-  const api = { logout: async () => {}, activity: async () => ({ expires_at: states[2] }) };
+  const api = { session: async () => null, logout: async () => {}, activity: async () => ({ expires_at: states[2] }) };
   const react = {
     createContext: () => ({ Provider: 'provider' }),
     useState: () => { const i = stateIndex++; return [states[i], (v) => { states[i] = typeof v === 'function' ? v(states[i]) : v; }]; },
@@ -50,6 +50,26 @@ test('failed logout preserves local session; successful retry clears it', async 
   h.api.logout = async () => {};
   await h.value.signOut();
   assert.equal(h.states[0], null);
+});
+
+test('an anonymous session restores as signed out without an API error', async () => {
+  const h = harness();
+  h.effects[0]();
+  await new Promise(setImmediate);
+  assert.equal(h.states[0], null);
+  assert.equal(h.states[1], false);
+  assert.equal(h.states[3], false);
+});
+
+test('a late anonymous session cannot clear a newer login', async () => {
+  const h = harness();
+  let resolveSession;
+  h.api.session = () => new Promise((resolve) => { resolveSession = resolve; });
+  h.effects[0]();
+  h.value.signIn({ slug: 'new', role: 'admin_big' }, '2099-02-01T00:00:00Z');
+  resolveSession(null);
+  await new Promise(setImmediate);
+  assert.equal(h.states[0].slug, 'new');
 });
 
 test('already expired logout clears local state', async () => {

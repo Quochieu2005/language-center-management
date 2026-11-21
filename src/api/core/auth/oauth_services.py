@@ -258,7 +258,7 @@ def consume_oauth_state_once(state: str, remote_ip: str) -> None:
 def _replicated_provider_account(provider: str, subject: str, sites: tuple[str, ...]):
     column = PROVIDER_COLUMNS[provider]
     rows_by_site = []
-    for site in sites:
+    for site in (settings.AUTH_SESSION_SITE_CODE,):
         with get_site_connection(site).cursor() as cursor:
             cursor.execute(
                 f"""
@@ -296,6 +296,9 @@ def login_with_oauth_provider(provider: str, subject: str, remote_ip: str):
                     raise LoginRateLimitExceeded(retry_after)
                 sites = active_site_codes()
                 account = _replicated_provider_account(provider, subject, sites)
+                if account is not None:
+                    from core.auth.session_services import require_settled_password
+                    require_settled_password(str(account[0]))
                 user = _resolve_principal(account[:10], sites) if account else None
                 if user is None or user.role != "hoc_vien":
                     _record_attempt(cursor, ip_digest, identity_digest, "that_bai")

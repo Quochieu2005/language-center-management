@@ -135,6 +135,8 @@ class StudentListResponseSerializer(serializers.Serializer):
 
 
 class StudentAccountProvisionResponseSerializer(serializers.Serializer):
+    replication_complete = serializers.BooleanField()
+    replication_pending_sites = serializers.ListField(child=serializers.CharField())
     account_id = serializers.CharField()
     student_id = serializers.CharField()
     slug = serializers.CharField()

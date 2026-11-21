@@ -7,7 +7,8 @@ import hashlib
 from django.db import connections, transaction
 from django.utils import timezone
 
-from core.auth.service_common import _acquire_named_lock, active_site_codes
+from core.auth.service_common import _acquire_named_lock
+from core.students.identity import reserve_student_email
 from core.classes.services import (
     ClassConflict,
     ClassInfrastructureUnavailable,
@@ -63,35 +64,14 @@ def list_public_course_classes(*, site_code: str, course_slug: str) -> dict:
     return {"site_code": site, "course_slug": course_slug, "count": len(results), "results": results}
 
 
-def _sites_with_email(email: str, site_codes: tuple[str, ...]) -> tuple[str, ...]:
-    matches = []
-    for site in site_codes:
-        with get_site_connection(site).cursor() as cursor:
-            cursor.execute(
-                "SELECT TOP (1) 1 FROM dbo.HocVien "
-                "WHERE LOWER(LTRIM(RTRIM(email))) = %s",
-                [email],
-            )
-            if cursor.fetchone() is not None:
-                matches.append(site)
-    return tuple(matches)
-
-
 @_translate_errors
+@reserve_student_email(ClassConflict)
 def create_public_enrollment(
     *, site_code: str, class_id: str, full_name: str, email: str,
     phone: str | None, remote_ip: str,
 ) -> dict:
     """Create a student, local enrollment and tuition in the selected site's transaction."""
     site = site_code.strip().upper()
-    sites = active_site_codes()
-    if site not in sites:
-        raise ClassSiteUnavailable
-    # shortcut: global email preflight can race across different site databases; use a shared reservation protocol if strict global uniqueness is required.
-    other_matches = tuple(code for code in _sites_with_email(email, sites) if code != site)
-    if other_matches:
-        raise ClassConflict("Không thể hoàn tất yêu cầu bằng thông tin này. Vui lòng liên hệ cơ sở.")
-
     alias = get_site_database_alias(site)
     with transaction.atomic(using=alias):
         with connections[alias].cursor() as cursor:

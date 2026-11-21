@@ -25,6 +25,11 @@ export type AvatarUploadIntent = {
 export type OAuthProvider = "google" | "facebook";
 
 export const authApi = {
+  registrationSites: () => apiRequest<{ sites: { site_code: string; name: string }[]; registration_ready: boolean }>("/auth/register/"),
+  register: (body: { full_name: string; email: string; site_code: string; password: string; confirm_password: string }) =>
+    apiRequest<{ detail: string; replication_complete: boolean; replication_pending_sites: string[] }>(
+      "/auth/register/", { method: "POST", body: jsonBody(body) },
+    ),
   csrf: () => apiRequest<{ csrf_token: string }>("/auth/csrf/"),
   login: (identifier: string, password: string) =>
     apiRequest<LoginResponse>("/auth/login/", { method: "POST", body: jsonBody({ identifier, password }) }),
@@ -35,7 +40,7 @@ export const authApi = {
     apiRequest<{ account_id: string; role: Role; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
       `/auth/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
-  session: () => apiRequest<ProfileResponse>("/auth/session/"),
+  session: () => apiRequest<ProfileResponse | null>("/auth/session/"),
   oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
   startOAuthLink: (provider: OAuthProvider) =>
     apiRequest<{ authorization_url: string }>(`/auth/oauth/${provider}/start/`, { method: "POST", body: "{}" }),

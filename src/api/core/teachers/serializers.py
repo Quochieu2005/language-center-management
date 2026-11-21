@@ -161,6 +161,8 @@ class TeacherListResponseSerializer(serializers.Serializer):
 
 
 class TeacherCreateResponseSerializer(TeacherResponseSerializer):
+    replication_complete = serializers.BooleanField()
+    replication_pending_sites = serializers.ListField(child=serializers.CharField())
     must_change_password = serializers.BooleanField()
     avatar_setup_token = serializers.CharField(allow_null=True)
 

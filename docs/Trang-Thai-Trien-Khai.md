@@ -1,11 +1,16 @@
 # Trạng thái triển khai theo source
 
+## Cô lập site lỗi và đăng ký học viên miễn phí — 21/11/2026
+
+Theo yêu cầu chủ dự án, thêm `/register` và API tạo tài khoản học viên trước khi mua khóa học; tách đăng nhập khỏi việc đối chiếu mọi replica, thêm outbox và worker retry. Migration 45 đã chạy Q1; authority local đổi Q7 → Q1. SQL Q1 đã kiểm tra tạo tài khoản/đăng nhập/phiên/đổi mật khẩu và hoàn tác dữ liệu QA. Q7/TD hiện chưa bật, nên chưa đối soát đủ site, chưa bootstrap email và chưa bật đăng ký mới trong môi trường này. Kiểm tra tự động mô phỏng phục hồi không thay bằng chứng ba SQL Server thật. Authority/API chưa có HA; chi tiết tại [Auth-Site-Isolation](Auth-Site-Isolation.md).
+
 ## Sửa local xác thực và chuyển quay lại — 21/11/2026
 
+- Đang đăng xuất, `/auth/session/` trả `204` không nội dung thay vì `401`; vậy kiểm tra phiên nền trên mọi trang không còn xuất hiện như lỗi HTTP trong Console. Cookie sai/hết hạn vẫn trả `401`; hạ tầng lỗi tiếp tục trả lỗi dịch vụ. Frontend xử lý phản hồi rỗng khi khôi phục và kiểm tra phiên.
 - Bổ sung import băm cho OTP hợp lệ. Helper phục hồi mật khẩu lấy khóa theo tài khoản tại coordinator, đọc lại job có khóa và giữ quyền điều phối đến hết các bước ghi site/chốt job, tránh worker cũ áp lại giá trị cũ. Transaction của coordinator có thể rollback khi site khác lỗi; các site đã commit vẫn được đối soát khi retry. Không phải ACID xuyên database.
 - Chuyển quay lại site cũ tái sử dụng `HocVien` đã `da_chuyen_di` đúng mã/cơ sở gốc/tài khoản (hoặc chưa có tài khoản), có sự kiện rời site và không còn giao dịch cũ đang mở tại đích. Giữ slug/lịch sử cũ, cập nhật metadata theo nguồn và ghi sự kiện tiếp nhận của giao dịch mới cùng transaction staging; sau đó dùng luồng kích hoạt/thông báo hiện có. Không xóa hoặc mở lại đăng ký cũ.
 - Test mới: `core.auth.test_password_recovery` dùng OTP mock, worker thật có lịch xen kẽ và kho dữ liệu/khóa giả; `core.academics.test_transfer_return` chạy Coordinator trên các DB SQLite tạm riêng, có lỗi sau commit đích/trước checkpoint và rollback sự kiện. Không chạy SQL Server thật, không sửa dữ liệu thật, chưa xác nhận concurrency SQL Server hoặc browser end-to-end. Không có migration mới.
-- Kết quả tại máy ngày 21/11/2026: `manage.py check` pass; `manage.py test core --noinput` **156/156 pass**, gồm 13 ca mới; `git diff --check` pass. Không đổi frontend và không chạy lại build/frontend trong đợt backend này.
+- Kết quả tại máy ngày 21/11/2026: `manage.py check` pass; `manage.py test core --noinput` **158/158 pass**, gồm 13 ca hồi quy chuyển/mật khẩu và 2 ca mới cho session; lint/typecheck và 10 frontend tests pass (lint còn cảnh báo `<img>` cũ ở `StudentTuitionPanel.tsx`); production build pass. Playwright mở đủ **31 URL** từ route tree frontend, không có JavaScript exception hoặc request thất bại; session được mô phỏng `204` theo hợp đồng. Ở lượt kiểm tra API thật, danh mục khóa học và site liên hệ nhận `503` khi CSDL site không sẵn sàng; cần bật các site DB để xác nhận tải dữ liệu thật. Route được bảo vệ tự về đăng nhập vì không có phiên thử nghiệm.
 
 ## Sửa lỗi thu/hoàn và lịch sử lớp — 20/11/2026
 

@@ -344,6 +344,8 @@ class StudentAccountProvisionView(APIView):
                 "account_status": "active",
                 "must_change_password": result.must_change_password,
                 "email_sent": result.email_sent,
+                "replication_complete": not result.replication_pending_sites,
+                "replication_pending_sites": list(result.replication_pending_sites),
             },
             status=status.HTTP_201_CREATED,
         )

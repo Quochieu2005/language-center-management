@@ -8,6 +8,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle, SimpleRateThrottle
 from rest_framework.views import APIView
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
+from core.auth.authentication import AuthCookieAuthentication
+from core.classes.services import register_student_to_class
 
 from core.classes.public_enrollment import create_public_enrollment, list_public_course_classes
 from core.classes.serializers import (
@@ -86,8 +90,9 @@ class PublicCourseClassListView(APIView):
             return _public_error(exc)
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class PublicEnrollmentCreateView(APIView):
-    authentication_classes = []
+    authentication_classes = [AuthCookieAuthentication]
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle, PublicEnrollmentEmailThrottle]
     throttle_scope = "public_enrollment"
@@ -97,11 +102,12 @@ class PublicEnrollmentCreateView(APIView):
         tags=["Đăng ký khóa học"],
         summary="Đăng ký học viên mới vào một lớp còn chỗ",
         description=(
-            "Khách chọn một lớp tại đúng site. API tìm email trên các site hoạt động để tránh tạo "
+            "Khách chọn một lớp tại đúng site. API giữ email trong directory đã bootstrap để tránh tạo "
             "hồ sơ lặp; nếu chưa có hồ sơ, tạo HocVien, DangKy, HocPhi và Logs tại CSDL site đã chọn "
             "trong cùng transaction cục bộ. Lớp, học phí và số chỗ được kiểm tra lại trong transaction. "
-            "Tài khoản đăng nhập chưa được tạo; Admin Small/Big cấp sau theo luồng quản trị hiện có. "
-            "Đây là GLOBAL preflight + LOCAL write, không phải transaction xuyên site."
+            "Khách ẩn danh chưa được tạo tài khoản; Admin cấp sau hoặc dùng signup riêng. "
+            "Với phiên học viên, ghi danh vào chính hồ sơ/site từ phiên. CSRF bắt buộc. "
+            "Directory kỹ thuật + LOCAL write, không phải transaction nguyên tử xuyên site."
         ),
         request=PublicEnrollmentCreateSerializer,
         responses={
@@ -118,10 +124,21 @@ class PublicEnrollmentCreateView(APIView):
         try:
             data = serializer.validated_data
             data.setdefault("phone", None)
-            result = create_public_enrollment(**data, remote_ip=_remote_ip(request))
+            if request.user.is_authenticated:
+                user = request.user
+                if user.role != "hoc_vien" or user.site_code != data["site_code"] or not user.profile_id:
+                    raise ClassConflict("Hãy chọn lớp tại cơ sở tài khoản của bạn; liên hệ trung tâm nếu cần chuyển cơ sở.")
+                enrolled = register_student_to_class(
+                    site_code=user.site_code, student_id=user.profile_id, class_id=data["class_id"],
+                    actor_id=user.account_id, remote_ip=_remote_ip(request),
+                )
+                result = {"site_code": user.site_code, "class_id": data["class_id"],
+                          "accepted": True, "already_registered": not enrolled["created"]}
+            else:
+                result = create_public_enrollment(**data, remote_ip=_remote_ip(request))
         except (ClassConflict, ClassInfrastructureUnavailable, ClassInvalid, ClassNotFound, ClassSiteUnavailable) as exc:
             return _public_error(exc)
-        result["message"] = (
-            "Yêu cầu đã được ghi nhận. Cơ sở sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau."
-        )
+        result["message"] = ("Đã ghi nhận đăng ký. Xem học phí trong cổng học viên."
+                             if request.user.is_authenticated else
+                             "Yêu cầu đã được ghi nhận. Cơ sở sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau.")
         return Response(result, status=status.HTTP_201_CREATED)

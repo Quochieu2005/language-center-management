@@ -31,8 +31,7 @@ from core.auth.service_common import (
 )
 
 def change_authenticated_password(user: AuthenticatedUser, current_password: str, new_password: str) -> bool:
-    """Verify the current password and replicate the replacement hash to every active site."""
-    _resume_pending_password_resets()
+    """Commit a replacement at the authority; its outbox delivers the current hash to replicas."""
     normalized_email = user.email.strip().casefold()
     sites = active_site_codes()
     alias = auth_session_alias()
@@ -65,12 +64,11 @@ def change_authenticated_password(user: AuthenticatedUser, current_password: str
         raise AuthInfrastructureUnavailable from exc
 
 def login_user(identifier: str, password: str, remote_ip: str) -> tuple[AuthenticatedUser, str, Any] | None:
-    """Authenticate any provisioned role using replicated account data and a local profile."""
+    """Authenticate against the account authority and the user's own site profile."""
     identifier = identifier.strip().casefold()
     if not identifier or not remote_ip:
         raise ValueError("Thiếu định danh hoặc địa chỉ IP.")
 
-    _resume_pending_password_resets()
     registry_alias = auth_session_alias()
     ip_digest = _digest("ip", remote_ip)
     identifier_digest = _digest("identity", identifier)
@@ -88,6 +86,8 @@ def login_user(identifier: str, password: str, remote_ip: str) -> tuple[Authenti
 
                 sites = active_site_codes()
                 account = _replicated_account(identifier, sites)
+                if account is not None:
+                    require_settled_password(str(account[0]))
                 password_matches = check_password(
                     password,
                     account[4] if account is not None else dummy_hash,
@@ -119,7 +119,6 @@ def login_user(identifier: str, password: str, remote_ip: str) -> tuple[Authenti
         raise AuthInfrastructureUnavailable from exc
 
 def load_user_session(token: str):
-    _resume_pending_password_resets()
     token_digest = session_token_digest(token)
     alias = auth_session_alias()
     try:
@@ -144,6 +143,7 @@ def load_user_session(token: str):
             row = cursor.fetchone()
         if row is None:
             return None
+        require_settled_password(str(row[1]))
         account = (
             row[1], row[3], row[4], row[5], None, row[6], row[7], row[8], row[9], row[10]
         )
@@ -158,6 +158,17 @@ def load_user_session(token: str):
         return user, session
     except (DatabaseError, ImproperlyConfigured, KeyError) as exc:
         raise AuthInfrastructureUnavailable from exc
+
+
+def require_settled_password(account_id):
+    """An unfinished password change blocks its account, not unrelated logins."""
+    with connections[auth_session_alias()].cursor() as cursor:
+        cursor.execute(
+            "SELECT TOP (1) 1 FROM dbo.GiaoDichDatLaiMatKhau "
+            "WHERE ma_tai_khoan = %s AND trang_thai = 'dang_xu_ly'", [account_id],
+        )
+        if cursor.fetchone() is not None:
+            raise AuthInfrastructureUnavailable
 
 def extend_user_session(token_digest: str):
     alias = auth_session_alias()

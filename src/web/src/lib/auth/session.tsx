@@ -16,7 +16,7 @@ type SessionContextValue = {
   refreshProfile: () => Promise<void>;
 };
 const SessionContext = createContext<SessionContextValue | null>(null);
-const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/courses", "/branches", "/programs", "/blog", "/contact"];
+const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/courses", "/branches", "/programs", "/blog", "/contact"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/courses/") || pathname.startsWith("/blog/");
@@ -81,13 +81,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const version = authMutationVersion.current;
-    authApi.session().then(({ user: sessionUser, expires_at }) => {
-      if (!cancelled && version === authMutationVersion.current) {
-        sessionStorage.setItem("qlttnn.account-slug", sessionUser.slug);
-        setUser(sessionUser);
-        setExpiresAt((current) => keepLaterExpiry(current, expires_at));
-        setRestoreError(false);
-      }
+    authApi.session().then((session) => {
+      if (cancelled || version !== authMutationVersion.current) return;
+      if (!session) { clearSession(); return; }
+      const { user: sessionUser, expires_at } = session;
+      sessionStorage.setItem("qlttnn.account-slug", sessionUser.slug);
+      setUser(sessionUser);
+      setExpiresAt((current) => keepLaterExpiry(current, expires_at));
+      setRestoreError(false);
     }).catch((error: unknown) => {
       if (cancelled || version !== authMutationVersion.current) return;
       if (error instanceof ApiError && error.status === 401) clearSession();
@@ -99,7 +100,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !restoreError && !isPublicPath(pathname)) router.replace("/login");
-    if (user && ["/login", "/forgot-password"].includes(pathname)) router.replace(homeForRole(user.role));
+    if (user && ["/login", "/register", "/forgot-password"].includes(pathname)) router.replace(homeForRole(user.role));
   }, [loading, pathname, restoreError, router, user]);
 
   useEffect(() => {
@@ -134,8 +135,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const version = authMutationVersion.current;
     const timer = window.setTimeout(() => {
-      void authApi.session().then(({ user: sessionUser, expires_at }) => {
+      void authApi.session().then((session) => {
         if (cancelled || version !== authMutationVersion.current) return;
+        if (!session) { clearSession(); router.replace("/login"); return; }
+        const { user: sessionUser, expires_at } = session;
         setUser(sessionUser);
         setExpiresAt((current) => keepLaterExpiry(current, expires_at));
         setRestoreError(false);

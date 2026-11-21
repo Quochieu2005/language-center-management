@@ -10,6 +10,7 @@ import {
   type PublicEnrollmentResult,
 } from "@/lib/api/catalog";
 import styles from "./PublicCourseCatalog.module.scss";
+import { useSession } from "@/lib/auth/session";
 
 type EnrollmentValues = {
   site_code: string;
@@ -30,8 +31,10 @@ export default function PublicCourseEnrollmentDialog({
   course: PublicCourse | null;
   onClose: () => void;
 }) {
+  const { user } = useSession();
+  const branches = user?.role === "hoc_vien" ? course?.branches.filter((branch) => branch.site_code === user.site_code) : course?.branches;
   const [form] = Form.useForm<EnrollmentValues>();
-  const [siteCode, setSiteCode] = useState(course?.branches[0]?.site_code ?? "");
+  const [siteCode, setSiteCode] = useState(branches?.[0]?.site_code ?? "");
   const [classResponse, setClassResponse] = useState<{
     key: string;
     results: PublicCourseClass[];
@@ -92,14 +95,15 @@ export default function PublicCourseEnrollmentDialog({
       <Alert type="success" showIcon title={result.message} description={`Cơ sở ${result.site_code} đã ghi nhận đăng ký lớp ${result.class_id}.`} />
       <Button type="primary" onClick={onClose}>Đóng</Button>
     </div> : <>
-      <p className={styles.enrollmentIntro}>Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau.</p>
+      <p className={styles.enrollmentIntro}>{user ? "Chọn lớp tại cơ sở của bạn. Đăng ký được gắn với tài khoản đang đăng nhập." : "Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau."}</p>
+      {user && !branches?.length && <Alert type="info" title="Khóa học chưa có lớp tại cơ sở của bạn. Liên hệ trung tâm nếu cần chuyển cơ sở." />}
       {(error || classError) && <Alert className={styles.enrollmentAlert} type="error" showIcon title={error || classError} />}
-      <Form form={form} layout="vertical" onFinish={submit} initialValues={{ site_code: siteCode }}>
+      <Form form={form} layout="vertical" onFinish={submit} initialValues={{ site_code: siteCode, email: user?.email }}>
         <Form.Item label="Cơ sở học" name="site_code" rules={[{ required: true, message: "Chọn cơ sở học." }]}>
           <Select
             value={siteCode || undefined}
             placeholder="Chọn cơ sở"
-            options={course?.branches.map((branch) => ({ value: branch.site_code, label: branch.site_name }))}
+            options={branches?.map((branch) => ({ value: branch.site_code, label: branch.site_name }))}
             onChange={(value: string) => {
               setSiteCode(value);
               setError("");

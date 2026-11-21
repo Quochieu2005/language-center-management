@@ -48,6 +48,7 @@ class HealthCheckTests(SimpleTestCase):
         self.assertIn("/api/v1/health/", schema["paths"])
         self.assertIn("get", schema["paths"]["/api/v1/health/"])
         self.assertIn("/api/v1/auth/profile/{slug}/", schema["paths"])
+        self.assertIn("204", schema["paths"]["/api/v1/auth/session/"]["get"]["responses"])
         self.assertNotIn("/api/v1/auth/me/", schema["paths"])
         self.assertIn("/api/v1/admin/admin-smalls/", schema["paths"])
         self.assertIn("get", schema["paths"]["/api/v1/admin/admin-smalls/"])
@@ -555,3 +556,17 @@ class AuthProfileSlugApiTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json(), {"detail": "Không tìm thấy hồ sơ tài khoản."})
+
+    def test_auth_session_without_a_cookie_is_a_normal_empty_session(self):
+        response = APIClient().get(reverse("core:auth-session"))
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.content, b"")
+
+    def test_auth_session_still_rejects_an_invalid_cookie(self):
+        client = APIClient()
+        client.cookies[settings.AUTH_COOKIE_NAME] = "a" * 64
+        with patch("core.auth.authentication.load_user_session", return_value=None):
+            response = client.get(reverse("core:auth-session"))
+
+        self.assertEqual(response.status_code, 401)

@@ -6,6 +6,7 @@ from functools import wraps
 from typing import Any
 
 from django.conf import settings
+from core.auth.account_replication import provisioning_sites, serialize_account_creation
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections, transaction
@@ -75,6 +76,7 @@ class TeacherProvisioningResult:
     status: str = "dang_day"
     must_change_password: bool = False
     credential_email_status: str = "ready"
+    replication_pending_sites: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -370,6 +372,7 @@ def _recover_teacher_provisioning(
 
 
 @_translate_infrastructure_errors
+@serialize_account_creation
 def create_teacher(
     *, full_name: str, email: str, username: str | None, phone: str | None,
     site_code: str, actor_id: str, remote_ip: str, slug: str | None = None,
@@ -385,7 +388,7 @@ def create_teacher(
     normalized_slug = make_slug(normalized_name, slug, max_length=120)
     if not normalized_email or not normalized_name or not remote_ip:
         raise ValueError("Thiếu thông tin giáo viên.")
-    sites = active_site_codes()
+    sites = provisioning_sites(site_code)
     _ensure_site(target_site, sites)
     recovered = _recover_teacher_provisioning(
         site_code=target_site, email=normalized_email, username=normalized_username,

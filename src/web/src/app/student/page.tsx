@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Input, Space, Tabs, Typography, message } from "antd";
 import { LogoutOutlined } from "@ant-design/icons";
+import Link from "next/link";
 import { academicsApi, type ApiRow } from "@/lib/api/academics";
 import { RequireSession, useSession } from "@/lib/auth/session";
 import { ApiDataTable } from "@/components/shared/ApiPage";
@@ -35,6 +36,7 @@ function StudentPortal() {
   };
   return <main style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}><Space orientation="vertical" size="middle" style={{ width: "100%" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}><div><Typography.Title level={2}>Cổng học viên</Typography.Title><Typography.Text type="secondary">Dữ liệu cá nhân, đăng ký, lịch học, học phí và điểm của tài khoản hiện tại.</Typography.Text></div><Button danger icon={<LogoutOutlined />} onClick={async () => { try { await signOut(); } catch { message.error("Không thu hồi được phiên trên máy chủ."); } }}>Đăng xuất</Button></div>
     {error && <Alert type="warning" showIcon title="Một số dữ liệu chưa tải được" description={error} />}
+    {!loading && !data.enrollments.length && <Alert type="info" showIcon title="Bạn chưa đăng ký khóa học" description={<Link href="/courses">Xem khóa học và đăng ký lớp tại cơ sở của bạn →</Link>} />}
     <Card title="Hồ sơ của tôi"><Form form={form} layout="inline" onFinish={save}><Form.Item label="Họ tên"><Input value={String(data.profile?.full_name || "")} disabled /></Form.Item><Form.Item label="Điện thoại" name="phone"><Input maxLength={20} /></Form.Item><Form.Item label="Địa chỉ" name="address"><Input maxLength={300} /></Form.Item><Button type="primary" htmlType="submit">Lưu liên hệ</Button></Form></Card>
     <SocialAccountConnections />
     <Card><Tabs items={[{ key: "enrollments", label: `Khóa học (${data.enrollments.length})`, children: <ApiDataTable rows={data.enrollments} loading={loading} rowKey={(row) => String(row.enrollment_id)} /> }, { key: "schedule", label: `Lịch học (${data.schedule.length})`, children: <ApiDataTable rows={data.schedule} loading={loading} rowKey={(row) => String(row.session_id)} /> }, { key: "tuition", label: `Học phí (${data.tuition.length})`, children: <StudentTuitionPanel rows={data.tuition} loading={loading} slug={user?.slug || ""} onRefresh={load} /> }, { key: "grades", label: `Điểm (${data.grades.length})`, children: <ApiDataTable rows={data.grades} loading={loading} rowKey={(row) => String(row.grade_id)} /> }]} /></Card>

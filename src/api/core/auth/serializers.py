@@ -72,6 +72,58 @@ class AuthChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
+class AuthRegisterSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True)
+    email = serializers.EmailField(max_length=254)
+    site_code = serializers.RegexField(regex=r"^[A-Za-z0-9_-]{2,12}$", max_length=12)
+    password = serializers.CharField(min_length=12, max_length=128, trim_whitespace=False, write_only=True)
+    confirm_password = serializers.CharField(min_length=12, max_length=128, trim_whitespace=False, write_only=True)
+
+    def to_internal_value(self, data):
+        if hasattr(data, "keys") and set(data.keys()) - set(self.fields):
+            raise serializers.ValidationError("Yêu cầu có trường không được phép.")
+        return super().to_internal_value(data)
+
+    def validate_full_name(self, value):
+        if not value.strip() or any(ord(character) < 32 for character in value):
+            raise serializers.ValidationError("Họ tên không hợp lệ.")
+        return value.strip()
+
+    def validate_email(self, value):
+        return value.strip().casefold()
+
+    def validate_site_code(self, value):
+        return value.upper()
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs.pop("confirm_password"):
+            raise serializers.ValidationError({"confirm_password": "Mật khẩu xác nhận không khớp."})
+        try:
+            from types import SimpleNamespace
+            validate_password(attrs["password"], SimpleNamespace(
+                email=attrs["email"], first_name=attrs["full_name"], username=attrs["email"], last_name="",
+            ))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)}) from exc
+        return attrs
+
+
+class AuthRegisterResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    replication_complete = serializers.BooleanField()
+    replication_pending_sites = serializers.ListField(child=serializers.CharField())
+
+
+class RegistrationSiteSerializer(serializers.Serializer):
+    site_code = serializers.CharField()
+    name = serializers.CharField()
+
+
+class RegistrationSitesSerializer(serializers.Serializer):
+    sites = RegistrationSiteSerializer(many=True)
+    registration_ready = serializers.BooleanField()
+
+
 class AdminSmallCreateSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=150, trim_whitespace=True)
     email = serializers.EmailField(max_length=254)
@@ -274,6 +326,8 @@ class AuthPasswordChangeResponseSerializer(serializers.Serializer):
 
 
 class AdminSmallCreateResponseSerializer(serializers.Serializer):
+    replication_complete = serializers.BooleanField()
+    replication_pending_sites = serializers.ListField(child=serializers.CharField())
     account_id = serializers.CharField()
     admin_id = serializers.CharField()
     username = serializers.CharField()
