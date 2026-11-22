@@ -81,7 +81,7 @@ export default function LoginPage() {
       <div className={styles.formMeta}><span>Phiên đăng nhập an toàn</span><Link href="/forgot-password">Quên mật khẩu?</Link></div>
       <Button className={styles.submit} type="primary" htmlType="submit" loading={busy} block size="large">Đăng nhập <span aria-hidden="true">→</span></Button>
     </Form>
-    <p>Chưa có tài khoản? <Link href="/register">Đăng ký miễn phí</Link></p>
+    <p className={styles.registerPrompt}>Chưa có tài khoản? <Link href="/register">Đăng ký miễn phí</Link></p>
     <div className={styles.socialLogin}>
       <span>Hoặc tiếp tục với tài khoản đã liên kết</span>
       <Space wrap>

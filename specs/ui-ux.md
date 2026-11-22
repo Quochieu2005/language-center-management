@@ -125,7 +125,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 
 | Page | Sections chính | Mục tiêu |
 |---|---|---|
-| Đăng nhập | Form mật khẩu, OAuth đã liên kết, quên mật khẩu, lỗi/loading và liên kết đăng ký miễn phí | Vai trò do API dựng; form signup riêng `/register`, không cho chọn role |
+| Đăng nhập | Form mật khẩu, OAuth đã liên kết, quên mật khẩu, lỗi/loading và liên kết đăng ký miễn phí | Dòng đăng ký cách nút Đăng nhập 20px; vai trò do API dựng; form signup riêng `/register`, không cho chọn role |
 | Quên mật khẩu | Form email/tên đăng nhập, xác nhận đã nhận yêu cầu, giới hạn gửi lại và thông báo chung | Không tiết lộ tài khoản có tồn tại hay không; trạng thái gửi do API trả về |
 | Đặt lại mật khẩu | Form mật khẩu mới/xác nhận, tiêu chí hợp lệ, trạng thái token hết hạn/đã dùng/thành công | Token dùng một lần; không lưu/ghi token vào log hoặc analytics |
 | Đăng ký tài khoản | Giới thiệu điều kiện đăng ký, form phù hợp với loại tài khoản được nhóm cho phép, trạng thái gửi thành công/chờ xử lý | Cùng frontend và cùng luồng form; API quyết định loại tài khoản/role. Không cho người dùng tự chọn hoặc tự cấp quyền nội bộ |
