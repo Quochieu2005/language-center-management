@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Dropdown, Tag, Typography, message } from "antd";
 import { BellOutlined, BulbOutlined, GlobalOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from "@ant-design/icons";
@@ -26,18 +26,44 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
   const router = useRouter();
   const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [notificationError, setNotificationError] = useState("");
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const notificationLoadingRef = useRef(false);
+  const notificationsLoadedRef = useRef(false);
+  const notificationRequestIdRef = useRef(0);
 
   useEffect(() => {
-    if (!user || !["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role)) return;
-    adminApi.notifications({ limit: 10 }).then((data) => {
+    notificationRequestIdRef.current += 1;
+    notificationLoadingRef.current = false;
+    notificationsLoadedRef.current = false;
+    setNotificationLoading(false);
+    setNotifications([]);
+    setNotificationError("");
+  }, [user?.account_id]);
+
+  const loadNotifications = useCallback(async () => {
+    if (!user || !["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role)
+      || notificationLoadingRef.current || notificationsLoadedRef.current) return;
+    const requestId = notificationRequestIdRef.current;
+    notificationLoadingRef.current = true;
+    setNotificationLoading(true);
+    try {
+      const data = await adminApi.notifications({ limit: 10 });
+      if (requestId !== notificationRequestIdRef.current) return;
       setNotifications(data.results);
       setNotificationError(data.complete ? "" : `Thiếu dữ liệu từ: ${data.missing_sites.join(", ")}`);
-    }).catch((error: unknown) => {
+      notificationsLoadedRef.current = data.complete;
+    } catch (error: unknown) {
+      if (requestId !== notificationRequestIdRef.current) return;
       setNotificationError(error instanceof Error ? error.message : "Không tải được thông báo.");
       if (error instanceof ApiError && Array.isArray(error.payload.results)) {
         setNotifications(error.payload.results.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"));
       }
-    });
+    } finally {
+      if (requestId === notificationRequestIdRef.current) {
+        notificationLoadingRef.current = false;
+        setNotificationLoading(false);
+      }
+    }
   }, [user]);
 
   const notificationMenu = {
@@ -46,7 +72,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
           key: String(item.slug ?? index),
           label: <div><strong>{String(item.title ?? "Thông báo")}</strong><div>{String(item.message ?? "")}</div><Typography.Text type="secondary">{String(item.site_code ?? "")}</Typography.Text></div>,
         }))
-      : [{ key: "empty", label: notificationError || "Chưa có thông báo.", disabled: true }],
+      : [{ key: "empty", label: notificationLoading ? "Đang tải thông báo..." : notificationError || "Chưa có thông báo.", disabled: true }],
     onClick: ({ key }: { key: string }) => {
       const item = notifications.find((notice, index) => String(notice.slug ?? index) === key);
       if (typeof item?.target_path === "string" && item.target_path.startsWith("/")) router.push(item.target_path);
@@ -80,7 +106,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
       </div>}
       {user?.role !== "admin_big" && user?.site_code && <Tag color="blue">Cơ sở {user.site_code}</Tag>}
 
-      {user && ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role) && <Dropdown menu={notificationMenu} trigger={["click"]} placement="bottomRight">
+      {user && ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role) && <Dropdown menu={notificationMenu} onOpenChange={(open) => { if (open) void loadNotifications(); }} trigger={["click"]} placement="bottomRight">
         <button type="button" className={styles.iconBtn} title={notificationError || "Thông báo"} aria-label="Thông báo">
           <Badge count={notifications.length} size="small"><BellOutlined /></Badge>
         </button>

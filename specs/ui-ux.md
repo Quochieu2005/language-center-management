@@ -358,6 +358,8 @@ Mỗi section lớn nằm trong thư mục riêng bên trong page, tối thiểu
 
 Nếu một section chỉ là một tiêu đề hoặc đoạn text không có style/hành vi riêng thì không cần tách thêm component. Các mẫu loading/empty/error dùng chung nên import từ `components/shared`, nhưng nội dung phải nói đúng nghiệp vụ của page.
 
+Header Admin hiển thị chuông thông báo nhưng chỉ tải danh sách khi người dùng mở chuông, để truy vấn toàn cục không chặn lúc vào trang. Trong menu phải hiện trạng thái đang tải, lỗi hoặc site thiếu; nếu dữ liệu chưa đầy đủ, lần mở tiếp theo cho phép tải lại. Khi đổi tài khoản, không giữ thông báo của phiên trước.
+
 ### 3.6. Danh mục page và route cần thiết
 
 Danh mục dưới đây làm rõ page nào cần thiết kế để không gộp nhiều nghiệp vụ vào một màn hình chung. Route minh họa là quy ước UI, không phải API endpoint. Các page nghiệp vụ nội bộ dùng chung shell và chỉ hiện theo quyền API. Source đã có `/student`, API portal và route SePay; phần này vẫn chưa được nhóm duyệt vào phạm vi môn học. Không xem code có sẵn là quyết định phạm vi hoặc bằng chứng vận hành.

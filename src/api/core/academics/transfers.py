@@ -21,6 +21,7 @@ from core.academics.common import (
 )
 from core.notifications.publisher import publish_notification
 from core.sites.connections import get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
 from core.students.slugging import available_student_slug
 
 
@@ -242,19 +243,26 @@ def list_transfer_requests(
     if not sites or not all(sites):
         raise AcademicSiteUnavailable
     take = offset + limit
+    unavailable = list(missing)
+    site_results, errors = read_sites_concurrently(
+        sites,
+        lambda site: _list_site_transfers(
+            site, status_filter=status_filter, take=take,
+            visible_to_site=recipient_site,
+        ),
+    )
     results: list[dict[str, Any]] = []
     counts = 0
-    unavailable = list(missing)
     for site in sites:
-        try:
-            count, items = _list_site_transfers(
-                site, status_filter=status_filter, take=take,
-                visible_to_site=recipient_site,
-            )
-            counts += count
-            results.extend(items)
-        except AcademicInfrastructureUnavailable:
+        error = errors.get(site)
+        if error is not None:
+            if not isinstance(error, AcademicInfrastructureUnavailable):
+                raise error
             unavailable.append(site)
+            continue
+        count, items = site_results[site]
+        counts += count
+        results.extend(items)
     results.sort(key=lambda item: (item["created_at"], item["source_site"], item["transfer_id"]), reverse=True)
     return {
         "complete": not unavailable,

@@ -1,8 +1,7 @@
 """Global and local student-count queries over isolated site databases."""
 
-from django.db import connections
-from django.db import DatabaseError
 from django.core.exceptions import ImproperlyConfigured
+from django.db import DatabaseError, connections
 
 from core.academics.common import (
     AcademicError,
@@ -12,8 +11,8 @@ from core.academics.common import (
     translate_database_errors,
 )
 from core.academics.tuition import _verify_cashier
-from core.sites.connections import get_site_database_alias
-from core.sites.connections import UnknownSiteError
+from core.sites.connections import UnknownSiteError, get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
 
 
 @translate_database_errors
@@ -34,19 +33,23 @@ def student_counts_by_site(*, requested_site: str | None = None) -> dict:
         }
 
     available, missing = active_site_state()
-    results = []
+
+    def read_count(site: str) -> dict:
+        alias = get_site_database_alias(site)
+        with connections[alias].cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT_BIG(*) FROM dbo.HocVien WHERE ma_co_so = %s AND trang_thai = 'dang_hoc'",
+                [site],
+            )
+            return {"site_code": site, "active_students": int(cursor.fetchone()[0])}
+
+    site_results, errors = read_sites_concurrently(available, read_count)
+    results = list(site_results.values())
     unavailable = list(missing)
-    for site in available:
-        try:
-            alias = get_site_database_alias(site)
-            with connections[alias].cursor() as cursor:
-                cursor.execute(
-                    "SELECT COUNT_BIG(*) FROM dbo.HocVien WHERE ma_co_so = %s AND trang_thai = 'dang_hoc'",
-                    [site],
-                )
-                results.append({"site_code": site, "active_students": int(cursor.fetchone()[0])})
-        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
-            unavailable.append(site)
+    for site, error in errors.items():
+        if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+            raise error
+        unavailable.append(site)
     results.sort(key=lambda row: row["site_code"])
     if not results and unavailable:
         raise AcademicInfrastructureUnavailable
@@ -112,13 +115,16 @@ def tuition_financial_summary(
         }
 
     available, missing = active_site_state()
-    results = []
+
+    site_results, errors = read_sites_concurrently(
+        available, _tuition_financial_summary_for_site,
+    )
+    results = list(site_results.values())
     unavailable = list(missing)
-    for site in available:
-        try:
-            results.append(_tuition_financial_summary_for_site(site))
-        except (AcademicError, ImproperlyConfigured, KeyError, UnknownSiteError):
-            unavailable.append(site)
+    for site, error in errors.items():
+        if not isinstance(error, (AcademicError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+            raise error
+        unavailable.append(site)
     results.sort(key=lambda row: row["site_code"])
     if not results and unavailable:
         raise AcademicInfrastructureUnavailable
