@@ -2,7 +2,7 @@
 
 Căn cứ tài liệu học phần: [bảng đối chiếu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Ánh xạ route/API sang dữ liệu/site theo [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh); ERD chỉ có FK cục bộ. Thay đổi hiệu năng này không thêm endpoint hoặc trường request/response; `GET /api/v1/admin/admin-smalls/` trả dữ liệu một phần khi ít nhất một site phản hồi và nêu `complete=false`/`missing_sites`.
 
-Thư mục này lưu yêu cầu thiết kế cho giao diện và các hợp đồng API. Hai file có mục đích riêng nhưng phải mô tả cùng một luồng nghiệp vụ:
+Thư mục này lưu yêu cầu thiết kế cho giao diện và các hợp đồng API. Luồng quản lý khóa học lưu ý định/ACK append-only trong `Logs` hiện có, dùng worker `manage.py sync_courses` và endpoint đối soát `POST /api/v1/admin/courses/sync/`; trạng thái 202/thiếu site phải khớp giữa hai tài liệu. Hai file có mục đích riêng nhưng phải mô tả cùng một luồng nghiệp vụ:
 
 | Tài liệu | Dùng để thống nhất |
 |---|---|

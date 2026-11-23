@@ -14,10 +14,12 @@ py -3.13 -m venv .venv
 Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py check
 .\.venv\Scripts\python.exe manage.py test
-.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
+.\run-local.ps1
 ```
 
 Nếu môi trường đã có Python khác tương thích, thay `py -3.13` bằng launcher/version tương ứng. Không cài package vào Python toàn máy; dependency được cài trong `.venv` của API. Cần cài driver SQL Server tương thích nếu máy API kết nối SQL Server qua ODBC.
+
+`run-local.ps1` khởi chạy API cùng worker đồng bộ tài khoản và `KhoaHoc`. Nếu chạy server bằng `manage.py runserver` hoặc chạy API trong môi trường khác, cần khởi chạy thêm các tiến trình được giám sát `manage.py sync_accounts` và `manage.py sync_courses` để tiếp tục đồng bộ khi site phục hồi.
 
 Khi mở repository ở thư mục gốc bằng VS Code, terminal tích hợp CMD mặc định bắt đầu tại thư mục gốc. Sau khi đã tạo `src/api/.venv`, có thể vào API theo từng bước rồi chạy lệnh như bình thường:
 
@@ -94,6 +96,7 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 | `core/sites/connections.py`, `core/sites/fanout.py` | Chọn alias site và chạy các Global Query độc lập song song với số worker giới hạn; giữ danh sách site thiếu/lỗi riêng |
 | `core/auth/` | Đăng nhập, phiên có thể thu hồi, CSRF, idle timeout, hồ sơ, đổi/reset mật khẩu, OAuth học viên và vòng đời Admin Small |
 | `core/catalog/` | Danh mục môn/khóa học, danh sách khóa học công khai và ghi danh mục dùng chung |
+| `core/catalog/course_sync_queue.py`, `core/management/commands/sync_courses.py` | Lưu intent/ACK `KhoaHoc` append-only trong `Logs` tại `AUTH_SESSION_SITE_CODE` và retry site còn thiếu mỗi 5 giây; `run-local.ps1` khởi chạy worker cùng API |
 | `core/blog/` | API công khai đọc danh mục và chi tiết Blog theo slug bằng Global Query; đối chiếu bản sao từng site và báo site thiếu/lệch |
 | `core/classes/` | Phòng/lớp/buổi, đăng ký công khai và đăng ký/xếp lớp cục bộ |
 | `core/academics/` | Chuyển cơ sở, học phí/phiếu thu/kỳ đóng, nhắc phí, báo cáo, điểm danh/điểm và SePay |

@@ -111,16 +111,29 @@ export type SharedCourseWriteResult = {
   ma_khoa_hoc: string; slug: string; ma_mon: string; ten_khoa_hoc: string;
   trinh_do: string; so_buoi: number | null; thoi_luong_so: number | string | null;
   thoi_luong_don_vi: "thang" | "ngay" | null; hoc_phi_chuan: number; phien_ban: number;
-  complete: boolean; sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
+  complete: boolean; sites: string[]; missing_sites: string[]; idempotent_replay: boolean; detail?: string;
 };
 export type SharedCourseDeleteResult = {
   ma_khoa_hoc: string; slug: string; deleted: boolean; complete: boolean;
-  sites: string[]; missing_sites: string[]; idempotent_replay: boolean;
+  sites: string[]; missing_sites: string[]; idempotent_replay: boolean; detail?: string;
+};
+export type SharedCourseSyncStatus = {
+  complete: boolean;
+  pending_count: number;
+  pending_sites: string[];
+  operations: {
+    operation_id: string; action: "tao" | "sua" | "xoa"; course_id: string | null;
+    slug: string; status: "cho_dong_bo" | "can_doi_soat"; pending_sites: string[];
+    detail: string | null;
+  }[];
 };
 
 export const catalogApi = {
   publicCourses: () => apiRequest<PublicCourseList>("/courses/"),
   courseClassSessions: () => apiRequest<CourseClassSessionSummary>("/admin/courses/class-sessions/"),
+  reconcileCourseWrites: (operationId?: string) => apiRequest<SharedCourseSyncStatus>("/admin/courses/sync/", {
+    method: "POST", ...(operationId ? { body: jsonBody({ operation_id: operationId }) } : {}),
+  }),
   sharedSubjects: () => apiRequest<SharedSubjectList>("/admin/shared/subjects/"),
   createSubject: (body: SharedSubjectCreateInput, idempotencyKey: string) =>
     apiRequest<SharedSubjectWriteResult>("/admin/shared/subjects/", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),

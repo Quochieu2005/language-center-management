@@ -35,6 +35,7 @@ export default function TuitionPage() {
   const canViewReceipts = user?.role !== "tu_van";
   const canManagePlan = ["admin_big", "admin_small", "tu_van"].includes(user?.role || "");
   const canSendReminder = ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user?.role || "");
+  const canViewFinancialSummary = ["admin_big", "admin_small", "ke_toan"].includes(user?.role || "");
   const [rows, setRows] = useState<TuitionRow[]>([]);
   const [active, setActive] = useState<TuitionRow | null>(null);
   const [modal, setModal] = useState<"receipt" | "plan" | "refund" | null>(null);
@@ -76,12 +77,12 @@ export default function TuitionPage() {
     finally { setLoading(false); }
   }, [site, statusFilter, search, offset]);
   const loadSummary = useCallback(async () => {
-    if (!site) { setSummary(null); return; }
+    if (!site || !canViewFinancialSummary) { setSummary(null); setSummaryError(""); return; }
     try {
       setSummary(await adminApi.tuitionFinancialSummary(site === ALL_SITES ? undefined : site));
       setSummaryError("");
     } catch (reason) { setSummary(null); setSummaryError(toMessage(reason)); }
-  }, [site]);
+  }, [site, canViewFinancialSummary]);
   useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) { void load(); void loadSummary(); } }); return () => { cancelled = true; }; }, [load, loadSummary]);
   const collect = async (values: ReceiptValues) => {
     if (!site || !active || !user || receiptBusy.current) return;
@@ -184,15 +185,15 @@ export default function TuitionPage() {
   return <Card title={`Học phí · ${site === ALL_SITES ? "Toàn hệ thống" : site || "Chưa chọn cơ sở"}`} extra={<Button onClick={() => { void load(); void loadSummary(); }}>Tải lại</Button>}>
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
     {partial.length > 0 && <Alert type="warning" showIcon title={`Global Query thiếu site: ${partial.join(", ")}; dữ liệu chưa đầy đủ.`} style={{ marginBottom: 16 }} />}
-    {summaryError && <Alert type="warning" showIcon title={`Chưa tải được tổng công nợ: ${summaryError}`} style={{ marginBottom: 16 }} />}
-    {summary && !summary.complete && <Alert type="warning" showIcon title={`Báo cáo công nợ thiếu site: ${summary.missing_sites.join(", ")}; tổng bên dưới chưa đầy đủ.`} style={{ marginBottom: 16 }} />}
+    {canViewFinancialSummary && summaryError && <Alert type="warning" showIcon title={`Chưa tải được tổng công nợ: ${summaryError}`} style={{ marginBottom: 16 }} />}
+    {canViewFinancialSummary && summary && !summary.complete && <Alert type="warning" showIcon title={`Báo cáo công nợ thiếu site: ${summary.missing_sites.join(", ")}; tổng bên dưới chưa đầy đủ.`} style={{ marginBottom: 16 }} />}
     <Alert type="info" showIcon title="Mỗi lần thu ghi một phiếu tại CSDL của cơ sở. Có thể thu một phần nhiều lần và đổi phương thức giữa tiền mặt, chuyển khoản hoặc thẻ. Nếu API timeout, kiểm tra lại phiếu trước khi thử thu lần nữa." style={{ marginBottom: 16 }} />
-    <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+    {canViewFinancialSummary && <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
       <Col xs={24} sm={12} xl={6}><Statistic title="Tổng còn nợ" value={summary ? summary.totals.outstanding : "—"} formatter={(value) => typeof value === "number" ? money(value) : value} /></Col>
       <Col xs={24} sm={12} xl={6}><Statistic title="Khoản còn nợ" value={summary ? summary.totals.accounts_with_balance : "—"} /></Col>
       <Col xs={24} sm={12} xl={6}><Statistic title="Tổng đã thu ròng" value={summary ? summary.totals.net_collected : "—"} formatter={(value) => typeof value === "number" ? money(value) : value} /></Col>
       <Col xs={24} sm={12} xl={6}><Statistic title="Số khoản học phí" value={summary ? summary.totals.tuition_accounts : "—"} /></Col>
-    </Row>
+    </Row>}
     <Space wrap style={{ marginBottom: 16 }}>
       <Select value={statusFilter} onChange={(value: TuitionStatusFilter) => { setStatusFilter(value); setOffset(0); }} options={[
         { value: "con_no", label: "Còn nợ" }, { value: "all", label: "Tất cả khoản học phí" },
@@ -205,9 +206,9 @@ export default function TuitionPage() {
       }} onSearch={(value) => { setSearch(value.trim()); setOffset(0); }} style={{ width: 320 }} />
     </Space>
     <Table rowKey="tuition_id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 1100 }} locale={{ emptyText: count !== 0 ? undefined : error ? "Không tải được danh sách học phí." : summaryError ? "Chưa xác định được công nợ; hãy tải lại." : summary?.totals.tuition_accounts === 0 ? "Chưa có khoản học phí. Khoản phí phát sinh khi học viên được đăng ký vào lớp." : statusFilter === "con_no" && !search ? "Hiện không có khoản học phí còn nợ." : "Không có khoản học phí phù hợp với bộ lọc." }} pagination={{ current: Math.floor(offset / tuitionPageSize) + 1, pageSize: tuitionPageSize, total: count, showSizeChanger: false, showTotal: (total) => `${total} khoản học phí`, onChange: (page) => setOffset((page - 1) * tuitionPageSize) }} />
-    <Modal title={`Ghi nhận thanh toán${active ? ` · ${active.student_name}` : ""}`} open={modal === "receipt"} onCancel={() => { if (!receiptBusy.current) setModal(null); }} closable={!receiptSubmitting} maskClosable={!receiptSubmitting} footer={null} destroyOnHidden><Form form={receiptForm} layout="vertical" onFinish={collect}><Form.Item label="Còn phải đóng"><Input value={active ? money(active.balance) : ""} disabled /></Form.Item><Form.Item name="amount" label="Số tiền nhận (đồng)" rules={[{ required: true }]}><InputNumber min={1} max={active?.balance || undefined} precision={0} style={{ width: "100%" }} /></Form.Item><Form.Item name="payment_method" label="Phương thức" rules={[{ required: true }]}><Select options={[{ value: "tien_mat", label: "Tiền mặt" }, { value: "chuyen_khoan", label: "Chuyển khoản" }, { value: "the", label: "Thẻ" }]} /></Form.Item><Form.Item name="note" label="Ghi chú"><Input maxLength={500} /></Form.Item><Button type="primary" htmlType="submit" block loading={receiptSubmitting}>Ghi phiếu thu</Button></Form></Modal>
+    <Modal title={`Ghi nhận thanh toán${active ? ` · ${active.student_name}` : ""}`} open={modal === "receipt"} onCancel={() => { if (!receiptBusy.current) setModal(null); }} closable={!receiptSubmitting} mask={{ closable: !receiptSubmitting }} footer={null} destroyOnHidden><Form form={receiptForm} layout="vertical" onFinish={collect}><Form.Item label="Còn phải đóng"><Input value={active ? money(active.balance) : ""} disabled /></Form.Item><Form.Item name="amount" label="Số tiền nhận (đồng)" rules={[{ required: true }]}><InputNumber min={1} max={active?.balance || undefined} precision={0} style={{ width: "100%" }} /></Form.Item><Form.Item name="payment_method" label="Phương thức" rules={[{ required: true }]}><Select options={[{ value: "tien_mat", label: "Tiền mặt" }, { value: "chuyen_khoan", label: "Chuyển khoản" }, { value: "the", label: "Thẻ" }]} /></Form.Item><Form.Item name="note" label="Ghi chú"><Input maxLength={500} /></Form.Item><Button type="primary" htmlType="submit" block loading={receiptSubmitting}>Ghi phiếu thu</Button></Form></Modal>
     <Modal title="Kế hoạch học phí" open={modal === "plan"} onCancel={() => setModal(null)} footer={null} destroyOnHidden><Form form={planForm} layout="vertical" onFinish={savePlan}><Form.Item name="payment_mode" label="Cách đóng" rules={[{ required: true }]}><Select options={[{ value: "full", label: "Đóng một lần" }, { value: "monthly", label: "Chia theo tháng" }]} /></Form.Item><Form.Item noStyle shouldUpdate>{({ getFieldValue }) => getFieldValue("payment_mode") === "monthly" ? <Form.Item name="installment_count" label="Số tháng" rules={[{ required: true }]}><Select options={[3, 6, 9, 12].map((n) => ({ value: n, label: `${n} tháng` }))} /></Form.Item> : null}</Form.Item><Form.Item name="first_due_date" label="Ngày đến hạn đầu tiên" rules={[{ required: true }]}><Input type="date" min={new Date().toLocaleDateString("en-CA")} /></Form.Item><Button type="primary" htmlType="submit" block>Lưu kế hoạch</Button></Form></Modal>
-    <Modal title={`Hoàn học phí${active ? ` · ${active.student_name}` : ""}`} open={modal === "refund"} onCancel={() => { if (!refundSubmitting) setModal(null); }} closable={!refundSubmitting} maskClosable={!refundSubmitting} footer={null} destroyOnHidden>
+    <Modal title={`Hoàn học phí${active ? ` · ${active.student_name}` : ""}`} open={modal === "refund"} onCancel={() => { if (!refundSubmitting) setModal(null); }} closable={!refundSubmitting} mask={{ closable: !refundSubmitting }} footer={null} destroyOnHidden>
       <Form form={refundForm} layout="vertical" onFinish={refund}>
         <Form.Item name="receipt_id" label="Phiếu thu gốc" rules={[{ required: true }]}>
           <Select loading={refundLoading} onChange={(id) => { setRefundReceiptId(id); const receipt = refundReceipts.find((item) => item.receipt_id === id); if (receipt) refundForm.setFieldValue("amount", receipt.refundable_amount); }} options={refundReceipts.filter((receipt) => receipt.refundable_amount > 0 || receipt.receipt_id === refundReceiptId).map((receipt) => ({ value: receipt.receipt_id, label: `${receipt.receipt_id} · còn hoàn ${money(receipt.refundable_amount)}` }))} />

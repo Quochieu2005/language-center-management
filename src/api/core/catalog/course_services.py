@@ -19,6 +19,14 @@ from core.catalog.services import (
     SharedCatalogNotFound,
     SharedCatalogUnavailable,
 )
+from core.catalog.course_sync_queue import (
+    get_operation,
+    get_pending_operations,
+    get_review_operations,
+    insert_operation,
+    mark_manual_retry,
+    save_progress,
+)
 from core.slug_utils import make_slug
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
@@ -157,7 +165,7 @@ def _check_subject_replicas(sites: tuple[str, ...], subject_id: str) -> None:
 
 def _apply_site(
     *, site: str, before: dict | None, after: dict, event_id: str,
-    request_hash: str, actor_id: str,
+    request_hash: str, actor_id: str, target_sites: tuple[str, ...],
 ) -> None:
     alias = get_site_database_alias(site)
     with transaction.atomic(using=alias):
@@ -260,7 +268,8 @@ def _apply_site(
                 "ma_ban_ghi, du_lieu_cu, du_lieu_moi, ket_qua, site_dich) "
                 "VALUES (%s, 'sync', %s, %s, %s, 'KhoaHoc', %s, %s, %s, 'thanh_cong', %s)",
                 [event_id, site, actor_id, "tao" if before is None else "sua", after["ma_khoa_hoc"],
-                 _json(before), _json({"request_hash": request_hash, "after": after}), site],
+                 _json(before), _json({"request_hash": request_hash, "after": after,
+                                       "target_sites": list(target_sites)}), site],
             )
 
 
@@ -268,27 +277,38 @@ def _write_course(*, action: str, slug: str, payload: dict, idempotency_key: str
     registry_site = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
     try:
         registry_alias = get_site_database_alias(registry_site)
-        sites, missing_sites = active_site_state()
     except (AcademicInfrastructureUnavailable, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise SharedCatalogUnavailable(
             f"Không kiểm tra được CSDL điều phối tại site {registry_site or 'chưa cấu hình'}; "
             "giữ nguyên mã yêu cầu và nội dung để thử lại.",
             missing_sites=(registry_site,) if registry_site else (),
         ) from exc
-    if missing_sites or not sites:
-        raise SharedCatalogUnavailable(
-            "Một hoặc nhiều site đang hoạt động chưa sẵn sàng; chưa bắt đầu ghi khóa học.",
-            missing_sites=missing_sites,
-        )
-
-    course_id = payload["ma_khoa_hoc"] if action == "tao" else None
     identity = {"action": action, "slug": slug, "payload": payload}
     request_hash = hashlib.sha256(_json(identity).encode("utf-8")).hexdigest()
     key_digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
-    ordered_sites = (registry_site,) + tuple(site for site in sorted(sites) if site != registry_site)
-    event_ids = {site: f"KHREP-{site}-{key_digest[:64]}" for site in ordered_sites}
+    try:
+        existing = get_operation(registry_alias, key_digest, available_sites=(registry_site,))
+        if existing:
+            if existing["request_hash"] != request_hash:
+                raise SharedCatalogConflict("Idempotency-Key đã dùng với nội dung khác.")
+            return _resume_course_operation_by_idempotency(
+                existing, registry_site=registry_site, registry_alias=registry_alias,
+                idempotent_replay=True,
+            )
+        reviews = get_review_operations(registry_alias)
+        if reviews:
+            raise SharedCatalogUnavailable(
+                "Có khóa học cần đối soát thủ công trước khi nhận thao tác mới.",
+                missing_sites=tuple(sorted({site for row in reviews for site in row.get("initial_pending_sites", ())})),
+            )
+    except (ImproperlyConfigured, KeyError, UnknownSiteError, DatabaseError) as exc:
+        raise SharedCatalogUnavailable(
+            "Chưa sẵn sàng Logs tại site điều phối để giữ yêu cầu đồng bộ khóa học.",
+            missing_sites=(registry_site,),
+        ) from exc
 
     try:
+        operation = None
         with transaction.atomic(using=registry_alias):
             try:
                 with connections[registry_alias].cursor() as cursor:
@@ -299,129 +319,136 @@ def _write_course(*, action: str, slug: str, payload: dict, idempotency_key: str
                     "giữ nguyên mã yêu cầu và nội dung để thử lại.",
                     missing_sites=(registry_site,),
                 ) from exc
-            states = {}
-            for site in ordered_sites:
-                try:
-                    states[site] = _read_site_course(
-                        site, slug=slug, course_id=course_id, event_id=event_ids[site]
-                    )
-                except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-                    raise SharedCatalogUnavailable(
-                        f"Không đối soát được khóa học tại site {site}; "
-                        "giữ nguyên mã yêu cầu và nội dung để thử lại.",
-                        missing_sites=(site,),
-                    ) from exc
-            current = {site: state[0] for site, state in states.items()}
-            events = {site: state[1] for site, state in states.items()}
-            if action == "tao":
-                existing_events = [event for event in events.values() if event]
-                if existing_events:
-                    transitions = [
-                        _validate_event(event, action=action, course_id=course_id, request_hash=request_hash)
-                        for event in existing_events
-                    ]
-                    before, after = transitions[0]
-                    if any(transition != transitions[0] for transition in transitions[1:]):
-                        raise SharedCatalogConflict("ACK tạo khóa học không thống nhất giữa các site.")
-                    for site in ordered_sites:
-                        if events[site]:
-                            if current[site] is None or current[site]["phien_ban"] < after["phien_ban"]:
-                                raise SharedCatalogConflict("ACK tồn tại nhưng bản sao khóa học bị thiếu hoặc cũ.")
-                            if current[site]["phien_ban"] == after["phien_ban"] and current[site] != after:
-                                raise SharedCatalogConflict("Bản sao khóa học không khớp ACK; cần đối soát.")
-                        elif current[site] is not None:
-                            raise SharedCatalogConflict("Site chưa ACK nhưng đã có dữ liệu khóa học khác.")
-                else:
-                    if any(course is not None for course in current.values()):
-                        raise SharedCatalogConflict("Mã khóa học hoặc slug đã tồn tại; hãy chọn mã/slug khác.")
-                    before = None
-                    after = {**payload, "phien_ban": 1}
-            else:
-                if any(course is None for course in current.values()):
-                    raise SharedCatalogNotFound("Không tìm thấy khóa học đồng nhất ở mọi site hoạt động.")
-                existing_events = [event for event in events.values() if event]
-                if existing_events:
-                    target_ids = {event.get("record_id") for event in existing_events}
-                    if len(target_ids) != 1 or not next(iter(target_ids)):
-                        raise SharedCatalogConflict("ACK cập nhật khóa học không thống nhất mã đích.")
-                    course_id = next(iter(target_ids))
-                    transitions = [
-                        _validate_event(event, action=action, course_id=course_id, request_hash=request_hash)
-                        for event in existing_events
-                    ]
-                    before, after = transitions[0]
-                    if any(transition != transitions[0] for transition in transitions[1:]):
-                        raise SharedCatalogConflict("ACK cập nhật khóa học không thống nhất giữa các site.")
-                    for site in ordered_sites:
-                        if events[site]:
-                            if current[site]["phien_ban"] < after["phien_ban"]:
-                                raise SharedCatalogConflict("ACK tồn tại nhưng bản sao khóa học thấp hơn phiên bản.")
-                            if current[site]["phien_ban"] == after["phien_ban"] and current[site] != after:
-                                raise SharedCatalogConflict("Bản sao khóa học không khớp ACK; cần đối soát.")
-                        elif current[site] != before:
-                            raise SharedCatalogConflict("Site chưa ACK nhưng dữ liệu khóa học đã thay đổi.")
-                else:
-                    before_values = list(current.values())
-                    if any(course != before_values[0] for course in before_values[1:]):
-                        raise SharedCatalogConflict("Các bản sao khóa học đang khác nhau; cần đồng bộ trước khi sửa.")
-                    before = before_values[0]
-                    course_id = before["ma_khoa_hoc"]
-                    try:
-                        new_slug = make_slug(
-                            payload.get("ten_khoa_hoc", before["ten_khoa_hoc"]), max_length=160
-                        )
-                    except ValueError as exc:
-                        raise SharedCatalogConflict("Không tạo được slug từ tên khóa học.") from exc
-                    after = {
-                        **before, **payload, "slug": new_slug,
-                        "phien_ban": before["phien_ban"] + 1,
-                    }
 
-            _check_subject_replicas(ordered_sites, after["ma_mon"])
-            if action == "sua":
+            operation = get_operation(registry_alias, key_digest, available_sites=(registry_site,))
+            if operation:
+                if operation["request_hash"] != request_hash:
+                    raise SharedCatalogConflict("Idempotency-Key đã dùng với nội dung khác.")
+            else:
+                sites, missing_sites = active_site_state()
+                if registry_site not in sites:
+                    raise SharedCatalogUnavailable(
+                        "CSDL điều phối chưa sẵn sàng; không thể ghi nhận yêu cầu đồng bộ.",
+                        missing_sites=(registry_site,),
+                    )
+                target_sites = tuple(sorted(set(sites) | set(missing_sites)))
+                ordered_sites = (registry_site,) + tuple(site for site in sorted(sites) if site != registry_site)
+                course_id = payload["ma_khoa_hoc"] if action == "tao" else None
+                event_ids = {site: f"KHREP-{site}-{key_digest[:64]}" for site in ordered_sites}
+
+                states = {}
                 for site in ordered_sites:
                     try:
-                        with get_site_connection(site).cursor() as cursor:
-                            cursor.execute(
-                                "SELECT ma_khoa_hoc FROM dbo.KhoaHoc "
-                                "WHERE (ma_khoa_hoc = %s OR slug = %s) AND ma_khoa_hoc <> %s",
-                                [after["ma_khoa_hoc"], after["slug"], current[site]["ma_khoa_hoc"]],
-                            )
-                            if cursor.fetchall():
-                                raise SharedCatalogConflict("Mã khóa học hoặc slug đã được dùng tại một site.")
+                        states[site] = _read_site_course(
+                            site, slug=slug, course_id=course_id, event_id=event_ids[site]
+                        )
                     except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
                         raise SharedCatalogUnavailable(
-                            f"Không kiểm tra được slug khóa học tại site {site}; "
-                            "giữ nguyên mã yêu cầu và nội dung để thử lại.",
+                            f"Không đối soát được khóa học tại site {site}; giữ nguyên yêu cầu để thử lại.",
                             missing_sites=(site,),
                         ) from exc
-            failed_sites = []
-            for site in ordered_sites:
-                if events[site]:
-                    continue
-                try:
-                    _apply_site(
-                        site=site, before=before, after=after, event_id=event_ids[site],
-                        request_hash=request_hash, actor_id=actor_id,
-                    )
-                except SharedCatalogConflict:
-                    raise
-                except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-                    if site == registry_site:
-                        raise SharedCatalogUnavailable(
-                            f"Không xác nhận được ghi khóa học tại site {site}; "
-                            "giữ nguyên mã yêu cầu và nội dung để thử lại.",
-                            missing_sites=(site,),
-                        ) from exc
-                    failed_sites.append(site)
-            return {
-                **after, "complete": not failed_sites,
-                "sites": [site for site in ordered_sites if site not in failed_sites],
-                "missing_sites": failed_sites, "idempotent_replay": bool(existing_events),
-            }
+                current = {site: state[0] for site, state in states.items()}
+                events = {site: state[1] for site, state in states.items()}
+                if action == "tao":
+                    existing_events = [event for event in events.values() if event]
+                    if existing_events:
+                        transitions = [
+                            _validate_event(event, action=action, course_id=course_id, request_hash=request_hash)
+                            for event in existing_events
+                        ]
+                        before, after = transitions[0]
+                        if any(transition != transitions[0] for transition in transitions[1:]):
+                            raise SharedCatalogConflict("ACK tạo khóa học không thống nhất giữa các site.")
+                        for site in ordered_sites:
+                            if events[site]:
+                                if current[site] is None or current[site]["phien_ban"] < after["phien_ban"]:
+                                    raise SharedCatalogConflict("ACK tồn tại nhưng bản sao khóa học bị thiếu hoặc cũ.")
+                                if current[site]["phien_ban"] == after["phien_ban"] and current[site] != after:
+                                    raise SharedCatalogConflict("Bản sao khóa học không khớp ACK; cần đối soát.")
+                            elif current[site] is not None:
+                                raise SharedCatalogConflict("Site chưa ACK nhưng đã có dữ liệu khóa học khác.")
+                    else:
+                        if any(course is not None for course in current.values()):
+                            raise SharedCatalogConflict("Mã khóa học hoặc slug đã tồn tại; hãy chọn mã/slug khác.")
+                        before = None
+                        after = {**payload, "phien_ban": 1}
+                else:
+                    if any(course is None for course in current.values()):
+                        raise SharedCatalogNotFound("Không tìm thấy khóa học tại các site đang phản hồi.")
+                    existing_events = [event for event in events.values() if event]
+                    if existing_events:
+                        target_ids = {event.get("record_id") for event in existing_events}
+                        if len(target_ids) != 1 or not next(iter(target_ids)):
+                            raise SharedCatalogConflict("ACK cập nhật khóa học không thống nhất mã đích.")
+                        course_id = next(iter(target_ids))
+                        transitions = [
+                            _validate_event(event, action=action, course_id=course_id, request_hash=request_hash)
+                            for event in existing_events
+                        ]
+                        before, after = transitions[0]
+                        if any(transition != transitions[0] for transition in transitions[1:]):
+                            raise SharedCatalogConflict("ACK cập nhật khóa học không thống nhất giữa các site.")
+                        for site in ordered_sites:
+                            if events[site]:
+                                if current[site]["phien_ban"] < after["phien_ban"]:
+                                    raise SharedCatalogConflict("ACK tồn tại nhưng bản sao khóa học thấp hơn phiên bản.")
+                                if current[site]["phien_ban"] == after["phien_ban"] and current[site] != after:
+                                    raise SharedCatalogConflict("Bản sao khóa học không khớp ACK; cần đối soát.")
+                            elif current[site] != before:
+                                raise SharedCatalogConflict("Site chưa ACK nhưng dữ liệu khóa học đã thay đổi.")
+                    else:
+                        before_values = list(current.values())
+                        if any(course != before_values[0] for course in before_values[1:]):
+                            raise SharedCatalogConflict("Các bản sao khóa học đang khác nhau; cần đồng bộ trước khi sửa.")
+                        before = before_values[0]
+                        course_id = before["ma_khoa_hoc"]
+                        try:
+                            new_slug = make_slug(
+                                payload.get("ten_khoa_hoc", before["ten_khoa_hoc"]), max_length=160
+                            )
+                        except ValueError as exc:
+                            raise SharedCatalogConflict("Không tạo được slug từ tên khóa học.") from exc
+                        after = {
+                            **before, **payload, "slug": new_slug,
+                            "phien_ban": before["phien_ban"] + 1,
+                        }
+
+                _check_subject_replicas(ordered_sites, after["ma_mon"])
+                if action == "sua":
+                    for site in ordered_sites:
+                        try:
+                            with get_site_connection(site).cursor() as cursor:
+                                cursor.execute(
+                                    "SELECT ma_khoa_hoc FROM dbo.KhoaHoc "
+                                    "WHERE (ma_khoa_hoc = %s OR slug = %s) AND ma_khoa_hoc <> %s",
+                                    [after["ma_khoa_hoc"], after["slug"], current[site]["ma_khoa_hoc"]],
+                                )
+                                if cursor.fetchall():
+                                    raise SharedCatalogConflict("Mã khóa học hoặc slug đã được dùng tại một site.")
+                        except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+                            raise SharedCatalogUnavailable(
+                                f"Không kiểm tra được slug khóa học tại site {site}; giữ nguyên yêu cầu để thử lại.",
+                                missing_sites=(site,),
+                            ) from exc
+
+                operation = {
+                    "operation_id": key_digest, "actor_id": actor_id, "action": action, "slug": slug,
+                    "course_id": after["ma_khoa_hoc"], "request_hash": request_hash,
+                    "before": before, "after": after, "target_sites": target_sites,
+                    "pending_sites": target_sites, "status": "cho_dong_bo",
+                }
+                insert_operation(registry_alias, operation)
+        operation = operation or get_operation(registry_alias, key_digest)
+        if operation is None:
+            raise SharedCatalogUnavailable("Không lưu được yêu cầu đồng bộ khóa học.", missing_sites=(registry_site,))
+        return _resume_course_operation_by_idempotency(
+            operation, registry_site=registry_site, registry_alias=registry_alias,
+            idempotent_replay=False,
+        )
     except (SharedCatalogConflict, SharedCatalogNotFound, SharedCatalogUnavailable):
         raise
-    except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+    except (AcademicInfrastructureUnavailable, AuthInfrastructureUnavailable, DatabaseError,
+            ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise SharedCatalogUnavailable(
             f"Không xác nhận được giao dịch điều phối tại site {registry_site or 'chưa cấu hình'}; "
             "giữ nguyên mã yêu cầu và nội dung để thử lại.",
@@ -461,12 +488,12 @@ def _validate_delete_event(event: dict, *, course_id: str, request_hash: str) ->
 def _delete_course_replicas(
     *, sites: tuple[str, ...], registry_alias: str, before: dict,
     events: dict, event_ids: dict, request_hash: str, actor_id: str,
+    target_sites: tuple[str, ...] = (),
 ) -> None:
     aliases = {site: get_site_database_alias(site) for site in sites}
     with ExitStack() as stack:
-        for site in sites:
-            if aliases[site] != registry_alias:
-                stack.enter_context(transaction.atomic(using=aliases[site]))
+        for alias in dict.fromkeys(aliases.values()):
+            stack.enter_context(transaction.atomic(using=alias))
 
         for site in sites:
             with connections[aliases[site]].cursor() as cursor:
@@ -513,8 +540,292 @@ def _delete_course_replicas(
                     "ma_ban_ghi, du_lieu_cu, du_lieu_moi, ket_qua, site_dich) "
                     "VALUES (%s, 'sync', %s, %s, 'xoa', 'KhoaHoc', %s, %s, %s, 'thanh_cong', %s)",
                     [event_ids[site], site, actor_id, before["ma_khoa_hoc"], _json(before),
-                     _json({"request_hash": request_hash, "after": None}), site],
+                     _json({"request_hash": request_hash, "after": None,
+                            "target_sites": list(target_sites or sites)}), site],
                 )
+
+
+def _resume_course_operation(
+    operation: dict, *, registry_site: str, registry_alias: str, idempotent_replay: bool,
+    site_state: tuple[tuple[str, ...], tuple[str, ...]] | None = None,
+) -> dict:
+    """Apply a durable course intent to reachable targets and retain missing targets for retry."""
+    before = _normalize_course_snapshot(operation["before"])
+    after = _normalize_course_snapshot(operation["after"])
+    if site_state is None:
+        try:
+            available, missing_now = active_site_state()
+        except (AcademicInfrastructureUnavailable, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+            raise SharedCatalogUnavailable("Không xác định được site để tiếp tục đồng bộ khóa học.") from exc
+    else:
+        available, missing_now = site_state
+    if registry_site not in available:
+        raise SharedCatalogUnavailable(
+            "CSDL điều phối chưa sẵn sàng; yêu cầu vẫn được giữ trong hàng đợi.",
+            missing_sites=(registry_site,),
+        )
+
+    active_sites = set(available) | set(missing_now)
+    targets = tuple(site for site in operation["target_sites"] if site in active_sites)
+    current_order = (registry_site,) + tuple(site for site in sorted(available) if site != registry_site)
+    available_targets = tuple(site for site in current_order if site in targets and site in available)
+    pending = set(targets) - set(available_targets)
+    operation_id = operation["operation_id"]
+    course_id = operation["course_id"] or (before or {}).get("ma_khoa_hoc")
+
+    if operation["action"] == "xoa":
+        if pending:
+            save_progress(
+                registry_alias, operation_id, pending_sites=pending,
+                detail="Đang chờ đủ site để kiểm tra lớp tham chiếu rồi mới xóa khóa học.",
+            )
+            return {
+                "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": False,
+                "complete": False, "sites": [], "missing_sites": sorted(pending),
+                "idempotent_replay": idempotent_replay,
+                "detail": "Đã xếp yêu cầu xóa vào hàng đợi; sẽ xóa sau khi đủ site để kiểm tra lớp.",
+            }
+
+        event_ids = {site: f"KHDEL-{site}-{operation_id}" for site in targets}
+        try:
+            states = {
+                site: _read_site_course(site, slug=operation["slug"], course_id=None,
+                                        event_id=event_ids[site])
+                for site in targets
+            }
+            current = {site: state[0] for site, state in states.items()}
+            events = {site: state[1] for site, state in states.items()}
+            _delete_course_replicas(
+                sites=targets, registry_alias=registry_alias, before=before, events=events,
+                event_ids=event_ids, request_hash=operation["request_hash"],
+                actor_id=operation["actor_id"], target_sites=targets,
+            )
+        except SharedCatalogConflict as exc:
+            completed_sites = set()
+            for site in targets:
+                try:
+                    current, event = _read_site_course(
+                        site, slug=operation["slug"], course_id=None, event_id=event_ids[site],
+                    )
+                    if event and current is None:
+                        _validate_delete_event(
+                            event, course_id=before["ma_khoa_hoc"],
+                            request_hash=operation["request_hash"],
+                        )
+                        completed_sites.add(site)
+                except (SharedCatalogConflict, AuthInfrastructureUnavailable, DatabaseError,
+                        ImproperlyConfigured, KeyError, UnknownSiteError):
+                    continue
+            if completed_sites == set(targets):
+                save_progress(registry_alias, operation_id, pending_sites=())
+                return {
+                    "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": True,
+                    "complete": True, "sites": list(targets), "missing_sites": [],
+                    "idempotent_replay": idempotent_replay,
+                }
+            save_progress(
+                registry_alias, operation_id, pending_sites=targets,
+                detail=str(exc), needs_review=True,
+            )
+            return {
+                "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": False,
+                "complete": False, "sites": [], "missing_sites": list(targets),
+                "idempotent_replay": idempotent_replay, "detail": str(exc),
+            }
+        except IntegrityError:
+            detail = "Khóa học đang được một lớp sử dụng; không thể xóa an toàn."
+            save_progress(
+                registry_alias, operation_id, pending_sites=targets,
+                detail=detail, needs_review=True,
+            )
+            return {
+                "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": False,
+                "complete": False, "sites": [], "missing_sites": list(targets),
+                "idempotent_replay": idempotent_replay, "detail": detail,
+            }
+        except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+            save_progress(
+                registry_alias, operation_id, pending_sites=targets,
+                detail="Một site chưa xác nhận xóa; yêu cầu được giữ để đối soát lại.",
+            )
+            return {
+                "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": False,
+                "complete": False, "sites": [], "missing_sites": list(targets),
+                "idempotent_replay": idempotent_replay,
+                "detail": "Một site chưa xác nhận xóa; hệ thống sẽ thử lại.",
+            }
+        save_progress(registry_alias, operation_id, pending_sites=())
+        return {
+            "ma_khoa_hoc": course_id, "slug": operation["slug"], "deleted": True,
+            "complete": True, "sites": list(targets), "missing_sites": [],
+            "idempotent_replay": idempotent_replay,
+        }
+
+    if not after:
+        raise SharedCatalogConflict("Yêu cầu đồng bộ khóa học không có dữ liệu đích.")
+    if available_targets:
+        try:
+            _check_subject_replicas(available_targets, after["ma_mon"])
+        except SharedCatalogNotFound as exc:
+            save_progress(
+                registry_alias, operation_id, pending_sites=targets,
+                detail="Môn học chưa có đủ bản sao; khóa học sẽ đồng bộ sau khi môn học sẵn sàng.",
+            )
+            return {
+                **after, "complete": False, "sites": [], "missing_sites": sorted(set(targets)),
+                "idempotent_replay": idempotent_replay,
+                "detail": "Đang chờ bản sao môn học để đồng bộ khóa học.",
+            }
+        except SharedCatalogConflict as exc:
+            save_progress(
+                registry_alias, operation_id, pending_sites=targets,
+                detail=f"Môn học chưa đồng nhất đủ site; sẽ thử lại. {exc}",
+            )
+            return {
+                **after, "complete": False, "sites": [], "missing_sites": sorted(set(targets)),
+                "idempotent_replay": idempotent_replay, "detail": f"Môn học đang chờ đồng bộ: {exc}",
+            }
+
+    confirmed: set[str] = set()
+    for site in available_targets:
+        event_id = f"KHREP-{site}-{operation_id}"
+        lookup_slug = before["slug"] if operation["action"] == "sua" else after["slug"]
+        lookup_id = after["ma_khoa_hoc"] if operation["action"] == "tao" else None
+        try:
+            current, event = _read_site_course(
+                site, slug=lookup_slug, course_id=lookup_id, event_id=event_id,
+            )
+            if event:
+                event_before, event_after = _validate_event(
+                    event, action=operation["action"], course_id=after["ma_khoa_hoc"],
+                    request_hash=operation["request_hash"],
+                )
+                if event_before != before or event_after != after or current != after:
+                    raise SharedCatalogConflict("ACK khóa học không khớp yêu cầu đang chờ.")
+            else:
+                if current != before:
+                    raise SharedCatalogConflict(
+                        f"Dữ liệu tại {site} đã thay đổi ngoài yêu cầu; cần đối soát trước khi ghi tiếp."
+                    )
+                _apply_site(
+                    site=site, before=before, after=after, event_id=event_id,
+                    request_hash=operation["request_hash"], actor_id=operation["actor_id"],
+                    target_sites=targets,
+                )
+            confirmed.add(site)
+        except SharedCatalogConflict as exc:
+            event_id = f"KHREP-{site}-{operation_id}"
+            lookup_slug = before["slug"] if operation["action"] == "sua" else after["slug"]
+            lookup_id = after["ma_khoa_hoc"] if operation["action"] == "tao" else None
+            try:
+                current, event = _read_site_course(
+                    site, slug=lookup_slug, course_id=lookup_id, event_id=event_id,
+                )
+                if event:
+                    event_before, event_after = _validate_event(
+                        event, action=operation["action"], course_id=after["ma_khoa_hoc"],
+                        request_hash=operation["request_hash"],
+                    )
+                    if event_before == before and event_after == after and current == after:
+                        confirmed.add(site)
+                        continue
+            except (SharedCatalogConflict, AuthInfrastructureUnavailable, DatabaseError,
+                    ImproperlyConfigured, KeyError, UnknownSiteError):
+                pass
+            pending.update(set(targets) - confirmed)
+            save_progress(
+                registry_alias, operation_id, pending_sites=pending,
+                detail=str(exc), needs_review=True,
+            )
+            return {
+                **after, "complete": False, "sites": sorted(confirmed),
+                "missing_sites": sorted(pending), "idempotent_replay": idempotent_replay,
+                "detail": str(exc),
+            }
+        except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+            pending.add(site)
+
+    pending.update(set(targets) - confirmed - pending)
+    detail = f"Đang chờ site: {', '.join(sorted(pending))}." if pending else None
+    save_progress(registry_alias, operation_id, pending_sites=pending, detail=detail)
+    return {
+        **after, "complete": not pending, "sites": sorted(confirmed),
+        "missing_sites": sorted(pending), "idempotent_replay": idempotent_replay,
+        **({"detail": detail} if detail else {}),
+    }
+
+
+def _resume_course_operation_by_idempotency(
+    operation: dict, *, registry_site: str, registry_alias: str, idempotent_replay: bool,
+) -> dict:
+    """Retry without holding the coordinator lock while site connections are opened."""
+    current = get_operation(registry_alias, operation["operation_id"])
+    if current is None:
+        raise SharedCatalogUnavailable(
+            "Không tìm thấy yêu cầu trong Logs; hãy thử lại cùng Idempotency-Key.",
+            missing_sites=(registry_site,),
+        )
+    if current["request_hash"] != operation["request_hash"]:
+        raise SharedCatalogConflict("Yêu cầu trong Logs đã đổi nội dung; cần đối soát thủ công.")
+    return _resume_course_operation(
+        current, registry_site=registry_site, registry_alias=registry_alias,
+        idempotent_replay=idempotent_replay,
+    )
+
+
+def reconcile_pending_course_writes(*, operation_id: str | None = None) -> dict:
+    """Retry pending catalog operations without holding a database lock across sites."""
+    registry_site = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
+    try:
+        registry_alias = get_site_database_alias(registry_site)
+        available_sites, missing_sites = active_site_state()
+        if operation_id:
+            selected = get_operation(registry_alias, operation_id, available_sites=available_sites)
+            if selected is None:
+                raise SharedCatalogNotFound("Không tìm thấy yêu cầu khóa học cần đối soát.")
+            if selected["status"] != "hoan_tat":
+                mark_manual_retry(registry_alias, operation_id)
+            operations = [selected] if selected["status"] != "hoan_tat" else []
+        else:
+            operations = get_pending_operations(registry_alias, limit=100, available_sites=available_sites)
+        for operation in operations:
+            if operation["status"] == "can_doi_soat" and operation_id != operation["operation_id"]:
+                continue
+            try:
+                _resume_course_operation(
+                    operation, registry_site=registry_site, registry_alias=registry_alias,
+                    idempotent_replay=True, site_state=(available_sites, missing_sites),
+                )
+            except SharedCatalogConflict as exc:
+                save_progress(
+                    registry_alias, operation["operation_id"],
+                    pending_sites=operation["pending_sites"], detail=str(exc), needs_review=True,
+                )
+            except (SharedCatalogNotFound, SharedCatalogUnavailable):
+                continue
+            except (AuthInfrastructureUnavailable, DatabaseError, ImproperlyConfigured,
+                    KeyError, UnknownSiteError):
+                continue
+        pending = get_pending_operations(registry_alias, limit=100, available_sites=available_sites)
+    except (AcademicInfrastructureUnavailable, AuthInfrastructureUnavailable, DatabaseError,
+            ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise SharedCatalogUnavailable(
+            "Không thể kiểm tra Logs hoặc tình trạng các site để đối soát khóa học."
+        ) from exc
+    return {
+        "complete": not pending,
+        "pending_count": len(pending),
+        "pending_sites": sorted({site for operation in pending for site in operation["pending_sites"]}),
+        "operations": [
+            {
+                "operation_id": operation["operation_id"], "action": operation["action"],
+                "course_id": operation["course_id"], "slug": operation["slug"],
+                "status": operation["status"], "pending_sites": list(operation["pending_sites"]),
+                "detail": operation["detail"],
+            }
+            for operation in pending
+        ],
+    }
 
 
 def delete_shared_course(*, slug: str, idempotency_key: str, actor_id: str) -> dict:
@@ -522,75 +833,94 @@ def delete_shared_course(*, slug: str, idempotency_key: str, actor_id: str) -> d
     registry_site = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
     try:
         registry_alias = get_site_database_alias(registry_site)
-        sites, missing_sites = active_site_state()
     except (AcademicInfrastructureUnavailable, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-        raise SharedCatalogUnavailable from exc
-    if missing_sites or not sites:
-        raise SharedCatalogUnavailable(
-            "Một hoặc nhiều site hoạt động chưa sẵn sàng; không bắt đầu xóa khóa học.",
-            missing_sites=missing_sites,
-        )
-
+        raise SharedCatalogUnavailable("Không đọc được CSDL điều phối khóa học.") from exc
     key_digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
     request_hash = hashlib.sha256(_json({"action": "xoa", "slug": slug, "payload": {}}).encode("utf-8")).hexdigest()
-    ordered_sites = (registry_site,) + tuple(site for site in sorted(sites) if site != registry_site)
-    event_ids = {site: f"KHDEL-{site}-{key_digest}" for site in ordered_sites}
-
     try:
+        existing = get_operation(registry_alias, key_digest, available_sites=(registry_site,))
+        if existing:
+            if existing["request_hash"] != request_hash:
+                raise SharedCatalogConflict("Idempotency-Key đã dùng với nội dung khác.")
+            return _resume_course_operation_by_idempotency(
+                existing, registry_site=registry_site, registry_alias=registry_alias,
+                idempotent_replay=True,
+            )
+        reviews = get_review_operations(registry_alias)
+        if reviews:
+            raise SharedCatalogUnavailable(
+                "Có khóa học cần đối soát thủ công trước khi nhận thao tác xóa.",
+                missing_sites=tuple(sorted({site for row in reviews for site in row.get("initial_pending_sites", ())})),
+            )
+
+        operation = None
         with transaction.atomic(using=registry_alias):
             with connections[registry_alias].cursor() as cursor:
                 acquire_record_lock(cursor, "shared-catalog:KhoaHoc")
-            states = {
-                site: _read_site_course(site, slug=slug, course_id=None, event_id=event_ids[site])
-                for site in ordered_sites
-            }
-            current = {site: state[0] for site, state in states.items()}
-            events = {site: state[1] for site, state in states.items()}
-            existing_events = [event for event in events.values() if event]
-            if existing_events:
-                before = _validate_delete_event(
-                    existing_events[0], course_id=existing_events[0]["record_id"], request_hash=request_hash
-                )
-                course_id = before["ma_khoa_hoc"]
-                for event in existing_events[1:]:
-                    if _validate_delete_event(event, course_id=course_id, request_hash=request_hash) != before:
-                        raise SharedCatalogConflict("ACK xóa khóa học không thống nhất giữa các site.")
-                for site in ordered_sites:
-                    if events[site] and current[site] is not None:
-                        raise SharedCatalogConflict("Khóa học đã được tạo lại sau khi ghi ACK xóa.")
-                    if not events[site] and current[site] != before:
-                        raise SharedCatalogConflict("Bản sao chưa ACK đã thay đổi; cần đối soát trước khi xóa tiếp.")
+            operation = get_operation(registry_alias, key_digest, available_sites=(registry_site,))
+            if operation:
+                if operation["request_hash"] != request_hash:
+                    raise SharedCatalogConflict("Idempotency-Key đã dùng với nội dung khác.")
             else:
-                values = list(current.values())
-                if all(course is None for course in values):
-                    raise SharedCatalogNotFound("Không tìm thấy khóa học.")
-                if any(course is None for course in values) or any(course != values[0] for course in values[1:]):
-                    raise SharedCatalogConflict("Các bản sao khóa học không thống nhất; cần đối soát trước khi xóa.")
-                before = values[0]
-                course_id = before["ma_khoa_hoc"]
-
-            _delete_course_replicas(
-                sites=ordered_sites, registry_alias=registry_alias, before=before, events=events,
-                event_ids=event_ids, request_hash=request_hash, actor_id=actor_id,
-            )
-            return {
-                "ma_khoa_hoc": course_id,
-                "slug": slug,
-                "deleted": True,
-                "complete": True,
-                "sites": list(ordered_sites),
-                "missing_sites": [],
-                "idempotent_replay": bool(existing_events),
-            }
-    except SharedCatalogConflict:
+                sites, missing_sites = active_site_state()
+                if registry_site not in sites:
+                    raise SharedCatalogUnavailable(
+                        "CSDL điều phối chưa sẵn sàng; không thể ghi nhận yêu cầu xóa.",
+                        missing_sites=(registry_site,),
+                    )
+                targets = tuple(sorted(set(sites) | set(missing_sites)))
+                ordered_available = (registry_site,) + tuple(
+                    site for site in sorted(sites) if site != registry_site
+                )
+                event_ids = {site: f"KHDEL-{site}-{key_digest}" for site in ordered_available}
+                states = {
+                    site: _read_site_course(site, slug=slug, course_id=None, event_id=event_ids[site])
+                    for site in ordered_available
+                }
+                current = {site: state[0] for site, state in states.items()}
+                events = {site: state[1] for site, state in states.items()}
+                existing_events = [event for event in events.values() if event]
+                if existing_events:
+                    before = _validate_delete_event(
+                        existing_events[0], course_id=existing_events[0]["record_id"], request_hash=request_hash
+                    )
+                    course_id = before["ma_khoa_hoc"]
+                    for event in existing_events[1:]:
+                        if _validate_delete_event(event, course_id=course_id, request_hash=request_hash) != before:
+                            raise SharedCatalogConflict("ACK xóa khóa học không thống nhất giữa các site.")
+                    for site in ordered_available:
+                        if events[site] and current[site] is not None:
+                            raise SharedCatalogConflict("Khóa học đã được tạo lại sau khi ghi ACK xóa.")
+                        if not events[site] and current[site] != before:
+                            raise SharedCatalogConflict("Bản sao chưa ACK đã thay đổi; cần đối soát trước khi xóa tiếp.")
+                else:
+                    values = list(current.values())
+                    if all(course is None for course in values):
+                        raise SharedCatalogNotFound("Không tìm thấy khóa học tại các site đang phản hồi.")
+                    if any(course is None for course in values) or any(course != values[0] for course in values[1:]):
+                        raise SharedCatalogConflict("Các bản sao khóa học đang lệch; cần đối soát trước khi xóa.")
+                    before = values[0]
+                    course_id = before["ma_khoa_hoc"]
+                operation = {
+                    "operation_id": key_digest, "actor_id": actor_id, "action": "xoa", "slug": slug,
+                    "course_id": course_id, "request_hash": request_hash, "before": before,
+                    "after": None, "target_sites": targets, "pending_sites": targets,
+                    "status": "cho_dong_bo",
+                }
+                insert_operation(registry_alias, operation)
+        operation = operation or get_operation(registry_alias, key_digest)
+        if operation is None:
+            raise SharedCatalogUnavailable("Không lưu được yêu cầu xóa vào hàng đợi.", missing_sites=(registry_site,))
+        return _resume_course_operation_by_idempotency(
+            operation, registry_site=registry_site, registry_alias=registry_alias,
+            idempotent_replay=False,
+        )
+    except (SharedCatalogConflict, SharedCatalogNotFound, SharedCatalogUnavailable):
         raise
     except IntegrityError as exc:
-        raise SharedCatalogConflict(
-            "Khóa học vừa được sử dụng bởi một lớp hoặc ACK bị xung đột; tải lại dữ liệu trước khi thử lại."
-        ) from exc
-    except (SharedCatalogNotFound, SharedCatalogUnavailable):
-        raise
-    except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+        raise SharedCatalogConflict("Khóa học vừa được sử dụng bởi một lớp; không xóa.") from exc
+    except (AcademicInfrastructureUnavailable, AuthInfrastructureUnavailable, DatabaseError,
+            ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise SharedCatalogUnavailable(
-            "Không xác nhận được kết quả xóa; retry bằng cùng Idempotency-Key để đối soát."
+            "Không xác nhận được yêu cầu xóa; retry bằng cùng Idempotency-Key để đối soát."
         ) from exc
