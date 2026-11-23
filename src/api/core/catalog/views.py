@@ -15,6 +15,8 @@ from core.catalog.serializers import (
     SharedCourseCreateSerializer,
     SharedCourseDeleteResponseSerializer,
     SharedCoursePatchSerializer,
+    SharedCourseSyncRequestSerializer,
+    SharedCourseSyncStatusSerializer,
     SharedCourseWriteResponseSerializer,
     PublicCourseListSerializer,
     SharedSubjectCreateSerializer,
@@ -31,7 +33,12 @@ from core.catalog.services import (
 )
 from core.catalog.subject_write_services import create_shared_subject, delete_shared_subject
 from core.catalog.public_courses import list_public_courses, list_shared_subjects
-from core.catalog.course_services import create_shared_course, delete_shared_course, update_shared_course
+from core.catalog.course_services import (
+    create_shared_course,
+    delete_shared_course,
+    reconcile_pending_course_writes,
+    update_shared_course,
+)
 from core.sites.connections import UnknownSiteError
 
 
@@ -51,6 +58,52 @@ def _catalog_write_error(exc):
     if missing:
         payload["missing_sites"] = list(missing)
     return Response(payload, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class SharedCourseSyncView(APIView):
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "shared_catalog_write"
+
+    @extend_schema(
+        operation_id="admin_shared_course_reconcile",
+        tags=["Danh mục dùng chung"],
+        summary="Đối soát và tiếp tục đồng bộ khóa học đang chờ",
+        description=(
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Đọc hàng đợi điều phối tại site cấu hình, "
+            "thử áp dụng các site còn thiếu theo ACK idempotent. Mỗi CSDL ghi trong transaction cục bộ; "
+            "không báo hoàn tất khi còn site chưa xác nhận. Giao diện gọi khi mở trang/định kỳ; management command "
+            "sync_courses cũng retry nền mỗi 5 giây khi được chạy cùng API. "
+            "Có thể truyền operation_id để yêu cầu đối soát lại một thao tác đang ở trạng thái cần đối soát."
+        ),
+        request=SharedCourseSyncRequestSerializer,
+        responses={
+            200: SharedCourseSyncStatusSerializer,
+            400: OpenApiResponse(description="operation_id không hợp lệ."),
+            401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
+            403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
+            404: OpenApiResponse(description="Không tìm thấy thao tác cần đối soát."),
+            503: OpenApiResponse(description="Site điều phối chưa sẵn sàng."),
+        },
+    )
+    def post(self, request):
+        if request.user.role not in _COURSE_MANAGEMENT_ROLES:
+            return Response({"detail": "Vai trò hiện tại không được quản lý khóa học."}, status=403)
+        serializer = SharedCourseSyncRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        operation_id = serializer.validated_data.get("operation_id")
+        try:
+            return Response(reconcile_pending_course_writes(operation_id=operation_id or None))
+        except SharedCatalogNotFound as exc:
+            return Response({"detail": str(exc)}, status=404)
+        except SharedCatalogUnavailable as exc:
+            return _catalog_write_error(exc)
+        except DatabaseError:
+            return Response(
+                {"detail": "Không đọc được hàng đợi đồng bộ khóa học; yêu cầu vẫn được giữ để thử lại."},
+                status=503,
+            )
 
 
 def _shared_subject_slug(value):
@@ -330,12 +383,14 @@ class SharedCourseCollectionView(APIView):
     @extend_schema(
         operation_id="admin_shared_course_create",
         tags=["Danh mục dùng chung"],
-        summary="Tạo khóa học và nhân bản tới các site hoạt động",
+        summary="Tạo khóa học và đồng bộ tới các site hoạt động",
         description=(
-            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Ghi KhoaHoc và ACK Logs trong transaction cục bộ ở từng site; "
-            "mã môn phải tồn tại và giống nhau tại mọi site. Bắt buộc Idempotency-Key. "
-            "Lỗi giữa chừng trả 202 để retry cùng key/body; đây là replication tầng ứng dụng, "
-            "không phải một transaction ACID xuyên CSDL."
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Ghi KhoaHoc và ACK Logs trong transaction cục bộ "
+            "ở từng site đang kết nối; mã môn phải tồn tại và nhất quán trên các site đang kết nối. Trước khi ghi, "
+            "API lưu ý định vào GiaoDichDongBoKhoaHoc tại site cấu hình AUTH_SESSION_SITE_CODE. Nếu một site khác "
+            "đang mất kết nối, API vẫn ghi các site hiện có và trả 202; endpoint POST /admin/courses/sync/ thử lại "
+            "khi kết nối phục hồi. Nếu site điều phối mất kết nối hoặc các bản sao đang lệch, không nhận yêu cầu mới. "
+            "Bắt buộc Idempotency-Key. Đây là fan-out có outbox và transaction cục bộ, không phải ACID xuyên CSDL."
         ),
         parameters=[OpenApiParameter(
             "Idempotency-Key", str, OpenApiParameter.HEADER, required=True,
@@ -350,7 +405,7 @@ class SharedCourseCollectionView(APIView):
             403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Môn học không tồn tại ở mọi site hoạt động."),
             409: OpenApiResponse(description="Mã/slug trùng, bản sao lệch hoặc key/body xung đột."),
-            503: OpenApiResponse(description="Site bắt buộc chưa sẵn sàng hoặc cần đối soát."),
+            503: OpenApiResponse(description="Site điều phối chưa sẵn sàng, outbox chưa cài, hoặc dữ liệu hiện có cần đối soát."),
         },
     )
     def post(self, request):
@@ -378,7 +433,7 @@ class SharedCourseCollectionView(APIView):
                 {"detail": "Không xác nhận được kết quả ghi; kiểm tra trạng thái rồi retry cùng Idempotency-Key."},
                 status=503,
             )
-        return Response(result, status=201 if result["complete"] else 202)
+        return Response(result, status=status.HTTP_201_CREATED if result["complete"] else status.HTTP_202_ACCEPTED)
 
 
 class SharedCourseDetailView(APIView):
@@ -390,12 +445,14 @@ class SharedCourseDetailView(APIView):
     @extend_schema(
         operation_id="admin_shared_course_update",
         tags=["Danh mục dùng chung"],
-        summary="Cập nhật khóa học và nhân bản tới các site hoạt động",
+        summary="Cập nhật khóa học và đồng bộ tới các site hoạt động",
         description=(
             "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân được sửa thông tin khóa học, bao gồm mã khóa học. Khi đổi mã, "
-            "các lớp đang tham chiếu được cập nhật trong cùng transaction tại từng site. "
-            "Ghi KhoaHoc cùng ACK Logs trong transaction cục bộ; retry kết quả một phần "
-            "bằng đúng Idempotency-Key và body."
+            "các lớp đang tham chiếu được cập nhật trong cùng transaction tại từng site. API lưu ý định vào "
+            "GiaoDichDongBoKhoaHoc trên site AUTH_SESSION_SITE_CODE, rồi ghi KhoaHoc cùng ACK Logs tại các site đang kết nối. "
+            "Nếu thiếu site khác, trả 202 và endpoint POST /admin/courses/sync/ sẽ thử lại khi site hoạt động. "
+            "Site điều phối không sẵn sàng hoặc các bản sao đang lệch thì không nhận yêu cầu mới. Giữ nguyên "
+            "Idempotency-Key và body khi retry; đây không phải transaction ACID xuyên CSDL."
         ),
         parameters=[
             OpenApiParameter("slug", str, OpenApiParameter.PATH),
@@ -413,7 +470,7 @@ class SharedCourseDetailView(APIView):
             403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Không tìm thấy khóa học hoặc môn học."),
             409: OpenApiResponse(description="Bản sao lệch hoặc Idempotency-Key/body xung đột."),
-            503: OpenApiResponse(description="Site bắt buộc chưa sẵn sàng hoặc cần đối soát."),
+            503: OpenApiResponse(description="Site điều phối chưa sẵn sàng, outbox chưa cài, hoặc dữ liệu hiện có cần đối soát."),
         },
     )
     def patch(self, request, slug):
@@ -454,12 +511,12 @@ class SharedCourseDetailView(APIView):
     @extend_schema(
         operation_id="admin_shared_course_delete",
         tags=["Danh mục dùng chung"],
-        summary="Xóa khóa học khỏi các site hoạt động",
+        summary="Xóa khóa học và đồng bộ tới các site hoạt động",
         description=(
-            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. Xóa cứng KhoaHoc trên các site đang hoạt động nếu khóa học chưa được "
-            "LopHoc nào sử dụng. Dữ liệu lớp không bị xóa. Mỗi site ghi ACK append-only vào Logs "
-            "trong transaction cục bộ; bắt buộc Idempotency-Key để retry nếu mất kết nối. Đây không "
-            "phải transaction ACID xuyên CSDL."
+            "Admin Big, Tư vấn & xếp lớp hoặc Kế toán & Lễ tân. API lưu ý định xóa vào hàng đợi điều phối. Nếu thiếu site, "
+            "trả 202 và chưa xóa ở bất kỳ site nào; khi đủ kết nối, hệ thống kiểm tra LopHoc tham chiếu tại mọi site rồi mới xóa. "
+            "Nếu lớp đang dùng khóa học, yêu cầu cần đối soát và không xóa. Mỗi site ghi ACK append-only vào Logs cùng KhoaHoc "
+            "trong transaction cục bộ. Dùng Idempotency-Key khi retry; đây không phải ACID xuyên CSDL."
         ),
         parameters=[
             OpenApiParameter("slug", str, OpenApiParameter.PATH),
@@ -470,12 +527,13 @@ class SharedCourseDetailView(APIView):
         ],
         responses={
             200: SharedCourseDeleteResponseSerializer,
+            202: SharedCourseDeleteResponseSerializer,
             400: OpenApiResponse(description="Slug hoặc Idempotency-Key không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập hoặc phiên hết hạn."),
             403: OpenApiResponse(description="Vai trò hiện tại không được quản lý khóa học."),
             404: OpenApiResponse(description="Không tìm thấy khóa học."),
             409: OpenApiResponse(description="Khóa học đang được lớp sử dụng hoặc các bản sao không thống nhất."),
-            503: OpenApiResponse(description="Site chưa sẵn sàng hoặc cần retry/đối soát."),
+            503: OpenApiResponse(description="Site điều phối chưa sẵn sàng, outbox chưa cài, hoặc dữ liệu hiện có cần đối soát."),
         },
     )
     def delete(self, request, slug):
@@ -508,7 +566,7 @@ class SharedCourseDetailView(APIView):
                 {"detail": "Không xác nhận được kết quả xóa; kiểm tra trạng thái rồi retry cùng Idempotency-Key."},
                 status=503,
             )
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=status.HTTP_200_OK if result["complete"] else status.HTTP_202_ACCEPTED)
 
 
 class CourseClassSessionSummaryView(APIView):

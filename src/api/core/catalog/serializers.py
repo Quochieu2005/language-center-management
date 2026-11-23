@@ -270,6 +270,7 @@ class SharedCourseWriteResponseSerializer(serializers.Serializer):
     sites = serializers.ListField(child=serializers.CharField())
     missing_sites = serializers.ListField(child=serializers.CharField())
     idempotent_replay = serializers.BooleanField()
+    detail = serializers.CharField(required=False)
 
 
 class SharedCourseDeleteResponseSerializer(serializers.Serializer):
@@ -280,3 +281,25 @@ class SharedCourseDeleteResponseSerializer(serializers.Serializer):
     sites = serializers.ListField(child=serializers.CharField())
     missing_sites = serializers.ListField(child=serializers.CharField())
     idempotent_replay = serializers.BooleanField()
+    detail = serializers.CharField(required=False)
+
+
+class SharedCoursePendingOperationSerializer(serializers.Serializer):
+    operation_id = serializers.CharField()
+    action = serializers.ChoiceField(choices=("tao", "sua", "xoa"))
+    course_id = serializers.CharField(allow_null=True)
+    slug = serializers.CharField()
+    status = serializers.ChoiceField(choices=("cho_dong_bo", "can_doi_soat"))
+    pending_sites = serializers.ListField(child=serializers.CharField())
+    detail = serializers.CharField(allow_null=True)
+
+
+class SharedCourseSyncRequestSerializer(serializers.Serializer):
+    operation_id = serializers.RegexField(regex=r"^[0-9a-f]{64}$", required=False)
+
+
+class SharedCourseSyncStatusSerializer(serializers.Serializer):
+    complete = serializers.BooleanField()
+    pending_count = serializers.IntegerField()
+    pending_sites = serializers.ListField(child=serializers.CharField())
+    operations = SharedCoursePendingOperationSerializer(many=True)

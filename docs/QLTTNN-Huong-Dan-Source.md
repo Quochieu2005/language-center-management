@@ -2,7 +2,7 @@
 
 **Tra nhanh:** [Luồng yêu cầu](#1-luồng-một-yêu-cầu) · [Module](#2-trách-nhiệm-module) · [Kiểu nghiệp vụ](#3-cách-xử-lý-từng-loại-nghiệp-vụ) · [Cấu trúc source](#5-cấu-trúc-source-hiện-có) · [Cấu hình/vòng đời site](#dinh-tuyen-site). Tổng quan dự án xem [README gốc](../README.md).
 
-Tài liệu này giải thích kiến trúc và cách lần theo source cho thành viên. Stack là **Next.js frontend**, **Django REST API/Coordinator** và **SQL Server**; **SSMS** dùng để quản trị/kiểm tra CSDL. Chuyển cơ sở có route retry do Admin Big gọi; worker/lịch chạy nền tự động chưa được xác nhận trong source. Ghi catalog dùng chung có service cho `MonHoc` và `KhoaHoc`; các nghiệp vụ khác có cơ chế riêng, không giả định đã gom vào một replication service tổng quát.
+Tài liệu này giải thích kiến trúc và cách lần theo source cho thành viên. Stack là **Next.js frontend**, **Django REST API/Coordinator** và **SQL Server**; **SSMS** dùng để quản trị/kiểm tra CSDL. Chuyển cơ sở có route retry do Admin Big gọi. Ghi `KhoaHoc` có outbox bền vững và worker `manage.py sync_courses`; `run-local.ps1` khởi động worker cùng API, UI cũng gọi đối soát khi trang mở/đang chờ. Môi trường chạy API bằng cách khác phải giám sát worker riêng. Ghi catalog dùng chung có service riêng cho `MonHoc` và `KhoaHoc`; các nghiệp vụ khác có cơ chế riêng, không giả định đã gom vào một replication service tổng quát.
 
 ## 1. Luồng một yêu cầu
 
@@ -36,7 +36,7 @@ Thứ tự bắt buộc: xác định người dùng và phạm vi quyền trư�
 | Site read fan-out (`src/api/core/sites/fanout.py`) | Chạy truy vấn đọc độc lập với số worker giới hạn, giữ lỗi theo từng site và đóng kết nối worker | Dùng cho ghi nhiều site hoặc biến lỗi site thành kết quả rỗng |
 | Service nghiệp vụ (`core/classes/`, `core/academics/`, `core/students/`...) | Áp dụng quy tắc đăng ký, học phí, điểm, lớp và hồ sơ | Tự triển khai lại logic fan-out dùng chung khi nghiệp vụ đã có service điều phối riêng |
 | Truy vấn nhiều site | Nằm trong service của nghiệp vụ cần `GLOBAL`; fan-out truy vấn đọc độc lập rồi gộp tại API | JOIN giữa CSDL hoặc che việc một site lỗi; hiện không có package `global_queries/` riêng |
-| Catalog dùng chung (`core/catalog/`) | Ghi `MonHoc`/`KhoaHoc` bằng các service có ACK và retry theo chính sách từng loại | Coi seed là replication hoặc coi mọi bảng dùng chung đã có một writer chung |
+| Catalog dùng chung (`core/catalog/`) | `publisher_subjects.py` ghi `MonHoc` tại Publisher; `course_services.py` ghi `KhoaHoc` qua outbox `course_sync_queue.py` trên `AUTH_SESSION_SITE_CODE`, fan-out và ACK từng site; `POST /admin/courses/sync/` và `sync_courses` worker đối soát hàng đợi | Coi seed là replication, coi hai bảng dùng cùng cơ chế, hoặc giả định worker đã chạy nếu chưa khởi động/giám sát tiến trình |
 | Chuyển cơ sở (`core/academics/transfers.py`) | Điều phối transaction cục bộ nguồn/đích, lưu tiến trình và cho Admin Big retry | Gọi là ACID nguyên tử xuyên CSDL hoặc mặc định có worker chạy nền |
 | Ghi các bản sao khác | `TaiKhoan` và một số luồng thông báo có service/fan-out riêng; `CoSo` chưa có fan-out runtime đầy đủ | Mặc định có một replication writer chung cho mọi bảng; trạng thái cụ thể xem ma trận triển khai |
 | Audit/log | Ghi người, site, thời điểm, loại hành động, kết quả và thay đổi | Ghi mật khẩu/token hoặc cho phép sửa/xóa log |
@@ -149,7 +149,7 @@ addCourse(actor, course):
     return success
 ```
 
-`sharedDataWriter` là mã giả cho trách nhiệm đồng bộ, không phải một class/package đã có. KhoaHoc dùng service fan-out và ACK theo từng transaction cục bộ. MonHoc có writer riêng tại Publisher và SQL Server truyền bất đồng bộ; không áp dụng mã giả fan-out để ghi MonHoc vào Subscriber. Tiền kiểm không bảo đảm mọi site cùng commit; sau một phần commit phải trả trạng thái chưa hoàn tất và phục hồi theo chính sách của bảng.
+`sharedDataWriter` là mã giả cho trách nhiệm đồng bộ, không phải một class/package đã có. `KhoaHoc` lưu snapshot ý định trong `core/catalog/course_sync_queue.py` tại DB `AUTH_SESSION_SITE_CODE`, sau đó `course_services.py` fan-out theo từng transaction cục bộ và ghi ACK tại từng site. `POST /admin/courses/sync/` tiếp tục thao tác còn chờ; UI gọi khi mở trang và mỗi 10 giây khi có hàng đợi. Tạo/sửa có thể ghi các site đang kết nối; xóa chỉ chạy khi đủ site để kiểm tra `LopHoc`. Thao tác `can_doi_soat` có thể được retry riêng bằng `operation_id` sau khi xử lý nguyên nhân. Nếu site điều phối offline thì không nhận yêu cầu mới. `MonHoc` có writer riêng tại Publisher và SQL Server truyền bất đồng bộ; không áp dụng fan-out để ghi MonHoc vào Subscriber. Không thao tác nào trong hai cơ chế là ACID xuyên CSDL.
 
 YC-03/YC-07 bắt buộc chốt phương pháp truyền thay đổi, lưu tiến trình/ACK, phiên bản và cách retry/đối soát trước khi triển khai. Tiền kiểm mọi site sẵn sàng không loại trừ site lỗi ngay sau đó. Nếu đã có bản sao commit, giữ kết quả từng site và báo chưa hoàn tất đến khi phục hồi; không tự giả định toàn bộ đã rollback. TC-REP-01 chứng minh truyền thay đổi thật; TC-SYNC-01 chứng minh lỗi/phục hồi. Seed ba DB và cấu hình kết nối không thay thế hai bài này.
 

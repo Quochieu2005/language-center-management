@@ -31,11 +31,12 @@ Trong source hiện tại, Coordinator chạy sau quyết định duyệt và Ad
 Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 
 1. Xác thực và kiểm tra quyền của từng bảng: MonHoc chỉ Admin Big; khóa học còn có Tư vấn/Kế toán theo hợp đồng hiện có.
-2. Đọc danh sách cơ sở `hoat_dong`; xác nhận mọi site có cấu hình kết nối và sẵn sàng.
-3. Nếu thiếu site: từ chối, không cập nhật site nào.
-4. Ghi theo chính sách bảng: MonHoc chỉ DML tại Publisher; KhoaHoc/Blog/tài khoản dùng service bản sao riêng, không cùng Publication.
-5. Chỉ trả thành công khi chính sách ghi đủ site đã được thỏa mãn.
-6. Với MonHoc, API chỉ ghi Publisher và biên nhận Logs trong transaction cục bộ; SQL Server Publication chuyển Subscriber. Sau commit API đọc bản sao, retry cùng key chỉ đối soát. Không gọi đây là ACID xuyên CSDL.
+2. Đọc danh sách cơ sở `hoat_dong` và chọn writer theo bảng; không áp dụng một quy tắc preflight chung cho mọi loại danh mục.
+3. Với `MonHoc`, chỉ DML tại Publisher; Publication chuyển Subscriber. API trả kết quả chưa hoàn tất nếu chưa xác nhận đủ bản sao; retry cùng key chỉ đối soát Publisher/Subscriber.
+4. Với `KhoaHoc`, lưu ý định và snapshot vào `GiaoDichDongBoKhoaHoc` tại `AUTH_SESSION_SITE_CODE`. Tạo/sửa có thể ghi những site đang kết nối, ghi ACK `Logs` trong transaction cục bộ và trả 202 khi còn site chờ. Khi site trở lại, `POST /admin/courses/sync/` tiếp tục site chưa ACK theo cùng idempotency key. Môn học tại site vừa trở lại phải được Publication cập nhật trước khi ghi khóa học ở đó.
+5. Với thao tác xóa `KhoaHoc`, không xóa ở site nào khi còn thiếu site; chỉ khi đủ site mới kiểm tra `LopHoc` tham chiếu ở tất cả nơi rồi mới xóa. Nếu khóa đang được dùng, chuyển sang cần đối soát và không xóa.
+6. Không báo hoàn tất khi còn site chưa ACK. Nếu CSDL điều phối trong `AUTH_SESSION_SITE_CODE` mất kết nối hoặc chưa cài outbox, không thể nhận thao tác bền vững. Worker `manage.py sync_courses` retry nền mỗi 5 giây; `run-local.ps1` khởi chạy worker, còn môi trường khác phải giám sát tiến trình này riêng. UI cũng đối soát khi trang đang mở/mở lại.
+7. Mỗi site có transaction cục bộ; fan-out/outbox không phải transaction ACID xuyên CSDL. `Blog`, tài khoản và các bảng khác vẫn theo service/chính sách riêng; không suy diễn chúng dùng cùng hàng đợi KhoaHoc.
 
 MonHoc dùng SQL Server Publication, KhoaHoc giữ fan-out riêng. Các quy tắc lỗi/retry phụ thuộc cơ chế: MonHoc không phát lại DML ở Subscriber, chỉ đọc xác nhận; KhoaHoc tiếp tục site chưa ACK. [Chính sách môn học](MonHoc-SQL-Replication.md). Seed không phải minh chứng replication.
 

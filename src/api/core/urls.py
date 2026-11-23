@@ -95,6 +95,7 @@ from core.employees.views import (
 from core.catalog.views import (
     CourseClassSessionSummaryView,
     SharedCourseCollectionView,
+    SharedCourseSyncView,
     SharedCourseDetailView,
     PublicCourseListView,
     SharedSubjectCollectionView,
@@ -171,6 +172,7 @@ urlpatterns = [
     path("admin/shared/subjects/", SharedSubjectCollectionView.as_view(), name="shared-subject-list"),
     path("admin/shared/subjects/<str:slug>/", SharedSubjectDetailView.as_view(), name="shared-subject-detail"),
     path("admin/courses/", SharedCourseCollectionView.as_view(), name="admin-course-create"),
+    path("admin/courses/sync/", SharedCourseSyncView.as_view(), name="admin-course-sync"),
     path("admin/courses/class-sessions/", CourseClassSessionSummaryView.as_view(), name="admin-course-class-sessions"),
     path("admin/courses/<str:slug>/", SharedCourseDetailView.as_view(), name="admin-course-detail"),
     path("courses/", PublicCourseListView.as_view(), name="public-course-list"),

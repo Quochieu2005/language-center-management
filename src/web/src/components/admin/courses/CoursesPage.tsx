@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, App, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tag } from "antd";
-import { catalogApi, type CourseClassSession, type CourseClassSessionSummary, type PublicCourse, type PublicCourseList, type SharedCourseCreateInput, type SharedCoursePatchInput, type SharedSubjectList } from "@/lib/api/catalog";
+import { catalogApi, type CourseClassSession, type CourseClassSessionSummary, type PublicCourse, type PublicCourseList, type SharedCourseCreateInput, type SharedCoursePatchInput, type SharedCourseSyncStatus, type SharedSubjectList } from "@/lib/api/catalog";
 import { ApiError } from "@/lib/api/client";
 import styles from "./CoursesPage.module.scss";
 
@@ -20,7 +20,7 @@ type PendingWrite =
   | { kind: "create"; key: string; body: SharedCourseCreateInput }
   | { kind: "update"; key: string; slug: string; body: SharedCoursePatchInput }
   | { kind: "delete"; key: string; slug: string };
-type PendingSync = { operation: PendingWrite; missingSites: string[] };
+type PendingSync = { operation: PendingWrite; missingSites: string[]; durable: boolean };
 
 const money = new Intl.NumberFormat("vi-VN");
 const durationNumber = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
@@ -47,6 +47,8 @@ export default function CoursesPage() {
   const [subjectPickerOpen, setSubjectPickerOpen] = useState(false);
   const [editing, setEditing] = useState<PublicCourse | null>(null);
   const [pending, setPending] = useState<PendingSync | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SharedCourseSyncStatus | null>(null);
+  const [syncError, setSyncError] = useState("");
   const [form] = Form.useForm<CourseForm>();
   const formScrollRef = useRef<HTMLDivElement>(null);
   const courseName = Form.useWatch("ten_khoa_hoc", form) || "";
@@ -56,10 +58,16 @@ export default function CoursesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    setSyncError("");
     setCatalog(null);
     setSubjects(null);
     setClassSessions(null);
     setClassSessionsError("");
+    const queueStatus = await catalogApi.reconcileCourseWrites().catch((reason) => {
+      setSyncError(reason instanceof Error ? reason.message : "Không kiểm tra được hàng đợi đồng bộ khóa học.");
+      return null;
+    });
+    setSyncStatus(queueStatus);
     try {
       const [courseResult, subjectResult, sessionResult] = await Promise.all([
         catalogApi.publicCourses(),
@@ -75,8 +83,47 @@ export default function CoursesPage() {
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được danh mục khóa học."); }
     finally { setLoading(false); }
+    return queueStatus;
   }, []);
   useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
+
+  useEffect(() => {
+    if (!syncStatus?.pending_count) return;
+    let stopped = false;
+    let running = false;
+    const timer = window.setInterval(async () => {
+      if (running) return;
+      running = true;
+      try {
+        const next = await catalogApi.reconcileCourseWrites();
+        if (stopped) return;
+        setSyncStatus(next);
+        setSyncError("");
+        if (!next.pending_count) {
+          setPending((current) => current?.durable ? null : current);
+          await load();
+        }
+      } catch (reason) {
+        if (!stopped) setSyncError(reason instanceof Error ? reason.message : "Chưa đối soát được hàng đợi đồng bộ.");
+      } finally { running = false; }
+    }, 10000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [load, syncStatus?.pending_count]);
+
+  const retryQueueOperation = async (operationId: string) => {
+    setSaving(true);
+    try {
+      const next = await catalogApi.reconcileCourseWrites(operationId);
+      setSyncStatus(next);
+      setSyncError("");
+      if (!next.pending_count) {
+        setPending(null);
+        await load();
+      }
+    } catch (reason) {
+      setSyncError(reason instanceof Error ? reason.message : "Chưa đối soát lại được yêu cầu.");
+    } finally { setSaving(false); }
+  };
 
   const runWrite = async (operation: PendingWrite) => {
     setSaving(true);
@@ -88,11 +135,12 @@ export default function CoursesPage() {
           ? await catalogApi.updateCourse(operation.slug, operation.body, operation.key)
           : await catalogApi.deleteCourse(operation.slug, operation.key);
       if (!result.complete) {
-        setPending({ operation, missingSites: result.missing_sites });
+        setPending({ operation, missingSites: result.missing_sites, durable: true });
         setModal(false);
         form.resetFields();
-        message.warning("Một số cơ sở chưa đồng bộ. Dùng nút thử lại bên dưới để tiếp tục cùng yêu cầu.");
-        void load();
+        message.warning("Yêu cầu đã được lưu. Site còn thiếu sẽ được đồng bộ tự động khi kết nối lại.");
+        const refreshed = await load();
+        if (refreshed?.pending_count === 0) setPending(null);
         return;
       }
       setPending(null);
@@ -105,7 +153,7 @@ export default function CoursesPage() {
       const missingSites = reason instanceof ApiError && Array.isArray(reason.payload.missing_sites)
         ? reason.payload.missing_sites.filter((site): site is string => typeof site === "string")
         : [];
-      if (!(reason instanceof ApiError) || reason.status >= 500) setPending({ operation, missingSites });
+      if (!(reason instanceof ApiError) || reason.status >= 500) setPending({ operation, missingSites, durable: false });
       else setPending(null);
       setError(reason instanceof Error ? reason.message : "Chưa xác nhận được kết quả. Hãy thử lại cùng yêu cầu.");
       if (!(reason instanceof ApiError) || reason.status >= 500) {
@@ -116,7 +164,7 @@ export default function CoursesPage() {
   };
 
   const submit = (values: CourseForm) => {
-    if (!catalog?.complete || !subjects?.complete || pending) return;
+    if (!canWrite) return;
     if (!editing && (values.thoi_luong_so == null || !values.thoi_luong_don_vi)) return;
     const key = crypto.randomUUID();
     const shared = {
@@ -145,7 +193,9 @@ export default function CoursesPage() {
     setModal(true);
   };
 
-  const canWrite = Boolean(catalog?.complete && subjects?.complete && !pending && !loading);
+  const catalogConsistent = Boolean(catalog && !catalog.inconsistent_sites.length && (catalog.complete || catalog.missing_sites.length));
+  const subjectsConsistent = Boolean(subjects && !subjects.inconsistent_sites.length && (subjects.complete || subjects.missing_sites.length));
+  const canWrite = Boolean(catalogConsistent && subjectsConsistent && syncStatus?.pending_count === 0 && !syncError && !pending && !loading);
   const sessionsByCourse = new Map<string, CourseClassSession[]>();
   for (const item of classSessions?.results || []) {
     const sessions = sessionsByCourse.get(item.course_id) || [];
@@ -172,11 +222,11 @@ export default function CoursesPage() {
     {error && <Alert type="error" showIcon title={error} />}
     {classSessionsError && <Alert type="warning" showIcon title="Không tải được số buổi theo lớp" description={classSessionsError} />}
     {classSessions && !classSessions.complete && <Alert type="warning" showIcon title="Số buổi lớp mới tải được một phần" description={`Thiếu site: ${classSessions.missing_sites.join(", ") || "không xác định"}.`} />}
-    {catalog && <>
-      {!catalog.complete && <Alert type="warning" showIcon title="Danh mục chưa đồng nhất giữa các cơ sở. Tạm khóa thao tác ghi để tránh làm lệch bản sao." description={`Site thiếu: ${catalog.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${catalog.inconsistent_sites.join(", ") || "không có"}.`} />}
-      {subjects && !subjects.complete && <Alert type="warning" showIcon title="Danh sách môn học chưa đối chiếu đủ các cơ sở. Tạm khóa tạo/sửa khóa học." description={`Site thiếu: ${subjects.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${subjects.inconsistent_sites.join(", ") || "không có"}.`} />}
-      {pending && <Alert type="warning" showIcon title="Yêu cầu đồng bộ chưa hoàn tất" description={<Space orientation="vertical"><span>Giữ nguyên nội dung và mã yêu cầu để tránh tạo thao tác trùng. Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định; API chưa xác nhận kết quả"}.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
-    </>}
+    {syncError && <Alert type="error" showIcon title="Không kiểm tra được hàng đợi đồng bộ khóa học; thao tác ghi đang tạm khóa." description={syncError} />}
+    {catalog && !catalog.complete && <Alert type={catalog.inconsistent_sites.length ? "error" : "warning"} showIcon title={catalog.inconsistent_sites.length ? "Danh mục khóa học đang lệch giữa các site; cần đối soát trước khi ghi." : "Danh sách khóa học thiếu site đang mất kết nối."} description={`Site thiếu: ${catalog.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${catalog.inconsistent_sites.join(", ") || "không có"}.${catalogConsistent ? " Có thể tạo/sửa; hệ thống sẽ lưu yêu cầu và chờ site thiếu đồng bộ." : ""}`} />}
+    {subjects && !subjects.complete && <Alert type={subjects.inconsistent_sites.length ? "error" : "warning"} showIcon title={subjects.inconsistent_sites.length ? "Danh sách môn học đang lệch; chưa thể tạo/sửa khóa học." : "Danh sách môn học thiếu site đang mất kết nối."} description={`Site thiếu: ${subjects.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${subjects.inconsistent_sites.join(", ") || "không có"}.${subjectsConsistent ? " Các site đang kết nối nhất quán; yêu cầu khóa học sẽ chờ bản sao môn học còn thiếu nếu cần." : ""}`} />}
+    {syncStatus && syncStatus.pending_count > 0 && <Alert type="warning" showIcon title="Đang chờ đồng bộ khóa học" description={<Space orientation="vertical"><span>Hàng đợi còn {syncStatus.pending_count} yêu cầu. Site chưa xác nhận: {syncStatus.pending_sites.join(", ") || "cần đối soát"}. Hệ thống tự thử mỗi 10 giây khi trang đang mở và khi bạn mở trang lần sau.</span>{syncStatus.operations.map((operation) => <Space key={operation.operation_id} wrap><span>{operation.action} · {operation.course_id || operation.slug} · {operation.status === "can_doi_soat" ? "cần đối soát" : `đang chờ ${operation.pending_sites.join(", ") || "site liên quan"}`}{operation.detail ? ` · ${operation.detail}` : ""}</span>{operation.status === "can_doi_soat" && <Button size="small" loading={saving} onClick={() => void retryQueueOperation(operation.operation_id)}>Đối soát lại</Button>}</Space>)}</Space>} />}
+    {pending && (!pending.durable || syncError || !syncStatus) && <Alert type="warning" showIcon title="Chưa xác nhận được kết quả ghi" description={<Space orientation="vertical"><span>Giữ nguyên nội dung yêu cầu. Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định"}.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
     <Card title={`Quản lý khóa học${catalog ? ` · ${catalog.count}` : ""}`} extra={<Button type="primary" onClick={create} disabled={!canWrite}>Tạo khóa học</Button>}>
       <Table rowKey="course_id" loading={loading} columns={columns} dataSource={catalog?.results || []} scroll={{ x: 1400 }} locale={{ emptyText: <Empty description={error ? "Không tải được dữ liệu từ các cơ sở" : "Chưa có khóa học"} /> }} />
     </Card>
@@ -204,14 +254,14 @@ export default function CoursesPage() {
             <Input maxLength={30} placeholder="FG hoặc HK-TOEIC-450-550" />
           </Form.Item>
         </div>
-        <Alert type="info" showIcon title="Mã môn phải là môn học đã tồn tại và có cùng dữ liệu trên tất cả site đang hoạt động." style={{ marginBottom: 16 }} />
+        <Alert type="info" showIcon title="Mã môn phải tồn tại và nhất quán trên các site đang kết nối. Site đang mất kết nối sẽ được kiểm tra khi đồng bộ." style={{ marginBottom: 16 }} />
         <div className={styles.formGrid}>
           <Form.Item label="Mã môn học" extra="Bấm Chọn mã môn để chọn môn có sẵn.">
             <Space.Compact style={{ width: "100%" }}>
               <Form.Item name="ma_mon" noStyle rules={[{ required: true, max: 30 }, { validator: (_, value: string | undefined) => !value || subjects?.results.some((subject) => subject.ma_mon.toUpperCase() === value.trim().toUpperCase()) ? Promise.resolve() : Promise.reject(new Error("Mã môn không tồn tại trong danh mục dùng chung.")) }]}>
                 <Input readOnly placeholder="Chưa chọn mã môn" />
               </Form.Item>
-              <Button htmlType="button" disabled={!subjects?.complete || !subjects.results.length} onClick={() => setSubjectPickerOpen(true)}>Chọn mã môn</Button>
+              <Button htmlType="button" disabled={!subjectsConsistent || !subjects?.results.length} onClick={() => setSubjectPickerOpen(true)}>Chọn mã môn</Button>
             </Space.Compact>
           </Form.Item>
           <Form.Item name="ten_khoa_hoc" label="Tên khóa học" rules={[{ required: true, max: 120 }]}><Input maxLength={120} /></Form.Item>

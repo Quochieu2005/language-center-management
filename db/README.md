@@ -64,6 +64,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `42_add_site_staff_notification_audience.sql` | Mở `ThongBao.doi_tuong` cho thông báo nội bộ tại site nhận; chạy trên mọi site đang hoạt động trước khi bật notification mới sau chuyển cơ sở. |
 | `43_enforce_contact_site_boundary.sql` | Sau migration 39: kiểm tra dữ liệu rồi thêm CHECK site cho liên hệ; dừng khi có dòng sai, không tự chuyển/xóa. Chạy lại an toàn. |
 | `44_revalidate_course_subject_fk.sql` | Kiểm tra khóa học thiếu môn cha và xác nhận lại FK. Với FK NOT FOR REPLICATION, chỉ dựng lại ánh xạ ma_mon không cascade như schema; không sửa dữ liệu hoặc Publication. |
+| `45_account_replication_queue.sql` | Tạo outbox đồng bộ tài khoản tại authority `AUTH_SESSION_SITE_CODE`; chỉ chạy một lần trên DB authority theo hướng dẫn Auth-Site-Isolation. |
+| `46_course_sync_outbox.sql` | Tạo hàng đợi retry cho ghi `KhoaHoc` dùng chung; chỉ chạy một lần trên DB `AUTH_SESSION_SITE_CODE`, không chạy trên cả ba DB. Cài trước khi bật API/UI ghi khóa học phiên bản mới. |
 
 ## Chạy bằng SSMS
 
@@ -82,6 +84,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 13. Trước khi triển khai API hoàn học phí, sao lưu rồi chạy `40_enable_tuition_refunds.sql` riêng trên từng database site đang hoạt động. Migration chỉ thêm cột/ràng buộc/index tại DB đang chọn, không thay đổi phiếu đã ghi; xác nhận thành công trên đủ site trước khi bật thao tác hoàn. Đối chiếu thủ công các phiếu `loai='hoan'` cũ chưa có `ma_phieu_goc`; API sẽ từ chối hoàn tiếp cho khoản có các phiếu này đến khi được gắn đúng phiếu gốc.
 14. Trước khi triển khai chức vụ `Kế toán & Lễ tân`, dừng ghi nhân viên, sao lưu từng site rồi chạy `41_merge_receptionist_into_accounting.sql` lần lượt trên Q1, Q7, TD (và mọi site đang hoạt động). Script chỉ đổi chức vụ `le_tan` sang `ke_toan` trong đúng database đang chọn, thay CHECK trong transaction cục bộ, rồi in số nhân viên theo chức vụ. Xác nhận cả site hoàn tất trước khi bật API/UI mới; không chạy ở database trung tâm.
 15. Trước khi triển khai thông báo chuyển cơ sở cho nhân sự site, sao lưu và chạy `42_add_site_staff_notification_audience.sql` trên mọi site đang hoạt động. Migration chỉ mở rộng CHECK `ThongBao.doi_tuong`; kiểm tra kết quả trên đủ site trước khi bật code phát thông báo.
+16. Trước khi bật khả năng ghi khóa học khi site khác mất kết nối, sao lưu rồi chạy `46_course_sync_outbox.sql` một lần trên đúng database được cấu hình `AUTH_SESSION_SITE_CODE`. Không chạy script này trên từng site; nó chứa ý định retry/ACK, còn `KhoaHoc` nghiệp vụ vẫn nằm riêng tại từng site.
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 
