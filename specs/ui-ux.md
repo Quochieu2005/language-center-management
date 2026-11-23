@@ -2,7 +2,7 @@
 
 Thu học phí giữ key/body cho lần gửi chưa rõ kết quả trong `sessionStorage`, tách theo tài khoản/site/khoản phí; khôi phục biểu mẫu khi mở lại kể cả sau reload cùng tab và khóa gửi/đóng dialog trong lúc chờ. Nếu trình duyệt chặn lưu trữ thì cảnh báo và chỉ retry an toàn trong trang đang mở; sau reload phải tra cứu phiếu. Key phải vừa mã phiếu 24 ký tự sau khi cộng tiền tố site. Giáo viên hiện tại xem được buổi cũ của lớp: `can_edit_attendance=false` thì hiện trạng thái chỉ đọc, khóa trường trạng thái/ghi chú và nút lưu điểm danh. Không thay bố cục trang. Đổi lớp sau khi đã có điểm/điểm danh hiển thị lỗi `409` từ API và giữ dữ liệu cũ.
 
-Bằng chứng giao diện phải đi kèm dữ liệu/API theo [đối chiếu tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Màn hình web hoặc danh sách bằng nhau không tự chứng minh phân mảnh/replication/giao dịch; giữ cảnh báo chưa đủ site, 202 và trạng thái phục hồi đúng hợp đồng hiện có. Đợt rà này không đổi giao diện.
+Bằng chứng giao diện phải đi kèm dữ liệu/API theo [đối chiếu tài liệu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Màn hình web hoặc danh sách bằng nhau không tự chứng minh phân mảnh/replication/giao dịch; giữ cảnh báo chưa đủ site, 202 và trạng thái phục hồi đúng hợp đồng hiện có. Cảnh báo admin dùng bố cục gọn, không xếp tiêu đề và mô tả thành các khối lớn khi màn hình đủ rộng.
 
 > Trạng thái: Đặc tả thiết kế UI/UX. Frontend Next.js đã có các route được liệt kê tại mục 3.6; cấu trúc và hành vi trong tài liệu này vẫn là yêu cầu thiết kế, không tự chứng minh route đã hoàn thiện hoặc TC phân tán đã đạt. Đối chiếu từng chức năng với [ma trận trạng thái source và bằng chứng](../docs/Trang-Thai-Trien-Khai.md).
 
@@ -142,6 +142,8 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 ### 3.2. Khu vực làm việc sau đăng nhập
 
 Đây là khu vực trong cùng website, không phải frontend riêng theo chức vụ. Tất cả người dùng nội bộ đi qua cùng màn hình đăng nhập; Django/API xác thực tài khoản rồi trả về ngữ cảnh cần cho giao diện: chức vụ/vai trò, cơ sở được giao (nếu có), phạm vi lớp (nếu là giáo viên) và quyền thao tác. Frontend dùng ngữ cảnh đó để điều hướng tới trang đầu phù hợp và dựng menu theo quyền. Không có dropdown cho người dùng tự chọn chức vụ lúc đăng nhập.
+
+Trong layout admin dùng chung, cảnh báo/lỗi/trạng thái site thu gọn theo nội dung: tiêu đề và chi tiết nằm cùng hàng khi đủ chỗ, không kéo dài hết chiều ngang nếu nội dung ngắn; màn hình hẹp tự xuống dòng và dùng hết chiều rộng khả dụng. Khi nhiều trạng thái cùng xuất hiện, vẫn giữ rõ site thiếu/lệch và hành động retry liên quan.
 
 | Page | Sections chính | Quyền và cách lấy dữ liệu |
 |---|---|---|
