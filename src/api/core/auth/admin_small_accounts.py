@@ -73,14 +73,18 @@ def list_admin_small_accounts(
             return total, rows
 
         site_results, errors = read_sites_concurrently(selected_sites, read_site)
-        if errors:
-            error = next(iter(errors.values()))
-            if isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
-                raise AuthInfrastructureUnavailable from error
-            raise error
+        missing_sites = []
+        for site, error in errors.items():
+            if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+                raise error
+            missing_sites.append(site)
 
-        total = sum(site_results[site][0] for site in selected_sites)
-        rows = [row for site in selected_sites for row in site_results[site][1]]
+        successful_sites = tuple(site for site in selected_sites if site in site_results)
+        if not successful_sites:
+            raise AuthInfrastructureUnavailable
+
+        total = sum(site_results[site][0] for site in successful_sites)
+        rows = [row for site in successful_sites for row in site_results[site][1]]
 
         results = []
         for row in rows:
@@ -106,8 +110,8 @@ def list_admin_small_accounts(
         results.sort(key=lambda item: (item["full_name"].casefold(), item["site_code"], item["admin_id"]))
         page = results[offset : offset + limit]
         return {
-            "complete": True,
-            "missing_sites": [],
+            "complete": not missing_sites,
+            "missing_sites": sorted(missing_sites),
             "site_codes": list(selected_sites),
             "count": total,
             "limit": limit,

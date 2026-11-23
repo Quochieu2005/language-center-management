@@ -1,6 +1,6 @@
 # Tài liệu đặc tả giao diện và API
 
-Căn cứ tài liệu học phần: [bảng đối chiếu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Ánh xạ route/API sang dữ liệu/site theo [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh); ERD chỉ có FK cục bộ. Thay đổi đợt rà này không thêm endpoint và không đổi request/response hiện hành.
+Căn cứ tài liệu học phần: [bảng đối chiếu giảng viên](../docs/QLTTNN-De-Cuong-Bao-Cao.md#tai-lieu-giang-vien). Ánh xạ route/API sang dữ liệu/site theo [lược đồ phân tán](../docs/DATABASE_SCHEMA.md#phan-manh); ERD chỉ có FK cục bộ. Thay đổi hiệu năng này không thêm endpoint hoặc trường request/response; `GET /api/v1/admin/admin-smalls/` trả dữ liệu một phần khi ít nhất một site phản hồi và nêu `complete=false`/`missing_sites`.
 
 Thư mục này lưu yêu cầu thiết kế cho giao diện và các hợp đồng API. Hai file có mục đích riêng nhưng phải mô tả cùng một luồng nghiệp vụ:
 

@@ -280,7 +280,12 @@ class AdminSmallCreateView(APIView):
             400: OpenApiResponse(description="Tham số phân trang hoặc site không hợp lệ."),
             401: OpenApiResponse(description="Chưa đăng nhập."),
             403: OpenApiResponse(description="Chỉ Admin Big được xem danh sách Admin Small."),
-            503: OpenApiResponse(description="Site/CSDL chưa sẵn sàng; danh sách chưa đầy đủ."),
+            503: OpenApiResponse(
+                description=(
+                    "Không đọc được site nào trong phạm vi yêu cầu. Nếu còn site phản hồi, "
+                    "API trả danh sách một phần với complete=false và missing_sites."
+                ),
+            ),
         },
     )
     def get(self, request):

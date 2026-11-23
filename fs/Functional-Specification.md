@@ -288,7 +288,7 @@ Khôi phục phiên không coi lỗi hạ tầng là hết phiên. Khi chuyển 
 
 **Người dùng:** Admin Big. **Phân tán:** TaiKhoan Replicated-Write; hồ sơ Admin/GiaoVien Local tại site được giao. Nhân viên nghiệp vụ theo FS-EMP-01.
 
-Admin Big đọc danh sách giáo viên bằng Global Query khi bỏ `site_code`: mỗi CSDL site được hỏi riêng, kết quả có `site_code` trên từng dòng và báo `complete=false`/`missing_sites` nếu thiếu site. Truyền `site_code` để lọc một site; xem chi tiết và mọi thay đổi hồ sơ/trạng thái vẫn định tuyến tới site cụ thể. Danh sách Admin Small cũng đọc toàn hệ thống mặc định và có thể lọc theo site.
+Admin Big đọc danh sách giáo viên bằng Global Query khi bỏ `site_code`: mỗi CSDL site được hỏi riêng, kết quả có `site_code` trên từng dòng và báo `complete=false`/`missing_sites` nếu thiếu site. Truyền `site_code` để lọc một site; xem chi tiết và mọi thay đổi hồ sơ/trạng thái vẫn định tuyến tới site cụ thể. Danh sách Admin Small cũng đọc toàn hệ thống mặc định và có thể lọc theo site. Nếu một site trong truy vấn toàn hệ thống lỗi, API vẫn trả các dòng từ site còn phản hồi, kèm `complete=false` và `missing_sites`; `count` chỉ là số đã đọc được. Nếu không site nào phản hồi thì trả lỗi dịch vụ. Truy vấn theo site cụ thể chỉ phụ thuộc site được chọn.
 
 1. Admin Big nhập thông tin tài khoản Admin Small hoặc giáo viên cùng site và chức vụ được giao.
 2. API kiểm tra site hoạt động, chức vụ hợp lệ, email/tên đăng nhập duy nhất toàn hệ thống và quyền Admin Big.
