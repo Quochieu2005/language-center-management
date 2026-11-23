@@ -473,17 +473,21 @@
     align-items: baseline;
     gap: 0 10px;
     min-width: 0;
+    font-size: 14px;
+    line-height: 20px;
   }
 
   :global(.ant-alert-title) {
     margin-bottom: 0 !important;
+    font-size: 14px !important;
+    font-weight: 600;
     line-height: 20px;
   }
 
   :global(.ant-alert-description) {
     margin-top: 0 !important;
-    font-size: 12px;
-    line-height: 18px;
+    font-size: 14px !important;
+    line-height: 20px;
   }
 
   :global(.ant-alert-icon) {

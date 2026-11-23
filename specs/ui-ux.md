@@ -143,7 +143,7 @@ Route chỉ lắp page component và xử lý ranh giới điều hướng. Comp
 
 Đây là khu vực trong cùng website, không phải frontend riêng theo chức vụ. Tất cả người dùng nội bộ đi qua cùng màn hình đăng nhập; Django/API xác thực tài khoản rồi trả về ngữ cảnh cần cho giao diện: chức vụ/vai trò, cơ sở được giao (nếu có), phạm vi lớp (nếu là giáo viên) và quyền thao tác. Frontend dùng ngữ cảnh đó để điều hướng tới trang đầu phù hợp và dựng menu theo quyền. Không có dropdown cho người dùng tự chọn chức vụ lúc đăng nhập.
 
-Trong layout admin dùng chung, cảnh báo/lỗi/trạng thái site thu gọn theo nội dung: tiêu đề và chi tiết nằm cùng hàng khi đủ chỗ, không kéo dài hết chiều ngang nếu nội dung ngắn; màn hình hẹp tự xuống dòng và dùng hết chiều rộng khả dụng. Khi nhiều trạng thái cùng xuất hiện, vẫn giữ rõ site thiếu/lệch và hành động retry liên quan.
+Trong layout admin dùng chung, cảnh báo/lỗi/trạng thái site thu gọn theo nội dung: tiêu đề và chi tiết cùng cỡ chữ 14px, tiêu đề dùng độ đậm cao hơn; chúng nằm cùng hàng khi đủ chỗ, không kéo dài hết chiều ngang nếu nội dung ngắn. Màn hình hẹp tự xuống dòng và dùng hết chiều rộng khả dụng. Khi nhiều trạng thái cùng xuất hiện, vẫn giữ rõ site thiếu/lệch và hành động retry liên quan.
 
 | Page | Sections chính | Quyền và cách lấy dữ liệu |
 |---|---|---|
