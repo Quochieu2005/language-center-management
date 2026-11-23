@@ -63,19 +63,25 @@ export default function CoursesPage() {
     setSubjects(null);
     setClassSessions(null);
     setClassSessionsError("");
-    const queueStatus = await catalogApi.reconcileCourseWrites().catch((reason) => {
+    const queueStatusRequest = catalogApi.reconcileCourseWrites().then((status) => {
+      setSyncStatus(status);
+      return status;
+    }).catch((reason) => {
       setSyncError(reason instanceof Error ? reason.message : "Không kiểm tra được hàng đợi đồng bộ khóa học.");
+      setSyncStatus(null);
       return null;
     });
-    setSyncStatus(queueStatus);
     try {
-      const [courseResult, subjectResult, sessionResult] = await Promise.all([
-        catalogApi.publicCourses(),
-        catalogApi.sharedSubjects(),
-        catalogApi.courseClassSessions().catch((reason) => {
-          setClassSessionsError(reason instanceof Error ? reason.message : "Không tải được số buổi theo lớp.");
-          return null;
-        }),
+      const [, [courseResult, subjectResult, sessionResult]] = await Promise.all([
+        queueStatusRequest,
+        Promise.all([
+          catalogApi.publicCourses(),
+          catalogApi.sharedSubjects(),
+          catalogApi.courseClassSessions().catch((reason) => {
+            setClassSessionsError(reason instanceof Error ? reason.message : "Không tải được số buổi theo lớp.");
+            return null;
+          }),
+        ]),
       ]);
       setCatalog(courseResult);
       setSubjects(subjectResult);
@@ -83,7 +89,7 @@ export default function CoursesPage() {
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được danh mục khóa học."); }
     finally { setLoading(false); }
-    return queueStatus;
+    return queueStatusRequest;
   }, []);
   useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
 
@@ -195,7 +201,8 @@ export default function CoursesPage() {
 
   const catalogConsistent = Boolean(catalog && !catalog.inconsistent_sites.length && (catalog.complete || catalog.missing_sites.length));
   const subjectsConsistent = Boolean(subjects && !subjects.inconsistent_sites.length && (subjects.complete || subjects.missing_sites.length));
-  const canWrite = Boolean(catalogConsistent && subjectsConsistent && syncStatus?.pending_count === 0 && !syncError && !pending && !loading);
+  const needsManualReview = Boolean(syncStatus?.operations.some((operation) => operation.status === "can_doi_soat"));
+  const canWrite = Boolean(catalogConsistent && subjectsConsistent && !needsManualReview && (!pending || pending.durable) && !loading);
   const sessionsByCourse = new Map<string, CourseClassSession[]>();
   for (const item of classSessions?.results || []) {
     const sessions = sessionsByCourse.get(item.course_id) || [];
@@ -222,7 +229,7 @@ export default function CoursesPage() {
     {error && <Alert type="error" showIcon title={error} />}
     {classSessionsError && <Alert type="warning" showIcon title="Không tải được số buổi theo lớp" description={classSessionsError} />}
     {classSessions && !classSessions.complete && <Alert type="warning" showIcon title="Số buổi lớp mới tải được một phần" description={`Thiếu site: ${classSessions.missing_sites.join(", ") || "không xác định"}.`} />}
-    {syncError && <Alert type="error" showIcon title="Không kiểm tra được hàng đợi đồng bộ khóa học; thao tác ghi đang tạm khóa." description={syncError} />}
+    {syncError && <Alert type="warning" showIcon title="Chưa cập nhật được trạng thái hàng đợi" description={<Space orientation="vertical"><span>{syncError}</span><span>Mỗi lần ghi vẫn được API kiểm tra riêng. Nếu site điều phối không sẵn sàng hoặc danh mục đang lệch, API sẽ từ chối và giữ nguyên dữ liệu bạn nhập.</span><Button size="small" onClick={() => void load()}>Tải lại trạng thái</Button></Space>} />}
     {catalog && !catalog.complete && <Alert type={catalog.inconsistent_sites.length ? "error" : "warning"} showIcon title={catalog.inconsistent_sites.length ? "Danh mục khóa học đang lệch giữa các site; cần đối soát trước khi ghi." : "Danh sách khóa học thiếu site đang mất kết nối."} description={`Site thiếu: ${catalog.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${catalog.inconsistent_sites.join(", ") || "không có"}.${catalogConsistent ? " Có thể tạo/sửa; hệ thống sẽ lưu yêu cầu và chờ site thiếu đồng bộ." : ""}`} />}
     {subjects && !subjects.complete && <Alert type={subjects.inconsistent_sites.length ? "error" : "warning"} showIcon title={subjects.inconsistent_sites.length ? "Danh sách môn học đang lệch; chưa thể tạo/sửa khóa học." : "Danh sách môn học thiếu site đang mất kết nối."} description={`Site thiếu: ${subjects.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${subjects.inconsistent_sites.join(", ") || "không có"}.${subjectsConsistent ? " Các site đang kết nối nhất quán; yêu cầu khóa học sẽ chờ bản sao môn học còn thiếu nếu cần." : ""}`} />}
     {syncStatus && syncStatus.pending_count > 0 && <Alert type="warning" showIcon title="Đang chờ đồng bộ khóa học" description={<Space orientation="vertical"><span>Hàng đợi còn {syncStatus.pending_count} yêu cầu. Site chưa xác nhận: {syncStatus.pending_sites.join(", ") || "cần đối soát"}. Hệ thống tự thử mỗi 10 giây khi trang đang mở và khi bạn mở trang lần sau.</span>{syncStatus.operations.map((operation) => <Space key={operation.operation_id} wrap><span>{operation.action} · {operation.course_id || operation.slug} · {operation.status === "can_doi_soat" ? "cần đối soát" : `đang chờ ${operation.pending_sites.join(", ") || "site liên quan"}`}{operation.detail ? ` · ${operation.detail}` : ""}</span>{operation.status === "can_doi_soat" && <Button size="small" loading={saving} onClick={() => void retryQueueOperation(operation.operation_id)}>Đối soát lại</Button>}</Space>)}</Space>} />}

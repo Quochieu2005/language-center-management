@@ -8,8 +8,9 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import DatabaseError, connections
+from django.db import DatabaseError, IntegrityError, connections
 
+from core.sites.fanout import read_sites_concurrently
 from core.sites.connections import UnknownSiteError, get_site_connection
 
 
@@ -107,19 +108,25 @@ def _status(alias: str, operation: dict) -> tuple[str, str | None]:
     return "cho_dong_bo", operation.get("detail")
 
 
-def get_operation(alias: str, operation_id: str) -> dict | None:
+def get_operation(alias: str, operation_id: str, *, available_sites=None) -> dict | None:
     operation = _read_intent(alias, operation_id)
     if operation is None:
         return None
     status, detail = _status(alias, operation)
-    pending = tuple(
-        site for site in operation["target_sites"]
-        if not _acknowledged(site, operation)
-    ) if status != "hoan_tat" else ()
+    if status == "hoan_tat":
+        pending = ()
+    else:
+        sites_to_check = set(available_sites) if available_sites is not None else set(operation["target_sites"])
+        sites_to_check.intersection_update(operation["target_sites"])
+        acknowledgements, _ = read_sites_concurrently(
+            tuple(sites_to_check), lambda site: _acknowledged(site, operation),
+        )
+        acknowledged_sites = {site for site, acknowledged in acknowledgements.items() if acknowledged}
+        pending = tuple(site for site in operation["target_sites"] if site not in acknowledged_sites)
     return {**operation, "pending_sites": pending, "status": status, "detail": detail}
 
 
-def get_pending_operations(alias: str, *, limit: int = 20) -> list[dict]:
+def get_pending_operations(alias: str, *, limit: int = 20, available_sites=None) -> list[dict]:
     with connections[alias].cursor() as cursor:
         cursor.execute(
             "SELECT TOP (%s) ma_log FROM dbo.Logs WHERE loai_log = 'sync' "
@@ -127,22 +134,59 @@ def get_pending_operations(alias: str, *, limit: int = 20) -> list[dict]:
             "AND NOT EXISTS (SELECT 1 FROM dbo.Logs AS finished "
             "WHERE finished.ma_log = N'KHFIN-' + SUBSTRING(dbo.Logs.ma_log, 7, 64) "
             "AND finished.ket_qua = 'thanh_cong') "
-            "ORDER BY thoi_diem_utc, ma_log",
+            "ORDER BY COALESCE(TRY_CONVERT(bigint, JSON_VALUE(du_lieu_moi, '$.queue_sequence')), 0), "
+            "thoi_diem_utc, ma_log",
             [limit, len(_INTENT_PREFIX), _INTENT_PREFIX],
         )
         operation_ids = [str(row[0])[len(_INTENT_PREFIX):] for row in cursor.fetchall()]
     pending = []
     for operation_id in operation_ids:
-        operation = get_operation(alias, operation_id)
+        operation = get_operation(alias, operation_id, available_sites=available_sites)
         if operation and operation["status"] != "hoan_tat":
             pending.append(operation)
     return pending
 
 
+def get_review_operations(alias: str) -> list[dict]:
+    """Read review blockers from coordinator Logs without contacting remote sites."""
+    return [operation for operation in get_open_operations(alias) if operation["status"] == "can_doi_soat"]
+
+
+def get_open_operations(alias: str) -> list[dict]:
+    """Read unfinished intent metadata from coordinator Logs without site connections."""
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            "SELECT intent.ma_log FROM dbo.Logs AS intent WHERE intent.loai_log = 'sync' "
+            "AND intent.bang_tac_dong = 'KhoaHoc' AND LEFT(intent.ma_log, %s) = %s "
+            "AND NOT EXISTS (SELECT 1 FROM dbo.Logs AS finished "
+            "WHERE finished.ma_log = N'KHFIN-' + SUBSTRING(intent.ma_log, 7, 64) "
+            "AND finished.ket_qua = 'thanh_cong') "
+            "ORDER BY thoi_diem_utc, ma_log",
+            [len(_INTENT_PREFIX), _INTENT_PREFIX],
+        )
+        operation_ids = [str(row[0])[len(_INTENT_PREFIX):] for row in cursor.fetchall()]
+    operations = []
+    for operation_id in operation_ids:
+        operation = _read_intent(alias, operation_id)
+        if operation is None:
+            continue
+        status, detail = _status(alias, operation)
+        if status != "hoan_tat":
+            operations.append({
+                **operation, "status": status, "detail": detail,
+                "pending_sites": operation["initial_pending_sites"],
+            })
+    return operations
+
+
 def insert_operation(alias: str, operation: dict) -> dict:
+    with connections[alias].cursor() as cursor:
+        cursor.execute("SELECT NEXT VALUE FOR dbo.Seq_NK")
+        queue_sequence = int(cursor.fetchone()[0])
     payload = {
         "queue_kind": "course_sync",
         "operation_id": operation["operation_id"],
+        "queue_sequence": queue_sequence,
         "slug": operation["slug"],
         "course_id": operation.get("course_id"),
         "after": operation.get("after"),
@@ -216,6 +260,12 @@ def save_progress(alias: str, operation_id: str, *, pending_sites, detail: str |
             cursor.execute("SELECT TOP (1) ma_log FROM dbo.Logs WHERE ma_log = %s", [f"KHFIN-{operation_id}"])
             if cursor.fetchone():
                 return
-        _insert_status_event(
-            alias, operation, prefix="KHFIN", action="hoan_tat", result="thanh_cong",
-        )
+        try:
+            _insert_status_event(
+                alias, operation, prefix="KHFIN", action="hoan_tat", result="thanh_cong",
+            )
+        except IntegrityError:
+            with connections[alias].cursor() as cursor:
+                cursor.execute("SELECT TOP (1) ma_log FROM dbo.Logs WHERE ma_log = %s", [f"KHFIN-{operation_id}"])
+                if not cursor.fetchone():
+                    raise
