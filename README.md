@@ -366,7 +366,7 @@ Trước khi thu hoặc hoàn, kiểm tra khoản phải thu, tổng đã thu/đ
 
 Báo cáo tài chính học phí cho Kế toán & Lễ tân xem dữ liệu `LOCAL` tại cơ sở được phân công; Admin Small chỉ xem site của mình, còn Admin Big có thể xem một site hoặc dùng Global Query. API hỏi từng CSDL site riêng và nêu site thiếu; các số liệu là tổng hiện tại từ `HocPhi`/`PhieuThu`, không phải báo cáo lọc theo kỳ ngày.
 
-Màn Học phí mặc định lọc các khoản còn nợ, hiển thị từng học viên, lớp, tổng học phí, đã thu và còn lại; có thể tìm theo tên/mã học viên hoặc tên/mã lớp, đổi bộ lọc và chuyển trang. Các thẻ tổng quan lấy từ báo cáo tại site, không chỉ cộng trang đang xem. Nếu chưa có dòng học phí, cần kiểm tra đăng ký lớp: một khoản `HocPhi` được tạo khi đăng ký hợp lệ phát sinh.
+Màn Học phí mặc định lọc các khoản còn nợ, hiển thị từng học viên, lớp, tổng học phí, đã thu và còn lại; có thể tìm theo tên/mã học viên hoặc tên/mã lớp, đổi bộ lọc và chuyển trang. Admin Big, Admin Small và Kế toán & Lễ tân xem thẻ tổng quan từ API báo cáo theo phạm vi quyền, không cộng trang đang xem; Tư vấn xem công nợ trên từng dòng và không gọi API báo cáo tài chính. Nếu chưa có dòng học phí, cần kiểm tra đăng ký lớp: một khoản `HocPhi` được tạo khi đăng ký hợp lệ phát sinh.
 
 ### 5.4. Nhập và sửa điểm
 

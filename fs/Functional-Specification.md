@@ -447,7 +447,7 @@ Sau khi thay giáo viên, giáo viên hiện tại được xem buổi/roster c�
 **Người dùng:** Admin Big xem danh sách toàn hệ thống; Kế toán & Lễ tân xem công nợ, xem phiếu thu và ghi nhận thu/hoàn tại site được cấp; Admin Small giám sát; Tư vấn xem công nợ, gửi email nhắc phí và chỉ đổi kế hoạch đóng tại site. **Kiểu:** danh sách Admin Big là `GLOBAL`, đọc `HocPhi` cùng `DangKy`/`HocVien`/`LopHoc` riêng ở mỗi site; các thao tác còn lại là `LOCAL`. **Site:** nơi lưu HocPhi. **Bảng:** DangKy, HocPhi, PhieuThu, DotHocPhi, NhanVien, Logs.
 
 1. Kế toán & Lễ tân và Tư vấn xem danh sách theo site; mặc định lọc khoản có số dư dương và mỗi dòng thể hiện học viên, lớp, tổng học phí, đã thu, còn lại và trạng thái.
-2. Có thể tìm theo tên/mã học viên hoặc tên/mã lớp, chọn trạng thái và phân trang trên server; báo cáo tổng công nợ không chỉ cộng trang hiện tại.
+2. Có thể tìm theo tên/mã học viên hoặc tên/mã lớp, chọn trạng thái và phân trang trên server. Vai trò được cấp báo cáo theo FS-TUI-03 xem tổng công nợ từ API, không cộng riêng trang hiện tại; Tư vấn xem công nợ trên từng dòng.
 3. Chỉ Kế toán & Lễ tân nhập số tiền dương không vượt quá số còn nợ, phương thức hợp lệ và ghi chú không chứa dữ liệu thanh toán nhạy cảm. Tư vấn không được ghi thu/hoàn hoặc sửa tổng học phí/giảm giá.
 4. API kiểm tra quyền, trạng thái khoản phí và khóa chống gửi lặp/idempotency. Tư vấn chỉ đổi kế hoạch đóng trước lần thu đầu tiên qua API lịch học phí.
 5. Trong transaction site, thêm PhieuThu loại thu, cập nhật trạng thái HocPhi, ghi audit; không sửa/xóa lịch sử phiếu đã phát hành.
