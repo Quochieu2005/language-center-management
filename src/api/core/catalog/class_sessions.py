@@ -11,6 +11,7 @@ from core.academics.common import (
     require_active_site,
 )
 from core.sites.connections import UnknownSiteError, get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
 
 
 def _read_site_classes(site_code: str, alias: str) -> list[dict]:
@@ -46,12 +47,14 @@ def list_course_class_sessions(*, role: str, user_site_code: str | None) -> dict
     if role == "admin_big":
         available, initially_missing = active_site_state()
         missing = set(initially_missing)
-        results = []
-        for site in available:
-            try:
-                results.extend(_read_site_classes(site, get_site_database_alias(site)))
-            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
-                missing.add(site)
+        site_results, errors = read_sites_concurrently(
+            available, lambda site: _read_site_classes(site, get_site_database_alias(site)),
+        )
+        results = [row for site in sorted(site_results) for row in site_results[site]]
+        for site, error in errors.items():
+            if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+                raise error
+            missing.add(site)
         site_codes = sorted(set(available) | missing)
         results.sort(key=lambda row: (row["course_id"], row["site_code"], row["class_name"], row["class_id"]))
         return {

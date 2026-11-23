@@ -91,7 +91,7 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 
 | Module | Trách nhiệm |
 |---|---|
-| `core/sites/connections.py` | Đọc cấu hình kết nối riêng từng site và chọn alias qua Site Router |
+| `core/sites/connections.py`, `core/sites/fanout.py` | Chọn alias site và chạy các Global Query độc lập song song với số worker giới hạn; giữ danh sách site thiếu/lỗi riêng |
 | `core/auth/` | Đăng nhập, phiên có thể thu hồi, CSRF, idle timeout, hồ sơ, đổi/reset mật khẩu, OAuth học viên và vòng đời Admin Small |
 | `core/catalog/` | Danh mục môn/khóa học, danh sách khóa học công khai và ghi danh mục dùng chung |
 | `core/blog/` | API công khai đọc danh mục và chi tiết Blog theo slug bằng Global Query; đối chiếu bản sao từng site và báo site thiếu/lệch |

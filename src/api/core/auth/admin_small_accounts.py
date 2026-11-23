@@ -11,6 +11,8 @@ from core.auth.account_state import account_status_label
 from core.auth.admin_small_email import credential_email_status
 from core.auth.service_common import AuthInfrastructureUnavailable, active_site_codes
 from core.sites.connections import UnknownSiteError, get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
+
 
 def list_admin_small_accounts(
     *, site_code: str | None = None, limit: int, offset: int
@@ -22,10 +24,9 @@ def list_admin_small_accounts(
         if any(site not in active_sites for site in selected_sites):
             raise ValueError("Site không hoạt động.")
 
-        total = 0
-        rows: list[tuple[Any, ...]] = []
         fetch_count = offset + limit
-        for site in selected_sites:
+
+        def read_site(site: str) -> tuple[int, list[tuple[Any, ...]]]:
             alias = get_site_database_alias(site)
             with connections[alias].cursor() as cursor:
                 cursor.execute(
@@ -38,7 +39,7 @@ def list_admin_small_accounts(
                     """,
                     [site],
                 )
-                total += int(cursor.fetchone()[0])
+                total = int(cursor.fetchone()[0])
                 cursor.execute(
                     """
                     SELECT n.ma_admin, n.ma_co_so, n.ho_ten, n.sdt,
@@ -68,7 +69,22 @@ def list_admin_small_accounts(
                     """,
                     [site, fetch_count],
                 )
-                rows.extend(tuple(row) for row in cursor.fetchall())
+                rows = [tuple(row) for row in cursor.fetchall()]
+            return total, rows
+
+        site_results, errors = read_sites_concurrently(selected_sites, read_site)
+        missing_sites = []
+        for site, error in errors.items():
+            if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+                raise error
+            missing_sites.append(site)
+
+        successful_sites = tuple(site for site in selected_sites if site in site_results)
+        if not successful_sites:
+            raise AuthInfrastructureUnavailable
+
+        total = sum(site_results[site][0] for site in successful_sites)
+        rows = [row for site in successful_sites for row in site_results[site][1]]
 
         results = []
         for row in rows:
@@ -91,11 +107,11 @@ def list_admin_small_accounts(
                     "credential_email_status": credential_email_status(str(row[10]) if row[10] else None),
                 }
             )
-            results.sort(key=lambda item: (item["full_name"].casefold(), item["site_code"], item["admin_id"]))
+        results.sort(key=lambda item: (item["full_name"].casefold(), item["site_code"], item["admin_id"]))
         page = results[offset : offset + limit]
         return {
-            "complete": True,
-            "missing_sites": [],
+            "complete": not missing_sites,
+            "missing_sites": sorted(missing_sites),
             "site_codes": list(selected_sites),
             "count": total,
             "limit": limit,

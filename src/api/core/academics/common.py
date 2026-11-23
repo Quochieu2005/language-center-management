@@ -13,6 +13,7 @@ from django.db import DatabaseError, connections
 
 from core.auth.service_common import AuthInfrastructureUnavailable, _acquire_named_lock
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
 
 
 class AcademicError(Exception):
@@ -151,16 +152,23 @@ def active_site_state() -> tuple[tuple[str, ...], tuple[str, ...]]:
     active = tuple(code for code, state in catalog if state == "hoat_dong")
     if not active or registry not in active:
         raise AcademicInfrastructureUnavailable
+
+    def check_site(site: str) -> bool:
+        get_site_database_alias(site)
+        return site_catalog(site) == catalog
+
+    checks, errors = read_sites_concurrently(active, check_site)
     available: list[str] = []
     missing: list[str] = []
     for site in active:
-        try:
-            get_site_database_alias(site)
-            if site_catalog(site) == catalog:
-                available.append(site)
-            else:
-                missing.append(site)
-        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+        error = errors.get(site)
+        if error is not None:
+            if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+                raise error
+            missing.append(site)
+        elif checks.get(site, False):
+            available.append(site)
+        else:
             missing.append(site)
     return tuple(available), tuple(sorted(set(missing)))
 
@@ -176,29 +184,39 @@ def global_site_list(
     available, initially_missing = active_site_state()
     site_codes = tuple(sorted(set(available) | set(initially_missing)))
     missing = set(initially_missing)
-    counts: dict[str, int] = {}
-    for site in available:
-        try:
-            counts[site] = int(reader(site, 1, 0)["count"])
-        except unavailable_exceptions:
-            missing.add(site)
+    count_results, count_errors = read_sites_concurrently(
+        available,
+        lambda site: int(reader(site, 1, 0)["count"]),
+    )
+    counts = dict(count_results)
+    for site, error in count_errors.items():
+        if not isinstance(error, unavailable_exceptions):
+            raise error
+        missing.add(site)
 
     total = sum(counts.values())
-    results: list[dict[str, Any]] = []
+    page_ranges: dict[str, tuple[int, int]] = {}
     site_start = 0
     for site, count in sorted(counts.items()):
         page_start = max(offset, site_start)
         page_end = min(offset + limit, site_start + count)
         if page_start < page_end:
-            try:
-                page = reader(site, page_end - page_start, page_start - site_start)
-            except unavailable_exceptions:
-                missing.add(site)
-            else:
-                for row in page["results"]:
-                    row.setdefault("site_code", site)
-                    results.append(row)
+            page_ranges[site] = (page_end - page_start, page_start - site_start)
         site_start += count
+
+    page_results, page_errors = read_sites_concurrently(
+        tuple(page_ranges),
+        lambda site: reader(site, *page_ranges[site]),
+    )
+    for site, error in page_errors.items():
+        if not isinstance(error, unavailable_exceptions):
+            raise error
+        missing.add(site)
+    results: list[dict[str, Any]] = []
+    for site in sorted(page_results):
+        for row in page_results[site]["results"]:
+            row.setdefault("site_code", site)
+            results.append(row)
 
     return {
         "scope": "GLOBAL",

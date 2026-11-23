@@ -32,9 +32,10 @@ Thứ tự bắt buộc: xác định người dùng và phạm vi quyền trư�
 | Module logic | Nhiệm vụ | Không được làm |
 |---|---|---|
 | Xác thực/phân quyền | Đăng nhập, trạng thái tài khoản, vai trò, cơ sở và quyền lớp | Tin vào quyền giao diện gửi lên mà không kiểm tra lại |
-| Site Router (`src/api/core/sites/`) | Đọc danh sách site hoạt động và ánh xạ sang cấu hình kết nối | Viết cứng vòng lặp ba site hoặc suy ra cơ sở hiện tại từ mã học viên |
+| Site Router (`src/api/core/sites/connections.py`) | Ánh xạ site đã xác thực sang alias SQL Server riêng | Viết cứng vòng lặp ba site hoặc suy ra cơ sở hiện tại từ mã học viên |
+| Site read fan-out (`src/api/core/sites/fanout.py`) | Chạy truy vấn đọc độc lập với số worker giới hạn, giữ lỗi theo từng site và đóng kết nối worker | Dùng cho ghi nhiều site hoặc biến lỗi site thành kết quả rỗng |
 | Service nghiệp vụ (`core/classes/`, `core/academics/`, `core/students/`...) | Áp dụng quy tắc đăng ký, học phí, điểm, lớp và hồ sơ | Tự triển khai lại logic fan-out dùng chung khi nghiệp vụ đã có service điều phối riêng |
-| Truy vấn nhiều site | Nằm trong service của nghiệp vụ cần `GLOBAL`, đọc từng kết nối site rồi gộp tại API | JOIN giữa CSDL hoặc che việc một site lỗi; hiện không có package `global_queries/` riêng |
+| Truy vấn nhiều site | Nằm trong service của nghiệp vụ cần `GLOBAL`; fan-out truy vấn đọc độc lập rồi gộp tại API | JOIN giữa CSDL hoặc che việc một site lỗi; hiện không có package `global_queries/` riêng |
 | Catalog dùng chung (`core/catalog/`) | Ghi `MonHoc`/`KhoaHoc` bằng các service có ACK và retry theo chính sách từng loại | Coi seed là replication hoặc coi mọi bảng dùng chung đã có một writer chung |
 | Chuyển cơ sở (`core/academics/transfers.py`) | Điều phối transaction cục bộ nguồn/đích, lưu tiến trình và cho Admin Big retry | Gọi là ACID nguyên tử xuyên CSDL hoặc mặc định có worker chạy nền |
 | Ghi các bản sao khác | `TaiKhoan` và một số luồng thông báo có service/fan-out riêng; `CoSo` chưa có fan-out runtime đầy đủ | Mặc định có một replication writer chung cho mọi bảng; trạng thái cụ thể xem ma trận triển khai |
@@ -229,7 +230,7 @@ src/
     ├── config/                     Settings, middleware và root URLs
     └── core/
         ├── auth/                   Đăng nhập, session, tài khoản và reset OTP
-        ├── sites/                  Site Router và kết nối SQL Server
+        ├── sites/                  Site Router, kết nối SQL Server và bounded read fan-out
         ├── catalog/                Môn/khóa học, đọc và ghi bản sao
         ├── blog/                   API Blog công khai qua Global Query và CMS Admin Big đồng bộ bản sao
         ├── classes/                Lớp, phòng, đăng ký và xếp lớp

@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, connections
 
 from core.sites.connections import UnknownSiteError, get_site_database_alias, get_site_connection
+from core.sites.fanout import read_sites_concurrently
 
 
 class NotificationInfrastructureUnavailable(Exception):
@@ -50,15 +51,21 @@ def _global_sites(requested_site: str | None = None) -> tuple[tuple[str, ...], t
             get_site_database_alias(site)
             return (site,), ()
 
+        def check_site(site: str) -> bool:
+            get_site_database_alias(site)
+            return _catalog(site) == catalog
+
+        checks, errors = read_sites_concurrently(active, check_site)
         available, missing = [], []
         for site in active:
-            try:
-                get_site_database_alias(site)
-                if _catalog(site) != catalog:
-                    missing.append(site)
-                else:
-                    available.append(site)
-            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+            error = errors.get(site)
+            if error is not None:
+                if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+                    raise error
+                missing.append(site)
+            elif checks.get(site, False):
+                available.append(site)
+            else:
                 missing.append(site)
         return tuple(available), tuple(sorted(set(missing)))
     except NotificationInfrastructureUnavailable:
@@ -226,21 +233,31 @@ def list_notifications(
     else:
         raise PermissionError("Vai trò không được xem thông báo.")
 
-    total_count = 0
-    results: list[dict[str, Any]] = []
     unavailable = list(missing)
     take = offset + limit
+
+    def read_site(site: str) -> tuple[int, list[dict[str, Any]]]:
+        count = _site_counts(site, role, category)
+        items = _site_items(site, role, category, take)
+        if category in (None, "tuition"):
+            tuition_summary = _live_tuition_summary(site)
+            if tuition_summary:
+                return count + 1, [*items, tuition_summary]
+        return count, items
+
+    site_results, errors = read_sites_concurrently(sites, read_site)
+    total_count = 0
+    results: list[dict[str, Any]] = []
     for site in sites:
-        try:
-            total_count += _site_counts(site, role, category)
-            results.extend(_site_items(site, role, category, take))
-            if category in (None, "tuition"):
-                tuition_summary = _live_tuition_summary(site)
-                if tuition_summary:
-                    total_count += 1
-                    results.append(tuition_summary)
-        except NotificationInfrastructureUnavailable:
+        error = errors.get(site)
+        if error is not None:
+            if not isinstance(error, NotificationInfrastructureUnavailable):
+                raise error
             unavailable.append(site)
+            continue
+        count, items = site_results[site]
+        total_count += count
+        results.extend(items)
     if role == "admin_big" and missing and category in (None, "system") and sites:
         total_count += 1
         results.append(_missing_site_summary(sites[0], missing))
