@@ -96,7 +96,7 @@ API hiện có upload intent và hoàn tất upload Cloudinary cho ảnh đại 
 | `core/sites/connections.py`, `core/sites/fanout.py` | Chọn alias site và chạy các Global Query độc lập song song với số worker giới hạn; giữ danh sách site thiếu/lỗi riêng |
 | `core/auth/` | Đăng nhập, phiên có thể thu hồi, CSRF, idle timeout, hồ sơ, đổi/reset mật khẩu, OAuth học viên và vòng đời Admin Small |
 | `core/catalog/` | Danh mục môn/khóa học, danh sách khóa học công khai và ghi danh mục dùng chung |
-| `core/catalog/course_sync_queue.py`, `core/management/commands/sync_courses.py` | Lưu outbox `KhoaHoc` tại `AUTH_SESSION_SITE_CODE` và retry site còn thiếu mỗi 5 giây; `run-local.ps1` khởi chạy worker cùng API |
+| `core/catalog/course_sync_queue.py`, `core/management/commands/sync_courses.py` | Lưu intent/ACK `KhoaHoc` append-only trong `Logs` tại `AUTH_SESSION_SITE_CODE` và retry site còn thiếu mỗi 5 giây; `run-local.ps1` khởi chạy worker cùng API |
 | `core/blog/` | API công khai đọc danh mục và chi tiết Blog theo slug bằng Global Query; đối chiếu bản sao từng site và báo site thiếu/lệch |
 | `core/classes/` | Phòng/lớp/buổi, đăng ký công khai và đăng ký/xếp lớp cục bộ |
 | `core/academics/` | Chuyển cơ sở, học phí/phiếu thu/kỳ đóng, nhắc phí, báo cáo, điểm danh/điểm và SePay |

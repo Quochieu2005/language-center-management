@@ -23,6 +23,7 @@ from core.catalog.course_sync_queue import (
     get_operation,
     get_pending_operations,
     insert_operation,
+    mark_manual_retry,
     save_progress,
 )
 from core.slug_utils import make_slug
@@ -295,7 +296,7 @@ def _write_course(*, action: str, slug: str, payload: dict, idempotency_key: str
             )
     except (ImproperlyConfigured, KeyError, UnknownSiteError, DatabaseError) as exc:
         raise SharedCatalogUnavailable(
-            "Chưa sẵn sàng hàng đợi đồng bộ khóa học tại site điều phối; hãy cài migration 46.",
+            "Chưa sẵn sàng Logs tại site điều phối để giữ yêu cầu đồng bộ khóa học.",
             missing_sites=(registry_site,),
         ) from exc
 
@@ -749,6 +750,8 @@ def reconcile_pending_course_writes(*, operation_id: str | None = None) -> dict:
                 selected = get_operation(registry_alias, operation_id)
                 if selected is None:
                     raise SharedCatalogNotFound("Không tìm thấy yêu cầu khóa học cần đối soát.")
+                if selected["status"] != "hoan_tat":
+                    mark_manual_retry(registry_alias, operation_id)
                 operations = [selected] if selected["status"] != "hoan_tat" else []
             else:
                 operations = get_pending_operations(registry_alias, limit=100)
@@ -774,7 +777,7 @@ def reconcile_pending_course_writes(*, operation_id: str | None = None) -> dict:
     except (AcademicInfrastructureUnavailable, AuthInfrastructureUnavailable, DatabaseError,
             ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise SharedCatalogUnavailable(
-            "Không thể đọc hàng đợi khóa học tại AUTH_SESSION_SITE_CODE; hãy cài migration 46 và kiểm tra kết nối."
+            "Không thể đọc Logs tại AUTH_SESSION_SITE_CODE để kiểm tra hàng đợi khóa học."
         ) from exc
     return {
         "complete": not pending,

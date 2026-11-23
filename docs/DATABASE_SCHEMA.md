@@ -58,7 +58,7 @@ Các bảng danh mục dùng chung có mã ổn định giống nhau ở mọi s
 | **Nhân bản** | ① Dùng chung | Mục tiêu bản sao thống nhất tại mọi site hoạt động; MonHoc truyền bất đồng bộ nên có khoảng trễ trước đối soát | `CoSo` `MonHoc` `KhoaHoc` `TaiKhoan` (gồm danh tính Google/Facebook nếu đã liên kết) `DanhMucBlog` `BaiVietBlog` |
 | **Phân mảnh nguyên thủy** | ② Riêng của cơ sở | Mỗi dòng có site sở hữu theo `ma_co_so`; HocVien giữ cả bản lịch sử nguồn sau chuyển, không yêu cầu mã học viên duy nhất xuyên các mảnh lịch sử | `HocVien` `GiaoVien` `NhanVien` `Admin` (hồ sơ Admin Small) `PhongHoc` `LopHoc` `YeuCauLienHe` |
 | **Phân mảnh dẫn xuất** | ③ Đi theo lớp / đăng ký | Dòng nằm **cùng site với dòng cha** | `BuoiHoc` `DangKy` `DiemDanh` `HocPhi` `DotHocPhi` `PhieuThu` `Diem` |
-| **Cục bộ** | ④ Trạng thái điều phối, xác thực, thanh toán theo site, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `GiaoDichDongBoKhoaHoc` `PhienDangNhap` `TokenDatLaiMatKhau` `GiaoDichDatLaiMatKhau` `YeuCauThanhToan` `SuKienThanhToan` `ThongBao` `Logs` |
+| **Cục bộ** | ④ Trạng thái điều phối, xác thực, thanh toán theo site, nhật ký và dữ liệu tạm | Không nhân bản; mỗi dòng được lưu tại site có trách nhiệm xử lý | `GiaoDichChuyenCoSo` `LichSuChuyenCoSo` `PhienDangNhap` `TokenDatLaiMatKhau` `GiaoDichDatLaiMatKhau` `YeuCauThanhToan` `SuKienThanhToan` `ThongBao` `Logs` |
 
 Bảng nhân bản có thêm 2 cột để **đối soát** khi 3 site bị lệch: `phien_ban` (số nguyên, tăng 1 mỗi lần sửa) và `cap_nhat_luc` (thời điểm sửa gần nhất).
 
@@ -115,17 +115,16 @@ flowchart LR
 | `LichSuChuyenCoSo` | Cục bộ | sự kiện append-only của lần chuyển | Site thực hiện sự kiện (thường nguồn và đích) |
 | `PhienDangNhap`, `TokenDatLaiMatKhau`, `GiaoDichDatLaiMatKhau` | Cục bộ kỹ thuật | session/OTP/ledger xác thực | Database site cấu hình `AUTH_SESSION_SITE_CODE` |
 | `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, legacy | dấu tiến trình cho luồng purge học viên cũ | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22. DELETE hiện hành không dùng bảng này và không purge lịch sử |
-| `GiaoDichDongBoKhoaHoc` | Cục bộ kỹ thuật, transactional outbox | Ý định, snapshot trước/sau, site đích và ACK còn chờ cho một lần ghi danh mục `KhoaHoc` | Chỉ database `AUTH_SESSION_SITE_CODE`; metadata phục hồi, không thay `KhoaHoc` làm bảng nghiệp vụ và không gộp dữ liệu các site |
 | `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
 | `YeuCauLienHe` | Phân mảnh ngang theo yêu cầu | `ma_co_so` do khách chọn và API xác nhận | Chỉ CSDL của site được chọn; Admin Big đọc GLOBAL bằng cách hỏi từng site, Admin Small chỉ đọc site được giao |
-| `Logs` | Cục bộ | audit hoặc ACK đồng bộ phát sinh tại một site | Site phát sinh; mỗi CSDL giữ log riêng |
+| `Logs` | Cục bộ | audit, ý định đồng bộ khóa học, ACK và trạng thái hoàn tất phát sinh tại một site | Ý định ở `AUTH_SESSION_SITE_CODE`; ACK ở từng site đích; mỗi CSDL giữ log riêng và chỉ ghi thêm, không cập nhật/xóa |
 
 ### Chính sách ghi và bố trí vật lý
 
 | Quan hệ | Nơi được ghi | Nơi lưu bản sao/mảnh | Cơ chế |
 |---|---|---|---|
 | `MonHoc` | Publisher `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1) | Mọi site hoạt động | SQL Server transactional push, bất đồng bộ; API chỉ đọc lại Subscriber để xác nhận |
-| `KhoaHoc` | `course_services.py`, sau khi ghi outbox tại `AUTH_SESSION_SITE_CODE` | Các site hoạt động trong ý định; bản ghi nghiệp vụ ở DB riêng từng site | Tạo/sửa ghi vào các site đang kết nối, lưu ACK idempotent và trả 202 khi còn site chờ; API đối soát qua `/admin/courses/sync/`. Xóa chưa ghi site nào cho tới khi đủ site để kiểm tra lớp tham chiếu. Mỗi site có transaction riêng; không phải ACID xuyên CSDL. Migration `db/46_course_sync_outbox.sql` chỉ chạy trên DB điều phối |
+| `KhoaHoc` | `course_services.py`, sau khi ghi ý định append-only vào `Logs` tại `AUTH_SESSION_SITE_CODE` | Các site hoạt động trong ý định; bản ghi nghiệp vụ ở DB riêng từng site | Tạo/sửa ghi vào các site đang kết nối, lưu ACK idempotent trong `Logs` và trả 202 khi còn site chờ; API đối soát qua `/admin/courses/sync/`. Xóa chưa ghi site nào cho tới khi đủ site để kiểm tra lớp tham chiếu. Mỗi site có transaction riêng; không phải ACID xuyên CSDL |
 | `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; không phải cùng Publication MonHoc |
 | `TaiKhoan` | Authority và site tạo hồ sơ theo quy trình cấp tài khoản | Mọi site hoạt động | Trigger/outbox tại authority, worker chuyển snapshot hiện tại; không dùng replica cũ để xác thực |
 | `DongBoTaiKhoan`, `DatChoEmailHocVien`, `TrangThaiKhoEmail` | Authority `AUTH_SESSION_SITE_CODE` | Chỉ authority | Trạng thái kỹ thuật theo migration 45; không chứa hợp hồ sơ nghiệp vụ; xem [quy trình khởi tạo](Auth-Site-Isolation.md) |
@@ -135,7 +134,7 @@ flowchart LR
 | `LichSuChuyenCoSo`, `Logs`, `ThongBao`, liên hệ | Site phát sinh/xử lý theo schema | Site tương ứng | Nhật ký cục bộ; không nhân bản toàn bộ lịch sử |
 | `PhienDangNhap`, OTP/ledger xác thực | Site chọn bởi `AUTH_SESSION_SITE_CODE` | Một site cấu hình | Trạng thái kỹ thuật, không chứa hợp dữ liệu nghiệp vụ |
 
-`GiaoDichDongBoKhoaHoc` giữ body cần thiết để tiếp tục thao tác sau mất kết nối và khóa retry theo idempotency key đã băm. Khi một site khác offline, API chỉ xác nhận phần đã ghi và giữ phần còn thiếu; worker `manage.py sync_courses` thử lại nền mỗi 5 giây, UI cũng đối soát khi trang mở và mỗi 10 giây khi còn việc chờ. `run-local.ps1` khởi động worker này; môi trường chạy API bằng cách khác phải chạy worker như một tiến trình được giám sát. Nếu site điều phối cấu hình trong `AUTH_SESSION_SITE_CODE` offline hoặc outbox chưa được cài, API không thể nhận yêu cầu mới. Migration 46 chạy một lần tại DB điều phối, không chạy ở cả ba site.
+`Logs` hiện có giữ ý định append-only cùng snapshot và danh sách site đích; ACK riêng tại mỗi site cho biết site nào đã áp dụng. Operation id là SHA-256 của idempotency key. Khi một site khác offline, API xác nhận phần đã ghi và giữ phần còn thiếu; worker `manage.py sync_courses` thử lại nền mỗi 5 giây, UI cũng đối soát khi trang mở và mỗi 10 giây khi còn việc chờ. `run-local.ps1` khởi động worker này; môi trường chạy API bằng cách khác phải chạy worker như một tiến trình được giám sát. Nếu site authority trong `AUTH_SESSION_SITE_CODE` offline, API không thể nhận yêu cầu mới. Migration 46 chỉ dùng một lần để chuyển dữ liệu khỏi bảng outbox tạm nếu bảng đó còn tồn tại; hệ thống không cần tạo bảng mới.
 
 Ảnh trạng thái lab đã ghi nhận ngày 20/11/2026: Q1 và TD là hai DB trên **cùng** instance Windows `DESKTOP-CK4K90F`; Q7 là DB `QLTTNN_Q7` trên instance Linux `sql-q7` trong Docker của Mac Intel. Mục tiêu cuối phân công TD sang Windows Minh Đức; cấu hình cuối phải đo và ghi lại khi chuyển xong. SSMS trên Windows và VS Code mssql trên Mac chỉ là công cụ khách, không quyết định dữ liệu nằm ở máy nào.
 
@@ -219,7 +218,7 @@ flowchart TB
 - FK ghép `(mã cha, ma_co_so)` ở lớp/buổi/đăng ký/học phí/điểm/phiếu thu bảo vệ cha–con cùng cơ sở. `MonHoc`/`KhoaHoc`/`TaiKhoan` được tham chiếu qua **bản sao cục bộ**.
 - DDL cho phép đăng ký có **0 hoặc 1** khoản học phí (unique ở `HocPhi.ma_dang_ky`); service đăng ký phải tạo đúng một khoản cùng transaction. ERD không biến yêu cầu của service thành FK bắt buộc hai chiều.
 - `HocVien`, `GiaoVien`, `NhanVien` có `ma_tai_khoan` nullable và unique index có lọc khi khác NULL. Trong từng bảng tại một site, một tài khoản chỉ gắn tối đa một hồ sơ; các index riêng không tự chặn một tài khoản xuất hiện ở hai loại hồ sơ hoặc ở database khác, nên service vẫn phải kiểm tra quy tắc toàn hệ thống.
-- `GiaoDichDongBoKhoaHoc` không có FK nghiệp vụ; đây là outbox kỹ thuật chỉ có tại `AUTH_SESSION_SITE_CODE`, không phải bản tổng hợp lưu trữ `KhoaHoc`. Bảng lưu `ma_giao_dich` (SHA-256 của idempotency key), người thao tác, hành động, slug/mã khóa học, hash request, snapshot JSON trước/sau, danh sách site đích/chờ, trạng thái, lỗi cuối và thời điểm. Migration `db/46_course_sync_outbox.sql` tạo bảng này riêng tại DB điều phối.
+- `Logs` vẫn append-only. Đồng bộ `KhoaHoc` dùng event `KHINT-<hash>` tại `AUTH_SESSION_SITE_CODE` để lưu người thao tác, hành động, snapshot JSON và site đích; ACK `KHREP-*`/`KHDEL-*` ở site đích và event hoàn tất/đối soát giữ tiến trình retry. Đây là metadata cục bộ trong bảng nhật ký hiện có, không thay `KhoaHoc` làm bảng nghiệp vụ và không tạo bảng mới. Migration `db/46_move_course_queue_to_logs.sql` chỉ chuyển dữ liệu khỏi bảng outbox tạm đã thử nghiệm rồi xóa bảng đó nếu còn.
 - `PhieuThu.ma_nhan_vien` và `ma_phieu_goc` có thể NULL; phiếu hoàn tham chiếu phiếu gốc tại cùng site. Không xóa chứng từ khi chuyển học viên.
 
 ### 5.2. Điều phối, xác thực và dữ liệu phụ trợ

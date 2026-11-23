@@ -45,7 +45,7 @@ commit, không phải ACK chứng minh Subscriber đã nhận. Lỗi không rõ 
    thử trùng key khác body và mất kết nối/khôi phục. Chỉ xóa môn thử không có
    khóa học tham chiếu. Không tự động sửa dữ liệu trên các Subscriber.
 
-`KhoaHoc`, tài khoản và Blog giữ cơ chế riêng; `KhoaHoc` dùng outbox/fan-out ở
+`KhoaHoc`, tài khoản và Blog giữ cơ chế riêng; `KhoaHoc` dùng intent/ACK append-only trong `Logs` cùng fan-out ở
 tầng ứng dụng theo tài liệu schema. Chưa chuyển chúng sang SQL replication;
 tuyệt đối không tự tạo Publication cho toàn bộ bảng nghiệp vụ.
 Global Query trên website vẫn đọc từng kết nối và tổng hợp tại API, không JOIN
