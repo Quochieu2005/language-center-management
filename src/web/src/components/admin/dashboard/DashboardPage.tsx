@@ -143,7 +143,13 @@ function AdminAnalyticsDashboard() {
   }, [apiSiteParam, isAdminBig, loadingSites]);
 
   useEffect(() => {
-    void loadDashboard();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadDashboard();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadDashboard]);
 
   // Aggregate derived metrics from real DB data

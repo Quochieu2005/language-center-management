@@ -32,12 +32,19 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
   const notificationRequestIdRef = useRef(0);
 
   useEffect(() => {
-    notificationRequestIdRef.current += 1;
+    const requestId = ++notificationRequestIdRef.current;
     notificationLoadingRef.current = false;
     notificationsLoadedRef.current = false;
-    setNotificationLoading(false);
-    setNotifications([]);
-    setNotificationError("");
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled || requestId !== notificationRequestIdRef.current) return;
+      setNotificationLoading(false);
+      setNotifications([]);
+      setNotificationError("");
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.account_id]);
 
   const loadNotifications = useCallback(async () => {

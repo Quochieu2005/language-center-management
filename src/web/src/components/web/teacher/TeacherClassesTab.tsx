@@ -9,7 +9,6 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import type { ApiRow, SessionRow } from "@/lib/api/academics";
-import styles from "./TeacherPortal.module.scss";
 
 type TeacherClassesTabProps = {
   classes: ApiRow[];
@@ -197,7 +196,7 @@ export function TeacherClassesTab({
                       {String(activeClass.name || activeClass.class_id)}
                     </Typography.Title>
                     <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                      Khóa đào tạo: <strong>{String(activeClass.course_name || activeClass.course_id)}</strong> · Cơ sở: {String(activeClass.site_code || "TD")}
+                      Khóa đào tạo: <strong>{String(activeClass.course_name || activeClass.course_id)}</strong> · Cơ sở: {String(activeClass.site_code || "Chưa xác định")}
                     </Typography.Text>
                   </div>
                   <Tag color="cyan" style={{ fontSize: 13, padding: "4px 10px" }}>

@@ -10,8 +10,6 @@ import {
   Form,
   InputNumber,
   Tag,
-  Tabs,
-  Space,
   Row,
   Col,
   Typography,
@@ -62,14 +60,11 @@ export function TeacherGradesTab({
   const [loadingGrades, setLoadingGrades] = useState(false);
   const [gradeData, setGradeData] = useState<ApiRow | null>(null);
   const [gradeHistory, setGradeHistory] = useState<ApiRow[]>([]);
+  const [loadedEnrollmentId, setLoadedEnrollmentId] = useState<string | null>(null);
 
   // Fetch grades & audit history when a student is selected
   useEffect(() => {
-    if (!selectedStudent) {
-      setGradeData(null);
-      setGradeHistory([]);
-      return;
-    }
+    if (!selectedStudent) return;
 
     const eid = String(selectedStudent.enrollment_id);
     let cancelled = false;
@@ -82,6 +77,7 @@ export function TeacherGradesTab({
           academicsApi.gradeHistory(eid),
         ]);
         if (!cancelled) {
+          setLoadedEnrollmentId(eid);
           setGradeData(gradesRes);
           const hist = Array.isArray(historyRes.results) ? historyRes.results : [];
           setGradeHistory(hist as ApiRow[]);
@@ -117,6 +113,7 @@ export function TeacherGradesTab({
         academicsApi.grades(eid),
         academicsApi.gradeHistory(eid),
       ]);
+      setLoadedEnrollmentId(eid);
       setGradeData(gradesRes);
       const hist = Array.isArray(historyRes.results) ? historyRes.results : [];
       setGradeHistory(hist as ApiRow[]);
@@ -139,7 +136,12 @@ export function TeacherGradesTab({
     return <span className={`${styles.scoreBadge} ${badgeClass}`}>{score.toFixed(1)}</span>;
   };
 
-  const currentGradeList = Array.isArray(gradeData?.results) ? (gradeData.results as ApiRow[]) : [];
+  const hasCurrentStudentGrades = Boolean(selectedStudent)
+    && loadedEnrollmentId === String(selectedStudent?.enrollment_id);
+  const currentGradeList = hasCurrentStudentGrades && Array.isArray(gradeData?.results)
+    ? (gradeData.results as ApiRow[])
+    : [];
+  const currentGradeHistory = hasCurrentStudentGrades ? gradeHistory : [];
 
   const gradeColumns = [
     {
@@ -319,15 +321,15 @@ export function TeacherGradesTab({
             {/* Audit History Tabs */}
             <Typography.Title level={5} style={{ margin: "16px 0 8px" }}>
               <HistoryOutlined style={{ marginRight: 8, color: "#8b5cf6" }} />
-              Nhật ký kiểm toán thay đổi điểm ({gradeHistory.length})
+              Nhật ký kiểm toán thay đổi điểm ({currentGradeHistory.length})
             </Typography.Title>
-            {gradeHistory.length === 0 ? (
+            {currentGradeHistory.length === 0 ? (
               <div style={{ textAlign: "center", padding: 20, color: "#94a3b8" }}>
                 Chưa có lịch sử điều chỉnh điểm cho học viên này.
               </div>
             ) : (
               <div style={{ maxHeight: 240, overflowY: "auto", paddingRight: 6 }}>
-                {gradeHistory.map((h, i) => {
+                {currentGradeHistory.map((h, i) => {
                   let beforeVal = "Chưa có";
                   let afterVal = "";
                   try {

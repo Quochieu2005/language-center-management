@@ -298,7 +298,7 @@ Admin Big đọc danh sách giáo viên bằng Global Query khi bỏ `site_code`
 
 **Quy tắc vai trò:** Admin Big dùng `admin_big` và không có site; Admin Small đăng nhập bằng `nhan_vien`, có hồ sơ `Admin.loai_admin=admin_small`; nhân viên có hồ sơ `NhanVien` và chức vụ nghiệp vụ; giáo viên dùng `giao_vien` và liên kết hồ sơ `GiaoVien`.
 
-**Nghiệm thu:** trùng username/email bị chặn toàn hệ thống; Admin Small/giáo viên không thể đổi site qua client; thao tác tạo dở không tạo tài khoản hoạt động một phần.
+**Nghiệm thu:** trùng username/email bị chặn toàn hệ thống; Admin Small/giáo viên không thể đổi site qua client; thao tác tạo dở không tạo tài khoản hoạt động một phần. Sau đăng nhập, portal giáo viên hiển thị `site_code` và `profile_id` từ ngữ cảnh phiên đã xác thực, khớp hồ sơ `GiaoVien` tại site được phân công; không dùng nhãn cơ sở hoặc mã giáo viên mặc định. Nếu thiếu ngữ cảnh site/hồ sơ thì hiển thị chưa xác định, không gán nhầm cơ sở.
 
 **Trạng thái source:** Có API tạo Admin Small/giáo viên, nhân bản tài khoản, hồ sơ site và cấp email thông tin đăng nhập; giao dịch email thật và lỗi nhiều site cần kiểm chứng. Source không dùng luồng token kích hoạt được mô tả trước đây.
 
