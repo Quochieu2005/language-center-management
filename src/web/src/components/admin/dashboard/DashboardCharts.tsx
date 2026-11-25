@@ -352,6 +352,12 @@ export type DonutSegment = {
   formattedValue?: string;
 };
 
+type ComputedDonutSegment = DonutSegment & {
+  percent: number;
+  dashArray: string;
+  dashOffset: number;
+};
+
 export function DonutChartCard({
   segments,
   centerValue,
@@ -368,19 +374,22 @@ export function DonutChartCard({
   const circumference = 2 * Math.PI * radius;
 
   const computed = useMemo(() => {
-    let offsetAcc = 0;
-    return segments.map((seg) => {
+    return segments.reduce<{ items: ComputedDonutSegment[]; offset: number }>((acc, seg) => {
       const ratio = total > 0 ? Math.max(0, seg.value) / total : 0;
       const dashLen = ratio * circumference;
-      const dashOffset = -offsetAcc;
-      offsetAcc += dashLen;
       return {
-        ...seg,
-        percent: total > 0 ? Math.round(ratio * 1000) / 10 : 0,
-        dashArray: `${dashLen} ${circumference}`,
-        dashOffset,
+        offset: acc.offset + dashLen,
+        items: [
+          ...acc.items,
+          {
+            ...seg,
+            percent: total > 0 ? Math.round(ratio * 1000) / 10 : 0,
+            dashArray: `${dashLen} ${circumference}`,
+            dashOffset: -acc.offset,
+          },
+        ],
       };
-    });
+    }, { items: [], offset: 0 }).items;
   }, [segments, total, circumference]);
 
   const focused = activeKey ? computed.find((c) => c.key === activeKey) : null;

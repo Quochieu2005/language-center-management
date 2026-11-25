@@ -6,11 +6,9 @@ import {
   Avatar,
   Button,
   message,
-  Space,
   Spin,
   Tabs,
   Tag,
-  Typography,
 } from "antd";
 import {
   CheckCircleOutlined,
@@ -64,6 +62,53 @@ function TeacherPortal() {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [error, setError] = useState("");
 
+  const loadAttendanceForSession = useCallback(async (sessionId: string) => {
+    setLoadingAttendance(true);
+    try {
+      const result = await academicsApi.attendance(sessionId);
+      const rows = asRows(result.results);
+      setRoster(rows);
+      setAttendanceEditable(result.can_edit_attendance === true);
+
+      // Pre-fill attendance map
+      const map: Record<string, { status?: string; note?: string }> = {};
+      for (const item of rows) {
+        map[String(item.enrollment_id)] = {
+          status: typeof item.attendance_status === "string" ? item.attendance_status : undefined,
+          note: typeof item.note === "string" ? item.note : "",
+        };
+      }
+      setAttendanceMap(map);
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Lỗi tải thông tin điểm danh.");
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }, []);
+
+  const loadSessionsForClass = useCallback(async (classId: string) => {
+    setLoadingSessions(true);
+    try {
+      const res = await academicsApi.teacherSessions(classId);
+      const sessionRows = (res.results || []) as SessionRow[];
+      setSessions(sessionRows);
+
+      if (sessionRows.length > 0) {
+        // Pick the first or upcoming session
+        const firstSess = sessionRows[0];
+        setActiveSession(firstSess);
+        void loadAttendanceForSession(String(firstSess.session_id));
+      } else {
+        setActiveSession(null);
+        setRoster([]);
+      }
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Lỗi tải danh sách buổi học.");
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [loadAttendanceForSession]);
+
   // Load teacher's assigned classes
   const loadClasses = useCallback(async () => {
     setLoading(true);
@@ -89,54 +134,7 @@ function TeacherPortal() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const loadSessionsForClass = async (classId: string) => {
-    setLoadingSessions(true);
-    try {
-      const res = await academicsApi.teacherSessions(classId);
-      const sessionRows = (res.results || []) as SessionRow[];
-      setSessions(sessionRows);
-
-      if (sessionRows.length > 0) {
-        // Pick the first or upcoming session
-        const firstSess = sessionRows[0];
-        setActiveSession(firstSess);
-        void loadAttendanceForSession(String(firstSess.session_id));
-      } else {
-        setActiveSession(null);
-        setRoster([]);
-      }
-    } catch (reason) {
-      message.error(reason instanceof Error ? reason.message : "Lỗi tải danh sách buổi học.");
-    } finally {
-      setLoadingSessions(false);
-    }
-  };
-
-  const loadAttendanceForSession = async (sessionId: string) => {
-    setLoadingAttendance(true);
-    try {
-      const result = await academicsApi.attendance(sessionId);
-      const rows = asRows(result.results);
-      setRoster(rows);
-      setAttendanceEditable(result.can_edit_attendance === true);
-
-      // Pre-fill attendance map
-      const map: Record<string, { status?: string; note?: string }> = {};
-      for (const item of rows) {
-        map[String(item.enrollment_id)] = {
-          status: typeof item.attendance_status === "string" ? item.attendance_status : undefined,
-          note: typeof item.note === "string" ? item.note : "",
-        };
-      }
-      setAttendanceMap(map);
-    } catch (reason) {
-      message.error(reason instanceof Error ? reason.message : "Lỗi tải thông tin điểm danh.");
-    } finally {
-      setLoadingAttendance(false);
-    }
-  };
+  }, [loadSessionsForClass]);
 
   useEffect(() => {
     let cancelled = false;
