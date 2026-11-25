@@ -98,8 +98,54 @@ class PublicCourseCatalogTests(SimpleTestCase):
         )
 
 
+class _FakeCourseQueue:
+    """In-memory stand-in for course_sync_queue (intents/ACK status normally kept in Logs)."""
+
+    def __init__(self):
+        self.operations = {}
+
+    def _view(self, operation):
+        return {**operation, "pending_sites": tuple(operation["pending"]),
+                "status": operation["status"], "detail": operation.get("detail")}
+
+    def get_operation(self, _alias, operation_id, *, available_sites=None):
+        operation = self.operations.get(operation_id)
+        return self._view(operation) if operation else None
+
+    def get_pending_operations(self, _alias, *, limit=20, available_sites=None):
+        return [self._view(op) for op in self.operations.values() if op["status"] != "hoan_tat"][:limit]
+
+    def get_review_operations(self, _alias):
+        return [self._view(op) for op in self.operations.values() if op["status"] == "can_doi_soat"]
+
+    def insert_operation(self, _alias, operation):
+        pending = tuple(operation.get("pending_sites", operation["target_sites"]))
+        self.operations[operation["operation_id"]] = {
+            **operation, "target_sites": tuple(operation["target_sites"]),
+            "initial_pending_sites": pending, "pending": pending, "status": "cho_dong_bo",
+        }
+        return operation
+
+    def mark_manual_retry(self, _alias, _operation_id):
+        return None
+
+    def save_progress(self, _alias, operation_id, *, pending_sites, detail=None, needs_review=False):
+        operation = self.operations.get(operation_id)
+        if operation is None:
+            return
+        operation["pending"] = tuple(sorted(set(pending_sites)))
+        operation["detail"] = detail
+        operation["status"] = "can_doi_soat" if needs_review else ("hoan_tat" if not pending_sites else "cho_dong_bo")
+
+
 class SharedCourseReplicationTests(SimpleTestCase):
     def setUp(self):
+        self.queue = _FakeCourseQueue()
+        queue_patchers = [
+            patch.object(course_services, name, getattr(self.queue, name))
+            for name in ("get_operation", "get_pending_operations", "get_review_operations",
+                         "insert_operation", "mark_manual_retry", "save_progress")
+        ]
         fake_cursor = SimpleNamespace(execute=lambda *_args, **_kwargs: None, fetchall=lambda: [])
         self.patchers = [
             patch.object(course_services, "active_site_state", return_value=(("Q1", "Q7", "TD"), ())),
@@ -109,10 +155,20 @@ class SharedCourseReplicationTests(SimpleTestCase):
             patch.object(course_services, "acquire_record_lock"),
             patch.object(course_services.transaction, "atomic", side_effect=lambda using: nullcontext()),
             patch.object(course_services, "_check_subject_replicas"),
+            *queue_patchers,
         ]
         for patcher in self.patchers:
             patcher.start()
             self.addCleanup(patcher.stop)
+
+    def _seed_operation(self, *, key, action, request_hash, before, after, pending):
+        """A retry always follows an intent the first attempt saved in coordinator Logs."""
+        self.queue.insert_operation("site_q1", {
+            "operation_id": hashlib.sha256(key.encode("utf-8")).hexdigest(), "actor_id": "Q1-TK-1",
+            "action": action, "slug": (after or before)["slug"], "course_id": (after or before)["ma_khoa_hoc"],
+            "request_hash": request_hash, "before": before, "after": after,
+            "target_sites": ("Q1", "Q7", "TD"), "pending_sites": pending,
+        })
 
     def _course(self, version=1, name="Tiếng Anh A1"):
         return {
@@ -150,6 +206,8 @@ class SharedCourseReplicationTests(SimpleTestCase):
         ack = {"record_id": after["ma_khoa_hoc"], "action": "tao", "before": None,
                "after": after, "request_hash": request_hash}
         read.side_effect = lambda site, **_kwargs: (after.copy(), ack) if site in {"Q1", "TD"} else (None, None)
+        self._seed_operation(key="course-create-001", action="tao", request_hash=request_hash,
+                             before=None, after=after, pending=("Q7",))
 
         result = course_services.create_shared_course(
             course=course, idempotency_key="course-create-001", actor_id="Q1-TK-1"
@@ -225,6 +283,8 @@ class SharedCourseReplicationTests(SimpleTestCase):
         ack = {"record_id": before["ma_khoa_hoc"], "action": "xoa", "before": before,
                "after": None, "request_hash": request_hash}
         read.side_effect = lambda site, **_kwargs: (None, ack) if site in {"Q1", "Q7"} else (before, None)
+        self._seed_operation(key="course-delete-001", action="xoa", request_hash=request_hash,
+                             before=before, after=None, pending=("TD",))
 
         result = course_services.delete_shared_course(
             slug=before["slug"], idempotency_key="course-delete-001", actor_id="Q1-TK-1"
