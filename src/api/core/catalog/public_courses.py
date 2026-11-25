@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal
 
 from django.conf import settings
@@ -12,6 +11,7 @@ from django.utils import timezone
 
 from core.catalog.services import SharedCatalogUnavailable
 from core.sites.connections import UnknownSiteError, get_site_database_alias
+from core.sites.fanout import read_sites_concurrently
 
 
 def _read_site_catalog(site_code: str) -> tuple[tuple[str, str, str], ...]:
@@ -117,6 +117,14 @@ def _active_sites() -> tuple[tuple[str, ...], tuple[tuple[str, str, str], ...]]:
     return active_sites, registry_catalog
 
 
+def _missing_or_raise(errors: dict[str, Exception]) -> set[str]:
+    """Database/config failures mark a site missing; anything else is a real bug and is raised."""
+    for error in errors.values():
+        if not isinstance(error, (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError)):
+            raise error
+    return set(errors)
+
+
 def _signature(catalog: dict) -> tuple:
     return tuple(
         tuple(course[key] for key in (
@@ -132,18 +140,9 @@ def list_shared_subjects() -> dict:
     """Read and compare replicated MonHoc rows from each active site."""
     registry_site = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
     active_sites, registry_catalog = _active_sites()
-    snapshots: dict[str, tuple[tuple, tuple[dict, ...]]] = {}
     missing_sites: set[str] = set()
-    with ThreadPoolExecutor(max_workers=min(8, len(active_sites))) as executor:
-        futures = {
-            executor.submit(_read_site_subject_snapshot, site): site for site in active_sites
-        }
-        for future in as_completed(futures):
-            site = futures[future]
-            try:
-                snapshots[site] = future.result()
-            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
-                missing_sites.add(site)
+    snapshots, errors = read_sites_concurrently(active_sites, _read_site_subject_snapshot)
+    missing_sites.update(_missing_or_raise(errors))
 
     if not snapshots:
         raise SharedCatalogUnavailable(
@@ -177,18 +176,9 @@ def list_public_courses() -> dict:
     active_sites, registry_catalog = _active_sites()
 
     today = timezone.localdate()
-    snapshots: dict[str, tuple[tuple, dict, dict]] = {}
     missing_sites: set[str] = set()
-    with ThreadPoolExecutor(max_workers=min(8, len(active_sites))) as executor:
-        futures = {
-            executor.submit(_read_site_snapshot, site, today): site for site in active_sites
-        }
-        for future in as_completed(futures):
-            site = futures[future]
-            try:
-                snapshots[site] = future.result()
-            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
-                missing_sites.add(site)
+    snapshots, errors = read_sites_concurrently(active_sites, lambda site: _read_site_snapshot(site, today))
+    missing_sites.update(_missing_or_raise(errors))
 
     if not snapshots:
         raise SharedCatalogUnavailable(

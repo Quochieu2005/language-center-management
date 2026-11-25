@@ -122,6 +122,9 @@ for _site_code, _site_config in _site_database_configs.items():
     }
     SITE_DATABASE_ALIASES[_site_code] = _alias
 
+# After a connect failure, GLOBAL reads report the site missing at once for this long
+# instead of waiting for the connect timeout again; 0 disables the skip.
+SITE_UNREACHABLE_COOLDOWN_SECONDS = float(os.getenv("SITE_UNREACHABLE_COOLDOWN_SECONDS", "30"))
 AUTH_SESSION_SITE_CODE = os.getenv("AUTH_SESSION_SITE_CODE", "").strip().upper()
 MONHOC_PUBLISHER_SITE_CODE = os.getenv("MONHOC_PUBLISHER_SITE_CODE", "Q1").strip().upper()
 if AUTH_SESSION_SITE_CODE and AUTH_SESSION_SITE_CODE not in SITE_DATABASE_ALIASES:
