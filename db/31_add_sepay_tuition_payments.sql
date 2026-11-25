@@ -109,15 +109,16 @@ BEGIN TRY
 
     IF NOT EXISTS
        (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_PhieuThu_YeuCauThanhToanCungCoSo')
-        ALTER TABLE dbo.PhieuThu ADD CONSTRAINT FK_PhieuThu_YeuCauThanhToanCungCoSo
+        /* Dynamic SQL: PhieuThu.ma_yeu_cau is added earlier in this batch, so it must be compiled late. */
+        EXEC(N'ALTER TABLE dbo.PhieuThu ADD CONSTRAINT FK_PhieuThu_YeuCauThanhToanCungCoSo
             FOREIGN KEY (ma_yeu_cau, ma_co_so)
-            REFERENCES dbo.YeuCauThanhToan(ma_yeu_cau, ma_co_so);
+            REFERENCES dbo.YeuCauThanhToan(ma_yeu_cau, ma_co_so);');
 
     IF NOT EXISTS
        (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.PhieuThu')
         AND name = N'UX_PhieuThu_ma_yeu_cau')
-        CREATE UNIQUE INDEX UX_PhieuThu_ma_yeu_cau
-            ON dbo.PhieuThu(ma_yeu_cau) WHERE ma_yeu_cau IS NOT NULL;
+        EXEC(N'CREATE UNIQUE INDEX UX_PhieuThu_ma_yeu_cau
+            ON dbo.PhieuThu(ma_yeu_cau) WHERE ma_yeu_cau IS NOT NULL;');
 
     IF NOT EXISTS
        (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.YeuCauThanhToan')
