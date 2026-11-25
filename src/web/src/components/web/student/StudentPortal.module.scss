@@ -1,0 +1,150 @@
+.portalContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.portalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #0d3b32 0%, #175245 100%);
+  color: #fff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(13, 59, 50, 0.15);
+
+  .studentInfo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .avatar {
+    background: #2a7a67;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .meta {
+    h2 {
+      margin: 0 0 4px;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 13px;
+    }
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+
+  .kpiCard {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+  }
+}
+
+.courseCard {
+  border-radius: 14px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+  margin-bottom: 16px;
+
+  &:hover {
+    border-color: #175245;
+    box-shadow: 0 6px 16px rgba(23, 82, 69, 0.1);
+  }
+}
+
+.scheduleTimeline {
+  padding: 12px 0;
+}
+
+.sessionItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--ant-color-bg-container, #fafafa);
+  border: 1px solid var(--ant-color-border-secondary, #eee);
+  border-radius: 10px;
+  margin-bottom: 12px;
+
+  .sessionTime {
+    min-width: 140px;
+    font-weight: 600;
+    color: #175245;
+  }
+
+  .sessionDetails {
+    flex: 1;
+    h5 {
+      margin: 0 0 4px;
+      font-size: 15px;
+    }
+    p {
+      margin: 0;
+      color: #666;
+      font-size: 13px;
+    }
+  }
+}
+
+.gradeScoreBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 32px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0 8px;
+
+  &.high {
+    background: #e6f7ed;
+    color: #137333;
+    border: 1px solid #b7ebd1;
+  }
+  &.medium {
+    background: #fef7e0;
+    color: #b06000;
+    border: 1px solid #fce8b2;
+  }
+  &.low {
+    background: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+  }
+}
+
+.passwordBanner {
+  margin-bottom: 20px;
+  border-radius: 10px;
+}

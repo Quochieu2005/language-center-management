@@ -1,0 +1,258 @@
+.portalContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.portalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #fff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+
+  .teacherInfo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .avatar {
+    background: #3b82f6;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .meta {
+    h2 {
+      margin: 0 0 4px;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+
+  .kpiCard {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+  }
+}
+
+.nextSessionCard {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+
+  .leftSection {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .iconWrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #3b82f6;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .info {
+      h4 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+      p {
+        margin: 0;
+        color: #475569;
+        font-size: 13px;
+      }
+    }
+  }
+}
+
+.classCard {
+  border-radius: 14px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+  margin-bottom: 16px;
+
+  &:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.12);
+  }
+
+  .cardHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+
+    .className {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+  }
+
+  .courseBadge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .infoRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+}
+
+.attendanceStatusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+
+  &.co_mat {
+    background: #dcfce7;
+    color: #15803d;
+  }
+  &.tre {
+    background: #fef3c7;
+    color: #b45309;
+  }
+  &.vang_co_phep {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+  &.vang_khong_phep {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  &.chua_diem_danh {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+}
+
+.scoreBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 30px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 0 8px;
+
+  &.high {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+  }
+  &.medium {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+  &.low {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+  }
+  &.none {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+    font-weight: 500;
+  }
+}
+
+.auditLogCard {
+  border-left: 4px solid #3b82f6;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin-bottom: 10px;
+
+  .logHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 4px;
+  }
+
+  .logDetails {
+    font-size: 13px;
+    color: #1e293b;
+    font-weight: 600;
+  }
+}
+
+.passwordBanner {
+  margin-bottom: 20px;
+  border-radius: 10px;
+}
