@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Card, Form, Input, Button, Row, Col, Typography, message, Tag, Descriptions } from "antd";
-import { LockOutlined, UserOutlined, MailOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { authApi, type SessionUser } from "@/lib/api/auth";
-import styles from "./TeacherPortal.module.scss";
 
 type TeacherAccountTabProps = {
   user: SessionUser | null;
@@ -47,17 +46,17 @@ export function TeacherAccountTab({ user }: TeacherAccountTabProps) {
             <Descriptions bordered layout="vertical" size="middle" column={{ xs: 1, sm: 2 }}>
               <Descriptions.Item label="Mã giáo viên">
                 <Tag color="blue" style={{ fontSize: 13, fontWeight: 600 }}>
-                  {user?.profile_id || "TD-GV-000001"}
+                  {user?.profile_id || "Chưa xác định"}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Tên đăng nhập">
-                <strong>{user?.username || "thesang"}</strong>
+                <strong>{user?.username || "Giáo viên"}</strong>
               </Descriptions.Item>
               <Descriptions.Item label="Email tài khoản">
                 <span>{user?.email || "Chưa cập nhật"}</span>
               </Descriptions.Item>
               <Descriptions.Item label="Cơ sở công tác">
-                <Tag color="cyan">Thủ Đức ({user?.site_code || "TD"})</Tag>
+                <Tag color="cyan">{user?.site_code || "Chưa xác định"}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Vai trò hệ thống">
                 <Tag color="purple">Giáo viên (LOCAL)</Tag>
@@ -69,7 +68,7 @@ export function TeacherAccountTab({ user }: TeacherAccountTabProps) {
 
             <div style={{ marginTop: 20, padding: 14, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                Lưu ý: Dữ liệu giảng dạy và điểm danh của bạn được phân mảnh cục bộ tại cơ sở Thủ Đức (TD) theo quy chuẩn CSDL phân tán. Mọi điều chỉnh điểm được ghi nhận vào hệ thống kiểm toán (Audit Logs).
+                Lưu ý: Dữ liệu giảng dạy và điểm danh của bạn được phân mảnh cục bộ tại cơ sở {user?.site_code || "chưa xác định"}. Mọi điều chỉnh điểm được ghi nhận vào nhật ký kiểm toán.
               </Typography.Text>
             </div>
           </Card>

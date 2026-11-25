@@ -244,7 +244,7 @@ flowchart TD
 
 #### Giáo viên — lớp và buổi được phân công
 
-Giáo viên dùng chung frontend và đăng nhập như các vai trò khác. API chỉ trả những lớp/buổi được phân công cho tài khoản; thay đổi điểm danh hoặc điểm luôn được kiểm tra lại phía API. Giáo viên không quản lý tài khoản, nhân sự, học phí hoặc dữ liệu cơ sở khác.
+Giáo viên dùng chung frontend và đăng nhập như các vai trò khác. Header, tổng quan và hồ sơ hiển thị `site_code`/`profile_id` từ ngữ cảnh phiên đã xác thực; không gắn cứng tên hoặc mã một cơ sở và không dùng mã hồ sơ mẫu. Nếu thiếu site hoặc hồ sơ thì hiển thị “Chưa xác định”. API chỉ trả những lớp/buổi được phân công cho tài khoản tại site trong phiên; thay đổi điểm danh hoặc điểm luôn được kiểm tra lại phía API. Danh sách không có lớp nghĩa là chưa có lớp được phân công tại site đó, không phải hệ thống tự suy ra giáo viên thuộc site khác. Giáo viên không quản lý tài khoản, nhân sự, học phí hoặc dữ liệu cơ sở khác.
 
 ```mermaid
 flowchart TD

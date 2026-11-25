@@ -17,6 +17,7 @@ type TeacherOverviewTabProps = {
   classes: ApiRow[];
   sessions: SessionRow[];
   nextSession: SessionRow | null;
+  siteCode: string | null;
   onNavigateAttendance: (classItem: ApiRow, sessionItem?: SessionRow) => void;
   onNavigateClasses: () => void;
 };
@@ -25,6 +26,7 @@ export function TeacherOverviewTab({
   classes,
   sessions,
   nextSession,
+  siteCode,
   onNavigateAttendance,
   onNavigateClasses,
 }: TeacherOverviewTabProps) {
@@ -60,9 +62,8 @@ export function TeacherOverviewTab({
         <Card className={styles.kpiCard} variant="borderless">
           <Statistic
             title="Cơ sở làm việc"
-            value="Thủ Đức"
+            value={siteCode || "Chưa xác định"}
             prefix={<EnvironmentOutlined style={{ color: "#f59e0b" }} />}
-            suffix={<span style={{ fontSize: 13, color: "#64748b" }}>(TD)</span>}
           />
         </Card>
       </div>

@@ -186,6 +186,7 @@ function TeacherPortal() {
           classes={classes}
           sessions={sessions}
           nextSession={nextSession}
+          siteCode={user?.site_code ?? null}
           onNavigateAttendance={handleNavigateAttendance}
           onNavigateClasses={() => setActiveTabKey("classes")}
         />
@@ -287,8 +288,8 @@ function TeacherPortal() {
             <p>
               <span>Xin chào, <strong>{user?.username || "Giáo viên"}</strong></span>
               <span>·</span>
-              <Tag color="cyan">Mã GV: {user?.profile_id || "TD-GV-000001"}</Tag>
-              <Tag color="gold">Cơ sở: Thủ Đức (TD)</Tag>
+              <Tag color="cyan">Mã GV: {user?.profile_id || "Chưa xác định"}</Tag>
+              <Tag color="gold">Cơ sở: {user?.site_code || "Chưa xác định"}</Tag>
             </p>
           </div>
         </div>
