@@ -461,6 +461,8 @@ Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy
 | Route minh họa | Page | Nội dung chính |
 |---|---|---|
 | `/portal/teacher/dashboard` | Tổng quan giảng dạy | Buổi sắp tới, lớp được giao, việc cần hoàn tất |
+| `/teacher` tab Thời khóa biểu | Lịch dạy | Mọi buổi của các lớp được giao từ `GET /teacher/schedule/`; lọc Hôm nay/Sắp tới/Tất cả theo ngày giờ Việt Nam, đánh dấu hôm nay, nút mở điểm danh đúng buổi |
+| `/teacher` tab Hồ sơ & Bảo mật | Hồ sơ cá nhân | Tải/đổi ảnh đại diện (JPG/PNG/WebP ≤ 5 MB, tiếp tục đồng bộ khi lỗi), sửa họ tên và điện thoại, xem mã/cơ sở/email/trạng thái, đổi mật khẩu |
 | `/portal/teacher/classes` và `/portal/teacher/classes/[classId]` | Lớp được phân công | Lịch, roster học viên đang đăng ký, chi tiết lớp trong phạm vi được giao |
 | `/portal/teacher/sessions/[sessionId]` | Chi tiết buổi học | Thời gian giờ Việt Nam, trạng thái buổi, danh sách học viên |
 | `/portal/teacher/sessions/[sessionId]/attendance` | Điểm danh | Roster, đánh dấu/sửa điểm danh, xác nhận lưu và lịch sử |

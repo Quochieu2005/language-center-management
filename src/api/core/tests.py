@@ -147,10 +147,10 @@ class CloudinaryAssetFolderTests(SimpleTestCase):
             {"actor_id": "Q7-TK-OTHER", "target_slug": "admin-small-q7-manager"},
             salt="core.media.admin-small-avatar-setup.v1",
         )
-        with patch("core.media.avatars._active_sites") as active_sites:
+        with patch("core.media.avatars._authority_site") as authority_site:
             with self.assertRaises(AvatarInvalidIntent):
                 create_admin_small_avatar_upload_intent(admin_big, "admin-small-q7-manager", token)
-        active_sites.assert_not_called()
+        authority_site.assert_not_called()
 
     @override_settings(CLOUDINARY_ROOT_FOLDER="language-center-management")
     def test_untrusted_path_segments_and_unknown_resources_are_rejected(self):

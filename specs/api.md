@@ -415,6 +415,8 @@ Create trả `201`; GET/PATCH/DELETE và gửi email thành công trả `200`; l
 | `GET /api/v1/teacher/dashboard` | Giáo viên | `LOCAL` | Lịch buổi sắp tới và tác vụ thuộc các lớp được phân công |
 | `GET /api/v1/teacher/classes/{ma_lop}` | Giáo viên được phân công | `LOCAL` | Trả thông tin lớp và danh sách đăng ký cần cho giảng dạy; từ chối lớp khác |
 | `GET /api/v1/teacher/classes/{ma_lop}/sessions` | Giáo viên được phân công | `LOCAL` | Đọc `BuoiHoc` tại site của lớp |
+| `GET /api/v1/teacher/schedule/` | Giáo viên | `LOCAL` | Thời khóa biểu: một truy vấn `BuoiHoc`/`LopHoc`/`KhoaHoc`/`PhongHoc` tại site trong phiên cho mọi lớp đang phân công (bỏ lớp `huy`, giáo viên phải `dang_day`), sắp theo ngày/giờ, tối đa 500 buổi; mỗi dòng có `can_edit_attendance` theo giáo viên ghi trên buổi |
+| `GET`/`PATCH /api/v1/teachers/profile/{slug}/` | Giáo viên chính chủ | `LOCAL` | Xem và tự sửa `ho_ten`, `sdt` của `GiaoVien`; email/tên đăng nhập/cơ sở không sửa qua đây. Ảnh đại diện tự tải qua `POST /api/v1/auth/profile/{slug}/avatar/upload-intents/` rồi `.../avatar/complete/` (metadata trong `TaiKhoan`) |
 | `PUT /api/v1/teacher/sessions/{ma_buoi}/attendance` | Giáo viên được phân công | `LOCAL` | Tạo/cập nhật `DiemDanh` cho học viên có `DangKy` hợp lệ của lớp; một dòng cho mỗi cặp buổi/đăng ký |
 | `GET /api/v1/teacher/enrollments/{ma_dang_ky}/grades` | Giáo viên được phân công | `LOCAL` | Đọc điểm của đăng ký trong lớp mình dạy |
 | `GET /api/v1/teacher/enrollments/{ma_dang_ky}/grades/history` | Giáo viên được phân công; quản lý theo quyền | `LOCAL` | Đọc lịch sử chỉnh sửa điểm của đăng ký đúng lớp/site; `count` bằng số phần tử trong `results`; không cho sửa lịch sử |

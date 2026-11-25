@@ -11,11 +11,11 @@
   gap: 16px;
   flex-wrap: wrap;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, #0d3b32 0%, #175245 100%);
   color: #fff;
   border-radius: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 8px 24px rgba(13, 59, 50, 0.15);
 
   .teacherInfo {
     display: flex;
@@ -24,9 +24,9 @@
   }
 
   .avatar {
-    background: #3b82f6;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #2a7a67;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .meta {
@@ -74,8 +74,8 @@
 }
 
 .nextSessionCard {
-  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #e6f7ed 0%, #f6faf8 100%);
+  border: 1px solid #b7ebd1;
   border-radius: 14px;
   padding: 20px;
   margin-bottom: 24px;
@@ -94,7 +94,7 @@
       width: 48px;
       height: 48px;
       border-radius: 12px;
-      background: #3b82f6;
+      background: #175245;
       color: #fff;
       display: flex;
       align-items: center;
@@ -126,8 +126,8 @@
   margin-bottom: 16px;
 
   &:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.12);
+    border-color: #175245;
+    box-shadow: 0 6px 16px rgba(23, 82, 69, 0.1);
   }
 
   .cardHeader {
@@ -146,8 +146,8 @@
   .courseBadge {
     display: inline-block;
     padding: 3px 10px;
-    background: #e0f2fe;
-    color: #0369a1;
+    background: #e6f7ed;
+    color: #175245;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
@@ -230,7 +230,7 @@
 }
 
 .auditLogCard {
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #175245;
   padding: 12px 16px;
   background: #f8fafc;
   border-radius: 6px;

@@ -64,6 +64,7 @@ from core.classes.public_views import PublicCourseClassListView, PublicEnrollmen
 from core.academics.attendance_views import (
     TeacherClassListView,
     TeacherSessionAttendanceView,
+    TeacherScheduleView,
     TeacherSessionListView,
 )
 from core.academics.grade_views import (
@@ -215,6 +216,7 @@ urlpatterns = [
     path("admin/reports/students-by-site/", StudentCountsBySiteView.as_view(), name="student-counts-by-site"),
     path("admin/reports/tuition-by-site/", TuitionFinancialReportView.as_view(), name="tuition-financial-report"),
     path("teacher/classes/", TeacherClassListView.as_view(), name="teacher-classes"),
+    path("teacher/schedule/", TeacherScheduleView.as_view(), name="teacher-schedule"),
     path("teacher/classes/<str:class_id>/sessions/", TeacherSessionListView.as_view(), name="teacher-class-sessions"),
     path("teacher/sessions/<str:session_id>/attendance/", TeacherSessionAttendanceView.as_view(), name="teacher-session-attendance"),
     path("teacher/enrollments/<str:enrollment_id>/grades/history/", TeacherEnrollmentGradeHistoryView.as_view(), name="teacher-grade-history"),

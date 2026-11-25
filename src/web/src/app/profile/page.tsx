@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { UploadOutlined, UserOutlined } from "@ant-design/icons";
+import { useEffect, useState } from "react";
+import { UserOutlined } from "@ant-design/icons";
 import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Space, Typography, message } from "antd";
 import { RequireSession, useSession } from "@/lib/auth/session";
 import { authApi, type SessionUser } from "@/lib/api/auth";
 import { adminApi } from "@/lib/api/admin";
 import { academicsApi } from "@/lib/api/academics";
-import { ApiError } from "@/lib/api/client";
+import { SelfAvatarUploader } from "@/components/shared/SelfAvatarUploader";
 import AdminLayout from "@/components/admin/layout/AdminLayout";
 
 type ProfileRecord = Record<string, unknown>;
 type ProfileField = { key: string; label: string };
-type PendingAvatar = { intent_token: string; public_id: string };
 
 const PROFILE_FIELDS: Record<string, ProfileField[]> = {
   account: [
@@ -92,10 +91,6 @@ function ProfilePage() {
   const [profile, setProfile] = useState<ProfileRecord>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [avatarError, setAvatarError] = useState("");
-  const [avatarLoading, setAvatarLoading] = useState(false);
-  const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(null);
-  const avatarInput = useRef<HTMLInputElement>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -171,67 +166,6 @@ function ProfilePage() {
     children: formatProfileValue(key, profile[key]),
   }));
 
-  const completeAvatar = async (intentToken: string, publicId: string) => {
-    if (!user) return;
-    setAvatarLoading(true);
-    setAvatarError("");
-    try {
-      const result = await authApi.completeAvatarUpload(user.slug, {
-        intent_token: intentToken,
-        public_id: publicId,
-      });
-      setProfile((current) => ({ ...current, avatar_secure_url: result.avatar_secure_url }));
-      setPendingAvatar(null);
-      message.success("Đã cập nhật ảnh đại diện.");
-    } catch (reason) {
-      const detail = reason instanceof Error ? reason.message : "Chưa đồng bộ được ảnh qua các cơ sở.";
-      setAvatarError(`${detail} Bạn có thể bấm tiếp tục đồng bộ ảnh để thử lại.`);
-      if (reason instanceof ApiError && [400, 401, 403, 404, 409].includes(reason.status)) {
-        setPendingAvatar(null);
-      } else {
-        setPendingAvatar({ intent_token: intentToken, public_id: publicId });
-      }
-    } finally {
-      setAvatarLoading(false);
-    }
-  };
-
-  const chooseAvatar = async (file?: File) => {
-    if (!file || !user || !canUploadAvatar) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setAvatarError("Chỉ nhận ảnh JPG, PNG hoặc WebP.");
-      return;
-    }
-    if (file.size < 1 || file.size > 5 * 1024 * 1024) {
-      setAvatarError("Ảnh phải có dung lượng tối đa 5 MB.");
-      return;
-    }
-    setAvatarLoading(true);
-    setAvatarError("");
-    try {
-      const intent = await authApi.createAvatarUploadIntent(user.slug);
-      const body = new FormData();
-      body.append("file", file);
-      body.append("api_key", intent.api_key);
-      Object.entries(intent.fields).forEach(([key, value]) => body.append(key, value));
-      const response = await fetch(intent.upload_url, { method: "POST", body, cache: "no-store" });
-      const uploaded = await response.json().catch(() => null) as { public_id?: unknown } | null;
-      if (!response.ok || typeof uploaded?.public_id !== "string") {
-        throw new Error("Cloudinary không nhận được ảnh. Hãy kiểm tra cấu hình và thử lại.");
-      }
-      const pending = { intent_token: intent.intent_token, public_id: uploaded.public_id };
-      setPendingAvatar(pending);
-      await completeAvatar(pending.intent_token, pending.public_id);
-    } catch (reason) {
-      const detail = reason instanceof Error ? reason.message : "Không tải được ảnh đại diện.";
-      setAvatarError(detail);
-      message.error(detail);
-    } finally {
-      setAvatarLoading(false);
-      if (avatarInput.current) avatarInput.current.value = "";
-    }
-  };
-
   return (
     <div style={{ maxWidth: 1040, margin: "32px auto", padding: 16 }}>
       <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
@@ -241,27 +175,16 @@ function ProfilePage() {
             <Space orientation="vertical" size={4}>
               <Typography.Text strong>Ảnh đại diện</Typography.Text>
               <Typography.Text type="secondary">JPG, PNG hoặc WebP · tối đa 5 MB</Typography.Text>
-              <Space>
-                <input
-                  ref={avatarInput}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  hidden
-                  onChange={(event) => void chooseAvatar(event.target.files?.[0])}
-                />
-                <Button
-                  icon={<UploadOutlined />}
-                  loading={avatarLoading}
-                  disabled={Boolean(pendingAvatar)}
-                  onClick={() => avatarInput.current?.click()}
-                >Tải ảnh lên</Button>
-                {pendingAvatar && <Button loading={avatarLoading} onClick={() => void completeAvatar(pendingAvatar.intent_token, pendingAvatar.public_id)}>
-                  Tiếp tục đồng bộ ảnh
-                </Button>}
-              </Space>
+              <SelfAvatarUploader
+                slug={user?.slug}
+                hasAvatar={Boolean(avatarUrl)}
+                onUploaded={(url) => {
+                  setProfile((current) => ({ ...current, avatar_secure_url: url }));
+                  void refreshProfile();
+                }}
+              />
             </Space>
           </Space>}
-          {avatarError && <Alert type="error" title={avatarError} style={{ marginBottom: 16 }} />}
           <Typography.Paragraph type="secondary">
             Thông tin được tải từ hồ sơ của bạn tại cơ sở có quyền truy cập. Mật khẩu và mã bảo mật không được hiển thị.
           </Typography.Paragraph>
