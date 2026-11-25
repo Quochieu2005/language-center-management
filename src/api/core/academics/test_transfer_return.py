@@ -213,3 +213,11 @@ class ReturnTransferTests(SimpleTestCase):
         self.sites["Q1"].execute("DELETE FROM dbo.HocVien")
         transfers._create_destination_profile(self.snapshot(), "TK")
         self.assertEqual(self.sites["Q1"].execute("SELECT ma_hoc_vien, trang_thai FROM dbo.HocVien").fetchone(), (self.student, "bao_luu"))
+
+    def test_retry_rejects_terminal_failed_transfer_without_reopening(self):
+        db = self.sites["Q7"]
+        db.execute("UPDATE dbo.GiaoDichChuyenCoSo SET trang_thai = 'that_bai' WHERE ma_chuyen = ?", (self.transfer,))
+        with self.assertRaises(AcademicConflict):
+            transfers.retry_transfer(source_site="Q7", transfer_id=self.transfer, actor_id="TK")
+        row = db.execute("SELECT trang_thai FROM dbo.GiaoDichChuyenCoSo WHERE ma_chuyen = ?", (self.transfer,)).fetchone()
+        self.assertEqual(row[0], "that_bai")

@@ -554,9 +554,9 @@ Học viên được quay lại site từng học bằng hồ sơ cùng mã đan
 | Điểm dừng/ lỗi | Hành vi bắt buộc |
 |---|---|
 | Chưa được duyệt | Không tạo dữ liệu đích; không xử lý tự động |
-| Trước khi đích commit | Giữ nguồn dang_hoc; lỗi tạm thời thì chờ retry, lỗi nghiệp vụ dứt điểm có trạng thái thất bại rõ |
-| Đích đã commit, nguồn chưa cập nhật | Giữ dang_xu_ly; ẩn/không tính bản đích trong Global Query cho đến khi tiến trình qua mốc cập nhật nguồn; retry tiến về phía trước |
-| Nguồn đã cập nhật, giao dịch chưa hoàn tất | Tính bản đích theo bước đã lưu; đối soát và hoàn thành trạng thái |
+| Trước khi đích commit | Giữ nguồn dang_hoc; lỗi tạm thời giữ dang_xu_ly kèm sự kiện that_bai/loi_cuoi để Admin Big retry. Source chưa tự đặt trạng thái that_bai; trạng thái that_bai là kết thúc, retry trả 409 |
+| Đích đã commit, nguồn chưa cập nhật | Giữ dang_xu_ly; bản đích bao_luu không được tính trong Global Query cho đến khi tiến trình qua mốc cập nhật nguồn; retry tiến về phía trước |
+| Nguồn đã cập nhật, giao dịch chưa hoàn tất | Global Query GLOBAL tính học viên cho site đích một lần (đích bao_luu được cộng qua in_transit_students; đích đã dang_hoc không cộng lại); đối soát và hoàn thành trạng thái |
 | Đích hoặc nguồn không phản hồi | Không báo hoàn tất; lưu trạng thái cần retry/đối soát và không xóa bản ghi đã commit |
 
 **Nghiệm thu:** retry không tạo hồ sơ đích thứ hai; nếu hồ sơ có ảnh thì metadata được giữ tại nguồn và sao chép sang đích; `ma_tai_khoan` không đổi; sau hoàn tất chỉ bản đích có trạng thái dang_hoc; bản nguồn da_chuyen_di còn nguyên; thông báo site nhận chỉ có một bản dù retry; nhân viên site nhận phải tự xếp lớp/phòng; không tuyên bố ACID nguyên tử xuyên hai CSDL.
@@ -568,7 +568,7 @@ Học viên được quay lại site từng học bằng hồ sơ cùng mã đan
 1. API xác định phạm vi theo vai trò. Admin Small không thể yêu cầu một site khác; Admin Big có thể chọn site hoặc toàn hệ thống.
 2. Mỗi site được truy vấn độc lập; API tổng hợp kết quả ở ứng dụng, không JOIN giữa CSDL.
 3. Đếm bản HocVien dang_hoc; không cộng da_chuyen_di, bao_luu, nghi_hoc vào chỉ tiêu đang học.
-4. Trong giai đoạn chuyển dở, áp dụng quy tắc bước cuối: trước khi nguồn cập nhật thì tính nguồn và ẩn đích; sau khi nguồn cập nhật thì tính đích.
+4. Trong giai đoạn chuyển dở, áp dụng quy tắc bước cuối: trước khi nguồn cập nhật thì tính nguồn (đích còn bao_luu); sau khi nguồn cập nhật thì tính đích. Với GLOBAL, API đọc giao dịch `dang_xu_ly`/`da_cap_nhat_nguon` ở nguồn, hỏi site đích và cộng học viên chưa kích hoạt vào site đích (`in_transit_students`); nếu site đích không đọc được thì đưa vào missing_sites. Thống kê LOCAL một site chỉ đọc site đó nên không gồm học viên đang chờ kích hoạt.
 5. Nếu một site lỗi, trả phần kết quả đã đọc kèm complete=false và missing_sites; giao diện phân biệt số liệu một phần.
 
 **Nghiệm thu:** tổng theo site khớp các truy vấn cục bộ; trạng thái chuyển không đếm đôi; site mất kết nối không bị biến thành số 0 im lặng.

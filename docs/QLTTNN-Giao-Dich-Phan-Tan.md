@@ -118,7 +118,7 @@ Chỉ trạng thái `dang_xu_ly` mới đủ điều kiện để Coordinator ch
 
 Site đích chỉ nhận hồ sơ học viên; điểm, học phí, phiếu thu, điểm danh và lịch sử cũ ở lại nguồn. Học viên đăng ký lớp mới tại đích bằng luồng `LOCAL`. Không xóa bản nguồn.
 
-Nếu lỗi nghiệp vụ dứt điểm xảy ra trước khi đích commit, có thể kết thúc `that_bai` tại nguồn; học viên vẫn `dang_hoc` ở nguồn và có thể gửi đề nghị mới. Lỗi mạng tạm thời trước khi biết kết quả commit thì giữ `dang_xu_ly` để retry/đối soát. Sau khi đích commit, Coordinator phải phục hồi tiến về phía trước, không xóa hồ sơ đích để giả lập rollback. `that_bai` chỉ hợp lệ trước khi hồ sơ đích commit.
+Theo thiết kế, lỗi nghiệp vụ dứt điểm trước khi đích commit có thể kết thúc ở trạng thái `that_bai` tại nguồn; học viên vẫn `dang_hoc` ở nguồn và có thể gửi đề nghị mới. **Source hiện chưa tự đặt trạng thái `that_bai`**: mọi lỗi hạ tầng được giữ `dang_xu_ly`, ghi `loi_cuoi` và một **sự kiện** `that_bai` nghĩa là "một lần chạy thất bại, còn retry được"; trạng thái chỉ đổi khi retry thành công. `that_bai` là trạng thái kết thúc: route retry từ chối và không mở lại, vì một đề nghị mới cho cùng học viên có thể đã chiếm khóa `HV:<ma_hoc_vien>`. Sau khi đích commit, Coordinator phải phục hồi tiến về phía trước, không xóa hồ sơ đích để giả lập rollback. `that_bai` chỉ hợp lệ trước khi hồ sơ đích commit.
 
 ## 6. Trạng thái, nhật ký và ràng buộc đồng thời
 
@@ -153,8 +153,8 @@ Global Query đọc các CSDL site riêng, trạng thái giao dịch ở nguồn
 | Tình trạng | Học viên được tính là hiện hành |
 |---|---|
 | `cho_duyet` | Bản nguồn `dang_hoc`; chưa có bản đích |
-| `dang_xu_ly` ở bước `da_tiep_nhan` hoặc `da_tao_ho_so_dich` | Bản nguồn; tạm ẩn bản đích nếu đã được tạo |
-| `dang_xu_ly` ở bước `da_cap_nhat_nguon` | Bản đích; bản nguồn đã là `da_chuyen_di` |
+| `dang_xu_ly` ở bước `da_tiep_nhan` hoặc `da_tao_ho_so_dich` | Bản nguồn `dang_hoc`; bản đích (nếu đã tạo) còn `bao_luu` nên không được tính |
+| `dang_xu_ly` ở bước `da_cap_nhat_nguon` | Bản đích; bản nguồn đã là `da_chuyen_di`. Bản đích có thể còn `bao_luu` tới bước kích hoạt, nên Global Query đọc giao dịch ở nguồn rồi cộng cho site đích nếu hồ sơ đích chưa `dang_hoc` (trường `in_transit_students`); site đích không đọc được thì báo thiếu |
 | `hoan_tat` hoặc không có đề nghị/giao dịch mở | Bản `dang_hoc`; không tính bản `da_chuyen_di` |
 | `tu_choi` hoặc `that_bai` | Bản nguồn `dang_hoc`; đề nghị/giao dịch kết thúc không đổi chủ sở hữu |
 
@@ -169,7 +169,7 @@ Nếu không đọc được CSDL nguồn để biết trạng thái giao dịch
 5. Admin Big hoặc Admin Small site nhận từ chối: lưu lý do/sự kiện; hồ sơ học viên vẫn `dang_hoc` ở nguồn.
 6. Hai quyết định đồng thời hoặc tạo đề nghị trùng: chỉ một đề nghị/giao dịch mở được chấp nhận. POST tạo đề nghị hiện không nhận Idempotency-Key; gửi lại khi đã có đề nghị mở trả xung đột, không phải replay response theo key. Route retry tiến trình chuyển dùng mã giao dịch đã lưu và không tạo hồ sơ đích thứ hai.
 7. Điều kiện đổi trong lúc chờ duyệt (phát sinh công nợ, học viên đổi trạng thái, site đích đóng): API không bắt đầu chuyển dựa trên kiểm tra cũ.
-8. Đích lỗi trước commit: giữ nguồn và retry hoặc kết thúc `that_bai` theo loại lỗi.
+8. Đích lỗi trước commit: giữ nguồn, trạng thái vẫn `dang_xu_ly` với sự kiện `that_bai` và `loi_cuoi`; retry tiếp tục được. Giao dịch đã ở trạng thái `that_bai` thì retry bị từ chối `409`.
 9. Ứng dụng dừng sau khi đích commit: route retry đối chiếu sự kiện rồi hoàn tất nguồn, không tạo đích lần hai.
 
 ## 9. Trách nhiệm phối hợp nhóm

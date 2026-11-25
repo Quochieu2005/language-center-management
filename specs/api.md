@@ -746,7 +746,9 @@ Hộp thư Admin Big là `GLOBAL`: hỏi các site độc lập và gộp tại 
 
 ## Thống kê học viên theo cơ sở
 
-Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm vi của người gọi. Admin Small không được yêu cầu site khác; Admin Big có thể truy vấn toàn hệ thống. Với `GLOBAL`, gộp kết quả ở API, loại bản `da_chuyen_di`, không đếm trùng trạng thái chuyển tạm thời và nêu rõ site không phản hồi.
+Site cụ thể chỉ được nhận từ request sau khi API kiểm tra phạm vi của người gọi. Admin Small không được yêu cầu site khác; Admin Big có thể truy vấn toàn hệ thống. Với `GLOBAL`, gộp kết quả ở API, loại bản `da_chuyen_di`, không đếm trùng trạng thái chuyển tạm thời và nêu rõ site không phản hồi. Mỗi dòng `results` có `active_students` và `in_transit_students`: số học viên có giao dịch `dang_xu_ly`/`da_cap_nhat_nguon` tại nguồn mà hồ sơ ở site đích còn `bao_luu`, đã được cộng vào `active_students` của site đích. `LOCAL` không trả trường này.
+
+Retry chuyển cơ sở (`Admin Big`) chỉ nhận giao dịch `dang_xu_ly`; `hoan_tat` trả kết quả đã hoàn tất, còn `cho_duyet`, `tu_choi` và `that_bai` trả `409`.
 
 ## Gửi lặp, cập nhật đồng thời và lỗi site
 
