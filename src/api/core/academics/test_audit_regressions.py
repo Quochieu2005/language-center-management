@@ -48,6 +48,7 @@ class TuitionReceiptRegressionTests(SimpleTestCase):
         cursor.rowcount = 1
         cursor.fetchone.side_effect = [
             (1000000, 0, 0, "chua_dong"), None,
+            ("Q1-HV-000001",), None,  # fee owner, no open transfer
             (1000000, 0, 200000, "dong_mot_phan"),
             ("Q1-HP-000001", "thu", 200000, "tien_mat", "NV", None),
         ]

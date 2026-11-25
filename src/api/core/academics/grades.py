@@ -10,6 +10,7 @@ from core.academics.common import (
     AcademicNotFound,
     acquire_record_lock,
     append_audit,
+    ensure_no_transfer_in_progress,
     next_id,
     require_active_site,
     translate_database_errors,
@@ -90,6 +91,7 @@ def upsert_enrollment_grade(
                 raise AcademicNotFound
             if str(context[4]).lower() not in {"da_dang_ky", "dang_hoc", "hoan_thanh"}:
                 raise AcademicConflict("Chỉ cập nhật điểm cho đăng ký còn hiệu lực hoặc đã hoàn thành.")
+            ensure_no_transfer_in_progress(cursor, site_code, str(context[2]))
             cursor.execute(
                 """
                 SELECT ma_diem, diem_so, ma_giao_vien_nhap

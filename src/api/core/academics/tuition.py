@@ -11,6 +11,7 @@ from core.academics.common import (
     AcademicNotFound,
     acquire_record_lock,
     append_audit,
+    ensure_no_transfer_in_progress,
     next_id,
     require_active_site,
     translate_database_errors,
@@ -179,6 +180,17 @@ def collect_tuition(
                     "tuition_status": str(fee[3]), "site_code": site_code,
                     "replayed": True,
                 }
+
+            # A replayed receipt above stays readable; only a new receipt is blocked.
+            cursor.execute(
+                "SELECT d.ma_hoc_vien FROM dbo.HocPhi AS hp INNER JOIN dbo.DangKy AS d "
+                "ON d.ma_dang_ky = hp.ma_dang_ky AND d.ma_co_so = hp.ma_co_so "
+                "WHERE hp.ma_co_so = %s AND hp.ma_hoc_phi = %s",
+                [site_code, tuition_id],
+            )
+            owner = cursor.fetchone()
+            if owner is not None:
+                ensure_no_transfer_in_progress(cursor, site_code, str(owner[0]))
 
             balance = int(fee[0]) - int(fee[1]) - int(fee[2])
             if balance <= 0:
