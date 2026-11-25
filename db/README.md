@@ -33,7 +33,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `12_admin_password_reset_otp.sql` | Bổ sung cấu trúc OTP đặt lại mật khẩu và sự kiện reset cho tài khoản quản trị. |
 | `13_admin_small_provisioning.sql` | Legacy/không còn dùng; hồ sơ Admin Small hiện ở `dbo.Admin`, không tạo bảng điều phối riêng. |
 | `14_admin_small_deactivation.sql` | Legacy/không còn dùng; trạng thái được lưu trực tiếp trên `Admin` và `TaiKhoan`. |
-| `15_admin_big_profile_update.sql` | Bổ sung cấu trúc cần cho Admin Big tự cập nhật hồ sơ tài khoản. |
+| `15_admin_big_profile_update.sql` | Legacy/không còn dùng; Admin Big tự sửa hồ sơ hiện chỉ ghi `TaiKhoan` tại authority và đồng bộ qua outbox migration 45, không cần bảng `GiaoDichCapNhatAdminBig`. |
 | `16_teacher_lifecycle.sql` | Legacy/không còn dùng; trạng thái hồ sơ giáo viên nằm ở `GiaoVien`, trạng thái tài khoản ở `TaiKhoan`. |
 | `17_account_status_lifecycle.sql` | Legacy/không còn dùng; trạng thái hoạt động nằm trực tiếp trong `TaiKhoan.trang_thai`. |
 | `18_add_notifications.sql` | Thêm bảng thông báo quản trị theo từng database site. |

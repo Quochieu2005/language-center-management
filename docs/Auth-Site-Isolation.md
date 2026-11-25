@@ -24,7 +24,7 @@ Migration `45_account_replication_queue.sql` chỉ chạy tại kho xác thực.
 
 Worker kiểm tra kết nối đích trước khi khóa tài khoản nguồn, thử lại lỗi sau 10 giây và quét đối soát lại mỗi 60 giây. Quét này có thể bù bản sao tài khoản cũ sau khi Subscriber được restore; không khôi phục dữ liệu nghiệp vụ chỉ tồn tại ở mảnh bị mất. Xóa bản sao có lịch sử/FK không thực hiện được vẫn nằm trong hàng đợi để kiểm tra. Lỗi job đổi mật khẩu chỉ chặn tài khoản liên quan; cập nhật mật khẩu có hiệu lực tại kho xác thực và được chuyển sang các replica qua cùng hàng đợi. Kho phiên kiểm tra phiên bản hiện tại để vô hiệu phiên cũ.
 
-Phản hồi cấp tài khoản trả `replication_complete` và `replication_pending_sites`. `201` xác nhận tài khoản/hồ sơ đã tạo tại các nơi bắt buộc, không khẳng định tất cả bản sao đã đồng bộ. UI thông báo các site còn chờ. Các luồng avatar, xóa tài khoản, sửa thông tin tài khoản và chuyển cơ sở có hợp đồng riêng; không suy ra chúng đều hoạt động khi site bắt buộc mất kết nối.
+Phản hồi cấp tài khoản trả `replication_complete` và `replication_pending_sites`. `201` xác nhận tài khoản/hồ sơ đã tạo tại các nơi bắt buộc, không khẳng định tất cả bản sao đã đồng bộ. UI thông báo các site còn chờ. Liên kết Google/Facebook và Admin Big tự sửa email/tên đăng nhập/slug cũng chỉ ghi authority, tăng `phien_ban` để worker ghi đè bản sao cũ (không còn ghi từng site rồi kẹt `AccountReplicaConflict` khi lỗi giữa chừng), giữ các phiên đang hiệu lực. Các luồng avatar, xóa tài khoản và chuyển cơ sở có hợp đồng riêng; không suy ra chúng đều hoạt động khi site bắt buộc mất kết nối.
 
 ## Tự đăng ký miễn phí và ghi danh
 

@@ -30,7 +30,8 @@ from core.auth.service_common import (
     auth_session_alias,
     session_token_digest,
 )
-from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
+from core.auth.account_writes import AccountVersionConflict, update_authority_account
+from core.sites.connections import UnknownSiteError, get_site_connection
 
 
 OAUTH_STATE_COOKIE_AGE = 600
@@ -323,49 +324,39 @@ def login_with_oauth_provider(provider: str, subject: str, remote_ip: str):
         raise AuthInfrastructureUnavailable from exc
 
 
-def _read_account_for_link(site: str, account_id: str, column: str, subject: str):
-    other_column = "facebook_subject" if column == "google_subject" else "google_subject"
-    with get_site_connection(site).cursor() as cursor:
-        cursor.execute(
-            f"""
-            SELECT TOP (3) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
-                           vai_tro, ma_co_so, trang_thai, phien_ban,
-                           bat_buoc_doi_mat_khau, {column}, {other_column}
-            FROM dbo.TaiKhoan
-            WHERE ma_tai_khoan = %s OR {column} = %s
-            """,
-            [account_id, subject],
-        )
-        return [tuple(row) for row in cursor.fetchall()]
+_LINK_COLUMNS = (
+    "ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau, vai_tro, ma_co_so, "
+    "trang_thai, phien_ban, bat_buoc_doi_mat_khau"
+)
 
 
 def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, remote_ip: str) -> None:
+    """Link a provider subject on the authority row only; the outbox worker fans it out."""
     if provider not in PROVIDER_COLUMNS or user.role != "hoc_vien":
         raise OAuthAccountConflict
     column = PROVIDER_COLUMNS[provider]
     sites = active_site_codes()
-    registry_alias = auth_session_alias()
-    target_rows = []
+    alias = auth_session_alias()
     try:
-        with transaction.atomic(using=registry_alias):
-            with connections[registry_alias].cursor() as cursor:
+        with transaction.atomic(using=alias):
+            with connections[alias].cursor() as cursor:
                 subject_digest = _digest(f"oauth-{provider}", subject)
                 _acquire_named_lock(cursor, f"qlttnn-oauth-link-account:{user.account_id}")
                 _acquire_named_lock(cursor, f"qlttnn-oauth-link-subject:{subject_digest}")
-                for site in sites:
-                    rows = _read_account_for_link(site, user.account_id, column, subject)
-                    account_rows = [row for row in rows if str(row[0]) == user.account_id]
-                    if len(account_rows) != 1 or len(rows) != 1:
-                        raise OAuthAccountConflict
-                    target_rows.append(account_rows[0])
-
-                base = target_rows[0][:10]
-                other_identity = target_rows[0][11]
-                if any(row[:10] != base or row[11] != other_identity for row in target_rows[1:]):
-                    raise AuthInfrastructureUnavailable
-                if any(row[5] != "hoc_vien" for row in target_rows):
+                cursor.execute(
+                    f"SELECT TOP (3) {_LINK_COLUMNS}, {column} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
+                    f"WHERE ma_tai_khoan = %s OR {column} = %s",
+                    [user.account_id, subject],
+                )
+                rows = [tuple(row) for row in cursor.fetchall()]
+                account_rows = [row for row in rows if str(row[0]) == user.account_id]
+                # A second row means the subject already belongs to another account.
+                if len(account_rows) != 1 or len(rows) != 1:
                     raise OAuthAccountConflict
-                principal = _resolve_principal(base, sites)
+                account = account_rows[0]
+                if account[5] != "hoc_vien":
+                    raise OAuthAccountConflict
+                principal = _resolve_principal(account[:10], sites)
                 if (
                     principal is None
                     or principal.account_id != user.account_id
@@ -373,33 +364,25 @@ def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, re
                     or principal.profile_id != user.profile_id
                 ):
                     raise OAuthAccountConflict
-                if any(row[10] not in (None, subject) for row in target_rows):
+                if account[10] == subject:
+                    return
+                if account[10] is not None:
                     raise OAuthAccountConflict
-
-                for site, row in zip(sites, target_rows):
-                    if row[10] == subject:
-                        continue
-                    alias = get_site_database_alias(site)
-                    with transaction.atomic(using=alias):
-                        with connections[alias].cursor() as site_cursor:
-                            site_cursor.execute(
-                                f"UPDATE dbo.TaiKhoan SET {column} = %s, cap_nhat_luc = SYSUTCDATETIME() "
-                                f"WHERE ma_tai_khoan = %s AND {column} IS NULL",
-                                [subject, user.account_id],
-                            )
-                            if site_cursor.rowcount != 1:
-                                raise OAuthAccountConflict
-                            site_cursor.execute(
-                                """
-                                INSERT INTO dbo.Logs
-                                    (ma_log, loai_log, ma_tai_khoan, hanh_dong,
-                                     bang_tac_dong, ma_ban_ghi, ket_qua)
-                                VALUES
-                                    (CONVERT(NVARCHAR(120), NEWID()), 'system', %s, %s,
-                                     'TaiKhoan', %s, 'thanh_cong')
-                                """,
-                                [user.account_id, f"oauth_link_{provider}", user.account_id],
-                            )
+                try:
+                    update_authority_account(cursor, user.account_id, int(account[8]), {column: subject})
+                except AccountVersionConflict as exc:
+                    raise OAuthAccountConflict from exc
+                cursor.execute(
+                    """
+                    INSERT INTO dbo.Logs
+                        (ma_log, loai_log, ma_tai_khoan, hanh_dong,
+                         bang_tac_dong, ma_ban_ghi, ket_qua)
+                    VALUES
+                        (CONVERT(NVARCHAR(120), NEWID()), 'system', %s, %s,
+                         'TaiKhoan', %s, 'thanh_cong')
+                    """,
+                    [user.account_id, f"oauth_link_{provider}", user.account_id],
+                )
     except (AuthInfrastructureUnavailable, OAuthAccountConflict, OAuthStateInvalid):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
@@ -407,31 +390,23 @@ def link_oauth_provider(user: AuthenticatedUser, provider: str, subject: str, re
 
 
 def get_oauth_connections(user: AuthenticatedUser, slug: str) -> dict[str, bool]:
+    """Read the authority row; replicas may lag behind the outbox and must not block this."""
     if user.role != "hoc_vien" or slug != user.slug:
         raise OAuthAccountConflict
-    sites = active_site_codes()
-    replicas = []
     try:
-        for site in sites:
-            with get_site_connection(site).cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT TOP (2) ma_tai_khoan, ten_dang_nhap, slug, email, mat_khau,
-                                   vai_tro, ma_co_so, trang_thai, phien_ban,
-                                   bat_buoc_doi_mat_khau, google_subject, facebook_subject
-                    FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s
-                    """,
-                    [user.account_id],
-                )
-                rows = cursor.fetchall()
-            if len(rows) != 1:
-                raise AuthInfrastructureUnavailable
-            replicas.append(tuple(rows[0]))
-        if any(row != replicas[0] for row in replicas[1:]):
+        with connections[auth_session_alias()].cursor() as cursor:
+            cursor.execute(
+                f"SELECT TOP (2) {_LINK_COLUMNS}, google_subject, facebook_subject "
+                "FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s",
+                [user.account_id],
+            )
+            rows = cursor.fetchall()
+        if len(rows) != 1:
             raise AuthInfrastructureUnavailable
-        if replicas[0][5] != "hoc_vien" or _resolve_principal(replicas[0][:10], sites) is None:
+        account = tuple(rows[0])
+        if account[5] != "hoc_vien" or _resolve_principal(account[:10], active_site_codes()) is None:
             raise OAuthAccountConflict
-        return {"google": bool(replicas[0][10]), "facebook": bool(replicas[0][11])}
+        return {"google": bool(account[10]), "facebook": bool(account[11])}
     except (AuthInfrastructureUnavailable, OAuthAccountConflict):
         raise
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:

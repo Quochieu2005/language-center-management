@@ -342,7 +342,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 
 Admin Small đăng nhập bằng role `nhan_vien` và hồ sơ `Admin.loai_admin = admin_small`; không dùng `NhanVien.chuc_vu` để biểu diễn Admin Small. Chức vụ nhân viên hiện tại là `tu_van` (hiển thị “Tư vấn & xếp lớp”) hoặc `ke_toan` (hiển thị “Kế toán & Lễ tân”). Migration 41 chuyển hồ sơ `le_tan` cũ thành `ke_toan`; không thêm bảng/cột.
 
-Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL. Coordinator phải kiểm tra các bản sao trước khi liên kết/thu hồi subject (`REPLICATED-WRITE`). Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret hoặc email provider trong `TaiKhoan`; chỉ lưu metadata avatar Cloudinary nêu trên.
+Danh tính ngoài được lưu ngay trên dòng `TaiKhoan`, không có bảng OAuth riêng. Mỗi subject có chỉ mục duy nhất riêng trong từng CSDL. Liên kết subject chỉ ghi bản `TaiKhoan` tại authority `AUTH_SESSION_SITE_CODE` (unique index lọc tại authority chặn trùng), tăng `phien_ban` và để trigger/outbox cùng worker `sync_accounts` chuyển sang các bản sao (`REPLICATED-WRITE` bất đồng bộ). Sửa email/tên đăng nhập/slug của Admin Big đi cùng đường này. Thay đổi danh tính không phải thao tác thu hồi quyền nên các phiên còn hiệu lực được chuyển sang phiên bản mới trong cùng transaction. Không dùng email provider làm định danh, không tự tạo tài khoản hoặc tự liên kết theo email trùng nhau. Không lưu access token, refresh token, client secret hoặc email provider trong `TaiKhoan`; chỉ lưu metadata avatar Cloudinary nêu trên.
 
 **`Admin` — hồ sơ quản trị tại site**
 

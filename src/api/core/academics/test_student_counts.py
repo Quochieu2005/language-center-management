@@ -111,3 +111,26 @@ class GlobalStudentCountTransferTests(SimpleTestCase):
         self.assertEqual(counts, {"Q1": 0, "TD": 0})
         self.assertFalse(result["complete"])
         self.assertEqual(result["missing_sites"], ["Q7"])
+
+
+class TransferWriteGuardTests(SimpleTestCase):
+    def test_guard_blocks_only_open_transfer_at_source(self):
+        from core.academics.common import AcademicConflict, ensure_no_transfer_in_progress
+        db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
+        db.execute("ATTACH DATABASE ':memory:' AS dbo")
+        db.execute("CREATE TABLE dbo.GiaoDichChuyenCoSo (ma_hoc_vien, co_so_nguon, trang_thai)")
+        db.executemany("INSERT INTO dbo.GiaoDichChuyenCoSo VALUES (?,?,?)", [
+            ("Q1-HV-000001", "Q1", "dang_xu_ly"), ("Q1-HV-000002", "Q1", "cho_duyet"),
+            ("Q1-HV-000003", "Q1", "hoan_tat"),
+        ])
+
+        class Cursor(_Cursor):
+            def execute(self, sql, params=()):
+                super().execute(sql.replace("SELECT TOP (1) 1", "SELECT 1"), params)
+
+        cursor = Cursor(db, lambda: False)
+        with self.assertRaises(AcademicConflict):
+            ensure_no_transfer_in_progress(cursor, "q1", "Q1-HV-000001")
+        for student in ("Q1-HV-000002", "Q1-HV-000003", "Q1-HV-000009"):
+            ensure_no_transfer_in_progress(cursor, "Q1", student)

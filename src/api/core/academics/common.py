@@ -107,6 +107,22 @@ def acquire_record_lock(cursor, key: str) -> None:
     _acquire_named_lock(cursor, f"qlttnn:academic:{key}")
 
 
+def ensure_no_transfer_in_progress(cursor, site_code: str, student_id: str) -> None:
+    """Block writes for a student whose approved transfer is still being coordinated.
+
+    The transfer state lives only at the source site, which is also where the student's
+    enrollments, tuition and grades are. The destination profile stays ``bao_luu`` until
+    activation, so it has no open enrollment to write against.
+    """
+    cursor.execute(
+        "SELECT TOP (1) 1 FROM dbo.GiaoDichChuyenCoSo "
+        "WHERE ma_hoc_vien = %s AND co_so_nguon = %s AND trang_thai = 'dang_xu_ly'",
+        [student_id, normalize_site(site_code)],
+    )
+    if cursor.fetchone() is not None:
+        raise AcademicConflict("Học viên đang chuyển cơ sở; hãy chờ giao dịch chuyển hoàn tất.")
+
+
 def append_audit(
     cursor,
     *,
