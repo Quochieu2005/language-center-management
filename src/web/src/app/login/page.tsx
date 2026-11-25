@@ -72,8 +72,8 @@ export default function LoginPage() {
     </div>
     {error && <Alert className={styles.error} type="error" showIcon title={error} />}
     <Form className={styles.form} layout="vertical" onFinish={submit} requiredMark={false} disabled={Boolean(socialBusy)}>
-      <Form.Item name="identifier" label="Email đăng nhập" rules={[{ required: true, type: "email", message: "Nhập email hợp lệ." }]}>
-        <Input type="email" autoComplete="username" prefix={<UserOutlined />} maxLength={254} size="large" placeholder="Nhập email" />
+      <Form.Item name="identifier" label="Email hoặc tên đăng nhập" rules={[{ required: true, message: "Nhập email hoặc tên đăng nhập." }]}>
+        <Input autoComplete="username" prefix={<UserOutlined />} maxLength={254} size="large" placeholder="Nhập email hoặc tên đăng nhập" />
       </Form.Item>
       <Form.Item name="password" label="Mật khẩu" rules={[{ required: true, message: "Nhập mật khẩu." }]}>
         <Input.Password autoComplete="current-password" prefix={<LockOutlined />} maxLength={128} size="large" />

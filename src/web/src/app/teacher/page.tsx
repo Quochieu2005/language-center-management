@@ -1,85 +1,355 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Typography, message } from "antd";
-import { LogoutOutlined } from "@ant-design/icons";
-import { academicsApi, type ApiRow } from "@/lib/api/academics";
+import {
+  Alert,
+  Avatar,
+  Button,
+  message,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+  Typography,
+} from "antd";
+import {
+  CheckCircleOutlined,
+  DashboardOutlined,
+  EditOutlined,
+  LogoutOutlined,
+  ReadOutlined,
+  ReloadOutlined,
+  SafetyCertificateOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { academicsApi, type ApiRow, type SessionRow } from "@/lib/api/academics";
+import { asRows } from "@/components/shared/ApiPage";
 import { RequireSession, useSession } from "@/lib/auth/session";
-import { ApiDataTable, asRows } from "@/components/shared/ApiPage";
+import { TeacherOverviewTab } from "@/components/web/teacher/TeacherOverviewTab";
+import { TeacherClassesTab } from "@/components/web/teacher/TeacherClassesTab";
+import { TeacherAttendanceTab } from "@/components/web/teacher/TeacherAttendanceTab";
+import { TeacherGradesTab } from "@/components/web/teacher/TeacherGradesTab";
+import { TeacherAccountTab } from "@/components/web/teacher/TeacherAccountTab";
+import styles from "@/components/web/teacher/TeacherPortal.module.scss";
 
-const gradeTypes = ["giua_ky", "cuoi_ky", "nghe", "noi", "doc", "viet"];
-const attendanceOptions = ["co_mat", "tre", "vang_co_phep", "vang_khong_phep"].map((value) => ({ value, label: value.replaceAll("_", " ") }));
-
-export default function TeacherRoute() { return <RequireSession roles={["giao_vien"]}><TeacherPortal /></RequireSession>; }
-
-function TeacherPortal() {
-  const { signOut } = useSession();
-  const [classes, setClasses] = useState<ApiRow[]>([]);
-  const [sessions, setSessions] = useState<ApiRow[]>([]);
-  const [roster, setRoster] = useState<ApiRow[]>([]);
-  const [attendanceEditable, setAttendanceEditable] = useState(false);
-  const [attendance, setAttendance] = useState<Record<string, { status?: string; note?: string }>>({});
-  const [gradeRecord, setGradeRecord] = useState<ApiRow | null>(null);
-  const [gradeData, setGradeData] = useState<ApiRow | null>(null);
-  const [gradeHistory, setGradeHistory] = useState<ApiRow | null>(null);
-  const [activeClass, setActiveClass] = useState<ApiRow | null>(null);
-  const [activeSession, setActiveSession] = useState<ApiRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [form] = Form.useForm();
-  const load = useCallback(async () => {
-    try { const result = await academicsApi.teacherClasses(); setClasses(result.results); setError(""); }
-    catch (reason) { setError(msg(reason)); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { let cancelled = false; queueMicrotask(() => { if (!cancelled) void load(); }); return () => { cancelled = true; }; }, [load]);
-  const chooseClass = async (row: ApiRow) => {
-    setActiveClass(row); setActiveSession(null); setRoster([]); setAttendanceEditable(false);
-    try { setSessions((await academicsApi.teacherSessions(String(row.class_id))).results); }
-    catch (reason) { setError(msg(reason)); }
-  };
-  const chooseSession = async (row: ApiRow) => {
-    setActiveSession(row); setError(""); setRoster([]); setAttendanceEditable(false);
-    try {
-      const result = await academicsApi.attendance(String(row.session_id));
-      const rows = asRows(result.results); setRoster(rows); setAttendanceEditable(result.can_edit_attendance === true);
-      setAttendance(Object.fromEntries(rows.map((item) => [String(item.enrollment_id), { status: typeof item.attendance_status === "string" ? item.attendance_status : undefined, note: typeof item.note === "string" ? item.note : "" }])));
-    } catch (reason) { setError(msg(reason)); }
-  };
-  const saveAttendance = async () => {
-    if (!activeSession || !attendanceEditable) return;
-    const incomplete = roster.some((row) => !attendance[String(row.enrollment_id)]?.status);
-    if (incomplete) { message.warning("Chọn trạng thái điểm danh cho từng học viên trước khi lưu."); return; }
-    try {
-      const items = roster.map((row) => ({ enrollment_id: String(row.enrollment_id), status: attendance[String(row.enrollment_id)].status as "co_mat" | "tre" | "vang_co_phep" | "vang_khong_phep", note: attendance[String(row.enrollment_id)].note || "" }));
-      const result = await academicsApi.saveAttendance(String(activeSession.session_id), items);
-      message.success(`Đã lưu điểm danh. Phản hồi cảnh báo email: ${JSON.stringify(result.email_alerts || {})}`);
-      await chooseSession(activeSession);
-    } catch (reason) { message.error(msg(reason)); }
-  };
-  const openGrade = async (row: ApiRow) => {
-    setGradeRecord(row); setGradeData(null); setGradeHistory(null);
-    try {
-      const [grades, history] = await Promise.all([academicsApi.grades(String(row.enrollment_id)), academicsApi.gradeHistory(String(row.enrollment_id))]);
-      setGradeData(grades); setGradeHistory(history);
-    } catch (reason) { message.error(msg(reason)); }
-  };
-  const saveGrade = async (values: { grade_type: string; score: number }) => {
-    if (!gradeRecord) return;
-    try { await academicsApi.saveGrade(String(gradeRecord.enrollment_id), values.grade_type, values.score); message.success("Đã lưu điểm và nhật ký thay đổi."); await openGrade(gradeRecord); form.resetFields(); }
-    catch (reason) { message.error(msg(reason)); }
-  };
-  const sessionColumns = [
-    { title: "Buổi", dataIndex: "sequence" }, { title: "Ngày", dataIndex: "session_date" }, { title: "Giờ", render: (_: unknown, row: ApiRow) => `${String(row.start_time || "")}–${String(row.end_time || "")}` },
-    { title: "Phòng", dataIndex: "room_name" }, { title: "Trạng thái", dataIndex: "status" }, { title: "Thao tác", render: (_: unknown, row: ApiRow) => <Button onClick={() => void chooseSession(row)}>Điểm danh</Button> },
-  ];
-  return <main style={{ maxWidth: 1200, margin: "24px auto", padding: 16 }}><Space orientation="vertical" size="middle" style={{ width: "100%" }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}><Typography.Title level={2} style={{ margin: 0 }}>Không gian giáo viên</Typography.Title><Button danger icon={<LogoutOutlined />} onClick={async () => { try { await signOut(); } catch { message.error("Không thu hồi được phiên trên máy chủ."); } }}>Đăng xuất</Button></div>
-    {error && <Alert type="error" showIcon title={error} />}
-    <Card title="Lớp được phân công"><ApiDataTable rows={classes} loading={loading} emptyText="Chưa được phân công lớp" rowKey={(row) => String(row.class_id)} onRow={(row) => ({ onClick: () => void chooseClass(row) })} />{classes.length > 0 && <Select placeholder="Chọn lớp để xem buổi học" style={{ width: "100%", marginTop: 12 }} value={activeClass ? String(activeClass.class_id) : undefined} onChange={(value) => { const found = classes.find((row) => String(row.class_id) === value); if (found) void chooseClass(found); }} options={classes.map((row) => ({ value: String(row.class_id), label: `${String(row.name || row.class_name || row.class_id)} · ${String(row.site_code || "")}` }))} />}</Card>
-    {activeClass && <Card title={`Buổi học · ${String(activeClass.name || activeClass.class_name || activeClass.class_id)}`}><Table rowKey={(row) => String(row.session_id)} dataSource={sessions} columns={sessionColumns} pagination={{ pageSize: 8 }} scroll={{ x: 750 }} /></Card>}
-    {activeSession && <Card title={`Điểm danh · ${String(activeSession.session_date || "")}`} extra={<Button type="primary" disabled={!attendanceEditable} onClick={() => void saveAttendance()}>Lưu điểm danh</Button>}>{!attendanceEditable && <Alert type="info" showIcon title="Buổi học chỉ đọc; bạn không được sửa điểm danh của buổi do giáo viên khác phụ trách." style={{ marginBottom: 12 }} />}<Table rowKey={(row) => String(row.enrollment_id)} dataSource={roster} pagination={false} scroll={{ x: 850 }} columns={[{ title: "Học viên", dataIndex: "student_name" }, { title: "Mã đăng ký", dataIndex: "enrollment_id" }, { title: "Trạng thái", render: (_: unknown, row: ApiRow) => <Select disabled={!attendanceEditable} value={attendance[String(row.enrollment_id)]?.status} placeholder="Chọn trạng thái" options={attendanceOptions} onChange={(value) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], status: value } }))} style={{ width: 180 }} /> }, { title: "Ghi chú", render: (_: unknown, row: ApiRow) => <Input disabled={!attendanceEditable} maxLength={500} value={attendance[String(row.enrollment_id)]?.note} onChange={(event) => setAttendance((prev) => ({ ...prev, [String(row.enrollment_id)]: { ...prev[String(row.enrollment_id)], note: event.target.value } }))} /> }, { title: "Điểm", render: (_: unknown, row: ApiRow) => <Button onClick={() => void openGrade(row)}>Xem / nhập điểm</Button> }]} /></Card>}
-    <Modal title={`Điểm · ${String(gradeRecord?.student_name || "Học viên")}`} open={Boolean(gradeRecord)} onCancel={() => setGradeRecord(null)} footer={null} width={760}><Form form={form} layout="inline" onFinish={saveGrade}><Form.Item name="grade_type" rules={[{ required: true }]}><Select placeholder="Loại điểm" style={{ width: 160 }} options={gradeTypes.map((value) => ({ value, label: value.replaceAll("_", " ") }))} /></Form.Item><Form.Item name="score" rules={[{ required: true }]}><InputNumber min={0} max={10} step={0.25} placeholder="0–10" /></Form.Item><Button type="primary" htmlType="submit">Lưu điểm</Button></Form><Tabs style={{ marginTop: 20 }} items={[{ key: "grades", label: "Điểm hiện tại", children: <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(gradeData, null, 2)}</pre> }, { key: "history", label: "Lịch sử", children: <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(gradeHistory, null, 2)}</pre> }]} /></Modal>
-  </Space></main>;
+export default function TeacherRoute() {
+  return (
+    <RequireSession roles={["giao_vien"]}>
+      <TeacherPortal />
+    </RequireSession>
+  );
 }
 
-function msg(reason: unknown) { return reason instanceof Error ? reason.message : "Yêu cầu API thất bại."; }
+function TeacherPortal() {
+  const { user, signOut } = useSession();
+
+  // Tab navigation state
+  const [activeTabKey, setActiveTabKey] = useState("overview");
+
+  // Core data states
+  const [classes, setClasses] = useState<ApiRow[]>([]);
+  const [activeClass, setActiveClass] = useState<ApiRow | null>(null);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [activeSession, setActiveSession] = useState<SessionRow | null>(null);
+  const [roster, setRoster] = useState<ApiRow[]>([]);
+  const [attendanceEditable, setAttendanceEditable] = useState(false);
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, { status?: string; note?: string }>>({});
+
+  // Grade modal state
+  const [selectedStudentForGrade, setSelectedStudentForGrade] = useState<ApiRow | null>(null);
+
+  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [error, setError] = useState("");
+
+  // Load teacher's assigned classes
+  const loadClasses = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await academicsApi.teacherClasses();
+      const classRows = result.results || [];
+      setClasses(classRows);
+      setError("");
+
+      if (classRows.length > 0) {
+        // Automatically select the first class if none is selected
+        const first = classRows[0];
+        setActiveClass(first);
+        void loadSessionsForClass(String(first.class_id));
+      } else {
+        setActiveClass(null);
+        setSessions([]);
+        setActiveSession(null);
+        setRoster([]);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Không thể tải danh sách lớp học.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadSessionsForClass = async (classId: string) => {
+    setLoadingSessions(true);
+    try {
+      const res = await academicsApi.teacherSessions(classId);
+      const sessionRows = (res.results || []) as SessionRow[];
+      setSessions(sessionRows);
+
+      if (sessionRows.length > 0) {
+        // Pick the first or upcoming session
+        const firstSess = sessionRows[0];
+        setActiveSession(firstSess);
+        void loadAttendanceForSession(String(firstSess.session_id));
+      } else {
+        setActiveSession(null);
+        setRoster([]);
+      }
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Lỗi tải danh sách buổi học.");
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const loadAttendanceForSession = async (sessionId: string) => {
+    setLoadingAttendance(true);
+    try {
+      const result = await academicsApi.attendance(sessionId);
+      const rows = asRows(result.results);
+      setRoster(rows);
+      setAttendanceEditable(result.can_edit_attendance === true);
+
+      // Pre-fill attendance map
+      const map: Record<string, { status?: string; note?: string }> = {};
+      for (const item of rows) {
+        map[String(item.enrollment_id)] = {
+          status: typeof item.attendance_status === "string" ? item.attendance_status : undefined,
+          note: typeof item.note === "string" ? item.note : "",
+        };
+      }
+      setAttendanceMap(map);
+    } catch (reason) {
+      message.error(reason instanceof Error ? reason.message : "Lỗi tải thông tin điểm danh.");
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadClasses();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadClasses]);
+
+  // Handler when user selects another class
+  const handleSelectClass = (cls: ApiRow) => {
+    setActiveClass(cls);
+    void loadSessionsForClass(String(cls.class_id));
+  };
+
+  // Handler when user selects another session
+  const handleSelectSession = (session: SessionRow) => {
+    setActiveSession(session);
+    void loadAttendanceForSession(String(session.session_id));
+  };
+
+  // Navigate shortcut from overview
+  const handleNavigateAttendance = (cls: ApiRow, sess?: SessionRow) => {
+    setActiveClass(cls);
+    if (sess) {
+      setActiveSession(sess);
+      void loadAttendanceForSession(String(sess.session_id));
+    } else {
+      void loadSessionsForClass(String(cls.class_id));
+    }
+    setActiveTabKey("attendance");
+  };
+
+  // Find next upcoming session for display in overview
+  const nextSession = sessions.find((s) => String(s.status) !== "da_hoc") || (sessions.length > 0 ? sessions[0] : null);
+
+  const tabItems = [
+    {
+      key: "overview",
+      label: (
+        <span>
+          <DashboardOutlined /> Tổng quan
+        </span>
+      ),
+      children: (
+        <TeacherOverviewTab
+          classes={classes}
+          sessions={sessions}
+          nextSession={nextSession}
+          onNavigateAttendance={handleNavigateAttendance}
+          onNavigateClasses={() => setActiveTabKey("classes")}
+        />
+      ),
+    },
+    {
+      key: "classes",
+      label: (
+        <span>
+          <ReadOutlined /> Lớp được giao
+        </span>
+      ),
+      children: (
+        <TeacherClassesTab
+          classes={classes}
+          activeClass={activeClass}
+          sessions={sessions}
+          roster={roster}
+          loadingSessions={loadingSessions}
+          onSelectClass={handleSelectClass}
+          onSelectSessionForAttendance={(s) => {
+            setActiveSession(s);
+            void loadAttendanceForSession(String(s.session_id));
+            setActiveTabKey("attendance");
+          }}
+          onSelectStudentForGrade={(s) => {
+            setSelectedStudentForGrade(s);
+            setActiveTabKey("grades");
+          }}
+        />
+      ),
+    },
+    {
+      key: "attendance",
+      label: (
+        <span>
+          <CheckCircleOutlined /> Điểm danh
+        </span>
+      ),
+      children: (
+        <TeacherAttendanceTab
+          classes={classes}
+          activeClass={activeClass}
+          sessions={sessions}
+          activeSession={activeSession}
+          roster={roster}
+          attendanceEditable={attendanceEditable}
+          attendanceMap={attendanceMap}
+          loadingSession={loadingAttendance}
+          onSelectClass={handleSelectClass}
+          onSelectSession={handleSelectSession}
+          onAttendanceMapChange={setAttendanceMap}
+          onRefreshSession={() => {
+            if (activeSession) void loadAttendanceForSession(String(activeSession.session_id));
+          }}
+        />
+      ),
+    },
+    {
+      key: "grades",
+      label: (
+        <span>
+          <EditOutlined /> Quản lý điểm
+        </span>
+      ),
+      children: (
+        <TeacherGradesTab
+          classes={classes}
+          activeClass={activeClass}
+          roster={roster}
+          selectedStudent={selectedStudentForGrade}
+          onSelectClass={handleSelectClass}
+          onCloseStudentModal={() => setSelectedStudentForGrade(null)}
+          onOpenStudentModal={setSelectedStudentForGrade}
+        />
+      ),
+    },
+    {
+      key: "account",
+      label: (
+        <span>
+          <SafetyCertificateOutlined /> Hồ sơ & Bảo mật
+        </span>
+      ),
+      children: <TeacherAccountTab user={user} />,
+    },
+  ];
+
+  return (
+    <main className={styles.portalContainer}>
+      {/* Teacher Workspace Header */}
+      <div className={styles.portalHeader}>
+        <div className={styles.teacherInfo}>
+          <Avatar size={54} className={styles.avatar} icon={<UserOutlined />}>
+            {user?.username ? user.username.slice(0, 2).toUpperCase() : "GV"}
+          </Avatar>
+          <div className={styles.meta}>
+            <h2>Không gian Giáo viên</h2>
+            <p>
+              <span>Xin chào, <strong>{user?.username || "Giáo viên"}</strong></span>
+              <span>·</span>
+              <Tag color="cyan">Mã GV: {user?.profile_id || "TD-GV-000001"}</Tag>
+              <Tag color="gold">Cơ sở: Thủ Đức (TD)</Tag>
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.actions}>
+          <Button
+            ghost
+            icon={<ReloadOutlined />}
+            onClick={() => void loadClasses()}
+          >
+            Làm mới
+          </Button>
+          <Button
+            ghost
+            icon={<SafetyCertificateOutlined />}
+            onClick={() => setActiveTabKey("account")}
+          >
+            Đổi mật khẩu
+          </Button>
+          <Button
+            danger
+            type="primary"
+            icon={<LogoutOutlined />}
+            onClick={async () => {
+              try {
+                await signOut();
+              } catch {
+                message.error("Không thu hồi được phiên đăng nhập.");
+              }
+            }}
+          >
+            Đăng xuất
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          title="Không thể tải dữ liệu"
+          description={error}
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "60px 0" }}>
+          <Spin size="large" tip="Đang kết nối CSDL và tải lớp học..." />
+        </div>
+      ) : (
+        <Tabs
+          activeKey={activeTabKey}
+          onChange={setActiveTabKey}
+          items={tabItems}
+          type="card"
+          size="large"
+        />
+      )}
+    </main>
+  );
+}
