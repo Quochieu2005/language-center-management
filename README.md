@@ -268,7 +268,7 @@ Chi tiết cấu trúc cột, khóa và vị trí của từng bảng được �
 | `LOCAL` | Chọn đúng một site qua Site Router | Đăng ký, đổi lớp, thu học phí, nhập điểm | Rollback thao tác cục bộ nếu một bước trong cùng CSDL thất bại |
 | `GLOBAL` | Đọc các site cần thiết rồi gộp ở Django | Thống kê toàn trung tâm, tra cứu học viên hiện tại | Đánh dấu kết quả thiếu site là chưa đầy đủ |
 | `REPLICATED-WRITE` | Ghi bảng dùng chung qua Coordinator vào các CSDL site riêng | `PATCH /api/v1/admin/shared/subjects/{slug}/` cập nhật `MonHoc`; tạo/sửa/xóa `KhoaHoc`; một số luồng tài khoản cũng có replication | Trả kết quả chưa hoàn tất nếu thiếu ACK; retry dùng lại `Idempotency-Key` và body |
-| `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; Global Query chọn một hồ sơ hiện hành dù tạm thời có thể có hai dòng vật lý `dang_hoc` |
+| `DISTRIBUTED-TX` | Phối hợp nhiều CSDL cho một nghiệp vụ | Chuyển học viên từ Q1 sang Q7 | Lưu trạng thái tại nguồn và phục hồi; hồ sơ đích ở `bao_luu` đến khi kích hoạt nên không có hai dòng `dang_hoc`; Global Query tính bản đích đang chờ kích hoạt sau `da_cap_nhat_nguon` |
 
 ### 4.3. Ghi dữ liệu dùng chung chỉ có một điểm vào
 
@@ -418,7 +418,7 @@ flowchart TD
 6. Chỉ sau quyết định duyệt, Coordinator mới tạo hồ sơ cùng mã ở site đích và sự kiện `tao_ho_so_dich` trong cùng transaction cục bộ tại đích. Giữ nguyên `ma_tai_khoan` để thông tin đăng nhập/mật khẩu không đổi. Metadata avatar Cloudinary (nếu có) được sao chép cùng hồ sơ; file không di chuyển khỏi Cloudinary và bản metadata nguồn vẫn được giữ cho lịch sử. Sau khi xác nhận đích đã commit, cập nhật `buoc_cuoi = da_tao_ho_so_dich` và thêm sự kiện `xac_nhan_ho_so_dich` ở nguồn.
 7. Trong một transaction cục bộ tại nguồn, đánh dấu học viên `da_chuyen_di`, đóng đăng ký/lớp cũ, cập nhật `buoc_cuoi = da_cap_nhat_nguon` và thêm sự kiện `cap_nhat_ho_so_nguon`. Sau khi đối chiếu hai site, cập nhật trạng thái giao dịch `hoan_tat` và ghi sự kiện cuối ở nguồn. Trong transaction kích hoạt hồ sơ đích, ghi thông báo idempotent tại `ThongBao` với audience `site_staff`; Admin Small, Kế toán & Lễ tân và Tư vấn & xếp lớp ở site nhận đọc được thông báo và Tư vấn chọn lớp/phòng phù hợp thủ công.
 
-Khi đề nghị còn `cho_duyet`, các nghiệp vụ tại nguồn vẫn có thể tiếp tục; vì vậy Admin Big phải kiểm tra lại điều kiện lúc duyệt. Sau khi đã duyệt và trạng thái là `dang_xu_ly`, API chặn đăng ký/thu phí/nhập điểm cho học viên ở cả hai site đến khi phục hồi hoàn tất. Không xóa bản nguồn. Vì hai CSDL commit riêng, sau khi tạo đích và trước khi cập nhật nguồn có thể tồn tại hai dòng vật lý `dang_hoc`; không tuyên bố đây là transaction ACID nguyên tử xuyên hai CSDL. Coordinator phục hồi tiến về phía trước sau khi đích đã commit. `LichSuChuyenCoSo` chỉ thêm sự kiện; chỉ `GiaoDichChuyenCoSo` là trạng thái hiện tại có thể cập nhật. Chi tiết lỗi, retry và kiểm chứng nằm trong [docs/QLTTNN-Giao-Dich-Phan-Tan.md](docs/QLTTNN-Giao-Dich-Phan-Tan.md).
+Khi đề nghị còn `cho_duyet`, các nghiệp vụ tại nguồn vẫn có thể tiếp tục; vì vậy Admin Big phải kiểm tra lại điều kiện lúc duyệt. Sau khi đã duyệt và trạng thái là `dang_xu_ly`, API chặn đăng ký/thu phí/nhập điểm cho học viên ở cả hai site đến khi phục hồi hoàn tất. Không xóa bản nguồn. Vì hai CSDL commit riêng, có lúc tồn tại hai dòng vật lý cùng mã học viên, nhưng hồ sơ đích chỉ ở `bao_luu` cho tới bước kích hoạt cuối nên không có hai dòng `dang_hoc` cùng lúc. Trong khoảng từ `da_cap_nhat_nguon` đến khi kích hoạt, không bản nào là `dang_hoc`; Global Query tính học viên này cho site đích theo bước đã lưu. Không tuyên bố đây là transaction ACID nguyên tử xuyên hai CSDL. Coordinator phục hồi tiến về phía trước sau khi đích đã commit. `LichSuChuyenCoSo` chỉ thêm sự kiện; chỉ `GiaoDichChuyenCoSo` là trạng thái hiện tại có thể cập nhật. Chi tiết lỗi, retry và kiểm chứng nằm trong [docs/QLTTNN-Giao-Dich-Phan-Tan.md](docs/QLTTNN-Giao-Dich-Phan-Tan.md).
 
 #### Phục hồi nếu ứng dụng dừng giữa lúc chuyển
 
@@ -438,9 +438,9 @@ flowchart LR
 | Điểm dừng | Kết quả phải đảm bảo sau phục hồi |
 |---|---|
 | Đề nghị đang chờ duyệt (`trang_thai = cho_duyet`) | Chưa tạo bản đích; bản nguồn vẫn `dang_hoc`, tiếp tục được tính tại nguồn; Coordinator chỉ chạy sau khi Admin Big hoặc Admin Small site nhận duyệt |
-| Trước khi tạo bản đích (`buoc_cuoi = da_tiep_nhan`) | Bản nguồn vẫn `dang_hoc`; lỗi nghiệp vụ dứt điểm có thể kết thúc `that_bai`; lỗi kết nối thì giữ giao dịch để thử lại |
-| Đích đã commit, nguồn chưa cập nhật (`buoc_cuoi = da_tao_ho_so_dich`) | Giữ `dang_xu_ly` và phục hồi tiến về phía trước; Global Query tính bản nguồn, tạm ẩn bản đích |
-| Nguồn đã cập nhật (`buoc_cuoi = da_cap_nhat_nguon`) | Transaction nguồn đã đổi nguồn thành `da_chuyen_di`; Global Query tính bản đích |
+| Trước khi tạo bản đích (`buoc_cuoi = da_tiep_nhan`) | Bản nguồn vẫn `dang_hoc`; source hiện giữ mọi lỗi ở `dang_xu_ly` để Admin Big retry (chưa tự đặt `that_bai`). `that_bai` là trạng thái kết thúc, route retry không mở lại |
+| Đích đã commit, nguồn chưa cập nhật (`buoc_cuoi = da_tao_ho_so_dich`) | Giữ `dang_xu_ly` và phục hồi tiến về phía trước; Global Query tính bản nguồn `dang_hoc`, bản đích `bao_luu` không được tính |
+| Nguồn đã cập nhật (`buoc_cuoi = da_cap_nhat_nguon`) | Transaction nguồn đã đổi nguồn thành `da_chuyen_di`; bản đích có thể còn `bao_luu` nếu chưa kích hoạt. Global Query GLOBAL đọc giao dịch ở nguồn và tính học viên cho site đích một lần (`in_transit_students`), không đếm lại nếu đích đã `dang_hoc` |
 | Hoàn tất (`trang_thai = hoan_tat`) | Chỉ bản ở site đích còn `dang_hoc`; bản nguồn là `da_chuyen_di` |
 
 ### 5.6. Thống kê học viên theo cơ sở/toàn hệ thống
@@ -460,7 +460,7 @@ flowchart LR
     TruyVanToanCuc["Truy vấn toàn cục"] -->|gộp kết quả| TongHopBaoCao["Tổng hợp báo cáo"]
 ```
 
-Django gửi truy vấn riêng tới các site trong phạm vi quyền, đọc đề nghị `cho_duyet` và trạng thái giao dịch ở từng CSDL nguồn, chuẩn hóa cấu trúc rồi gộp tại ứng dụng. Đề nghị `cho_duyet` chưa tạo bản đích nên bản nguồn tiếp tục được tính như bình thường. Với giao dịch `dang_xu_ly`, trước `da_cap_nhat_nguon` chỉ tính bản nguồn và ẩn bản đích; từ `da_cap_nhat_nguon` trở đi chỉ tính bản đích. Khi hoàn tất, đếm bản `dang_hoc` và loại bản `da_chuyen_di`. Nếu một site lỗi, hiển thị cảnh báo và đánh dấu số liệu thiếu; không gọi đó là tổng đầy đủ. Admin Small không được dùng tham số API để xem site khác.
+Django gửi truy vấn riêng tới các site trong phạm vi quyền, đọc đề nghị `cho_duyet` và trạng thái giao dịch ở từng CSDL nguồn, chuẩn hóa cấu trúc rồi gộp tại ứng dụng. Đề nghị `cho_duyet` chưa tạo bản đích nên bản nguồn tiếp tục được tính như bình thường. Với giao dịch `dang_xu_ly`, trước `da_cap_nhat_nguon` chỉ tính bản nguồn (bản đích còn `bao_luu`); từ `da_cap_nhat_nguon` trở đi chỉ tính cho site đích: API đọc giao dịch ở nguồn, hỏi site đích xem hồ sơ đã `dang_hoc` chưa và chỉ cộng thêm khi chưa kích hoạt. Thống kê `LOCAL` một site không đọc site nguồn nên có thể thiếu học viên đang chờ kích hoạt tại đích. Khi hoàn tất, đếm bản `dang_hoc` và loại bản `da_chuyen_di`. Nếu một site lỗi, hiển thị cảnh báo và đánh dấu số liệu thiếu; không gọi đó là tổng đầy đủ. Admin Small không được dùng tham số API để xem site khác.
 
 ### 5.7. Đăng nhập
 

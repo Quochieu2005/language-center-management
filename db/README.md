@@ -50,7 +50,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `29_extend_employee_roles.sql` | Chuẩn hóa các chức vụ nhân viên nghiệp vụ theo danh sách được hỗ trợ. |
 | `30_enforce_site_fragment_boundaries.sql` | Kiểm tra dữ liệu site rồi thêm 16 `CHECK` constraints để chặn ghi nhầm mảnh; rollback nếu có dòng sai site. |
 | `31_add_account_avatar_metadata.sql` | Thêm metadata avatar Cloudinary vào `TaiKhoan`; yêu cầu `Logs` có sẵn. |
-| `31_add_sepay_tuition_payments.sql` | Thêm yêu cầu/sự kiện thanh toán SePay tại site chứa `HocPhi`; scope thanh toán online vẫn cần nhóm duyệt. |
+| `31_add_sepay_tuition_payments.sql` | Thêm yêu cầu/sự kiện thanh toán SePay tại site chứa `HocPhi`; scope thanh toán online vẫn cần nhóm duyệt. API cổng học viên đọc `YeuCauThanhToan`, nên site thiếu migration này trả 503 ở học phí học viên. Chạy bằng `sqlcmd` phải thêm `-I` (bật `QUOTED_IDENTIFIER` cho filtered index); SSMS mặc định đã bật. |
 | `32_allow_admin_small_hard_delete.sql` | Cho phép xóa vật lý hồ sơ Admin Small trong khi giữ lịch sử; cần backup và chỉ chạy nếu bật luồng này. |
 | `33_add_course_duration_fields.sql` | Thêm thời lượng tháng/ngày cho `KhoaHoc`; chạy trước 34 và 35 khi cần nâng schema cũ. |
 | `34_allow_fractional_course_months.sql` | Đổi thời lượng sang `DECIMAL(7,2)` để hỗ trợ tháng lẻ; chạy sau 33. |

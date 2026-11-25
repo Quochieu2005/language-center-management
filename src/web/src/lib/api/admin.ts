@@ -11,7 +11,7 @@ export type SiteCounts = {
   missing_sites: string[];
   site_codes: string[];
   total_active_students: number;
-  results: { site_code: string; active_students: number }[];
+  results: { site_code: string; active_students: number; in_transit_students?: number }[];
 };
 export type TuitionFinancialReport = {
   scope: "LOCAL" | "GLOBAL";

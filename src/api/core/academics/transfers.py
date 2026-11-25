@@ -849,15 +849,9 @@ def retry_transfer(*, source_site: str, transfer_id: str, actor_id: str) -> dict
                 raise AcademicNotFound
             if str(row[0]).lower() == "hoan_tat":
                 return {"transfer_id": transfer_id, "status": "hoan_tat", "step": str(row[1]), "complete": True}
-            if str(row[0]).lower() not in {"dang_xu_ly", "that_bai"}:
+            # that_bai is terminal: reopening it could collide with a newer open request.
+            if str(row[0]).lower() != "dang_xu_ly":
                 raise AcademicConflict("Chỉ giao dịch đã duyệt và chưa hoàn tất mới được retry.")
-            if str(row[0]).lower() == "that_bai":
-                cursor.execute(
-                    "UPDATE dbo.GiaoDichChuyenCoSo SET trang_thai = 'dang_xu_ly', "
-                    "cap_nhat_luc = SYSUTCDATETIME(), loi_cuoi = NULL "
-                    "WHERE ma_chuyen = %s AND co_so_nguon = %s AND trang_thai = 'that_bai'",
-                    [transfer_id, source_site],
-                )
             _audit_transfer(
                 cursor, site_code=source_site, actor_id=actor_id,
                 action="retry_chuyen_co_so", transfer_id=transfer_id,
