@@ -22,6 +22,7 @@ import styles from "./AdminLayout.module.scss";
 import { useSession } from "@/lib/auth/session";
 import type { Role } from "@/lib/api/auth";
 import type { ReactNode } from "react";
+import { BRAND_INITIAL, BRAND_SHORT_NAME } from "@/lib/brand";
 
 type AdminSidebarProps = {
   isCollapsed: boolean;
@@ -76,9 +77,9 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}>
       {/* Brand logo / title */}
       <div className={styles.brandSection}>
-        <div className={styles.brandLogo}>Z</div>
+        <div className={styles.brandLogo}>{BRAND_INITIAL}</div>
         <div className={styles.brandName}>
-          <span className={styles.title}>Zenith Admin</span>
+          <span className={styles.title}>{BRAND_SHORT_NAME} Admin</span>
           <span className={styles.subtitle}>CSDL Phân tán</span>
         </div>
       </div>

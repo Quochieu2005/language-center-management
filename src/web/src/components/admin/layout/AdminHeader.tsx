@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Dropdown, Tag, Typography, message } from "antd";
-import { BellOutlined, BulbOutlined, GlobalOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from "@ant-design/icons";
+import { BellOutlined, BulbOutlined, GlobalOutlined, HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from "@ant-design/icons";
 import { adminApi } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session";
 import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
 import { useAdminTheme } from "../theme/AdminThemeContext";
 import styles from "./AdminLayout.module.scss";
+import Link from "next/link";
 
 type AdminHeaderProps = {
   isSidebarCollapsed: boolean;
@@ -113,6 +114,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
       </div>}
       {user?.role !== "admin_big" && user?.site_code && <Tag color="blue">Cơ sở {user.site_code}</Tag>}
 
+      <Link href="/" className={styles.iconBtn} title="Xem trang chủ website" aria-label="Xem trang chủ website"><HomeOutlined /></Link>
       {user && ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role) && <Dropdown menu={notificationMenu} onOpenChange={(open) => { if (open) void loadNotifications(); }} trigger={["click"]} placement="bottomRight">
         <button type="button" className={styles.iconBtn} title={notificationError || "Thông báo"} aria-label="Thông báo">
           <Badge count={notifications.length} size="small"><BellOutlined /></Badge>
@@ -121,6 +123,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
       <Button className={styles.iconBtn} type="text" icon={<BulbOutlined />} onClick={toggleTheme} title={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"} aria-label="Đổi giao diện sáng tối" />
 
       <Dropdown menu={{ items: [
+        { key: "home", label: "Xem trang chủ website", onClick: () => router.push("/") },
         { key: "profile", label: "Hồ sơ của tôi", onClick: () => router.push("/profile") },
         { key: "password", label: "Đổi mật khẩu", onClick: () => router.push("/password/change") },
         { type: "divider" },

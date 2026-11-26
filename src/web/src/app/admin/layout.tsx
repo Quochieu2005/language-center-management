@@ -1,9 +1,10 @@
 import AdminLayout from "@/components/admin/layout/AdminLayout";
 import type { ReactNode } from "react";
 import { RequireSession } from "@/lib/auth/session";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata = {
-  title: "Admin Dashboard - Quản lý trung tâm ngoại ngữ (Zenith Theme)",
+  title: `Quản trị | ${BRAND_NAME}`,
   description: "Bảng điều khiển quản trị hệ thống CSDL phân tán",
 };
 
