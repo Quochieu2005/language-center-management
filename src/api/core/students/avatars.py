@@ -42,9 +42,13 @@ def _site_and_actor(actor, site_code: str) -> tuple[str, str, str, str | None]:
     actor_id = str(getattr(actor, "account_id", ""))
     actor_site = str(getattr(actor, "site_code", "") or "").strip().upper() or None
     site = str(site_code or "").strip().upper()
-    if role not in {"admin_big", "admin_small"} or not actor_id:
+    if role == "hoc_vien":
+        # A student manages only their own photo, at the site of their current profile.
+        if not actor_id or not actor_site or actor_site != site:
+            raise AvatarConflict("Học viên chỉ được đổi ảnh hồ sơ của chính mình tại cơ sở hiện tại.")
+    elif role not in {"admin_big", "admin_small"} or not actor_id:
         raise AvatarConflict("Chỉ Admin Big hoặc Admin Small được quản lý ảnh học viên.")
-    if role == "admin_small" and (not actor_site or actor_site != site):
+    elif role == "admin_small" and (not actor_site or actor_site != site):
         raise AvatarConflict("Admin Small chỉ được tải ảnh tại cơ sở của mình.")
     try:
         sites = active_site_codes()
@@ -90,12 +94,18 @@ def _avatar_state(profile: dict) -> dict[str, str | None]:
     return state
 
 
+def _require_own_profile(actor, actor_role: str, profile: dict) -> None:
+    if actor_role == "hoc_vien" and profile["student_id"] != str(getattr(actor, "profile_id", "") or ""):
+        raise AvatarConflict("Học viên chỉ được đổi ảnh hồ sơ của chính mình.")
+
+
 def create_student_avatar_upload_intent(actor, site_code: str, slug: str) -> dict:
     try:
         site, actor_id, actor_role, actor_site = _site_and_actor(actor, site_code)
         alias = get_site_database_alias(site)
         with connections[alias].cursor() as cursor:
             profile = _profile(cursor, site, slug)
+        _require_own_profile(actor, actor_role, profile)
         if profile["status"] == "da_chuyen_di":
             raise StudentConflict
         old_avatar = _avatar_state(profile)
@@ -174,6 +184,7 @@ def complete_student_avatar_upload(
         with transaction.atomic(using=alias):
             with connections[alias].cursor() as cursor:
                 profile = _profile(cursor, site, slug, lock=True)
+                _require_own_profile(actor, actor_role, profile)
                 if profile["student_id"] != intent["student_id"] or profile["status"] == "da_chuyen_di":
                     raise StudentConflict
                 cursor.execute(

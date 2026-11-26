@@ -13,6 +13,7 @@ import {
 } from "@ant-design/icons";
 import type { ApiRow } from "@/lib/api/academics";
 import styles from "./StudentPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   profile: ApiRow | null;
@@ -59,7 +60,7 @@ export function StudentOverviewTab({
           <Statistic
             title="Lớp đang tham gia"
             value={enrollments.length}
-            prefix={<BookOutlined style={{ color: "#1677ff" }} />}
+            prefix={<BookOutlined className={portal.accent} />}
             suffix="lớp"
           />
           <Button
@@ -76,7 +77,7 @@ export function StudentOverviewTab({
           <Statistic
             title="Buổi học tiếp theo"
             value={upcomingSession ? String(upcomingSession.date || "Chưa có") : "Không có"}
-            prefix={<CalendarOutlined style={{ color: "#52c41a" }} />}
+            prefix={<CalendarOutlined className={portal.accent} />}
           />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {upcomingSession
@@ -91,7 +92,7 @@ export function StudentOverviewTab({
             value={totalBalance}
             precision={0}
             formatter={(val) => `${Number(val).toLocaleString("vi-VN")} ₫`}
-            prefix={<DollarCircleOutlined style={{ color: totalBalance > 0 ? "#faad14" : "#52c41a" }} />}
+            prefix={<DollarCircleOutlined className={portal.accent} />}
           />
           <Button
             type="link"
@@ -107,7 +108,7 @@ export function StudentOverviewTab({
           <Statistic
             title="Điểm trung bình"
             value={avgGrade || "Chưa có"}
-            prefix={<TrophyOutlined style={{ color: "#fa8c16" }} />}
+            prefix={<TrophyOutlined className={portal.accent} />}
             suffix={avgGrade ? "/ 10" : ""}
           />
           <Button
@@ -127,7 +128,7 @@ export function StudentOverviewTab({
         <Card
           title={
             <Space>
-              <BookOutlined style={{ color: "#175245" }} />
+              <BookOutlined className={portal.accent} />
               <span>Khóa học & Lớp học đang tham gia</span>
             </Space>
           }
@@ -144,7 +145,7 @@ export function StudentOverviewTab({
               <div key={String(item.enrollment_id || index)} className={styles.sessionItem}>
                 <div className={styles.sessionDetails}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <Typography.Title level={5} style={{ margin: 0, color: "#175245" }}>
+                    <Typography.Title level={5} className={portal.accent} style={{ margin: 0 }}>
                       {String(item.class_name || item.course_name || "Lớp học")}
                     </Typography.Title>
                     <Tag color="green">Đang theo học</Tag>
@@ -165,7 +166,7 @@ export function StudentOverviewTab({
         <Card
           title={
             <Space>
-              <CalendarOutlined style={{ color: "#175245" }} />
+              <CalendarOutlined className={portal.accent} />
               <span>Lịch học sắp tới</span>
             </Space>
           }
@@ -212,7 +213,7 @@ export function StudentOverviewTab({
       <Card
         title={
           <Space>
-            <UserOutlined style={{ color: "#175245" }} />
+            <UserOutlined className={portal.accent} />
             <span>Thông tin cá nhân học viên</span>
           </Space>
         }
@@ -229,7 +230,7 @@ export function StudentOverviewTab({
           </div>
           <div>
             <Typography.Text type="secondary">Mã học viên</Typography.Text>
-            <div style={{ fontWeight: 600, color: "#175245" }}>{String(profile?.student_id || "---")}</div>
+            <div className={portal.accent} style={{ fontWeight: 600 }}>{String(profile?.student_id || "---")}</div>
           </div>
           <div>
             <Typography.Text type="secondary">Cơ sở đào tạo</Typography.Text>

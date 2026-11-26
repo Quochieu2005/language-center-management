@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Alert, Button, Card, Empty, Segmented, Space, Table, Tag, Typography } from "antd";
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, EnvironmentOutlined } from "@ant-design/icons";
 import type { TeacherScheduleRow } from "@/lib/api/academics";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Filter = "upcoming" | "today" | "all";
 
@@ -15,7 +16,6 @@ type Props = {
 };
 
 const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-const ACCENT = "#175245";
 
 /** Business dates are Vietnam local dates, independent of the browser time zone. */
 function todayInVietnam(): string {
@@ -57,7 +57,7 @@ export function TeacherScheduleTab({ schedule, loading, error, onOpenAttendance 
       width: 170,
       render: (value: string) => (
         <Space>
-          <CalendarOutlined style={{ color: ACCENT }} />
+          <CalendarOutlined className={portal.accent} />
           <span style={{ fontWeight: value === today ? 700 : 400 }}>{formatDate(value)}</span>
           {value === today && <Tag color="green">Hôm nay</Tag>}
         </Space>
@@ -69,7 +69,7 @@ export function TeacherScheduleTab({ schedule, loading, error, onOpenAttendance 
       width: 130,
       render: (_: unknown, row: TeacherScheduleRow) => (
         <Space>
-          <ClockCircleOutlined style={{ color: ACCENT }} />
+          <ClockCircleOutlined className={portal.accent} />
           <span>{hhmm(row.start_time)} – {hhmm(row.end_time)}</span>
         </Space>
       ),
@@ -91,7 +91,7 @@ export function TeacherScheduleTab({ schedule, loading, error, onOpenAttendance 
       width: 170,
       render: (value: string | null) => (
         <Space>
-          <EnvironmentOutlined style={{ color: ACCENT }} />
+          <EnvironmentOutlined className={portal.accent} />
           <span>{value || "Chưa xếp phòng"}</span>
         </Space>
       ),
@@ -111,7 +111,7 @@ export function TeacherScheduleTab({ schedule, loading, error, onOpenAttendance 
 
   return (
     <Card
-      title={<Space><CalendarOutlined style={{ color: ACCENT }} /><span>Thời khóa biểu giảng dạy</span></Space>}
+      title={<Space><CalendarOutlined className={portal.accent} /><span>Thời khóa biểu giảng dạy</span></Space>}
       extra={
         <Segmented<Filter>
           value={filter}

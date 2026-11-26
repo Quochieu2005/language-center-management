@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import type { ApiRow } from "@/lib/api/academics";
 import styles from "./StudentPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   enrollments: ApiRow[];
@@ -47,7 +48,7 @@ export function StudentCoursesTab({ enrollments, loading, onSelectTab }: Props) 
               className={styles.courseCard}
               title={
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography.Text strong style={{ fontSize: 16, color: "#175245" }}>
+                  <Typography.Text strong className={portal.accent} style={{ fontSize: 16 }}>
                     {String(item.class_name || "Lớp học")}
                   </Typography.Text>
                   <Tag color="green">Đang học</Tag>
@@ -69,16 +70,16 @@ export function StudentCoursesTab({ enrollments, loading, onSelectTab }: Props) 
                   <code>{String(item.enrollment_id || "---")}</code>
                 </div>
                 <div>
-                  <CalendarOutlined style={{ color: "#175245", marginRight: 6 }} />
+                  <CalendarOutlined className={portal.accent} style={{ marginRight: 6 }}/>
                   <span>Thời gian học: <strong>{String(item.schedule || "---")}</strong></span>
                 </div>
                 <div>
-                  <ClockCircleOutlined style={{ color: "#175245", marginRight: 6 }} />
+                  <ClockCircleOutlined className={portal.accent} style={{ marginRight: 6 }}/>
                   <span>Khung giờ: <strong>{String(item.start_time || "")} - {String(item.end_time || "")}</strong></span>
                 </div>
                 {Boolean(item.start_date) && (
                   <div>
-                    <EnvironmentOutlined style={{ color: "#175245", marginRight: 6 }} />
+                    <EnvironmentOutlined className={portal.accent} style={{ marginRight: 6 }}/>
                     <span>Lộ trình: {String(item.start_date)} đến {String(item.end_date || "Kết khóa")}</span>
                   </div>
                 )}

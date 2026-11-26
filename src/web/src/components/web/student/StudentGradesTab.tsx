@@ -4,6 +4,7 @@ import { Card, Table, Tag, Typography, Empty, Space, Statistic, Row, Col } from 
 import { TrophyOutlined, StarOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import type { ApiRow } from "@/lib/api/academics";
 import styles from "./StudentPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   grades: ApiRow[];
@@ -103,7 +104,7 @@ export function StudentGradesTab({ grades, loading }: Props) {
               title="Điểm trung bình tích lũy"
               value={avg}
               suffix="/ 10"
-              prefix={<TrophyOutlined style={{ color: "#52c41a" }} />}
+              prefix={<TrophyOutlined className={portal.accent} />}
             />
           </Col>
           <Col xs={24} sm={8}>
@@ -111,7 +112,7 @@ export function StudentGradesTab({ grades, loading }: Props) {
               title="Tổng số bài kiểm tra"
               value={grades.length}
               suffix="bài"
-              prefix={<StarOutlined style={{ color: "#faad14" }} />}
+              prefix={<StarOutlined className={portal.accent} />}
             />
           </Col>
           <Col xs={24} sm={8}>
@@ -129,7 +130,7 @@ export function StudentGradesTab({ grades, loading }: Props) {
       <Card
         title={
           <Space>
-            <TrophyOutlined style={{ color: "#175245" }} />
+            <TrophyOutlined className={portal.accent} />
             <span>Bảng điểm chi tiết ({grades.length} cột điểm)</span>
           </Space>
         }

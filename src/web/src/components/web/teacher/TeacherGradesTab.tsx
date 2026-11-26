@@ -26,6 +26,7 @@ import {
 } from "@ant-design/icons";
 import { academicsApi, type ApiRow } from "@/lib/api/academics";
 import styles from "./TeacherPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type TeacherGradesTabProps = {
   classes: ApiRow[];
@@ -248,7 +249,7 @@ export function TeacherGradesTab({
       <Modal
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <UserOutlined style={{ color: "#175245" }} />
+            <UserOutlined className={portal.accent} />
             <span>
               Bảng điểm học viên: <strong>{String(selectedStudent?.student_name || "Học viên")}</strong>
             </span>
@@ -296,7 +297,7 @@ export function TeacherGradesTab({
             <Card
               title={
                 <span>
-                  <EditOutlined style={{ marginRight: 6, color: "#175245" }} />
+                  <EditOutlined className={portal.accent} style={{ marginRight: 6 }}/>
                   Nhập / Cập nhật điểm
                 </span>
               }
@@ -320,7 +321,7 @@ export function TeacherGradesTab({
 
             {/* Audit History Tabs */}
             <Typography.Title level={5} style={{ margin: "16px 0 8px" }}>
-              <HistoryOutlined style={{ marginRight: 8, color: "#175245" }} />
+              <HistoryOutlined className={portal.accent} style={{ marginRight: 8 }}/>
               Nhật ký kiểm toán thay đổi điểm ({currentGradeHistory.length})
             </Typography.Title>
             {currentGradeHistory.length === 0 ? (

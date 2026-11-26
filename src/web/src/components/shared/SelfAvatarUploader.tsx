@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Space, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { authApi } from "@/lib/api/auth";
+import { authApi, type AvatarUploadIntent } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 
 type PendingAvatar = { intent_token: string; public_id: string };
@@ -11,10 +11,22 @@ type PendingAvatar = { intent_token: string; public_id: string };
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
 
+type AvatarApi = {
+  createIntent: (slug: string) => Promise<AvatarUploadIntent>;
+  complete: (slug: string, body: { intent_token: string; public_id: string }) => Promise<{ avatar_secure_url: string }>;
+};
+
+/** Account photo (staff, teachers); students pass their own profile-photo API instead. */
+const accountAvatarApi: AvatarApi = {
+  createIntent: authApi.createAvatarUploadIntent,
+  complete: authApi.completeAvatarUpload,
+};
+
 type Props = {
   slug: string | undefined;
   hasAvatar?: boolean;
   onUploaded: (url: string | null) => void;
+  api?: AvatarApi;
 };
 
 /**
@@ -22,7 +34,7 @@ type Props = {
  * then the API completes it. A failed completion keeps the uploaded asset so the user
  * can resume instead of uploading again.
  */
-export function SelfAvatarUploader({ slug, hasAvatar = false, onUploaded }: Props) {
+export function SelfAvatarUploader({ slug, hasAvatar = false, onUploaded, api = accountAvatarApi }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<PendingAvatar | null>(null);
@@ -33,7 +45,7 @@ export function SelfAvatarUploader({ slug, hasAvatar = false, onUploaded }: Prop
     setLoading(true);
     setError("");
     try {
-      const result = await authApi.completeAvatarUpload(slug, { intent_token: intentToken, public_id: publicId });
+      const result = await api.complete(slug, { intent_token: intentToken, public_id: publicId });
       onUploaded(result.avatar_secure_url);
       setPending(null);
       message.success("Đã cập nhật ảnh đại diện.");
@@ -60,7 +72,7 @@ export function SelfAvatarUploader({ slug, hasAvatar = false, onUploaded }: Prop
     setLoading(true);
     setError("");
     try {
-      const intent = await authApi.createAvatarUploadIntent(slug);
+      const intent = await api.createIntent(slug);
       const body = new FormData();
       body.append("file", file);
       body.append("api_key", intent.api_key);

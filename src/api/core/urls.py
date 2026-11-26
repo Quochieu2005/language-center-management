@@ -48,6 +48,7 @@ from core.students.views import (
     StudentScheduleView,
     StudentTuitionView,
 )
+from core.students.self_avatar_views import StudentSelfAvatarCompleteView, StudentSelfAvatarUploadIntentView
 from core.classes.views import (
     ClassCollectionView,
     ClassCourseOptionsView,
@@ -223,6 +224,8 @@ urlpatterns = [
     path("teacher/enrollments/<str:enrollment_id>/grades/", TeacherEnrollmentGradesView.as_view(), name="teacher-enrollment-grades"),
     path("teacher/enrollments/<str:enrollment_id>/grades/<str:grade_type>/", TeacherEnrollmentGradeItemView.as_view(), name="teacher-grade-upsert"),
     path("students/profile/<str:slug>/", StudentProfileView.as_view(), name="student-profile"),
+    path("students/profile/<str:slug>/avatar/upload-intents/", StudentSelfAvatarUploadIntentView.as_view(), name="student-self-avatar-upload-intent"),
+    path("students/profile/<str:slug>/avatar/complete/", StudentSelfAvatarCompleteView.as_view(), name="student-self-avatar-complete"),
     path("students/profile/<str:slug>/enrollments/", StudentEnrollmentListView.as_view(), name="student-enrollments"),
     path("students/profile/<str:slug>/schedule/", StudentScheduleView.as_view(), name="student-schedule"),
     path("students/profile/<str:slug>/tuition/", StudentTuitionView.as_view(), name="student-tuition"),

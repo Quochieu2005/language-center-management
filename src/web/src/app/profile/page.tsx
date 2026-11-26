@@ -109,10 +109,8 @@ function ProfilePage() {
           ]);
           result = { ...teacher, avatar_secure_url: account.user.avatar_secure_url };
         } else if (user.role === "hoc_vien") {
-          const [student, account] = await Promise.all([
-            academicsApi.studentProfile(user.slug), authApi.profile(user.slug),
-          ]);
-          result = { ...student, avatar_secure_url: account.user.avatar_secure_url };
+          // Students' photo lives on their profile (HocVien), the one staff see and transfers copy.
+          result = await academicsApi.studentProfile(user.slug);
         }
         else result = (await authApi.profile(user.slug)).user as unknown as ProfileRecord;
         if (cancelled) return;
@@ -178,6 +176,9 @@ function ProfilePage() {
               <SelfAvatarUploader
                 slug={user?.slug}
                 hasAvatar={Boolean(avatarUrl)}
+                api={user?.role === "hoc_vien"
+                  ? { createIntent: academicsApi.createStudentSelfAvatarIntent, complete: academicsApi.completeStudentSelfAvatar }
+                  : undefined}
                 onUploaded={(url) => {
                   setProfile((current) => ({ ...current, avatar_secure_url: url }));
                   void refreshProfile();

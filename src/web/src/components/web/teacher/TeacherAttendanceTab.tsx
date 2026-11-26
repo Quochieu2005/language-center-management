@@ -27,6 +27,7 @@ import {
 } from "@ant-design/icons";
 import { academicsApi, type ApiRow, type SessionRow } from "@/lib/api/academics";
 import styles from "./TeacherPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type TeacherAttendanceTabProps = {
   classes: ApiRow[];
@@ -267,7 +268,7 @@ export function TeacherAttendanceTab({
         <Card
           title={
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <CalendarOutlined style={{ color: "#175245", fontSize: 18 }} />
+              <CalendarOutlined className={portal.accent} style={{ fontSize: 18 }}/>
               <span>
                 Điểm danh: <strong>Buổi #{String((activeSession as Record<string, unknown>).sequence ?? activeSession.session_number ?? "")}</strong> — Ngày: {String((activeSession as Record<string, unknown>).session_date ?? activeSession.date ?? "")}
               </span>

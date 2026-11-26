@@ -1,12 +1,14 @@
 "use client";
 
-import { Card, Form, Input, Button, Typography, Space, message, Divider } from "antd";
+import { Avatar, Card, Form, Input, Button, Typography, Space, message, Divider } from "antd";
 import { UserOutlined, PhoneOutlined, HomeOutlined, LockOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import type { ApiRow } from "@/lib/api/academics";
 import { academicsApi } from "@/lib/api/academics";
 import { authApi } from "@/lib/api/auth";
 import { SocialAccountConnections } from "./SocialAccountConnections";
+import { SelfAvatarUploader } from "@/components/shared/SelfAvatarUploader";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   profile: ApiRow | null;
@@ -19,6 +21,8 @@ export function StudentAccountTab({ profile, slug, onRefresh }: Props) {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [uploadedAvatar, setUploadedAvatar] = useState<string | null>(null);
+  const avatarUrl = uploadedAvatar ?? (typeof profile?.avatar_secure_url === "string" ? profile.avatar_secure_url : null);
 
   // Luu thong tin lien he
   const saveProfile = async (values: { phone?: string; address?: string }) => {
@@ -64,11 +68,24 @@ export function StudentAccountTab({ profile, slug, onRefresh }: Props) {
       <Card
         title={
           <Space>
-            <UserOutlined style={{ color: "#175245" }} />
+            <UserOutlined className={portal.accent} />
             <span>Thông tin cá nhân & Liên hệ</span>
           </Space>
         }
       >
+        <Space align="center" size="large" style={{ marginBottom: 20 }} wrap>
+          <Avatar size={88} src={avatarUrl || undefined} icon={<UserOutlined />} style={{ background: "var(--portal-accent)" }} alt="Ảnh đại diện" />
+          <Space orientation="vertical" size={4}>
+            <Typography.Text strong>Ảnh đại diện</Typography.Text>
+            <Typography.Text type="secondary">JPG, PNG hoặc WebP · tối đa 5 MB</Typography.Text>
+            <SelfAvatarUploader
+              slug={slug}
+              hasAvatar={Boolean(avatarUrl)}
+              api={{ createIntent: academicsApi.createStudentSelfAvatarIntent, complete: academicsApi.completeStudentSelfAvatar }}
+              onUploaded={(url) => { setUploadedAvatar(url); void onRefresh(); }}
+            />
+          </Space>
+        </Space>
         <Form
           form={profileForm}
           layout="vertical"
@@ -116,7 +133,7 @@ export function StudentAccountTab({ profile, slug, onRefresh }: Props) {
       <Card
         title={
           <Space>
-            <LockOutlined style={{ color: "#175245" }} />
+            <LockOutlined className={portal.accent} />
             <span>Đổi mật khẩu tài khoản</span>
           </Space>
         }

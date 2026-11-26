@@ -735,7 +735,7 @@ def get_student_profile(*, account_id: str, student_id: str, site_code: str):
                    ho_ten AS full_name, ngay_sinh AS birth_date,
                    gioi_tinh AS gender, sdt AS phone, email,
                    dia_chi AS address, ngay_nhap_hoc AS enrolled_on,
-                   trang_thai AS status
+                   trang_thai AS status, avatar_secure_url
             FROM dbo.HocVien
             WHERE ma_hoc_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
               AND trang_thai IN ('dang_hoc', 'bao_luu')
