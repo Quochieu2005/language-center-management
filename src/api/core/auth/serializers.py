@@ -75,7 +75,8 @@ class AuthChangePasswordSerializer(serializers.Serializer):
 class AuthRegisterSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=150, trim_whitespace=True)
     email = serializers.EmailField(max_length=254)
-    site_code = serializers.RegexField(regex=r"^[A-Za-z0-9_-]{2,12}$", max_length=12)
+    # Optional: a self-registered login only needs a home for its profile row; default to the account authority.
+    site_code = serializers.RegexField(regex=r"^[A-Za-z0-9_-]{2,12}$", max_length=12, required=False)
     password = serializers.CharField(min_length=12, max_length=128, trim_whitespace=False, write_only=True)
     confirm_password = serializers.CharField(min_length=12, max_length=128, trim_whitespace=False, write_only=True)
 

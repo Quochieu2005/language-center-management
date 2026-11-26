@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import DatabaseError, connections
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
@@ -42,8 +43,9 @@ class AuthRegisterView(APIView):
         serializer = AuthRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            result = register_student(**serializer.validated_data,
-                                      remote_ip=request.META.get("REMOTE_ADDR", "unknown"))
+            data = dict(serializer.validated_data)
+            data.setdefault("site_code", settings.AUTH_SESSION_SITE_CODE)
+            result = register_student(**data, remote_ip=request.META.get("REMOTE_ADDR", "unknown"))
         except (RegistrationConflict, StudentConflict):
             return Response({"detail": "Không thể tạo tài khoản bằng thông tin này. Hãy đăng nhập hoặc liên hệ trung tâm."}, status=409)
         except ValueError:

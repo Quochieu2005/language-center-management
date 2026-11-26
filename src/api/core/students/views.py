@@ -595,7 +595,7 @@ class StudentProfileView(APIView):
     @extend_schema(
         operation_id="student_profile_update_contact",
         tags=["Cổng học viên"],
-        summary="Học viên cập nhật số điện thoại/địa chỉ của chính mình",
+        summary="Học viên cập nhật hồ sơ của chính mình (họ tên, ngày sinh, giới tính, số điện thoại, địa chỉ)",
         parameters=[OpenApiParameter("slug", str, OpenApiParameter.PATH)],
         request=StudentProfileUpdateSerializer,
         responses={200: StudentProfileSerializer, 400: OpenApiResponse(description="Thông tin liên hệ không hợp lệ."),

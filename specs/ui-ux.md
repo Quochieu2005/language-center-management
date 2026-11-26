@@ -364,7 +364,7 @@ Header Admin hiển thị chuông thông báo nhưng chỉ tải danh sách khi 
 
 ### 3.6. Danh mục page và route cần thiết
 
-Danh mục dưới đây làm rõ page nào cần thiết kế để không gộp nhiều nghiệp vụ vào một màn hình chung. Route minh họa là quy ước UI, không phải API endpoint. Các page nghiệp vụ nội bộ dùng chung shell và chỉ hiện theo quyền API. Source có `/student` (portal cơ bản, duyệt 21/11/2026) và thanh toán qua Cổng thanh toán SePay (duyệt 26/11/2026); code có sẵn không phải bằng chứng đã chạy giao dịch thật.
+Danh mục dưới đây làm rõ page nào cần thiết kế để không gộp nhiều nghiệp vụ vào một màn hình chung. Route minh họa là quy ước UI, không phải API endpoint. Các page nghiệp vụ nội bộ dùng chung shell và chỉ hiện theo quyền API. Source có `/account` (trang hồ sơ của người dùng đã đăng ký/đăng nhập, dùng khung trang công khai: ảnh, họ tên, ngày sinh, giới tính, điện thoại, địa chỉ; email và mã hồ sơ chỉ xem) và `/student` (portal cơ bản, duyệt 21/11/2026) và thanh toán qua Cổng thanh toán SePay (duyệt 26/11/2026); code có sẵn không phải bằng chứng đã chạy giao dịch thật.
 
 #### Route Next.js đang có trong source
 

@@ -136,6 +136,28 @@ class RegistrationBoundaryTests(SimpleTestCase):
                 identity.seed_student_emails()
         reserve.assert_not_called()
 
+    def test_operator_can_opt_in_to_bootstrap_without_offline_sites(self):
+        conn, cursor = connection()
+        cursor.fetchall.return_value = [("STUDENT", "test@example.com")]
+        registry, _ = connection()
+        def read(site):
+            if site == "Q7":
+                raise DatabaseError("offline")
+            return conn
+        with (
+            patch.object(identity, "active_site_codes", return_value=("Q1", "Q7")),
+            patch.object(identity, "get_site_connection", side_effect=read),
+            patch.object(identity, "auth_session_alias", return_value="auth"),
+            patch.object(identity, "connections", {"auth": registry}),
+            patch.object(identity.transaction, "atomic", return_value=nullcontext()),
+            patch.object(identity, "_acquire_named_lock"),
+            patch.object(identity, "reserve_email", return_value="key") as reserve,
+            override_settings(AUTH_SESSION_SITE_CODE="Q1"),
+        ):
+            reserved, skipped = identity.seed_student_emails(allow_missing_sites=True)
+        self.assertEqual((reserved, skipped), (1, ("Q7",)))
+        reserve.assert_called_once()
+
     def test_duplicate_email_is_checked_in_registry_without_querying_other_sites(self):
         local, local_cursor = connection()
         local_cursor.fetchone.return_value = ("hoat_dong",)
@@ -146,3 +168,13 @@ class RegistrationBoundaryTests(SimpleTestCase):
             with self.assertRaises(identity.StudentEmailConflict):
                 identity.reserve_email("same@example.com", "Q1")
         self.assertTrue(all(call.args == ("Q1",) for call in read.call_args_list))
+
+
+class RegistrationWithoutSiteTests(SimpleTestCase):
+    def test_site_is_optional_and_defaults_to_the_authority(self):
+        from core.auth.serializers import AuthRegisterSerializer
+
+        data = {"full_name": "Minh", "email": "m@example.com", "password": "x" * 12, "confirm_password": "x" * 12}
+        serializer = AuthRegisterSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertNotIn("site_code", serializer.validated_data)
