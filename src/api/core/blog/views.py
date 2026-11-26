@@ -16,12 +16,16 @@ from core.blog.serializers import (
     BlogCategoryPatchSerializer,
     BlogWriteResponseSerializer,
     BlogImageCompleteRequestSerializer,
+    BlogSyncStatusSerializer,
     BlogImageCompleteResponseSerializer,
     BlogImageIntentRequestSerializer,
     PublicBlogArticlesResponseSerializer,
     PublicBlogCategoriesResponseSerializer,
     PublicBlogDetailResponseSerializer,
 )
+from django.db import DatabaseError
+
+from core.blog import sync_queue
 from core.blog.images import complete_blog_image, create_blog_image_intent
 from core.media.avatars import AvatarInvalidIntent, AvatarInvalidUpload, AvatarUnavailable
 from core.media.serializers import AdminAvatarUploadIntentResponseSerializer
@@ -352,3 +356,33 @@ class AdminBlogImageCompleteView(_BlogImageView):
             return Response(complete_blog_image(request.user, **serializer.validated_data))
         except (AvatarInvalidIntent, AvatarInvalidUpload, AvatarUnavailable) as exc:
             return _image_error(exc)
+
+
+class AdminBlogSyncView(_AdminBlogView):
+    @extend_schema(
+        operation_id="admin_blog_sync_status", tags=["Blog"],
+        summary="Số thao tác Blog đang chờ đồng bộ tới các site",
+        responses={200: BlogSyncStatusSerializer, 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def get(self, request):
+        denied = _blog_roles_only(request, ("admin_big", "tu_van"))
+        if denied:
+            return denied
+        try:
+            return Response(sync_queue.status())
+        except DatabaseError as exc:
+            return Response({"detail": "Chưa đọc được hàng đợi đồng bộ Blog."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @extend_schema(
+        operation_id="admin_blog_sync_run", tags=["Blog"],
+        summary="Chạy ngay một lượt đồng bộ Blog (tương tự worker sync_blog)",
+        request=None, responses={200: BlogSyncStatusSerializer, 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def post(self, request):
+        denied = _blog_roles_only(request, ("admin_big", "tu_van"))
+        if denied:
+            return denied
+        try:
+            return Response(sync_queue.reconcile_pending_blog_writes())
+        except (DatabaseError, PublicBlogUnavailable):
+            return Response({"detail": "Chưa đồng bộ được Blog; các site chưa sẵn sàng."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
