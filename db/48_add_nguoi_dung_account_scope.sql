@@ -13,19 +13,9 @@ GO
 
 -- Chạy trên MỌI site (Q1, Q7, TD) TRƯỚC khi API bắt đầu tạo hoặc nhân bản tài khoản vai trò nguoi_dung.
 -- nguoi_dung: tài khoản xem website, chưa thuộc cơ sở nào (ma_co_so NULL) và chưa có hồ sơ học viên.
+-- Hồ sơ của họ nằm ở bảng dbo.NguoiDung tại authority (migration 49), không phải cột trong TaiKhoan.
 BEGIN TRY
     BEGIN TRANSACTION;
-
-    IF COL_LENGTH(N'dbo.TaiKhoan', N'ho_ten') IS NULL
-        EXEC(N'ALTER TABLE dbo.TaiKhoan ADD ho_ten NVARCHAR(150) NULL');
-    IF COL_LENGTH(N'dbo.TaiKhoan', N'sdt') IS NULL
-        EXEC(N'ALTER TABLE dbo.TaiKhoan ADD sdt NVARCHAR(20) NULL');
-    IF COL_LENGTH(N'dbo.TaiKhoan', N'ngay_sinh') IS NULL
-        EXEC(N'ALTER TABLE dbo.TaiKhoan ADD ngay_sinh DATE NULL');
-    IF COL_LENGTH(N'dbo.TaiKhoan', N'gioi_tinh') IS NULL
-        EXEC(N'ALTER TABLE dbo.TaiKhoan ADD gioi_tinh NVARCHAR(20) NULL');
-    IF COL_LENGTH(N'dbo.TaiKhoan', N'dia_chi') IS NULL
-        EXEC(N'ALTER TABLE dbo.TaiKhoan ADD dia_chi NVARCHAR(300) NULL');
 
     IF NOT EXISTS (
         SELECT 1 FROM sys.check_constraints
@@ -53,7 +43,7 @@ BEGIN TRY
     END;
 
     COMMIT TRANSACTION;
-    PRINT N'Đã cho phép vai trò nguoi_dung (ma_co_so NULL) và thêm cột hồ sơ cơ bản vào dbo.TaiKhoan.';
+    PRINT N'Đã cho phép vai trò nguoi_dung (ma_co_so NULL) trong dbo.TaiKhoan.';
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;

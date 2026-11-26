@@ -59,10 +59,6 @@ ACCOUNT_COLUMNS = (
     "ngay_doi_mat_khau_cuoi", "avatar_public_id", "avatar_secure_url",
     "google_subject", "facebook_subject",
 )
-# Basic profile of a `nguoi_dung` account (migration 48). Replicated only for that role, so sites that have not
-# run migration 48 keep receiving every other account unchanged.
-PROFILE_COLUMNS = ("ho_ten", "sdt", "ngay_sinh", "gioi_tinh", "dia_chi")
-PROFILE_ROLE = "nguoi_dung"
 
 
 def deliver_account(account_id, target):
@@ -76,9 +72,7 @@ def deliver_account(account_id, target):
     with transaction.atomic(using=authority):
         with connections[authority].cursor() as cursor:
             _acquire_named_lock(cursor, f"qlttnn-account-sync:{account_id}")
-            cursor.execute("SELECT vai_tro FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s", [account_id])
-            role = cursor.fetchone()
-            columns = ACCOUNT_COLUMNS + PROFILE_COLUMNS if role and str(role[0]) == PROFILE_ROLE else ACCOUNT_COLUMNS
+            columns = ACCOUNT_COLUMNS
             cursor.execute(
                 f"SELECT {','.join(columns)} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
                 "WHERE ma_tai_khoan = %s", [account_id],

@@ -130,10 +130,14 @@ def _create_user_account(*, full_name, email, password, remote_ip):
             account_id = _next_student_account_id(authority, sites)
             cursor.execute(
                 "INSERT dbo.TaiKhoan(ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro, ma_co_so, "
-                "trang_thai, bat_buoc_doi_mat_khau, phien_ban, ho_ten) "
-                "VALUES (%s,%s,%s,%s,%s,'nguoi_dung',NULL,1,0,1,%s)",
+                "trang_thai, bat_buoc_doi_mat_khau, phien_ban) "
+                "VALUES (%s,%s,%s,%s,%s,'nguoi_dung',NULL,1,0,1)",
                 [account_id, _user_slug(full_name, sites), _user_username(email, sites), email,
-                 make_password(password), full_name],
+                 make_password(password)],
+            )
+            cursor.execute(
+                "INSERT dbo.NguoiDung(ma_nguoi_dung, ma_tai_khoan, ho_ten) VALUES (%s,%s,%s)",
+                [account_id.replace("-TK-", "-ND-"), account_id, full_name],
             )
             cursor.execute(
                 "INSERT dbo.Logs(ma_log, loai_log, ma_co_so, ma_tai_khoan, hanh_dong, "
