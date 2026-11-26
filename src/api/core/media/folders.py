@@ -112,6 +112,27 @@ def build_avatar_public_id(resource_type: str, *, slug: str, on_date, site_code:
     return folder, f"{folder}/{name}"
 
 
+def build_blog_image_public_id(kind: str, *, slug: str, on_date, stamp: str) -> tuple[str, str]:
+    """Return ``(asset_folder, public_id)`` for a Blog image.
+
+    Layout: ``<root>/blog/bia/<slug>-<dd-mm-yyyy>`` for the cover (one per article per day) and
+    ``<root>/blog/noi-dung/<slug>-<HHMMSS>-<dd-mm-yyyy>`` for pictures inside the article body.
+    """
+    if kind not in {"cover", "content"}:
+        raise ValueError("Loại ảnh Blog không được hỗ trợ.")
+    folder = "/".join([*_root_segments(), "blog", "bia" if kind == "cover" else "noi-dung"])
+    suffix = f"{on_date:%d-%m-%Y}" if kind == "cover" else f"{stamp}-{on_date:%d-%m-%Y}"
+    name = _validate_code(f"{slug}-{suffix}", _RECORD_CODE, "Tên ảnh")
+    return folder, f"{folder}/{name}"
+
+
+def is_blog_public_id(value: object) -> bool:
+    if not isinstance(value, str) or not _PATH_PUBLIC_ID.fullmatch(value):
+        return False
+    base = "/".join(_root_segments()) + "/blog/"
+    return value.startswith(base + "bia/") or value.startswith(base + "noi-dung/")
+
+
 def is_avatar_public_id(value: object) -> bool:
     """Accept new path-style ids under the configured root and legacy UUID ids already stored."""
     if not isinstance(value, str):

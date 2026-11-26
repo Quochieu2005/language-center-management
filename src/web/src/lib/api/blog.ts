@@ -1,3 +1,4 @@
+import type { AvatarUploadIntent } from "./auth";
 import { apiRequest, jsonBody } from "./client";
 
 export type BlogList<T> = {
@@ -26,9 +27,10 @@ export type BlogArticleSummary = {
   reading_time_minutes: number;
   status: "nhap" | "da_xuat_ban" | "an";
   published_at: string | null;
+  cover_url?: string | null;
 };
 
-export type BlogArticle = BlogArticleSummary & { content: string };
+export type BlogArticle = BlogArticleSummary & { content: string; cover_public_id?: string | null };
 export type PublicBlogArticle = {
   slug: string;
   title: string;
@@ -37,9 +39,12 @@ export type PublicBlogArticle = {
   reading_time_minutes: number;
   published_at: string | null;
   category: { slug: string; name: string };
+  cover_url: string | null;
 };
+export type PublicBlogArticleSummary = Omit<PublicBlogArticle, "content">;
 export type BlogCategoryInput = Pick<BlogCategory, "slug" | "name" | "description" | "status">;
-export type BlogArticleInput = Omit<BlogArticle, "published_at"> & { published_at: string | null };
+export type BlogArticleInput = Omit<BlogArticle, "published_at" | "cover_url"> & { published_at: string | null; cover_url?: string | null };
+export type BlogImageKind = "cover" | "content";
 
 export type BlogWriteResult = {
   scope: "REPLICATED-WRITE";
@@ -54,6 +59,13 @@ type BlogDetail<T> = { scope: "GLOBAL"; complete: boolean; site_codes: string[];
 type PublicBlogDetail = BlogDetail<PublicBlogArticle>;
 
 export const blogApi = {
+  imageIntent: (slug: string, kind: BlogImageKind) => apiRequest<AvatarUploadIntent>("/admin/blog/images/upload-intents/", {
+    method: "POST", body: jsonBody({ slug, kind }),
+  }),
+  imageComplete: (body: { intent_token: string; public_id: string }) => apiRequest<{ public_id: string; secure_url: string }>("/admin/blog/images/complete/", {
+    method: "POST", body: jsonBody(body),
+  }),
+  publicArticles: () => apiRequest<BlogList<PublicBlogArticleSummary>>("/blog/articles/"),
   publicArticle: (slug: string) => apiRequest<PublicBlogDetail>(`/blog/${encodeURIComponent(slug)}/`),
   categories: () => apiRequest<BlogList<BlogCategory>>("/admin/blog/categories/"),
   articles: () => apiRequest<BlogList<BlogArticleSummary>>("/admin/blog/articles/"),

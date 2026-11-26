@@ -1,0 +1,4 @@
+.field { display: grid; gap: 10px; }
+.preview { display: block; width: 100%; max-width: 420px; aspect-ratio: 16 / 9; border: 1px solid var(--ant-color-border-secondary, #e1e6df); border-radius: 6px; object-fit: cover; }
+.empty { display: grid; place-items: center; width: 100%; max-width: 420px; aspect-ratio: 16 / 9; border: 1px dashed var(--ant-color-border, #d9d9d9); border-radius: 6px; color: #718078; font-size: 13px; text-align: center; padding: 12px; }
+.hint { color: #8a948e; font-size: 12px; }

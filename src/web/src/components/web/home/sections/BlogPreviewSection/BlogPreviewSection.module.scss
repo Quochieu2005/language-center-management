@@ -23,3 +23,6 @@
 .more { display: flex; justify-content: space-between; gap: 20px; margin-top: 25px; padding-top: 16px; border-top: 1px solid #dce2db; color: #78867e; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .more a { color: #2c746b; font-size: 12px; letter-spacing: 0; text-decoration: none; }
 @media (max-width: 760px) { .section { padding: 72px 0; }.inner { width: min(100% - 32px, 560px); }.top { align-items: start; flex-direction: column; gap: 15px; }.grid { grid-template-columns: 1fr; gap: 15px; }.art { height: 150px; }.more { flex-direction: column; } }
+
+.artCover::before, .artCover::after { display: none; }
+.coverImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

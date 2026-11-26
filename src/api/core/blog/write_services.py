@@ -45,11 +45,14 @@ def _record(entity: str, row) -> dict | None:
         "slug": str(row[1]), "category_slug": str(row[2]), "title": str(row[3]),
         "excerpt": str(row[4]), "content": str(row[5]), "reading_time_minutes": int(row[6]),
         "status": str(row[7]), "published_at": _utc(row[8]),
+        "cover_public_id": None if row[9] is None else str(row[9]),
+        "cover_url": None if row[10] is None else str(row[10]),
     }
 
 
 def _decode_event_value(entity: str, raw):
-    value = json.loads(raw) if raw else None
+    # `before` is stored as a JSON string, `after` as a nested object inside the ACK payload.
+    value = raw if isinstance(raw, dict) else (json.loads(raw) if raw else None)
     if value is not None and not isinstance(value, dict):
         raise ValueError("ACK payload must be an object")
     if entity == "article" and value and value.get("published_at"):
@@ -70,7 +73,7 @@ def _read_record(cursor, entity: str, *, slug: str | None = None, record_id: str
         where, value = (f"post.{pk} = %s", record_id) if record_id else ("post.slug = %s", slug)
         cursor.execute(
             f"SELECT post.{pk}, post.slug, category.slug, post.tieu_de, post.tom_tat, post.noi_dung, "
-            f"post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc "
+            f"post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc, post.anh_bia_public_id, post.anh_bia_url "
             f"FROM dbo.{table} AS post{hint} INNER JOIN dbo.DanhMucBlog AS category "
             f"ON category.ma_danh_muc_blog = post.ma_danh_muc_blog WHERE {where}", [value],
         )
@@ -122,13 +125,15 @@ def _site_context():
     except (AcademicInfrastructureUnavailable, DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise PublicBlogUnavailable("Không xác định được các site Blog đang hoạt động.") from exc
     sites = tuple(sorted(set(available)))
-    if missing or not sites or registry_site not in sites:
+    if not sites or registry_site not in sites:
         raise PublicBlogUnavailable(
-            "Một hoặc nhiều site hoạt động chưa sẵn sàng; chưa ghi danh mục Blog.",
+            "Site điều phối Blog chưa sẵn sàng; chưa ghi Blog.",
             site_codes=tuple(sorted(set(available) | set(missing))),
             missing_sites=missing or (registry_site,),
         )
-    return registry_site, registry_alias, (registry_site,) + tuple(site for site in sites if site != registry_site)
+    # Sites are independent: write to every reachable one, report the rest as pending (retry with the same key).
+    ordered = (registry_site,) + tuple(site for site in sites if site != registry_site)
+    return registry_site, registry_alias, ordered, tuple(sorted(missing))
 
 
 def _category_id(cursor, slug: str, *, require_active: bool):
@@ -205,10 +210,12 @@ def _apply_site(*, site: str, entity: str, action: str, expected, after, event_i
                 category_id, _ = _category_id(cursor, after["category_slug"], require_active=after["status"] == "da_xuat_ban")
                 cursor.execute(
                     "INSERT INTO dbo.BaiVietBlog (ma_danh_muc_blog, slug, tieu_de, tom_tat, noi_dung, "
-                    "so_phut_doc, trang_thai, ngay_xuat_ban_utc) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    "so_phut_doc, trang_thai, ngay_xuat_ban_utc, anh_bia_public_id, anh_bia_url) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     [category_id, after["slug"], after["title"], after["excerpt"], after["content"],
                      after["reading_time_minutes"], after["status"],
-                     after["published_at"].replace(tzinfo=None) if after["published_at"] else None],
+                     after["published_at"].replace(tzinfo=None) if after["published_at"] else None,
+                     after.get("cover_public_id"), after.get("cover_url")],
                 )
             cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS BIGINT)")
             local_id = str(cursor.fetchone()[0])
@@ -224,10 +231,12 @@ def _apply_site(*, site: str, entity: str, action: str, expected, after, event_i
                 cursor.execute(
                     "UPDATE dbo.BaiVietBlog SET ma_danh_muc_blog = %s, slug = %s, tieu_de = %s, tom_tat = %s, "
                     "noi_dung = %s, so_phut_doc = %s, trang_thai = %s, ngay_xuat_ban_utc = %s, "
+                    "anh_bia_public_id = %s, anh_bia_url = %s, "
                     "cap_nhat_luc_utc = SYSUTCDATETIME() WHERE ma_bai_viet_blog = %s",
                     [category_id, after["slug"], after["title"], after["excerpt"], after["content"],
                      after["reading_time_minutes"], after["status"],
-                     after["published_at"].replace(tzinfo=None) if after["published_at"] else None, local_id],
+                     after["published_at"].replace(tzinfo=None) if after["published_at"] else None,
+                     after.get("cover_public_id"), after.get("cover_url"), local_id],
                 )
         else:
             if entity == "category":
@@ -259,7 +268,7 @@ def write_blog(*, entity: str, action: str, slug: str, payload: dict | None,
     slug = str(slug or "").strip().lower()
     if payload and entity == "article" and payload.get("published_at") is not None:
         payload = {**payload, "published_at": _utc(payload["published_at"])}
-    registry_site, registry_alias, sites = _site_context()
+    registry_site, registry_alias, sites, offline = _site_context()
     request_hash = hashlib.sha256(_json({"entity": entity, "action": action, "slug": slug, "payload": payload}).encode()).hexdigest()
     key_digest = hashlib.sha256(idempotency_key.encode()).hexdigest()
     event_ids = {site: f"BLOG-{entity[:3].upper()}-{site}-{key_digest[:64]}" for site in sites}
@@ -346,8 +355,8 @@ def write_blog(*, entity: str, action: str, slug: str, payload: dict | None,
 
             result = after if after is not None else {"slug": before["slug"], "deleted": True}
             return {
-                "scope": "REPLICATED-WRITE", "complete": not failed,
-                "site_codes": list(sites), "missing_sites": failed,
+                "scope": "REPLICATED-WRITE", "complete": not failed and not offline,
+                "site_codes": list(sites) + list(offline), "missing_sites": sorted(set(failed) | set(offline)),
                 "idempotent_replay": bool(replay), "result": result,
             }
     except (PublicBlogConflict, PublicBlogNotFound, PublicBlogUnavailable):

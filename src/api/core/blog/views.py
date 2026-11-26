@@ -15,9 +15,16 @@ from core.blog.serializers import (
     BlogCategoryCreateSerializer,
     BlogCategoryPatchSerializer,
     BlogWriteResponseSerializer,
+    BlogImageCompleteRequestSerializer,
+    BlogImageCompleteResponseSerializer,
+    BlogImageIntentRequestSerializer,
+    PublicBlogArticlesResponseSerializer,
     PublicBlogCategoriesResponseSerializer,
     PublicBlogDetailResponseSerializer,
 )
+from core.blog.images import complete_blog_image, create_blog_image_intent
+from core.media.avatars import AvatarInvalidIntent, AvatarInvalidUpload, AvatarUnavailable
+from core.media.serializers import AdminAvatarUploadIntentResponseSerializer
 from core.blog.services import (
     PublicBlogConflict,
     PublicBlogNotFound,
@@ -27,6 +34,7 @@ from core.blog.services import (
     get_public_blog_article,
     list_admin_blog_articles,
     list_admin_blog_categories,
+    list_public_blog_articles,
     list_public_blog_categories,
 )
 from core.blog.write_services import (
@@ -141,6 +149,24 @@ class PublicBlogCategoriesView(APIView):
     def get(self, request):
         try:
             return Response(list_public_blog_categories())
+        except PublicBlogUnavailable as exc:
+            return Response(_blog_error(exc), status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class PublicBlogArticlesView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        operation_id="public_blog_articles",
+        tags=["Blog"],
+        summary="Liệt kê bài Blog đã xuất bản",
+        description="Global Query chỉ đọc; trả bài đã xuất bản mới nhất trước, từ các site đang kết nối được.",
+        responses={200: PublicBlogArticlesResponseSerializer, 503: OpenApiResponse(description="Không site nào đọc được.")},
+    )
+    def get(self, request):
+        try:
+            return Response(list_public_blog_articles())
         except PublicBlogUnavailable as exc:
             return Response(_blog_error(exc), status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -274,3 +300,55 @@ class AdminBlogArticleDetailView(_AdminBlogView):
         except (PublicBlogConflict, PublicBlogNotFound, PublicBlogUnavailable) as exc:
             return _admin_blog_error(exc)
         return Response(result, status=status.HTTP_200_OK if result["complete"] else status.HTTP_202_ACCEPTED)
+
+
+def _image_error(exc):
+    code = status.HTTP_503_SERVICE_UNAVAILABLE if isinstance(exc, AvatarUnavailable) else status.HTTP_400_BAD_REQUEST
+    return Response({"detail": str(exc)}, status=code)
+
+
+class _BlogImageView(_AdminBlogView):
+    throttle_scope = "profile_avatar"
+
+    def _guard(self, request):
+        return _blog_roles_only(request, ("admin_big", "tu_van"))
+
+
+class AdminBlogImageIntentView(_BlogImageView):
+    @extend_schema(
+        operation_id="admin_blog_image_intent", tags=["Blog"],
+        summary="Xin chữ ký tải ảnh bìa hoặc ảnh trong bài Blog lên Cloudinary",
+        request=BlogImageIntentRequestSerializer,
+        responses={200: AdminAvatarUploadIntentResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def post(self, request):
+        denied = self._guard(request)
+        if denied:
+            return denied
+        serializer = BlogImageIntentRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            return Response(create_blog_image_intent(request.user, **serializer.validated_data))
+        except (AvatarInvalidIntent, AvatarInvalidUpload, AvatarUnavailable) as exc:
+            return _image_error(exc)
+
+
+class AdminBlogImageCompleteView(_BlogImageView):
+    @extend_schema(
+        operation_id="admin_blog_image_complete", tags=["Blog"],
+        summary="Xác minh ảnh Blog đã tải lên Cloudinary và trả URL",
+        request=BlogImageCompleteRequestSerializer,
+        responses={200: BlogImageCompleteResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def post(self, request):
+        denied = self._guard(request)
+        if denied:
+            return denied
+        serializer = BlogImageCompleteRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            return Response(complete_blog_image(request.user, **serializer.validated_data))
+        except (AvatarInvalidIntent, AvatarInvalidUpload, AvatarUnavailable) as exc:
+            return _image_error(exc)
