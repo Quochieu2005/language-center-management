@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import styles from "./WebHeader.module.scss";
 import { BRAND_INITIAL, BRAND_NAME } from "@/lib/brand";
+import type { Role } from "@/lib/api/auth";
+import { homeForRole, useSession } from "@/lib/auth/session";
 
 const links = [
   { href: "/programs", label: "Chương trình" },
@@ -13,8 +15,15 @@ const links = [
   { href: "/contact", label: "Liên hệ" },
 ];
 
+function portalLabel(role: Role): string {
+  if (role === "giao_vien") return "Cổng giáo viên";
+  if (role === "hoc_vien") return "Cổng học viên";
+  return "Trang quản trị";
+}
+
 export default function WebHeader() {
   const pathname = usePathname();
+  const { user, loading } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -48,8 +57,14 @@ export default function WebHeader() {
               {link.label}
             </Link>
           ))}
-          <Link className={styles.loginLink} href="/login" onClick={() => setMenuOpen(false)}>
-            Đăng nhập <span aria-hidden="true">↗</span>
+          {/* Signed-in users go straight to their own area; hidden (not removed) while the session loads to avoid layout shift. */}
+          <Link
+            className={styles.loginLink}
+            href={user ? homeForRole(user.role) : "/login"}
+            style={loading ? { visibility: "hidden" } : undefined}
+            onClick={() => setMenuOpen(false)}
+          >
+            {user ? portalLabel(user.role) : "Đăng nhập"} <span aria-hidden="true">↗</span>
           </Link>
         </nav>
       </div>
