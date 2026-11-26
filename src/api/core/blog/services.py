@@ -79,7 +79,7 @@ def _read_site_article(site_code: str, slug: str) -> dict | None:
             """
             SELECT post.slug, post.tieu_de, post.tom_tat, post.noi_dung,
                    post.so_phut_doc, post.ngay_xuat_ban_utc,
-                   category.slug, category.ten_danh_muc
+                   category.slug, category.ten_danh_muc, post.anh_bia_url
             FROM dbo.BaiVietBlog AS post
             INNER JOIN dbo.DanhMucBlog AS category
               ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
@@ -104,6 +104,7 @@ def _read_site_article(site_code: str, slug: str) -> dict | None:
         "reading_time_minutes": int(row[4]),
         "published_at": published_at,
         "category": {"slug": str(row[6]), "name": str(row[7])},
+        "cover_url": None if row[8] is None else str(row[8]),
     }
 
 
@@ -139,7 +140,7 @@ def _read_site_admin_articles(site_code: str) -> tuple[dict, ...]:
         cursor.execute(
             """
             SELECT post.slug, category.slug, post.tieu_de, post.tom_tat,
-                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc
+                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc, post.anh_bia_url
             FROM dbo.BaiVietBlog AS post
             INNER JOIN dbo.DanhMucBlog AS category
               ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
@@ -161,6 +162,7 @@ def _read_site_admin_articles(site_code: str) -> tuple[dict, ...]:
                 "reading_time_minutes": int(row[4]),
                 "status": str(row[5]),
                 "published_at": published_at,
+                "cover_url": None if row[7] is None else str(row[7]),
             }
         )
     return tuple(articles)
@@ -196,6 +198,53 @@ def _canonical_site(snapshots: dict) -> str:
     return registry_site if registry_site in snapshots else sorted(snapshots)[0]
 
 
+def _read_site_published_articles(site_code: str) -> tuple[dict, ...]:
+    alias = get_site_database_alias(site_code)
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT post.slug, post.tieu_de, post.tom_tat, post.so_phut_doc, post.ngay_xuat_ban_utc,
+                   category.slug, category.ten_danh_muc, post.anh_bia_url
+            FROM dbo.BaiVietBlog AS post
+            INNER JOIN dbo.DanhMucBlog AS category ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
+            WHERE post.trang_thai = 'da_xuat_ban'
+              AND (post.ngay_xuat_ban_utc IS NULL OR post.ngay_xuat_ban_utc <= SYSUTCDATETIME())
+              AND category.trang_thai = 'hoat_dong'
+            ORDER BY COALESCE(post.ngay_xuat_ban_utc, '0001-01-01') DESC, post.slug
+            """
+        )
+        rows = cursor.fetchall()
+    articles = []
+    for row in rows:
+        published_at = row[4]
+        if published_at is not None and published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=datetime_timezone.utc)
+        articles.append({
+            "slug": str(row[0]), "title": str(row[1]), "excerpt": str(row[2]),
+            "reading_time_minutes": int(row[3]), "published_at": published_at,
+            "category": {"slug": str(row[5]), "name": str(row[6])},
+            "cover_url": None if row[7] is None else str(row[7]),
+        })
+    return tuple(articles)
+
+
+def list_public_blog_articles() -> dict:
+    """Published articles from the reachable sites; the canonical copy wins, drift is reported."""
+    site_codes, initial_missing = _site_state()
+    snapshots, missing_sites = _read_snapshots(site_codes, _read_site_published_articles, initial_missing)
+    if not snapshots:
+        raise PublicBlogUnavailable(
+            "Không đọc được bài Blog ở site nào.", site_codes=site_codes, missing_sites=missing_sites or site_codes,
+        )
+    canonical = snapshots[_canonical_site(snapshots)]
+    inconsistent_sites = tuple(sorted(site for site, rows in snapshots.items() if rows != canonical))
+    return {
+        "scope": "GLOBAL", "complete": not missing_sites and not inconsistent_sites,
+        "site_codes": list(site_codes), "missing_sites": list(missing_sites),
+        "inconsistent_sites": list(inconsistent_sites), "count": len(canonical), "results": list(canonical),
+    }
+
+
 def list_public_blog_categories() -> dict:
     site_codes, initial_missing = _site_state()
     snapshots, missing_sites = _read_snapshots(site_codes, _read_site_categories, initial_missing)
@@ -227,22 +276,16 @@ def get_public_blog_article(slug: str) -> dict:
     if not normalized_slug or len(normalized_slug) > 160:
         raise PublicBlogNotFound("Không tìm thấy bài Blog đã xuất bản với slug này.")
 
-    site_codes, initial_missing = _site_state()
-    if initial_missing:
-        raise PublicBlogUnavailable(
-            "Thiếu site hoạt động; không thể xác nhận chi tiết Blog toàn cục.",
-            site_codes=site_codes,
-            missing_sites=initial_missing,
-        )
+    all_sites, initial_missing = _site_state()
     snapshots, missing_sites = _read_snapshots(
-        site_codes, lambda site: _read_site_article(site, normalized_slug)
+        all_sites, lambda site: _read_site_article(site, normalized_slug), initial_missing
     )
-    if missing_sites or len(snapshots) != len(site_codes):
+    if not snapshots:
         raise PublicBlogUnavailable(
-            "Không đọc đủ các site hoạt động để xác nhận slug Blog.",
-            site_codes=site_codes,
-            missing_sites=missing_sites or tuple(sorted(set(site_codes) - set(snapshots))),
+            "Không site hoạt động nào đọc được Blog.", site_codes=all_sites, missing_sites=missing_sites or all_sites,
         )
+    # Sites are independent: a public reader is served by the reachable ones.
+    site_codes = tuple(sorted(snapshots))
 
     found = {site: article for site, article in snapshots.items() if article is not None}
     if not found:
@@ -302,14 +345,13 @@ def _get_admin_blog_record(reader, slug: str, label: str) -> dict:
     normalized_slug = str(slug or "").strip().lower()
     if not normalized_slug:
         raise PublicBlogNotFound(f"Không tìm thấy {label}.")
-    site_codes, initial_missing = _site_state()
-    snapshots, missing_sites = _read_snapshots(site_codes, lambda site: reader(site, normalized_slug), initial_missing)
-    if missing_sites or len(snapshots) != len(site_codes):
+    all_sites, initial_missing = _site_state()
+    snapshots, missing_sites = _read_snapshots(all_sites, lambda site: reader(site, normalized_slug), initial_missing)
+    if not snapshots:
         raise PublicBlogUnavailable(
-            f"Không đọc đủ site để xác nhận {label}.",
-            site_codes=site_codes,
-            missing_sites=missing_sites or tuple(sorted(set(site_codes) - set(snapshots))),
+            f"Không site nào đọc được {label}.", site_codes=all_sites, missing_sites=missing_sites or all_sites,
         )
+    site_codes = tuple(sorted(snapshots))
     found = {site: value for site, value in snapshots.items() if value is not None}
     if not found:
         raise PublicBlogNotFound(f"Không tìm thấy {label}.", site_codes=site_codes)
@@ -322,7 +364,7 @@ def _get_admin_blog_record(reader, slug: str, label: str) -> dict:
             site_codes=site_codes,
             inconsistent_sites=inconsistent,
         )
-    return {"scope": "GLOBAL", "complete": True, "site_codes": list(site_codes), "result": canonical}
+    return {"scope": "GLOBAL", "complete": not missing_sites, "site_codes": list(site_codes), "missing_sites": list(missing_sites), "result": canonical}
 
 
 def _read_site_admin_category(site_code: str, slug: str) -> dict | None:
@@ -335,7 +377,8 @@ def _read_site_admin_article(site_code: str, slug: str) -> dict | None:
         cursor.execute(
             """
             SELECT post.slug, category.slug, post.tieu_de, post.tom_tat, post.noi_dung,
-                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc
+                   post.so_phut_doc, post.trang_thai, post.ngay_xuat_ban_utc,
+                   post.anh_bia_public_id, post.anh_bia_url
             FROM dbo.BaiVietBlog AS post
             INNER JOIN dbo.DanhMucBlog AS category
               ON category.ma_danh_muc_blog = post.ma_danh_muc_blog
@@ -353,6 +396,8 @@ def _read_site_admin_article(site_code: str, slug: str) -> dict | None:
         "slug": str(row[0]), "category_slug": str(row[1]), "title": str(row[2]),
         "excerpt": str(row[3]), "content": str(row[4]), "reading_time_minutes": int(row[5]),
         "status": str(row[6]), "published_at": published_at,
+        "cover_public_id": None if row[8] is None else str(row[8]),
+        "cover_url": None if row[9] is None else str(row[9]),
     }
 
 

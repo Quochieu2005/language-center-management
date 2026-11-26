@@ -6,6 +6,7 @@ import type { ColumnsType } from "antd/es/table";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session";
 import BlogContentEditor from "./BlogContentEditor";
+import BlogCoverField, { type BlogCover } from "./BlogCoverField";
 import styles from "./BlogPage.module.scss";
 import {
   blogApi, type BlogArticleInput, type BlogArticleSummary,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/api/blog";
 
 type CategoryForm = BlogCategoryInput;
-type ArticleForm = Omit<BlogArticleInput, "published_at"> & { published_at?: string };
+type ArticleForm = Omit<BlogArticleInput, "published_at" | "cover_public_id" | "cover_url"> & { published_at?: string; cover?: BlogCover };
 type Editor = { kind: "category" | "article"; slug?: string } | null;
 type WriteOperation =
   | { kind: "category-create"; key: string; body: CategoryForm }
@@ -95,6 +96,7 @@ export default function BlogPage() {
   const [pending, setPending] = useState<PendingWrite | null>(null);
   const [categoryForm] = Form.useForm<CategoryForm>();
   const [articleForm] = Form.useForm<ArticleForm>();
+  const articleSlugValue = Form.useWatch("slug", articleForm)?.trim() || undefined;
   const articleSlugManuallyEdited = useRef(false);
 
   const load = useCallback(async () => {
@@ -174,8 +176,9 @@ export default function BlogPage() {
     }
   };
 
-  const dataComplete = Boolean(categoryList?.complete && articleList?.complete && !loading);
-  const canWrite = dataComplete && !pending && !saving;
+    const dataComplete = Boolean(categoryList?.complete && articleList?.complete && !loading);
+  const noConflict = Boolean(categoryList && articleList && !categoryList.inconsistent_sites.length && !articleList.inconsistent_sites.length && !loading);
+  const canWrite = noConflict && !pending && !saving;
   const activeCategories = categoryList?.results.filter((item) => item.status === "hoat_dong") ?? [];
 
   const openCategory = (row?: BlogCategory) => {
@@ -196,7 +199,10 @@ export default function BlogPage() {
     setLoadingArticle(row.slug);
     try {
       const { result } = await blogApi.article(row.slug);
-      articleForm.setFieldsValue({ ...result, published_at: toLocalDate(result.published_at) });
+      articleForm.setFieldsValue({
+        ...result, published_at: toLocalDate(result.published_at),
+        cover: result.cover_public_id && result.cover_url ? { public_id: result.cover_public_id, url: result.cover_url } : null,
+      });
       articleSlugManuallyEdited.current = result.slug !== articleSlug(result.title);
       setEditor({ kind: "article", slug: row.slug });
     } catch (reason) {
@@ -222,6 +228,7 @@ export default function BlogPage() {
       excerpt: values.excerpt.trim(), content: values.content.trim(),
       reading_time_minutes: values.reading_time_minutes, status: values.status,
       published_at: toUtcDateTime(values.published_at),
+      cover_public_id: values.cover?.public_id ?? null, cover_url: values.cover?.url ?? null,
     };
     const key = crypto.randomUUID();
     void runWrite(editor?.slug
@@ -263,8 +270,8 @@ export default function BlogPage() {
 
   return <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
     {error && <Alert type="error" showIcon title={error} />}
-    {categoryList && !categoryList.complete && <Alert type="warning" showIcon title="Danh mục Blog chưa được đối chiếu đủ các cơ sở. Thao tác ghi đang bị khóa." description={`Site thiếu: ${categoryList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${categoryList.inconsistent_sites.join(", ") || "không có"}.`} />}
-    {articleList && !articleList.complete && <Alert type="warning" showIcon title="Bài viết Blog chưa được đối chiếu đủ các cơ sở. Thao tác ghi đang bị khóa." description={`Site thiếu: ${articleList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${articleList.inconsistent_sites.join(", ") || "không có"}.`} />}
+    {categoryList && !categoryList.complete && <Alert type="warning" showIcon title="Danh mục Blog chưa đối chiếu đủ các cơ sở. Vẫn ghi được vào các cơ sở đang hoạt động, cơ sở thiếu sẽ đồng bộ khi thử lại." description={`Site thiếu: ${categoryList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${categoryList.inconsistent_sites.join(", ") || "không có"}.`} />}
+    {articleList && !articleList.complete && <Alert type="warning" showIcon title="Bài viết Blog chưa đối chiếu đủ các cơ sở. Vẫn ghi được vào các cơ sở đang hoạt động, cơ sở thiếu sẽ đồng bộ khi thử lại." description={`Site thiếu: ${articleList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${articleList.inconsistent_sites.join(", ") || "không có"}.`} />}
     {pending && <Alert type="warning" showIcon title="Yêu cầu Blog chưa đồng bộ hoàn tất" description={<Space orientation="vertical"><span>Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định; API chưa xác nhận kết quả"}. Giữ nguyên mã yêu cầu và nội dung khi thử lại.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
     <Card title={`${isAdminBig ? "Quản lý Blog" : "Bài viết Blog"}${categoryList && articleList ? ` · ${categoryList.count} danh mục · ${articleList.count} bài viết` : ""}`} extra={<Space><Button disabled={loading || saving} onClick={() => void load()}>Tải lại</Button>{canWriteArticles && <Button type="primary" disabled={!canWrite || !activeCategories.length} onClick={() => openArticle()}>Tạo bài viết</Button>}{isAdminBig && <Button type="primary" disabled={!canWrite} onClick={() => openCategory()}>Tạo danh mục</Button>}</Space>}>
       {categoryList && articleList && <div style={{ marginBottom: 12 }}><Tag color={dataComplete ? "green" : "orange"}>{dataComplete ? "Đã đối chiếu đầy đủ" : "Chưa đồng bộ đủ"}</Tag><span>Các site: {categoryList.site_codes.join(", ") || "Chưa có dữ liệu"}</span></div>}
@@ -302,8 +309,9 @@ export default function BlogPage() {
           <Form.Item name="status" label="Trạng thái" rules={[{ required: true }]}><Select options={[{ value: "nhap", label: "Bản nháp" }, { value: "da_xuat_ban", label: "Đã xuất bản" }, { value: "an", label: "Đã ẩn" }]} /></Form.Item>
           <Form.Item name="published_at" label="Ngày xuất bản" extra="Mặc định là ngày tạo; để trống nếu xuất bản ngay khi bật trạng thái."><Input type="date" /></Form.Item>
         </div>
+        <Form.Item name="cover" label="Ảnh bìa" extra="Hiện ở thẻ bài viết trên trang chủ, trang Blog và đầu bài chi tiết. JPG/PNG/WebP, tối đa 5 MB."><BlogCoverField slug={articleSlugValue} /></Form.Item>
         <Form.Item name="excerpt" label="Tóm tắt" rules={[{ required: true }, { max: 500 }]}><Input.TextArea rows={2} maxLength={500} /></Form.Item>
-        <Form.Item name="content" label="Nội dung chi tiết" rules={[{ required: true }, { max: 20000 }]}><BlogContentEditor /></Form.Item>
+        <Form.Item name="content" label="Nội dung chi tiết" rules={[{ required: true }, { max: 20000 }]}><BlogContentEditor slug={articleSlugValue} /></Form.Item>
         <Button type="primary" htmlType="submit" block loading={saving}>{editor?.slug ? "Lưu và đồng bộ" : "Tạo và đồng bộ"}</Button>
       </Form>
     </Modal>

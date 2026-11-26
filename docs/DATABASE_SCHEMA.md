@@ -317,6 +317,7 @@ Hai bảng có bản sao tại từng database site. Migration `36_add_blog_tabl
 | `BaiVietBlog.noi_dung` | `NVARCHAR(MAX)` | Lưu nguồn Markdown giới hạn dạng văn bản thường; hỗ trợ đoạn văn, tiêu đề `##`/`###`, danh sách đánh số và bảng. HTML thô không được render hoặc thực thi; không cần đổi schema |
 | `BaiVietBlog.so_phut_doc` | `SMALLINT`, 1–240 | Thời lượng đọc ước tính |
 | `BaiVietBlog.trang_thai` | `nhap` / `da_xuat_ban` / `an` | API chỉ đọc bài đã xuất bản và tới thời điểm xuất bản |
+| `BaiVietBlog.anh_bia_public_id`, `anh_bia_url` | `NVARCHAR(255)` / `NVARCHAR(1024)`, nullable, cùng null hoặc cùng có | Ảnh bìa Cloudinary, thư mục `<root>/blog/bia/<slug>-dd-mm-yyyy`; ảnh chèn trong bài nằm ở `<root>/blog/noi-dung/<slug>-HHMMSS-dd-mm-yyyy` và chỉ được tham chiếu bằng Markdown `![mô tả](https://res.cloudinary.com/...)` trong `noi_dung` |
 | `BaiVietBlog.ngay_xuat_ban_utc` | `DATETIME2(0)`, nullable | `NULL` nghĩa là bài đã xuất bản ngay; thời điểm tương lai được ẩn đến hạn |
 
 ### 6.2. Tài khoản và phương thức đăng nhập (nhân bản, dùng chung các vai trò)

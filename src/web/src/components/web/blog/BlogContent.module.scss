@@ -16,7 +16,7 @@
   white-space: pre-wrap;
 }
 
-.heading {
+.heading { scroll-margin-top: 90px;
   margin: 34px 0 14px;
   color: #20322b;
   font-family: var(--font-display);
@@ -75,3 +75,7 @@ h3.heading { font-size: 21px; }
   .table th,
   .table td { padding: 10px; }
 }
+
+.figure { margin: 26px 0; }
+.figure img { display: block; width: 100%; height: auto; border-radius: 4px; }
+.figure figcaption { margin-top: 10px; color: #718078; font-size: 13px; line-height: 1.6; text-align: center; }

@@ -65,6 +65,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `43_enforce_contact_site_boundary.sql` | Sau migration 39: kiểm tra dữ liệu rồi thêm CHECK site cho liên hệ; dừng khi có dòng sai, không tự chuyển/xóa. Chạy lại an toàn. |
 | `44_revalidate_course_subject_fk.sql` | Kiểm tra khóa học thiếu môn cha và xác nhận lại FK. Với FK NOT FOR REPLICATION, chỉ dựng lại ánh xạ ma_mon không cascade như schema; không sửa dữ liệu hoặc Publication. |
 | `45_account_replication_queue.sql` | Tạo outbox đồng bộ tài khoản tại authority `AUTH_SESSION_SITE_CODE`; chỉ chạy một lần trên DB authority theo hướng dẫn Auth-Site-Isolation. |
+| `47_add_blog_cover_image.sql` | Thêm `anh_bia_public_id`, `anh_bia_url` vào `BaiVietBlog`. **Chạy trên mọi site (Q1, Q7, TD)**: Blog là dữ liệu nhân bản, site thiếu cột bị API Blog coi là thiếu site. |
 | `46_move_course_queue_to_logs.sql` | Chuyển các yêu cầu còn lưu trong bảng outbox tạm sang `Logs` append-only rồi xóa bảng tạm; chỉ chạy tại DB `AUTH_SESSION_SITE_CODE`. Không tạo bảng mới; nếu bảng tạm không tồn tại thì không làm gì. |
 
 ## Chạy bằng SSMS

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { ApiError } from "@/lib/api/client";
-import { blogApi } from "@/lib/api/blog";
+import { blogApi, type PublicBlogArticleSummary } from "@/lib/api/blog";
 import { ArticlePage } from "@/components/web/catalog/PublicInfoPage";
 import { articles } from "@/lib/content/articles";
 
@@ -29,5 +29,11 @@ export default async function Page({ params }: Props) {
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
   }
-  return <ArticlePage article={article} />;
+  let latest: PublicBlogArticleSummary[] = [];
+  try {
+    latest = (await blogApi.publicArticles()).results.filter((item) => item.slug !== slug).slice(0, 4);
+  } catch {
+    // shortcut: the sidebar is optional; the article itself is what matters.
+  }
+  return <ArticlePage article={article} latest={latest} />;
 }
