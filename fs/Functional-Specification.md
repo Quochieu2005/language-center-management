@@ -482,19 +482,19 @@ Mã phiếu thu tối đa 24 ký tự nên key dài 8 đến `24 - len(site) - 4
 
 ### FS-PAY-01 — Thanh toán trực tuyến học phí
 
-**Trạng thái phạm vi:** Có code/schema/API cho SePay, nhưng portal học viên và thanh toán online chưa được nhóm duyệt vào phạm vi đồ án; `SEPAY_ENABLED=false` mặc định và chưa có bằng chứng giao dịch thật. **Kiểu:** `LOCAL` tại site chứa `HocPhi`; không phải giao dịch xuyên site.
+**Trạng thái phạm vi:** chủ dự án duyệt ngày 26/11/2026 dùng **Cổng thanh toán SePay** (merchant ID + secret key) cho học viên tự đóng học phí; bật bằng `SEPAY_ENABLED=true`. Chưa có bằng chứng giao dịch thật. **Kiểu:** `LOCAL` tại site chứa `HocPhi`; SePay là dịch vụ ngoài, không phải giao dịch xuyên site. **Bảng:** HocPhi, DotHocPhi, YeuCauThanhToan, SuKienThanhToan, PhieuThu, Logs.
 
-Khi nhóm duyệt phạm vi và bật tích hợp, luồng phải đáp ứng:
+1. Học viên chọn **Kỳ tiếp theo** (số còn nợ của kỳ chưa đóng sớm nhất), **Một nửa** (một nửa số còn nợ, làm tròn lên đồng) hoặc **Toàn bộ**. API tự tính số tiền từ HocPhi/DotHocPhi; client chỉ gửi lựa chọn.
+2. Trước khi chuyển sang SePay, API đối soát các yêu cầu cũ của khoản đó với SePay (`order/detail`), rồi lưu `YeuCauThanhToan` (`cho_thanh_toan`, hạn `SEPAY_PAYMENT_TTL_SECONDS`) cùng Idempotency-Key và trả form checkout đã ký (HMAC-SHA256, base64). Một khoản chỉ có tối đa một yêu cầu còn hạn; yêu cầu `can_doi_soat` chặn tạo mới.
+3. Trình duyệt gửi form tới trang thanh toán của SePay (thẻ/chuyển khoản); dữ liệu thẻ không đi qua hệ thống. URL quay về do server tạo từ `WEB_APP_BASE_URL/student?payment=<mã>`; redirect không chứng minh đã trả tiền.
+4. Xác nhận bằng IPN (`POST /api/v1/webhooks/sepay/`, header `X-Secret-Key`) hoặc khi học viên xem trạng thái, API gọi `GET order/detail/{mã}` của SePay. Cả hai dùng cùng khóa sự kiện theo mã hóa đơn nên chỉ ghi một lần.
+5. Khi SePay báo `CAPTURED`/`ORDER_PAID` đúng mã, đúng VND và đúng số tiền: trong transaction site tạo một PhieuThu, tăng `HocPhi.so_tien_da_dong`, trừ dần vào các kỳ sớm nhất, chuyển yêu cầu `da_thanh_toan`, ghi SuKienThanhToan và audit, rồi gửi biên nhận email.
+6. Sai số tiền, vượt số dư (đã thu ở quầy hoặc yêu cầu khác) hoặc đơn không khớp chuyển `can_doi_soat`, không tạo phiếu; cơ sở đối soát/hoàn thủ công. Thanh toán đến sau khi yêu cầu `het_han` vẫn được ghi nếu còn số dư.
+7. SePay không phản hồi khi đối soát yêu cầu cũ: chặn tạo yêu cầu mới (503) để tránh thu hai lần. Hoàn online là bút toán hoàn tại quầy tham chiếu phiếu gốc. Không lưu PAN/CVV, secret hay payload thô.
 
-1. API lấy site, số tiền, loại tiền, chủ khoản nợ từ HocPhi; frontend không được quyết định giá trị này.
-2. Tạo YeuCauThanhToan bền vững cùng idempotency key trước khi chuyển người dùng đến cổng. Một HocPhi chỉ có tối đa một yêu cầu còn mở theo trạng thái được chốt.
-3. Reload, quay lại website hoặc đăng nhập lại chỉ đọc trạng thái đã lưu; không tự tạo lượt thanh toán mới. URL redirect/query string không chứng minh đã trả tiền.
-4. Webhook phải xác minh chữ ký, merchant, amount/currency, timestamp/replay và mã giao dịch provider; callback lặp phải idempotent.
-5. Chỉ sau khi callback hợp lệ và transaction site đã commit PhieuThu, HocPhi và sự kiện thanh toán mới trả trạng thái thành công.
-6. Timeout hoặc DB lỗi khi kết quả cổng chưa rõ chuyển sang can_doi_soat; chặn tạo lượt mới cho đến khi đối soát/retry có kết quả rõ.
-7. Hoàn online là bút toán bù trừ tham chiếu giao dịch gốc. Không lưu PAN/CVV, secret, token provider hoặc payload thô.
+**Nghiệm thu:** thử giao dịch nhỏ trên production hoặc bộ khóa sandbox; IPN đúng/sai `X-Secret-Key`, IPN lặp, quay về trước khi IPN tới, thoát giữa chừng, hết hạn rồi tạo lại, lỗi database, số dư đã thu ở quầy; tổng các kỳ khớp HocPhi sau mỗi lần thu.
 
-**Điều kiện nghiệm thu trước khi bật:** cấu hình merchant/webhook và HTTPS; đối chiếu schema hiện có `YeuCauThanhToan`/`SuKienThanhToan`; kiểm thử webhook đúng/sai chữ ký, phát lại, reload, thoát giữa chừng, timeout, lỗi database và refund. Không coi schema hoặc code là bằng chứng giao dịch đã chạy.
+**Thu tại quầy theo kỳ (FS-TUI-01):** Kế toán & Lễ tân có nút chọn nhanh Kỳ tiếp theo/Một nửa/Toàn bộ và thấy các kỳ còn nợ; vẫn có thể nhập số bất kỳ không vượt số dư, tiền được trừ dần vào kỳ sớm nhất.
 
 ### FS-GRADE-01 — Nhập, sửa và xem điểm
 
