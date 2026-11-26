@@ -513,6 +513,20 @@
   }
 }
 
+/* Follows the hovered column: `left`/`top` come from the chart, `translate` centers it above the point
+   (separate from `transform`, which the fade animation uses). */
+.chartTooltipAnchored {
+  right: auto;
+  min-width: 150px;
+  max-width: 224px;
+  translate: -50% calc(-100% - 12px);
+}
+
+/* Not enough room above a tall column: show it below the column top instead. */
+.chartTooltipBelow {
+  translate: -50% 14px;
+}
+
 /* Donut Chart */
 .donutLayout {
   display: flex;
