@@ -15,10 +15,8 @@ import {
   Typography,
   message,
   Empty,
-  Popconfirm,
 } from "antd";
 import {
-  CheckCircleOutlined,
   SaveOutlined,
   ReloadOutlined,
   ExclamationCircleOutlined,
@@ -26,7 +24,6 @@ import {
   CalendarOutlined,
 } from "@ant-design/icons";
 import { academicsApi, type ApiRow, type SessionRow } from "@/lib/api/academics";
-import styles from "./TeacherPortal.module.scss";
 import portal from "@/components/web/shared/Portal.module.scss";
 
 type TeacherAttendanceTabProps = {

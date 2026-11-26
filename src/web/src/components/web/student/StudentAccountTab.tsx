@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, Card, Form, Input, Button, Typography, Space, message, Divider } from "antd";
+import { Avatar, Card, Form, Input, Button, Typography, Space, message } from "antd";
 import { UserOutlined, PhoneOutlined, HomeOutlined, LockOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import type { ApiRow } from "@/lib/api/academics";
