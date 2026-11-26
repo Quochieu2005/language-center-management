@@ -9,7 +9,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from core.auth.authentication import AuthenticationUnavailable
-from core.auth.registration import RegistrationConflict, register_student
+from core.auth.registration import RegistrationConflict, register_student, register_user
 from core.auth.serializers import AuthRegisterSerializer, AuthRegisterResponseSerializer, RegistrationSitesSerializer
 from core.auth.service_common import AuthInfrastructureUnavailable, auth_session_alias
 from core.students.services import StudentConflict, StudentInfrastructureUnavailable
@@ -44,8 +44,13 @@ class AuthRegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             data = dict(serializer.validated_data)
-            data.setdefault("site_code", settings.AUTH_SESSION_SITE_CODE)
-            result = register_student(**data, remote_ip=request.META.get("REMOTE_ADDR", "unknown"))
+            remote_ip = request.META.get("REMOTE_ADDR", "unknown")
+            if settings.SELF_REGISTRATION_ACCOUNT_ONLY:
+                data.pop("site_code", None)
+                result = register_user(**data, remote_ip=remote_ip)
+            else:
+                data.setdefault("site_code", settings.AUTH_SESSION_SITE_CODE)
+                result = register_student(**data, remote_ip=remote_ip)
         except (RegistrationConflict, StudentConflict):
             return Response({"detail": "Không thể tạo tài khoản bằng thông tin này. Hãy đăng nhập hoặc liên hệ trung tâm."}, status=409)
         except ValueError:

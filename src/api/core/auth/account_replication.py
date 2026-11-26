@@ -59,6 +59,10 @@ ACCOUNT_COLUMNS = (
     "ngay_doi_mat_khau_cuoi", "avatar_public_id", "avatar_secure_url",
     "google_subject", "facebook_subject",
 )
+# Basic profile of a `nguoi_dung` account (migration 48). Replicated only for that role, so sites that have not
+# run migration 48 keep receiving every other account unchanged.
+PROFILE_COLUMNS = ("ho_ten", "sdt", "ngay_sinh", "gioi_tinh", "dia_chi")
+PROFILE_ROLE = "nguoi_dung"
 
 
 def deliver_account(account_id, target):
@@ -72,8 +76,11 @@ def deliver_account(account_id, target):
     with transaction.atomic(using=authority):
         with connections[authority].cursor() as cursor:
             _acquire_named_lock(cursor, f"qlttnn-account-sync:{account_id}")
+            cursor.execute("SELECT vai_tro FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s", [account_id])
+            role = cursor.fetchone()
+            columns = ACCOUNT_COLUMNS + PROFILE_COLUMNS if role and str(role[0]) == PROFILE_ROLE else ACCOUNT_COLUMNS
             cursor.execute(
-                f"SELECT {','.join(ACCOUNT_COLUMNS)} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
+                f"SELECT {','.join(columns)} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
                 "WHERE ma_tai_khoan = %s", [account_id],
             )
             account = cursor.fetchone()
@@ -94,7 +101,7 @@ def deliver_account(account_id, target):
                 with transaction.atomic(using=alias):
                     with connections[alias].cursor() as replica:
                         replica.execute(
-                            f"SELECT {','.join(ACCOUNT_COLUMNS)} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
+                            f"SELECT {','.join(columns)} FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
                             "WHERE ma_tai_khoan = %s", [account_id],
                         )
                         existing = replica.fetchone()
@@ -110,13 +117,13 @@ def deliver_account(account_id, target):
                             replica.execute("DELETE FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s", [account_id])
                         elif exists and tuple(existing) != tuple(account):
                             replica.execute(
-                                "UPDATE dbo.TaiKhoan SET " + ",".join(f"{c} = %s" for c in ACCOUNT_COLUMNS[1:])
+                                "UPDATE dbo.TaiKhoan SET " + ",".join(f"{c} = %s" for c in columns[1:])
                                 + " WHERE ma_tai_khoan = %s", [*account[1:], account_id],
                             )
                         elif not exists:
                             replica.execute(
-                                f"INSERT dbo.TaiKhoan ({','.join(ACCOUNT_COLUMNS)}) VALUES "
-                                f"({','.join(['%s'] * len(ACCOUNT_COLUMNS))})", list(account),
+                                f"INSERT dbo.TaiKhoan ({','.join(columns)}) VALUES "
+                                f"({','.join(['%s'] * len(columns))})", list(account),
                             )
             cursor.execute(
                 "DELETE FROM dbo.DongBoTaiKhoan WHERE ma_tai_khoan = %s AND site_dich = %s "

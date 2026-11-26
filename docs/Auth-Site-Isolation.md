@@ -6,6 +6,8 @@ Chốt ngày 21/11/2026 theo yêu cầu chủ dự án: cho tự đăng ký tài
 
 `AUTH_SESSION_SITE_CODE` chọn bản `TaiKhoan` có thẩm quyền cùng kho phiên, khóa đăng nhập và hàng đợi; môi trường hiện dùng **Q1 trên máy chạy API**, thay cho Q7. Chỉ đọc bản có thẩm quyền để kiểm tra mật khẩu, khóa tài khoản và phiên bản; không dùng mật khẩu từ bản sao cũ khi mất kết nối. Dữ liệu lớp, học viên, học phí, điểm và chứng từ vẫn phân mảnh theo site, không gom về Q1.
 
+**Đăng ký chỉ tạo tài khoản (bước 2, `SELF_REGISTRATION_ACCOUNT_ONLY`, mặc định tắt):** tạo `TaiKhoan` vai trò `nguoi_dung`, `ma_co_so` rỗng, không tạo `HocVien`. Email được giữ chỗ trong `DatChoEmailHocVien` dưới site authority và `ma_hoc_vien` rỗng. Trigger/worker vẫn nhân bản tài khoản tới mọi site hoạt động; 5 cột hồ sơ cơ bản chỉ được sao chép cho vai trò `nguoi_dung`, nên site chưa chạy migration 48 vẫn nhận các tài khoản khác bình thường nhưng sẽ lỗi (nằm lại hàng đợi) với tài khoản `nguoi_dung`. Chỉ bật cờ sau khi mọi site đã chạy migration 48 và phần đăng nhập hỗ trợ vai trò này (bước 3). Khi tư vấn tạo hồ sơ học viên cho email đã giữ chỗ dưới authority, luồng gắn tài khoản (bước 5) phải xử lý bản giữ chỗ này.
+
 | Tình huống | Hành vi |
 |---|---|
 | Q7 không truy cập được, Q1/TD và API còn chạy | Người dùng Q1/TD đăng nhập bằng kho xác thực Q1 và hồ sơ ở cơ sở mình. Không mở kết nối Q7 để đối chiếu mật khẩu. |
