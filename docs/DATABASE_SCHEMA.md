@@ -125,7 +125,7 @@ flowchart LR
 |---|---|---|---|
 | `MonHoc` | Publisher `MONHOC_PUBLISHER_SITE_CODE` (mặc định Q1) | Mọi site hoạt động | SQL Server transactional push, bất đồng bộ; API chỉ đọc lại Subscriber để xác nhận |
 | `KhoaHoc` | `course_services.py`, sau khi ghi ý định append-only vào `Logs` tại `AUTH_SESSION_SITE_CODE` | Các site hoạt động trong ý định; bản ghi nghiệp vụ ở DB riêng từng site | Tạo/sửa ghi vào các site đang kết nối, lưu ACK idempotent trong `Logs` và trả 202 khi còn site chờ; API đối soát qua `/admin/courses/sync/`. Xóa chưa ghi site nào cho tới khi đủ site để kiểm tra lớp tham chiếu. Mỗi site có transaction riêng; không phải ACID xuyên CSDL |
-| `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; không phải cùng Publication MonHoc |
+| `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; site chưa nhận được ghi vào hàng đợi bền trong `Logs` tại authority (`BLINT-`/`BLFIN-`/`BLREV-`) và worker `sync_blog` phát lại cùng khóa idempotent; không phải cùng Publication MonHoc |
 | `TaiKhoan` | Authority và site tạo hồ sơ theo quy trình cấp tài khoản | Mọi site hoạt động | Trigger/outbox tại authority, worker chuyển snapshot hiện tại; không dùng replica cũ để xác thực |
 | `DongBoTaiKhoan`, `DatChoEmailHocVien`, `TrangThaiKhoEmail` | Authority `AUTH_SESSION_SITE_CODE` | Chỉ authority | Trạng thái kỹ thuật theo migration 45; không chứa hợp hồ sơ nghiệp vụ; xem [quy trình khởi tạo](Auth-Site-Isolation.md) |
 | `CoSo` | Metadata vận hành theo quy trình provisioning | Bản sao các site | Chưa có API CRUD/provision runtime đầy đủ; không tuyên bố thêm site tự động |

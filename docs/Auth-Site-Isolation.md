@@ -10,7 +10,8 @@ Chốt ngày 21/11/2026 theo yêu cầu chủ dự án: cho tự đăng ký tài
 
 **Danh sách bật đăng ký chỉ tạo tài khoản (bước 6):**
 1. Chạy `db/48_add_nguoi_dung_account_scope.sql` (và `db/47_add_blog_cover_image.sql` nếu dùng Blog) trên **mọi** site: Q1, Q7, TD.
-2. Bảo đảm worker `sync_accounts` đang chạy (`.un-local.ps1`) và hàng đợi `DongBoTaiKhoan` không tồn đọng.
+2. Bảo đảm worker `sync_accounts` đang chạy (`.
+un-local.ps1`) và hàng đợi `DongBoTaiKhoan` không tồn đọng.
 3. Đã chạy `manage.py seed_student_emails` (cờ `san_sang` bật), xem mục bootstrap ở trên.
 4. Đặt `SELF_REGISTRATION_ACCOUNT_ONLY=true` trong `.env` và khởi động lại API.
 5. Kiểm tra: đăng ký → vào `/account` sửa hồ sơ → đăng ký lớp ở một cơ sở → Admin cấp tài khoản → đăng nhập lại thấy cổng học viên với cùng mật khẩu.
@@ -54,7 +55,7 @@ Phản hồi cấp tài khoản trả `replication_complete` và `replication_pe
 3. Cấu hình `AUTH_SESSION_SITE_CODE=Q1` cho API và worker. Không đổi `MONHOC_PUBLISHER_SITE_CODE` theo biến này.
 4. Khi đủ site online và đã dừng ghi hồ sơ/chuyển cơ sở: chạy `.\.venv\Scripts\python.exe manage.py seed_student_emails` từ `src/api`. Lỗi đọc bất kỳ site nào không được bật `san_sang`; không sửa cờ bằng tay. Đây là bước khởi tạo **một lần**, không phải điều kiện phải bật mọi máy trong mỗi lần đăng ký.
    Khi chưa thể bật đủ site, người vận hành có thể chủ động chạy `manage.py seed_student_emails --allow-missing-sites`: site mất kết nối (trừ authority) bị bỏ qua và lệnh in danh sách site đã bỏ qua. Rủi ro: email chỉ tồn tại ở site bị bỏ qua không được giữ chỗ nên có thể bị đăng ký trùng; khi site trở lại hãy chạy lại lệnh không có tùy chọn hoặc đối soát thủ công. Mặc định lệnh vẫn đòi đủ site.
-5. Khởi động API cùng worker bằng `src/api/run-local.ps1`. Nếu chạy API bằng lệnh khác, phải chạy thêm `sync_accounts` và `sync_courses` trong các tiến trình được giám sát. Worker cần chạy để tự đồng bộ tài khoản/khóa học sau phục hồi; `--once` chỉ phục vụ kiểm tra một lượt. Môi trường production phải giám sát/khởi động lại API và worker bằng công cụ vận hành hiện có.
+5. Khởi động API cùng worker bằng `src/api/run-local.ps1` (chạy `sync_accounts`, `sync_courses` và `sync_blog`). Nếu chạy API bằng lệnh khác, phải chạy thêm `sync_accounts` và `sync_courses` trong các tiến trình được giám sát. Worker cần chạy để tự đồng bộ tài khoản/khóa học sau phục hồi; `--once` chỉ phục vụ kiểm tra một lượt. Môi trường production phải giám sát/khởi động lại API và worker bằng công cụ vận hành hiện có.
 6. Khi site khôi phục: kiểm tra SQL/ZeroTier/schema, để worker tiếp tục; đọc `DongBoTaiKhoan` theo site, `so_lan_thu` và `loi`. `AccountReplicaConflict` cần đối soát dữ liệu và nguồn có thẩm quyền trước khi xử lý; không tắt kiểm tra xung đột.
 
 ## Bằng chứng ngày 21/11/2026

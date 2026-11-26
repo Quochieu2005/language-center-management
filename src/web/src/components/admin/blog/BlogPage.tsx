@@ -9,7 +9,7 @@ import BlogContentEditor from "./BlogContentEditor";
 import BlogCoverField, { type BlogCover } from "./BlogCoverField";
 import styles from "./BlogPage.module.scss";
 import {
-  blogApi, type BlogArticleInput, type BlogArticleSummary,
+  blogApi, type BlogArticleInput, type BlogArticleSummary, type BlogSyncStatus,
   type BlogCategory, type BlogCategoryInput, type BlogList, type BlogWriteResult,
 } from "@/lib/api/blog";
 
@@ -94,6 +94,8 @@ export default function BlogPage() {
   const [error, setError] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
   const [pending, setPending] = useState<PendingWrite | null>(null);
+  const [sync, setSync] = useState<BlogSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [categoryForm] = Form.useForm<CategoryForm>();
   const [articleForm] = Form.useForm<ArticleForm>();
   const articleSlugValue = Form.useWatch("slug", articleForm)?.trim() || undefined;
@@ -115,13 +117,38 @@ export default function BlogPage() {
     }
   }, []);
 
+  const refreshSync = useCallback(async () => {
+    try { setSync(await blogApi.syncStatus()); } catch { /* the queue status is informational */ }
+  }, []);
+
+  // While writes wait for an offline site, re-check every 10 s; the server worker replays them.
+  const waiting = (sync?.pending_count ?? 0) > 0;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setInterval(() => { void refreshSync(); }, 10000);
+    return () => window.clearInterval(timer);
+  }, [waiting, refreshSync]);
+
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      setSync(await blogApi.runSync());
+      await load();
+    } catch (reason) {
+      message.warning(reason instanceof Error ? reason.message : "Chưa đồng bộ được; các cơ sở chưa sẵn sàng.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   useEffect(() => {
     const restored = readPendingWrite();
     queueMicrotask(() => {
       if (restored) setPending(restored);
       void load();
+      void refreshSync();
     });
-  }, [load]);
+  }, [load, refreshSync]);
 
   const savePending = (value: PendingWrite | null) => {
     setPending(value);
@@ -153,9 +180,11 @@ export default function BlogPage() {
         case "article-delete": result = await blogApi.deleteArticle(operation.slug, operation.key); break;
       }
       if (!result.complete) {
-        savePending({ operation, missingSites: result.missing_sites });
+        // The server queued it: sites that missed it catch up on their own when they are back.
+        savePending(null);
         finishEditor();
-        message.warning("Blog chưa đồng bộ đủ cơ sở. Dùng nút thử lại để tiếp tục đúng yêu cầu này.");
+        message.warning(`Đã lưu. ${result.missing_sites.join(", ") || "Các cơ sở còn lại"} sẽ tự đồng bộ khi hoạt động trở lại.`);
+        void refreshSync();
         void load();
         return;
       }
@@ -272,6 +301,8 @@ export default function BlogPage() {
     {error && <Alert type="error" showIcon title={error} />}
     {categoryList && !categoryList.complete && <Alert type="warning" showIcon title="Danh mục Blog chưa đối chiếu đủ các cơ sở. Vẫn ghi được vào các cơ sở đang hoạt động, cơ sở thiếu sẽ đồng bộ khi thử lại." description={`Site thiếu: ${categoryList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${categoryList.inconsistent_sites.join(", ") || "không có"}.`} />}
     {articleList && !articleList.complete && <Alert type="warning" showIcon title="Bài viết Blog chưa đối chiếu đủ các cơ sở. Vẫn ghi được vào các cơ sở đang hoạt động, cơ sở thiếu sẽ đồng bộ khi thử lại." description={`Site thiếu: ${articleList.missing_sites.join(", ") || "không có"}. Site lệch dữ liệu: ${articleList.inconsistent_sites.join(", ") || "không có"}.`} />}
+    {sync && sync.pending_count > 0 && <Alert type="info" showIcon title={`Đang chờ đồng bộ ${sync.pending_count} thao tác tới các cơ sở chưa nhận.`} description="Máy chủ tự thử lại khi cơ sở hoạt động trở lại; trong lúc đó chưa thể sửa tiếp các bản ghi đang lệch." action={<Button size="small" loading={syncing} onClick={() => void syncNow()}>Đồng bộ ngay</Button>} />}
+    {sync && sync.review_count > 0 && <Alert type="warning" showIcon title={`${sync.review_count} thao tác Blog cần đối soát thủ công.`} description="Các bản sao lệch nhau nên hàng đợi đã dừng thao tác này; hãy kiểm tra dữ liệu Blog giữa các cơ sở." />}
     {pending && <Alert type="warning" showIcon title="Yêu cầu Blog chưa đồng bộ hoàn tất" description={<Space orientation="vertical"><span>Site chưa xác nhận: {pending.missingSites.join(", ") || "chưa xác định; API chưa xác nhận kết quả"}. Giữ nguyên mã yêu cầu và nội dung khi thử lại.</span><Button size="small" loading={saving} onClick={() => void runWrite(pending.operation)}>Thử lại đúng yêu cầu</Button></Space>} />}
     <Card title={`${isAdminBig ? "Quản lý Blog" : "Bài viết Blog"}${categoryList && articleList ? ` · ${categoryList.count} danh mục · ${articleList.count} bài viết` : ""}`} extra={<Space><Button disabled={loading || saving} onClick={() => void load()}>Tải lại</Button>{canWriteArticles && <Button type="primary" disabled={!canWrite || !activeCategories.length} onClick={() => openArticle()}>Tạo bài viết</Button>}{isAdminBig && <Button type="primary" disabled={!canWrite} onClick={() => openCategory()}>Tạo danh mục</Button>}</Space>}>
       {categoryList && articleList && <div style={{ marginBottom: 12 }}><Tag color={dataComplete ? "green" : "orange"}>{dataComplete ? "Đã đối chiếu đầy đủ" : "Chưa đồng bộ đủ"}</Tag><span>Các site: {categoryList.site_codes.join(", ") || "Chưa có dữ liệu"}</span></div>}

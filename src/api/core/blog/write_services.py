@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import DatabaseError, IntegrityError, connections, transaction
 
 from core.academics.common import AcademicInfrastructureUnavailable, acquire_record_lock, active_site_state
+from core.blog import sync_queue
 from core.blog.services import PublicBlogConflict, PublicBlogNotFound, PublicBlogUnavailable
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 
@@ -217,7 +218,8 @@ def _apply_site(*, site: str, entity: str, action: str, expected, after, event_i
                      after["published_at"].replace(tzinfo=None) if after["published_at"] else None,
                      after.get("cover_public_id"), after.get("cover_url")],
                 )
-            cursor.execute("SELECT CAST(SCOPE_IDENTITY() AS BIGINT)")
+            # SCOPE_IDENTITY() is NULL here (the INSERT ran in another batch scope); slug is unique per site.
+            cursor.execute(f"SELECT {_TABLES[entity][1]} FROM dbo.{table} WHERE slug = %s", [after["slug"]])
             local_id = str(cursor.fetchone()[0])
         elif action == "sua":
             if entity == "category":
@@ -331,7 +333,11 @@ def write_blog(*, entity: str, action: str, slug: str, payload: dict | None,
                     before = copies[0]
                     after = {**before, **payload} if action == "sua" else None
 
-            _preflight(entity, action, sites, before, after)
+            # Sites that already ACKed this operation are done; checking them again would reject a replay
+            # (for example "slug already exists" on a create that this very operation made).
+            todo = tuple(site for site in sites if not events[site])
+            if todo:
+                _preflight(entity, action, todo, before, after)
             failed = []
             # shortcut: commits are site-local and retried forward; use DBMS-wide coordination only if required by the course rubric.
             for site in sites:
@@ -354,6 +360,12 @@ def write_blog(*, entity: str, action: str, slug: str, payload: dict | None,
                     failed.append(site)
 
             result = after if after is not None else {"slug": before["slug"], "deleted": True}
+            if failed or offline:
+                # Sites that missed it catch up through the worker (replay with the same key).
+                sync_queue.enqueue(
+                    registry_alias, entity=entity, action=action, slug=slug, payload=payload,
+                    idempotency_key=idempotency_key, request_hash=request_hash, actor_id=actor_id,
+                )
             return {
                 "scope": "REPLICATED-WRITE", "complete": not failed and not offline,
                 "site_codes": list(sites) + list(offline), "missing_sites": sorted(set(failed) | set(offline)),

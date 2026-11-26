@@ -226,3 +226,9 @@ class BlogWriteResponseSerializer(serializers.Serializer):
     missing_sites = serializers.ListField(child=serializers.CharField())
     idempotent_replay = serializers.BooleanField()
     result = serializers.DictField()
+
+
+class BlogSyncStatusSerializer(serializers.Serializer):
+    pending_count = serializers.IntegerField(min_value=0)
+    review_count = serializers.IntegerField(min_value=0)
+    completed = serializers.IntegerField(min_value=0, required=False)

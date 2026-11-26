@@ -44,6 +44,7 @@ export type PublicBlogArticle = {
 export type PublicBlogArticleSummary = Omit<PublicBlogArticle, "content">;
 export type BlogCategoryInput = Pick<BlogCategory, "slug" | "name" | "description" | "status">;
 export type BlogArticleInput = Omit<BlogArticle, "published_at" | "cover_url"> & { published_at: string | null; cover_url?: string | null };
+export type BlogSyncStatus = { pending_count: number; review_count: number; completed?: number };
 export type BlogImageKind = "cover" | "content";
 
 export type BlogWriteResult = {
@@ -65,6 +66,8 @@ export const blogApi = {
   imageComplete: (body: { intent_token: string; public_id: string }) => apiRequest<{ public_id: string; secure_url: string }>("/admin/blog/images/complete/", {
     method: "POST", body: jsonBody(body),
   }),
+  syncStatus: () => apiRequest<BlogSyncStatus>("/admin/blog/sync/"),
+  runSync: () => apiRequest<BlogSyncStatus>("/admin/blog/sync/", { method: "POST", body: "{}" }),
   publicArticles: () => apiRequest<BlogList<PublicBlogArticleSummary>>("/blog/articles/"),
   publicArticle: (slug: string) => apiRequest<PublicBlogDetail>(`/blog/${encodeURIComponent(slug)}/`),
   categories: () => apiRequest<BlogList<BlogCategory>>("/admin/blog/categories/"),
