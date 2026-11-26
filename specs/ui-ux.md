@@ -364,7 +364,7 @@ Header Admin hiển thị chuông thông báo nhưng chỉ tải danh sách khi 
 
 ### 3.6. Danh mục page và route cần thiết
 
-Danh mục dưới đây làm rõ page nào cần thiết kế để không gộp nhiều nghiệp vụ vào một màn hình chung. Route minh họa là quy ước UI, không phải API endpoint. Các page nghiệp vụ nội bộ dùng chung shell và chỉ hiện theo quyền API. Source đã có `/student`, API portal và route SePay; phần này vẫn chưa được nhóm duyệt vào phạm vi môn học. Không xem code có sẵn là quyết định phạm vi hoặc bằng chứng vận hành.
+Danh mục dưới đây làm rõ page nào cần thiết kế để không gộp nhiều nghiệp vụ vào một màn hình chung. Route minh họa là quy ước UI, không phải API endpoint. Các page nghiệp vụ nội bộ dùng chung shell và chỉ hiện theo quyền API. Source có `/student` (portal cơ bản, duyệt 21/11/2026) và thanh toán qua Cổng thanh toán SePay (duyệt 26/11/2026); code có sẵn không phải bằng chứng đã chạy giao dịch thật.
 
 #### Route Next.js đang có trong source
 
@@ -472,7 +472,7 @@ Các page dưới đây nằm trong workspace cơ sở. Admin Small chỉ thấy
 
 #### Học viên — portal có trong source, phạm vi môn học chờ duyệt
 
-Source hiện có route `/student` và API đọc hồ sơ, đăng ký, lịch, học phí, điểm; API cũng có route SePay nhưng tích hợp mặc định tắt. Các dòng `/portal/student/...` dưới đây là tên trang thiết kế, không phải route Next.js đã có. Chỉ tính portal/thanh toán online vào phạm vi đồ án sau khi nhóm chốt và cập nhật README, FS, schema, API và UI; đến lúc đó không mở rộng các màn hình hoặc ghi nhận tích hợp thanh toán thật.
+Source hiện có route `/student` và API đọc hồ sơ, đăng ký, lịch, học phí, điểm; Tab Học phí cho chọn kỳ tiếp theo/một nửa/toàn bộ, chuyển sang trang checkout SePay bằng form ký từ API và xác nhận kết quả qua API khi quay về (`/student?payment=<mã>`). Các dòng `/portal/student/...` dưới đây là tên trang thiết kế, không phải route Next.js đã có. Không ghi nhận đã thanh toán thật khi chưa có giao dịch và IPN thật.
 
 | Route minh họa | Page | Nội dung khi được duyệt |
 |---|---|---|

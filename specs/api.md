@@ -441,7 +441,7 @@ Các đường dẫn thực tế được khai báo trong `src/api/core/urls.py`
 | `POST /api/v1/admin/students/{slug}/avatar/complete/?site_code=...` | Admin Big chọn site; Admin Small/Tư vấn đúng site | `LOCAL` đọc/ghi `HocVien` và `Logs`; API xác minh asset Cloudinary rồi cập nhật metadata ảnh trong transaction site-local; lỗi lưu sau upload chưa được báo thành công và có thể retry cùng token/public ID |
 | `POST /api/v1/admin/students/{slug}/account/` | Admin chủ động cấp tài khoản sau khi tạo hồ sơ | Trong phạm vi riêng; hồ sơ phải `dang_hoc` và email hợp lệ, không yêu cầu có `DangKy`; `REPLICATED-WRITE` cho `TaiKhoan` và liên kết cục bộ |
 | `/api/v1/students/profile/{slug}/` và các route con `/enrollments/`, `/schedule/`, `/tuition/`, `/grades/` | Đọc hồ sơ/portal theo tài khoản đã xác thực | Có code; chỉ trả dữ liệu theo hồ sơ hiện hành; phạm vi chưa được duyệt |
-| `/api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/` | Tạo yêu cầu thanh toán SePay | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
+| `/api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/` | Tạo yêu cầu thanh toán SePay | Đã duyệt 26/11/2026 (FS-PAY-01); body `{option}`, trả form checkout; chưa có giao dịch thật |
 | `/api/v1/students/profile/{slug}/payments/{attempt_id}/` | Đọc trạng thái lượt thanh toán | Có code/schema; tắt mặc định và chưa được duyệt phạm vi |
 
 Không có account-signup endpoint công khai. `POST /api/v1/public/enrollments/` là đăng ký khóa học, không tự tạo tài khoản. API vẫn phải xác thực quyền và giới hạn bản ghi ở server; không tin slug/site do client gửi để mở rộng quyền. Bằng chứng source và giới hạn phạm vi được ghi trong [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
@@ -739,7 +739,7 @@ Schema hiện tại cho `YeuCauThanhToan.trang_thai` các giá trị `cho_thanh_
 
 `db/01_create_schema.sql` đã có `YeuCauThanhToan` và `SuKienThanhToan`, đặt cục bộ tại từng database site; `PhieuThu` có liên kết tới yêu cầu. `YeuCauThanhToan` giữ khoản học phí, kỳ, tài khoản, số tiền, mã tham chiếu, khóa idempotency, trạng thái và thời hạn; `SuKienThanhToan` lưu ID giao dịch SePay duy nhất cùng metadata đã lọc và kết quả nhận. Không có database thanh toán trung tâm. Đối chiếu đủ cột/ràng buộc trong [`DATABASE_SCHEMA.md`](../docs/DATABASE_SCHEMA.md).
 
-Thu tại quầy dùng mã phiếu để nhận diện yêu cầu lặp; hoàn tiền dùng `khoa_idempotency` bền vững trong `PhieuThu`. Refund API cần migration `40_enable_tuition_refunds.sql` trên từng site trước khi triển khai. SePay có code/schema nhưng mặc định tắt và chưa được kiểm chứng merchant/webhook thật. Chốt phạm vi với nhóm trước khi bật portal/payment; nếu thay đổi schema hoặc hợp đồng API, cập nhật schema/script trong cùng thay đổi.
+Thu tại quầy dùng mã phiếu để nhận diện yêu cầu lặp; hoàn tiền dùng `khoa_idempotency` bền vững trong `PhieuThu`. Refund API cần migration `40_enable_tuition_refunds.sql` trên từng site trước khi triển khai. Cổng thanh toán SePay đã được duyệt (26/11/2026) và bật bằng `SEPAY_ENABLED`; chưa có bằng chứng giao dịch/IPN thật. Nếu thay đổi schema hoặc hợp đồng API, cập nhật schema/script trong cùng thay đổi.
 
 ## Quản lý điểm
 
@@ -762,7 +762,7 @@ Retry chuyển cơ sở (`Admin Big`) chỉ nhận giao dịch `dang_xu_ly`; `ho
 - Mọi thao tác tạo/sửa kiểm tra quyền, phạm vi site và điều kiện nghiệp vụ trước khi ghi. DELETE hồ sơ học viên chỉ được xóa bản chưa có tài khoản, đăng ký hoặc lịch sử chuyển; không xóa học phí, phiếu thu, điểm, điểm danh, lịch sử hoặc nhật ký đã phát sinh.
 - Ràng buộc duy nhất hiện có giúp chặn một số thao tác trùng: `DangKy(ma_hoc_vien, ma_lop)`, `Diem(ma_dang_ky, loai_diem)`, `DiemDanh(ma_buoi, ma_dang_ky)`, và `GiaoDichChuyenCoSo.khoa_chong_lap`. Khi nhận lại cùng thao tác hợp lệ, API nên trả kết quả cũ thay vì tạo thêm nghiệp vụ.
 - Thu tại quầy dùng mã phiếu site-prefixed; hoàn tại quầy lưu UUID idempotency trong `PhieuThu` cùng transaction với `HocPhi`/`DotHocPhi`. Xác nhận migration 40 đã áp dụng lên từng site trước khi triển khai.
-- SePay hiện có `YeuCauThanhToan`/`SuKienThanhToan` tại database site và API callback; tích hợp mặc định tắt, chưa có bằng chứng giao dịch thật. Khi được nhóm duyệt, cần kiểm chứng callback lặp, timeout, retry và đối soát; không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
+- SePay dùng `YeuCauThanhToan`/`SuKienThanhToan` tại database site, IPN và tra cứu `order/detail`; chưa có bằng chứng giao dịch thật. Cần kiểm chứng IPN lặp, timeout, retry và đối soát; không dựa vào trạng thái frontend/localStorage để xác định đã thu tiền.
 - Tạo tài khoản nội bộ vừa ghi bản sao `TaiKhoan` vừa tạo hồ sơ site. API phải lưu đủ tiến trình để tiếp tục hoặc vô hiệu hóa an toàn nếu một chặng lỗi; không tuyên bố transaction ACID xuyên site.
 - Giao dịch chuyển dùng `GiaoDichChuyenCoSo.khoa_chong_lap` và trạng thái Coordinator trong CSDL nguồn. Nếu site đích đã commit hồ sơ, phục hồi phải tiến về phía trước theo README mục 5.5.
 - `GLOBAL` không trả thành công toàn phần khi site bị lỗi: giữ kết quả từng site, đặt `complete: false`, liệt kê `missing_sites`; các thao tác yêu cầu đủ site như `REPLICATED-WRITE` phải báo thất bại/chờ đối soát theo chính sách, không giả thành công.
@@ -861,7 +861,7 @@ Sao chép mẫu này cho từng endpoint sau khi nhóm thống nhất:
 
 ## Các điểm còn phải thống nhất hoặc kiểm chứng
 
-1. CRUD hồ sơ và cấp tài khoản học viên theo thao tác Admin riêng nằm trong FS-STU-01. Portal học viên và SePay có code/schema/UI nhưng vẫn chưa được duyệt phạm vi; không coi việc cấp tài khoản là quyết định bật portal hoặc thanh toán online.
+1. CRUD hồ sơ và cấp tài khoản học viên theo thao tác Admin riêng nằm trong FS-STU-01. Portal học viên cơ bản (21/11/2026) và thanh toán SePay (26/11/2026) đã được chủ dự án duyệt; học viên chỉ xem/đóng học phí của chính mình tại site hiện hành.
 2. Refund API yêu cầu chạy migration `40_enable_tuition_refunds.sql` riêng trên mỗi site. Chưa kiểm chứng migration và API với SQL Server đang dùng; đối chiếu cấu trúc Q1/Q7/TD trước khi bật.
 3. API quản lý `CoSo` chưa có; runtime replication cho `CoSo` còn thiếu. `MonHoc`/`KhoaHoc` có service ghi replication; một số luồng ghi `TaiKhoan` vẫn có cơ chế riêng, chưa gom về một điểm vào.
 4. Chạy đủ TC-SITE/FRAG/REP/SYNC/DTX/CON/DQ trên các database SQL Server đang dùng. Còn thiếu outage/recovery, fault injection chuyển cơ sở, concurrency hai phiên và Global Query khi thiếu site; xem [ma trận trạng thái](../docs/Trang-Thai-Trien-Khai.md).
