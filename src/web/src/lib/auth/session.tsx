@@ -184,5 +184,6 @@ export function RequireSession({ children, roles }: { children: ReactNode; roles
 export function homeForRole(role: Role) {
   if (role === "giao_vien") return "/teacher";
   if (role === "hoc_vien") return "/student";
+  if (role === "nguoi_dung") return "/account";
   return "/admin/dashboard";
 }

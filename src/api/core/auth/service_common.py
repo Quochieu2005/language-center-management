@@ -188,6 +188,19 @@ def _resolve_principal(account, active_codes: tuple[str, ...] | None = None):
             must_change_password=bool(account[9]),
         )
 
+    if account_role == "nguoi_dung":
+        # Website account: no site and no student profile yet; a consultant attaches both at enrollment.
+        if site_code is not None:
+            return None
+        return AuthenticatedUser(
+            account_id=account_id,
+            username=username,
+            slug=slug,
+            email=email,
+            role="nguoi_dung",
+            must_change_password=bool(account[9]),
+        )
+
     if account_role == "hoc_vien":
         sites = active_codes if active_codes is not None else active_site_codes()
         # The owning profile is sufficient; only search other fragments after a transfer.

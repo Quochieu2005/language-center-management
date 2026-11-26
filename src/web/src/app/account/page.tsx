@@ -12,7 +12,7 @@ import { ApiError } from "@/lib/api/client";
 import { RequireSession, useSession } from "@/lib/auth/session";
 
 export default function AccountRoute() {
-  return <RequireSession roles={["hoc_vien"]}><AccountPage /></RequireSession>;
+  return <RequireSession roles={["hoc_vien", "nguoi_dung"]}><AccountPage /></RequireSession>;
 }
 
 function AccountPage() {
@@ -23,14 +23,14 @@ function AccountPage() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!slug) return;
+    if (!slug || user?.role !== "hoc_vien") return;
     try {
       setProfile(await academicsApi.studentProfile(slug));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Chưa tải được hồ sơ.");
     }
-  }, [slug]);
+  }, [slug, user?.role]);
 
   useEffect(() => { queueMicrotask(() => void load()); }, [load]);
 
@@ -59,9 +59,17 @@ function AccountPage() {
         <h1>Hồ sơ<br /><span>của bạn.</span></h1>
         <p className={pageStyles.lead}>Cập nhật ảnh và thông tin để trung tâm liên hệ và hỗ trợ bạn khi chọn khóa học.</p>
       </section>
+      {user?.role === "nguoi_dung" && <section className={pageStyles.notice}>
+        <span aria-hidden="true">i</span>
+        <div>
+          <strong>{user.email}</strong>
+          <p>Tài khoản của bạn đang dùng để xem website. Khi bạn đăng ký khóa học, trung tâm sẽ tạo hồ sơ học viên cho bạn và các thông tin cá nhân sẽ cập nhật tại đây.</p>
+        </div>
+        <Link href="/courses">Xem khóa học ↗</Link>
+      </section>}
       {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 20 }} />}
       {profile ? <AccountProfile profile={profile} slug={slug} saving={saving} onSave={save} />
-        : !error && <div style={{ padding: 60, textAlign: "center" }}><Spin /></div>}
+        : !error && user?.role === "hoc_vien" && <div style={{ padding: 60, textAlign: "center" }}><Spin /></div>}
     </main>
     <WebFooter />
   </div>;
