@@ -49,6 +49,7 @@ from core.students.views import (
     StudentScheduleView,
     StudentTuitionView,
 )
+from core.students.course_registration_views import AdminCourseRegistrationListView
 from core.students.self_avatar_views import StudentSelfAvatarCompleteView, StudentSelfAvatarUploadIntentView
 from core.classes.views import (
     ClassCollectionView,
@@ -200,6 +201,7 @@ urlpatterns = [
     path("admin/blog/articles/<slug:slug>/", AdminBlogArticleDetailView.as_view(), name="admin-blog-article-detail"),
     path("courses/<str:course_slug>/classes/", PublicCourseClassListView.as_view(), name="public-course-classes"),
     path("public/enrollments/", PublicEnrollmentCreateView.as_view(), name="public-enrollment-create"),
+    path("admin/course-registrations/", AdminCourseRegistrationListView.as_view(), name="admin-course-registrations"),
     path("admin/students/", StudentAdminCollectionView.as_view(), name="student-admin-list"),
     path("admin/students/<str:slug>/avatar/upload-intents/", StudentAvatarUploadIntentView.as_view(), name="student-avatar-upload-intent"),
     path("admin/students/<str:slug>/avatar/complete/", StudentAvatarCompleteView.as_view(), name="student-avatar-complete"),

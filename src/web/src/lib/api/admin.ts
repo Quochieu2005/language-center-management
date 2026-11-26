@@ -107,6 +107,12 @@ export type Student = {
   phone: string | null; email: string | null; avatar_secure_url: string | null; status: string;
   account_issued: boolean; account_issue_eligible: boolean;
 };
+export type CourseRegistration = {
+  enrollment_id: string; enrolled_at: string; enrollment_status: string; student_id: string; slug: string;
+  site_code: string; full_name: string; email: string | null; phone: string | null; class_id: string;
+  class_name: string; course_name: string; account_issued: boolean; account_issue_eligible: boolean;
+  has_website_account: boolean | null;
+};
 export type StudentProfile = {
   student_id: string; slug: string; site_code: string; full_name: string;
   birth_date: string | null; gender: string | null; phone: string | null;
@@ -207,6 +213,8 @@ export const adminApi = {
     apiRequest<{ deleted: boolean; profile_retained: boolean; detail: string }>(`/admin/employees/${encodeURIComponent(slug)}/${query({ site_code })}`, { method: "DELETE" }),
   students: (options: { site_code?: string; status?: string; search?: string; account_issued?: boolean; limit?: number; offset?: number } = {}) =>
     apiRequest<ApiPage<Student>>(`/admin/students/${query(options)}`),
+  courseRegistrations: (options: { site_code?: string; pending?: boolean; search?: string; limit?: number; offset?: number } = {}) =>
+    apiRequest<ApiPage<CourseRegistration>>(`/admin/course-registrations/${query(options)}`),
   createStudent: (body: StudentProfileWrite, site_code?: string) =>
     apiRequest<StudentProfile>(`/admin/students/${query({ site_code })}`, { method: "POST", body: jsonBody(body) }),
   student: (slug: string, site_code?: string) =>

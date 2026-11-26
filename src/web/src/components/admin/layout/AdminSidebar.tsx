@@ -17,6 +17,7 @@ import {
   PhoneOutlined,
   ReadOutlined,
   HomeOutlined,
+  SolutionOutlined,
 } from "@ant-design/icons";
 import styles from "./AdminLayout.module.scss";
 import { useSession } from "@/lib/auth/session";
@@ -49,6 +50,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
     {
       title: "Quản lý",
       items: [
+        { label: "Đăng ký khóa học", href: "/admin/enrollments", icon: <SolutionOutlined />, roles: ["admin_big", "admin_small", "tu_van"] },
         { label: "Hồ sơ học viên", href: "/admin/students", icon: <TeamOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
         { label: "Lớp học & Xếp lớp", href: "/admin/classes", icon: <CalendarOutlined />, roles: ["admin_big", "admin_small", "le_tan", "tu_van", "ke_toan"] },
         { label: "Phòng học", href: "/admin/rooms", icon: <HomeOutlined />, roles: ["admin_big", "admin_small", "ke_toan", "tu_van"] },
