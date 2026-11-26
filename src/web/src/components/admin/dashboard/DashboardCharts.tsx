@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import styles from "./AdminDashboard.module.scss";
 
 export function AnimatedCounter({
@@ -160,7 +160,11 @@ export function ComboBarLineChart({
   formatLineValue: (val: number) => string;
 }) {
   const gradId = useId().replace(/:/g, "");
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  // `x`/`y` are the top of the hovered column in px inside the chart box; null = not measurable.
+  const [hover, setHover] = useState<{ idx: number; x: number | null; y: number }| null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const hoveredIdx = hover?.idx ?? null;
 
   const chart = useMemo(() => {
     const W = 380;
@@ -204,6 +208,23 @@ export function ComboBarLineChart({
 
   const activePoint = hoveredIdx !== null ? chart.items[hoveredIdx] : null;
 
+  // Convert the column top from viewBox units to box pixels so the tooltip follows the column
+  // whatever the chart is scaled or letterboxed to.
+  const showTooltip = (idx: number) => {
+    const item = chart.items[idx];
+    const ctm = svgRef.current?.getScreenCTM();
+    const box = boxRef.current?.getBoundingClientRect();
+    if (!item || !ctm || !box || !svgRef.current) {
+      setHover({ idx, x: null, y: 0 });
+      return;
+    }
+    const point = svgRef.current.createSVGPoint();
+    point.x = item.cx;
+    point.y = Math.min(item.barY, item.lineY);
+    const screen = point.matrixTransform(ctm);
+    setHover({ idx, x: screen.x - box.left, y: screen.y - box.top });
+  };
+
   if (points.length === 0) {
     return (
       <div className={styles.comboChartContainer} style={{ justifyContent: "center", alignItems: "center", color: "var(--admin-text-muted)" }}>
@@ -225,9 +246,16 @@ export function ComboBarLineChart({
         </span>
       </div>
 
-      <div className={styles.svgChartBox}>
+      <div className={styles.svgChartBox} ref={boxRef}>
         {activePoint && (
-          <div className={styles.chartTooltip}>
+          <div
+            className={[
+              styles.chartTooltip,
+              hover?.x != null ? styles.chartTooltipAnchored : "",
+              hover?.x != null && hover.y < 96 ? styles.chartTooltipBelow : "",
+            ].join(" ")}
+            style={hover?.x != null ? { left: `clamp(112px, ${hover.x}px, calc(100% - 112px))`, top: hover.y } : undefined}
+          >
             <div className={styles.ttTitle}>{activePoint.tooltipTitle}</div>
             <div className={styles.ttRow}>
               <span>{activePoint.barLabel}:</span>
@@ -240,7 +268,7 @@ export function ComboBarLineChart({
           </div>
         )}
 
-        <svg viewBox={`0 0 ${chart.W} ${chart.H}`} preserveAspectRatio="xMidYMid meet">
+        <svg ref={svgRef} viewBox={`0 0 ${chart.W} ${chart.H}`} preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id={`barGrad-${gradId}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#3b82f6" />
@@ -280,8 +308,8 @@ export function ComboBarLineChart({
           {chart.items.map((item, idx) => (
             <g
               key={item.label + idx}
-              onMouseEnter={() => setHoveredIdx(idx)}
-              onMouseLeave={() => setHoveredIdx(null)}
+              onMouseEnter={() => showTooltip(idx)}
+              onMouseLeave={() => setHover(null)}
             >
               <rect
                 x={item.barX}
@@ -323,8 +351,8 @@ export function ComboBarLineChart({
           {chart.items.map((item, idx) => (
             <g
               key={`dot-${idx}`}
-              onMouseEnter={() => setHoveredIdx(idx)}
-              onMouseLeave={() => setHoveredIdx(null)}
+              onMouseEnter={() => showTooltip(idx)}
+              onMouseLeave={() => setHover(null)}
             >
               <circle
                 cx={item.cx}

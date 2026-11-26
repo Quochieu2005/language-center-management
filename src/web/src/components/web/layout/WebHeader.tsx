@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import styles from "./WebHeader.module.scss";
+import { BRAND_INITIAL, BRAND_NAME } from "@/lib/brand";
 
 const links = [
   { href: "/programs", label: "Chương trình" },
@@ -20,9 +21,9 @@ export default function WebHeader() {
     <header className={styles.header}>
       <a className={styles.skipLink} href="#main-content">Bỏ qua điều hướng</a>
       <div className={styles.inner}>
-        <Link className={styles.brand} href="/" aria-label="[Tên trung tâm] — trang chủ" onClick={() => setMenuOpen(false)}>
-          <span className={styles.brandMark} aria-hidden="true">N</span>
-          <span className={styles.brandText}>[Tên trung tâm]<span>TRUNG TÂM NGOẠI NGỮ</span></span>
+        <Link className={styles.brand} href="/" aria-label={`${BRAND_NAME} — trang chủ`} onClick={() => setMenuOpen(false)}>
+          <span className={styles.brandMark} aria-hidden="true">{BRAND_INITIAL}</span>
+          <span className={styles.brandText}>{BRAND_NAME}<span>TRUNG TÂM NGOẠI NGỮ</span></span>
         </Link>
 
         <button
