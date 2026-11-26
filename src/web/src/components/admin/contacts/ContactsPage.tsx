@@ -50,9 +50,12 @@ export default function ContactsPage() {
         offset: (page - 1) * PAGE_SIZE,
       }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không tải được hộp thư liên hệ.");
       if (reason instanceof ApiError && Array.isArray(reason.payload.results)) {
-        setData(reason.payload as unknown as ContactRequestList);
+        // 503 carrying the readable part: show it with the "incomplete" warning, not a red error.
+        const partial = reason.payload as unknown as ContactRequestList;
+        setData({ ...partial, complete: false, missing_sites: partial.missing_sites || [] });
+      } else {
+        setError(reason instanceof Error ? reason.message : "Không tải được hộp thư liên hệ.");
       }
     } finally {
       setLoading(false);
