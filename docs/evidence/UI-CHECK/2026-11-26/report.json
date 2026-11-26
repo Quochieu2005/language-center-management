@@ -92,8 +92,8 @@
   },
   {
    "check": "enrollments mobile: page itself has no horizontal overflow (table scrolls inside card)",
-   "ok": false,
-   "overflow_px": 534
+   "ok": true,
+   "overflow_px": 0
   },
   {
    "check": "account page: loads profile for nguoi_dung",

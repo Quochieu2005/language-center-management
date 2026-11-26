@@ -496,6 +496,80 @@
   }
 }
 
+/* Phone/tablet: the sidebar is an off-canvas drawer (keep the width in sync with MOBILE_QUERY in AdminLayout.tsx). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, border-color 0.25s ease;
+
+    &.drawerOpen {
+      transform: translateX(0);
+      box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  .mainWrapper,
+  .mainWrapper.sidebarCollapsed {
+    margin-left: 0;
+  }
+
+  .header {
+    padding: 0 12px;
+  }
+
+  .headerLeft {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .searchBox {
+    width: 180px;
+  }
+
+  .headerRight {
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .contentArea {
+    padding: 12px;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .searchBox,
+  .campusSelector span {
+    display: none;
+  }
+
+  .campusSelect {
+    max-width: 120px;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 480px) {
+  .homeBtn,
+  .userProfile .userInfo {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .contentArea {
     :global(.ant-alert) {

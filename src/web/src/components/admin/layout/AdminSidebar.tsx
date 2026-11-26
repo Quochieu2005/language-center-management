@@ -27,12 +27,16 @@ import { BRAND_INITIAL, BRAND_SHORT_NAME } from "@/lib/brand";
 
 type AdminSidebarProps = {
   isCollapsed: boolean;
+  /** Phone width: the sidebar is a drawer that is hidden until `drawerOpen`. */
+  isMobile?: boolean;
+  drawerOpen?: boolean;
+  onNavigate?: () => void;
 };
 
 type MenuItem = { label: string; href: string; icon: ReactNode; roles?: Role[]; openInNewTab?: boolean };
 type MenuSection = { title: string; items: MenuItem[] };
 
-export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
+export default function AdminSidebar({ isCollapsed, isMobile = false, drawerOpen = false, onNavigate }: AdminSidebarProps) {
   const pathname = usePathname();
   const { user } = useSession();
 
@@ -76,7 +80,10 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
   ];
 
   return (
-    <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""}`}>
+    <aside
+      className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ""} ${drawerOpen ? styles.drawerOpen : ""}`}
+      inert={isMobile && !drawerOpen ? true : undefined}
+    >
       {/* Brand logo / title */}
       <div className={styles.brandSection}>
         <div className={styles.brandLogo}>{BRAND_INITIAL}</div>
@@ -108,6 +115,7 @@ export default function AdminSidebar({ isCollapsed }: AdminSidebarProps) {
                         rel={item.openInNewTab ? "noopener noreferrer" : undefined}
                         className={`${styles.menuItem} ${isActive ? styles.active : ""}`}
                         title={item.label}
+                        onClick={onNavigate}
                       >
                         <span className={styles.menuIcon}>{item.icon}</span>
                         <span className={styles.menuLabel}>{item.label}</span>

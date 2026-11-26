@@ -114,7 +114,7 @@ export default function AdminHeader({ isSidebarCollapsed, onToggleSidebar, selec
       </div>}
       {user?.role !== "admin_big" && user?.site_code && <Tag color="blue">Cơ sở {user.site_code}</Tag>}
 
-      <Link href="/" className={styles.iconBtn} title="Xem trang chủ website" aria-label="Xem trang chủ website"><HomeOutlined /></Link>
+      <Link href="/" className={`${styles.iconBtn} ${styles.homeBtn}`} title="Xem trang chủ website" aria-label="Xem trang chủ website"><HomeOutlined /></Link>
       {user && ["admin_big", "admin_small", "ke_toan", "tu_van"].includes(user.role) && <Dropdown menu={notificationMenu} onOpenChange={(open) => { if (open) void loadNotifications(); }} trigger={["click"]} placement="bottomRight">
         <button type="button" className={styles.iconBtn} title={notificationError || "Thông báo"} aria-label="Thông báo">
           <Badge count={notifications.length} size="small"><BellOutlined /></Badge>
