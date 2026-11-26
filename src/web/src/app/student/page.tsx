@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Avatar, Button, Card, Spin, Tabs, Tag, Typography, message } from "antd";
+import { Alert, Avatar, Button, Card, Spin, Tabs, Tag, message } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
@@ -222,7 +222,6 @@ function StudentPortal() {
                 children: (
                   <StudentCoursesTab
                     enrollments={data.enrollments}
-                    loading={loading}
                     onSelectTab={setActiveTab}
                   />
                 ),

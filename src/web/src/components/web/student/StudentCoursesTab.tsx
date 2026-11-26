@@ -2,7 +2,6 @@
 
 import { Card, Tag, Typography, Button, Empty, Row, Col } from "antd";
 import {
-  BookOutlined,
   CalendarOutlined,
   ClockCircleOutlined,
   EnvironmentOutlined,
@@ -15,11 +14,10 @@ import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   enrollments: ApiRow[];
-  loading: boolean;
   onSelectTab: (key: string) => void;
 };
 
-export function StudentCoursesTab({ enrollments, loading, onSelectTab }: Props) {
+export function StudentCoursesTab({ enrollments, onSelectTab }: Props) {
   if (enrollments.length === 0) {
     return (
       <Card>

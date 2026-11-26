@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Table, Tag, Typography, Empty, Space, Statistic, Row, Col } from "antd";
+import { Card, Table, Tag, Empty, Space, Statistic, Row, Col } from "antd";
 import { TrophyOutlined, StarOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import type { ApiRow } from "@/lib/api/academics";
 import styles from "./StudentPortal.module.scss";
