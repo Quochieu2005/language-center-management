@@ -1,5 +1,22 @@
 from rest_framework import serializers
 
+from core.media.folders import is_avatar_public_id
+
+
+class AvatarPublicIdField(serializers.CharField):
+    """Cloudinary public id: ``<root>/<category>/[<SITE>/]<slug>-dd-mm-yyyy`` or a legacy UUID."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", 255)
+        kwargs.setdefault("trim_whitespace", False)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        if not is_avatar_public_id(value):
+            raise serializers.ValidationError("Mã ảnh tải lên không hợp lệ.")
+        return value
+
 
 class AdminAvatarUploadIntentResponseSerializer(serializers.Serializer):
     intent_token = serializers.CharField()
@@ -12,11 +29,7 @@ class AdminAvatarUploadIntentResponseSerializer(serializers.Serializer):
 
 class AdminAvatarFinalizeRequestSerializer(serializers.Serializer):
     intent_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
-    public_id = serializers.RegexField(
-        regex=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-        max_length=36,
-        trim_whitespace=False,
-    )
+    public_id = AvatarPublicIdField()
 
     def to_internal_value(self, data):
         if hasattr(data, "keys") and set(data.keys()) != {"intent_token", "public_id"}:
@@ -36,11 +49,7 @@ class AdminSmallAvatarUploadIntentRequestSerializer(serializers.Serializer):
 class AdminSmallAvatarFinalizeRequestSerializer(serializers.Serializer):
     setup_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
     intent_token = serializers.CharField(max_length=2048, trim_whitespace=False, write_only=True)
-    public_id = serializers.RegexField(
-        regex=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-        max_length=36,
-        trim_whitespace=False,
-    )
+    public_id = AvatarPublicIdField()
 
     def to_internal_value(self, data):
         if hasattr(data, "keys") and set(data.keys()) != {"setup_token", "intent_token", "public_id"}:

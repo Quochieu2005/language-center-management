@@ -81,3 +81,73 @@ class AvatarPublicIdTests(SimpleTestCase):
         self.assertFalse(is_avatar_public_id("other-root/giao-vien/Q1/x"))
         self.assertFalse(is_avatar_public_id("language-center-management/../secret"))
         self.assertFalse(is_avatar_public_id("language-center-management/a b"))
+
+
+@override_settings(CLOUDINARY_ROOT_FOLDER="language-center-management")
+class AvatarCompleteRequestTests(SimpleTestCase):
+    """The finalize requests must accept every public id the intents generate (this was a 400)."""
+
+    CASES = (
+        ("account", None, "admin"),
+        ("account", None, "admin-small-q1"),
+        ("teacher", "Q1", "the-sang"),
+        ("employee", "TD", "lan-le"),
+        ("student", "Q7", "minh-duc"),
+    )
+
+    def test_every_generated_public_id_passes_all_finalize_serializers(self):
+        from datetime import date
+
+        from core.media.folders import build_avatar_public_id
+        from core.media.serializers import (
+            AdminAvatarFinalizeRequestSerializer,
+            AdminSmallAvatarFinalizeRequestSerializer,
+            EmployeeAvatarFinalizeRequestSerializer,
+            TeacherAvatarFinalizeRequestSerializer,
+        )
+
+        for resource, site, slug in self.CASES:
+            _folder, public_id = build_avatar_public_id(resource, slug=slug, on_date=date(2026, 11, 26), site_code=site)
+            with self.subTest(public_id=public_id):
+                body = {"intent_token": "token", "public_id": public_id}
+                for serializer_class in (AdminAvatarFinalizeRequestSerializer,):
+                    serializer = serializer_class(data=body)
+                    self.assertTrue(serializer.is_valid(), serializer.errors)
+                setup_body = {**body, "setup_token": "setup"}
+                for serializer_class in (
+                    AdminSmallAvatarFinalizeRequestSerializer,
+                    TeacherAvatarFinalizeRequestSerializer,
+                    EmployeeAvatarFinalizeRequestSerializer,
+                ):
+                    serializer = serializer_class(data=setup_body)
+                    self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_legacy_uuid_still_passes_and_unsafe_ids_do_not(self):
+        from core.media.serializers import AdminAvatarFinalizeRequestSerializer
+
+        legacy = "fe691960-ecc6-4683-a920-7346c9374a8a"
+        self.assertTrue(AdminAvatarFinalizeRequestSerializer(data={"intent_token": "t", "public_id": legacy}).is_valid())
+        for bad in ("../x", "language-center-management/../secret", "other-root/giao-vien/Q1/x", "a b", ""):
+            with self.subTest(bad=bad):
+                serializer = AdminAvatarFinalizeRequestSerializer(data={"intent_token": "t", "public_id": bad})
+                self.assertFalse(serializer.is_valid())
+
+    def test_self_complete_endpoint_accepts_the_new_id_and_calls_the_service(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from core.media import views as media_views
+
+        public_id = "language-center-management/giao-vien/Q1/the-sang-26-11-2026"
+        user = SimpleNamespace(is_authenticated=True, role="giao_vien", account_id="Q1-TK-000002", site_code="Q1", slug="the-sang", pk="Q1-TK-000002")
+        request = APIRequestFactory().post(
+            "/api/v1/auth/profile/the-sang/avatar/complete/",
+            {"intent_token": "token", "public_id": public_id}, format="json",
+        )
+        force_authenticate(request, user=user)
+        with patch.object(media_views, "complete_admin_avatar_upload", return_value={
+            "account_id": "Q1-TK-000002", "role": "giao_vien", "avatar_secure_url": "https://res.cloudinary.com/x.png",
+            "complete": True, "site_codes": ["Q1"],
+        }) as complete:
+            response = media_views.AdminAvatarCompleteView.as_view()(request, slug="the-sang")
+        self.assertEqual(response.status_code, 200, getattr(response, "data", None))
+        self.assertEqual(complete.call_args.args[2], public_id)
