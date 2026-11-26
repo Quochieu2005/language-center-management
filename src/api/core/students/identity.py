@@ -16,6 +16,15 @@ class StudentEmailConflict(Exception):
     pass
 
 
+def _held_by_website_account(cursor, email) -> bool:
+    """Is this email the login of a ``nguoi_dung`` account (authority TaiKhoan, cursor is on the authority)?"""
+    cursor.execute(
+        "SELECT TOP (1) 1 FROM dbo.TaiKhoan WHERE LOWER(email) = %s AND vai_tro = 'nguoi_dung' AND ma_co_so IS NULL",
+        [str(email).strip().casefold()],
+    )
+    return cursor.fetchone() is not None
+
+
 def reserve_email(email, site, *, bootstrap=False):
     with get_site_connection(site).cursor() as local:
         local.execute("SELECT trang_thai FROM dbo.CoSo WHERE ma_co_so = %s", [site])
@@ -36,7 +45,11 @@ def reserve_email(email, site, *, bootstrap=False):
                 "WHERE email_bam = %s", [key],
             )
             existing = cursor.fetchone()
-            if existing is not None and str(existing[0]) != site:
+            if existing is not None and str(existing[0]) != site and existing[1] is None and _held_by_website_account(cursor, email):
+                # Reserved at sign-up for a website account (no student yet): the first student profile at any
+                # site takes over the reservation, and the account is attached when the account is issued.
+                cursor.execute("UPDATE dbo.DatChoEmailHocVien SET ma_co_so = %s WHERE email_bam = %s", [site, key])
+            elif existing is not None and str(existing[0]) != site:
                 # A transferred profile retains its ID; move only after verifying the local current row.
                 with get_site_connection(site).cursor() as local:
                     local.execute(

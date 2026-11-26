@@ -162,7 +162,7 @@ class RegistrationBoundaryTests(SimpleTestCase):
         local, local_cursor = connection()
         local_cursor.fetchone.return_value = ("hoat_dong",)
         registry, registry_cursor = connection()
-        registry_cursor.fetchone.side_effect = [(1,), ("Q7", None)]
+        registry_cursor.fetchone.side_effect = [(1,), ("Q7", None), None]  # last: no website account holds the email
         local_cursor.fetchall.return_value = []
         with patch.object(identity, "get_site_connection", return_value=local) as read, patch.object(identity, "auth_session_alias", return_value="auth"), patch.object(identity, "connections", {"auth": registry}), patch.object(identity.transaction, "atomic", return_value=nullcontext()), patch.object(identity, "_acquire_named_lock"):
             with self.assertRaises(identity.StudentEmailConflict):

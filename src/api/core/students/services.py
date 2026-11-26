@@ -25,9 +25,11 @@ from django.utils import timezone
 from core.auth.account_state import account_is_active, account_status_bit
 from core.auth.service_common import (
     AuthInfrastructureUnavailable,
+    _acquire_named_lock,
     _next_sequence_number,
     _replicated_account,
     active_site_codes,
+    auth_session_alias,
 )
 from core.sites.connections import UnknownSiteError, get_site_connection, get_site_database_alias
 from core.slug_utils import make_slug
@@ -245,6 +247,74 @@ def _account_slug_candidate(profile_slug: str, sites: tuple[str, ...]) -> str:
     raise StudentConflict
 
 
+_ACCOUNT_COLUMNS = (
+    "ma_tai_khoan, slug, ten_dang_nhap, email, mat_khau, vai_tro, ma_co_so, trang_thai, bat_buoc_doi_mat_khau, phien_ban"
+)
+
+
+def _attach_website_account(cursor, found, student, site_code: str, actor_id: str, remote_ip: str) -> tuple[Any, ...]:
+    """Make the sign-up account (role nguoi_dung) the login of this student.
+
+    Authority first: the account becomes ``hoc_vien`` at ``site_code`` (keeping its own password; ``phien_ban`` is
+    bumped so replicas accept the change and the old sessions end). The site replica and the HocVien link are done
+    by the caller. A retry after the authority commit resumes instead of failing. ``cursor`` is on the student's site.
+    """
+    account_id = str(found[0])
+    role = str(found[5]).lower()
+    account_site = _site_code(found[6]) if found[6] else None
+    if not account_is_active(found[7]):
+        raise StudentConflict
+    student_id = str(student[0])
+    if role == "hoc_vien" and account_site == site_code:
+        cursor.execute("SELECT COUNT_BIG(*) FROM dbo.HocVien WHERE ma_tai_khoan = %s", [account_id])
+        if cursor.fetchone()[0]:
+            raise StudentConflict
+        promoted = False
+    elif role == "nguoi_dung" and account_site is None:
+        promoted = True
+    else:
+        raise StudentConflict
+
+    authority = auth_session_alias()
+    profile = None
+    with transaction.atomic(using=authority):
+        with connections[authority].cursor() as acursor:
+            _acquire_named_lock(acursor, f"qlttnn-account-sync:{account_id}")
+            if promoted:
+                acursor.execute(
+                    "SELECT ngay_sinh, gioi_tinh, sdt, dia_chi FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
+                    "WHERE ma_tai_khoan = %s AND vai_tro = 'nguoi_dung' AND ma_co_so IS NULL",
+                    [account_id],
+                )
+                profile = acursor.fetchone()
+                if profile is None:
+                    raise StudentConflict
+                acursor.execute(
+                    "UPDATE dbo.TaiKhoan SET vai_tro = 'hoc_vien', ma_co_so = %s, bat_buoc_doi_mat_khau = 0, "
+                    "phien_ban = phien_ban + 1, cap_nhat_luc = SYSUTCDATETIME() "
+                    "WHERE ma_tai_khoan = %s AND vai_tro = 'nguoi_dung' AND ma_co_so IS NULL",
+                    [site_code, account_id],
+                )
+                if acursor.rowcount != 1:
+                    raise StudentConflict
+                _append_audit(
+                    acursor, site_code, actor_id, "nguoi_dung_len_hoc_vien", "TaiKhoan", account_id,
+                    remote_ip, account_id, {"account_id": account_id, "student_id": student_id},
+                )
+            acursor.execute(f"SELECT {_ACCOUNT_COLUMNS} FROM dbo.TaiKhoan WHERE ma_tai_khoan = %s", [account_id])
+            account = acursor.fetchone()
+    if account is None:
+        raise StudentInfrastructureUnavailable
+    if profile is not None:
+        # The sign-up details become the starting profile; whatever the consultant already typed wins.
+        cursor.execute(
+            "UPDATE dbo.HocVien SET ngay_sinh = COALESCE(ngay_sinh, %s), gioi_tinh = COALESCE(gioi_tinh, %s), "
+            "sdt = COALESCE(sdt, %s), dia_chi = COALESCE(dia_chi, %s) WHERE ma_hoc_vien = %s AND ma_co_so = %s",
+            [*profile, student_id, site_code],
+        )
+    return tuple(account)
+
+
 def _create_or_load_student_account(
     student, site_code: str, actor_id: str, remote_ip: str, sites: tuple[str, ...]
 ) -> tuple[Any, ...]:
@@ -301,8 +371,9 @@ def _create_or_load_student_account(
                         raise StudentInfrastructureUnavailable
                     return tuple(account)
 
-                if _replicated_account(email, sites) is not None:
-                    raise StudentConflict
+                existing_account = _replicated_account(email, sites)
+                if existing_account is not None:
+                    return _attach_website_account(cursor, existing_account, current, site_code, actor_id, remote_ip)
                 username = _username_candidate(email, site_code, sites)
                 account_slug = _account_slug_candidate(str(current[1]), sites)
                 account_id = _next_student_account_id(site_code, sites)
@@ -598,6 +669,19 @@ def _ensure_account_replica(site_code: str, expected: tuple[Any, ...]) -> None:
                     """,
                     [account_id, slug, username, email, password_hash, account_site, status, forced, version],
                 )
+            elif (
+                actual != normalized and actual[0] == normalized[0] and actual[5] == "nguoi_dung"
+                and actual[6] is None and normalized[5] == "hoc_vien" and normalized[9] > actual[9]
+                and actual[1:5] == normalized[1:5] and actual[7] == normalized[7]
+            ):
+                # The replica still holds the sign-up account: move it to the student's role and site.
+                cursor.execute(
+                    "UPDATE dbo.TaiKhoan SET vai_tro = 'hoc_vien', ma_co_so = %s, bat_buoc_doi_mat_khau = %s, "
+                    "phien_ban = %s WHERE ma_tai_khoan = %s AND vai_tro = 'nguoi_dung' AND ma_co_so IS NULL",
+                    [account_site, forced, version, account_id],
+                )
+                if cursor.rowcount != 1:
+                    raise StudentConflict
             elif actual != normalized:
                 raise StudentConflict
             _append_replication_event(cursor, site_code, str(account_id))
