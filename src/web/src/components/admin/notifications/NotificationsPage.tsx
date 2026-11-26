@@ -48,10 +48,11 @@ export default function NotificationsPage() {
       });
       setData(result);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không tải được thông báo.");
       if (reason instanceof ApiError && Array.isArray(reason.payload.results)) {
         const payload = reason.payload as unknown as AdminNotificationList;
         setData({ ...payload, complete: false, missing_sites: payload.missing_sites || [] });
+      } else {
+        setError(reason instanceof Error ? reason.message : "Không tải được thông báo.");
       }
     } finally {
       setLoading(false);

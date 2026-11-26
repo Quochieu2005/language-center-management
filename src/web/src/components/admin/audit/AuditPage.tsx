@@ -48,10 +48,11 @@ export default function AuditPage() {
         offset: (page - 1) * PAGE_SIZE,
       }));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Không tải được nhật ký.");
       if (reason instanceof ApiError && Array.isArray(reason.payload.results)) {
         const partial = reason.payload as unknown as AdminAuditLogList;
         setLogs({ ...partial, complete: false, missing_sites: partial.missing_sites || [] });
+      } else {
+        setError(reason instanceof Error ? reason.message : "Không tải được nhật ký.");
       }
     } finally {
       setLoading(false);
