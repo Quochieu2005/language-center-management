@@ -156,14 +156,14 @@ export function TeacherClassesTab({
                       style={{
                         padding: 14,
                         borderRadius: 10,
-                        border: isSelected ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-                        background: isSelected ? "#eff6ff" : "#fff",
+                        border: isSelected ? "2px solid #175245" : "1px solid #e2e8f0",
+                        background: isSelected ? "#e6f7ed" : "#fff",
                         cursor: "pointer",
                         transition: "all 0.2s",
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: isSelected ? "#1d4ed8" : "#1e293b" }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: isSelected ? "#175245" : "#1e293b" }}>
                           {String(cls.name || cls.class_id)}
                         </span>
                         <Tag color={String(cls.status) === "dang_hoc" ? "green" : "default"}>
@@ -209,7 +209,7 @@ export function TeacherClassesTab({
               <Card
                 title={
                   <span>
-                    <CalendarOutlined style={{ marginRight: 8, color: "#3b82f6" }} />
+                    <CalendarOutlined style={{ marginRight: 8, color: "#175245" }} />
                     Danh sách buổi học ({sessions.length})
                   </span>
                 }
@@ -229,7 +229,7 @@ export function TeacherClassesTab({
               <Card
                 title={
                   <span>
-                    <TeamOutlined style={{ marginRight: 8, color: "#10b981" }} />
+                    <TeamOutlined style={{ marginRight: 8, color: "#175245" }} />
                     Học viên trong lớp ({roster.length})
                   </span>
                 }

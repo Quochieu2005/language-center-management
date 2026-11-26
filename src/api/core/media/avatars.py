@@ -7,7 +7,6 @@ import hashlib
 import json
 import re
 import time
-import uuid
 from contextlib import contextmanager
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlparse
@@ -21,7 +20,7 @@ from django.utils import timezone
 
 from core.academics.common import AcademicInfrastructureUnavailable, active_site_state
 from core.auth.service_common import AuthenticatedUser
-from core.media.folders import build_asset_folder
+from core.media.folders import build_avatar_public_id, is_avatar_public_id
 from core.slug_utils import make_slug
 from core.sites.connections import UnknownSiteError, get_site_database_alias
 
@@ -75,7 +74,6 @@ _AVATAR_RESOURCE = {
     "giao_vien": "teacher",
     "hoc_vien": "student",
 }
-_PUBLIC_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\Z")
 
 
 def _account_scope_matches(role: str, site_value, account_site: str | None) -> bool:
@@ -94,17 +92,13 @@ def _cloudinary_config() -> tuple[str, str, str]:
     return cloud_name, api_key, api_secret
 
 
-def _active_sites() -> tuple[str, ...]:
+def _reachable_sites() -> tuple[str, ...]:
+    """Active sites that answered; unlike _active_sites an unrelated offline site is not fatal."""
     try:
-        sites, missing = active_site_state()
+        sites, _missing = active_site_state()
     except (AcademicInfrastructureUnavailable, DatabaseError, ImproperlyConfigured,
             KeyError, UnknownSiteError) as exc:
         raise AvatarUnavailable from exc
-    if missing or not sites:
-        raise AvatarUnavailable(
-            "Một hoặc nhiều cơ sở đang hoạt động chưa kết nối được.",
-            missing_sites=missing,
-        )
     return tuple(sorted(sites))
 
 
@@ -137,7 +131,8 @@ def _resolve_admin_small_setup_target(admin_big, slug: str, setup_token: str) ->
     ):
         raise AvatarInvalidIntent("Quyền tải ảnh ban đầu không thuộc yêu cầu này.")
 
-    sites = _active_sites()
+    # Account identity is read at the authority; other replicas may be offline or lagging.
+    sites = (_authority_site(),)
     replicas = []
     for site in sites:
         with connections[get_site_database_alias(site)].cursor() as cursor:
@@ -229,7 +224,8 @@ def _resolve_teacher_setup_target(actor, slug: str, setup_token: str) -> Authent
     ):
         raise AvatarInvalidIntent("Quyền tải ảnh ban đầu không thuộc yêu cầu này.")
 
-    sites = _active_sites()
+    # Account identity is read at the authority; other replicas may be offline or lagging.
+    sites = (_authority_site(),)
     replicas = []
     for site in sites:
         with connections[get_site_database_alias(site)].cursor() as cursor:
@@ -322,7 +318,7 @@ def _resolve_employee_setup_target(actor, slug: str, setup_token: str) -> Authen
     ):
         raise AvatarInvalidIntent("Quyền tải ảnh ban đầu không thuộc yêu cầu này.")
 
-    sites = _active_sites()
+    sites = _reachable_sites()
     site_code = str(claims.get("target_site", "")).upper()
     if site_code not in sites or (actor_role == "admin_small" and actor_site != site_code):
         raise AvatarTargetNotFound
@@ -392,22 +388,25 @@ def _read_account(site_code: str, account_id: str, role: str, account_site: str 
     return {"avatar_public_id": public_id, "avatar_secure_url": secure_url}
 
 
-def _replicated_avatar(
-    account_id: str, role: str, account_site: str | None, sites: tuple[str, ...]
-) -> dict:
-    states = [_read_account(site, account_id, role, account_site) for site in sites]
-    if not states or any(state != states[0] for state in states[1:]):
-        raise AvatarConflict("Ảnh đại diện giữa các cơ sở chưa đồng bộ; cần đối soát trước.")
-    return states[0]
+def _authority_site() -> str:
+    authority = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
+    if not authority:
+        raise ImproperlyConfigured("Thiếu AUTH_SESSION_SITE_CODE.")
+    return authority
 
 
 def get_admin_avatar_url(account_id: str, role: str, account_site: str | None = None) -> str | None:
+    """Read the avatar from the authority ``TaiKhoan`` row only.
+
+    A read must not require every replica online (one offline site made every profile
+    page wait for the connect timeout and then fail); replicas receive the avatar
+    columns through the account outbox worker.
+    """
     if role not in _ACCOUNT_ROLE:
         raise AvatarConflict("Vai trò không được phép xem ảnh đại diện này.")
     try:
         site = str(account_site).upper() if account_site else None
-        state = _replicated_avatar(account_id, role, site, _active_sites())
-        return state["avatar_secure_url"]
+        return _read_account(_authority_site(), account_id, role, site)["avatar_secure_url"]
     except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
         raise AvatarUnavailable from exc
 
@@ -460,7 +459,7 @@ def _upload_signature(params: dict[str, str], api_secret: str) -> str:
 def destroy_cloudinary_avatar_asset(public_id: str | None) -> None:
     if not public_id:
         return
-    if not _PUBLIC_ID.fullmatch(public_id):
+    if not is_avatar_public_id(public_id):
         raise AvatarUnavailable("Mã ảnh đại diện đã lưu không hợp lệ.")
     cloud_name, api_key, api_secret = _cloudinary_config()
     params = {
@@ -519,16 +518,13 @@ def _create_admin_avatar_upload_intent(
         raise AvatarConflict("Phạm vi tài khoản không hợp lệ.")
     cloud_name, api_key, api_secret = _cloudinary_config()
     with _account_lock(account_id):
-        sites = _active_sites()
-        old_avatar = _replicated_avatar(account_id, role, account_site, sites)
+        old_avatar = _read_account(_authority_site(), account_id, role, account_site)
         if (initial_admin_small or initial_teacher or initial_employee) and any(old_avatar.values()):
             raise AvatarConflict("Ảnh ban đầu đã được thiết lập cho tài khoản này.")
-        image_id = str(uuid.uuid4())
         try:
-            folder_name = f"{make_slug(target.slug, max_length=52)}-{timezone.localdate().isoformat()}"
             resource_type = _AVATAR_RESOURCE[role]
-            asset_folder = build_asset_folder(
-                resource_type, asset_id=image_id, record_code=folder_name,
+            asset_folder, image_id = build_avatar_public_id(
+                resource_type, slug=make_slug(target.slug, max_length=52), on_date=timezone.localdate(),
                 site_code=account_site if resource_type in {"student", "teacher", "employee"} else None,
             )
         except ValueError as exc:
@@ -537,7 +533,9 @@ def _create_admin_avatar_upload_intent(
         fields = {
             "allowed_formats": _ALLOWED_FORMATS,
             "asset_folder": asset_folder,
-            "overwrite": "false",
+            # Same person, same day => same name; the new upload replaces that day's photo.
+            "invalidate": "true",
+            "overwrite": "true",
             "public_id": image_id,
             "timestamp": timestamp,
         }
@@ -606,7 +604,7 @@ def create_employee_avatar_upload_intent(actor, slug: str, setup_token: str) -> 
 
 
 def _load_intent(token: str, actor, target, public_id: str) -> dict:
-    if not _PUBLIC_ID.fullmatch(public_id):
+    if not is_avatar_public_id(public_id):
         raise AvatarInvalidIntent("Mã ảnh tải lên không hợp lệ.")
     try:
         data = signing.loads(token, salt=_INTENT_SALT, max_age=_INTENT_TTL_SECONDS)
@@ -732,7 +730,6 @@ def _apply_site(site_code: str, account_id: str, role: str, account_site: str | 
             cursor.execute(
                 "UPDATE dbo.TaiKhoan SET avatar_public_id = %s, avatar_secure_url = %s, "
                 "cap_nhat_luc = SYSUTCDATETIME() "
-                "OUTPUT INSERTED.ma_tai_khoan "
                 "WHERE ma_tai_khoan = %s AND vai_tro = %s "
                 "AND ((avatar_public_id = %s) OR (avatar_public_id IS NULL AND %s IS NULL)) "
                 "AND ((avatar_secure_url = %s) OR (avatar_secure_url IS NULL AND %s IS NULL))",
@@ -740,7 +737,8 @@ def _apply_site(site_code: str, account_id: str, role: str, account_site: str | 
                  _ACCOUNT_ROLE[role], old["avatar_public_id"], old["avatar_public_id"],
                  old["avatar_secure_url"], old["avatar_secure_url"]],
             )
-            if cursor.fetchone() is None:
+            # No OUTPUT clause: TaiKhoan has the outbox trigger (SQL Server error 334).
+            if cursor.rowcount != 1:
                 raise AvatarConflict("Không cập nhật được metadata ảnh tại cơ sở.")
             cursor.execute(
                 "INSERT INTO dbo.Logs "
@@ -784,30 +782,30 @@ def _complete_admin_avatar_upload(
     intent = _load_intent(token, actor, target, public_id)
     new_avatar = _cloudinary_resource(public_id, intent["asset_folder"])
     old_avatar = intent["old_avatar"]
+    authority = _authority_site()
     with _account_lock(account_id):
-        sites = _active_sites()
-        for site in sites:
-            try:
-                _apply_site(
-                    site, account_id, role, account_site, old_avatar, new_avatar, token,
-                    str(getattr(actor, "account_id", "")), remote_ip,
-                )
-            except (AvatarConflict, AvatarUnavailable):
-                raise
-            except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
-                raise AvatarUnavailable(
-                    "Đồng bộ chưa hoàn tất; gửi lại cùng yêu cầu để tiếp tục.",
-                    missing_sites=(site,),
-                ) from exc
-        states = [_read_account(site, account_id, role, account_site) for site in sites]
-        if any(state != new_avatar for state in states):
-            raise AvatarUnavailable("Đồng bộ ảnh đại diện chưa hoàn tất; hãy tiếp tục thử lại.")
+        # Only the authority row is written (idempotent ACK in its Logs); the TaiKhoan
+        # outbox trigger queues every site and sync_accounts copies the avatar columns.
+        try:
+            _apply_site(
+                authority, account_id, role, account_site, old_avatar, new_avatar, token,
+                str(getattr(actor, "account_id", "")), remote_ip,
+            )
+        except (AvatarConflict, AvatarUnavailable):
+            raise
+        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError) as exc:
+            raise AvatarUnavailable(
+                "Chưa lưu được ảnh tại kho tài khoản; gửi lại cùng yêu cầu để tiếp tục.",
+                missing_sites=(authority,),
+            ) from exc
+        if _read_account(authority, account_id, role, account_site) != new_avatar:
+            raise AvatarUnavailable("Chưa xác nhận được ảnh đại diện mới; hãy tiếp tục thử lại.")
     return {
         "account_id": account_id,
         "role": role,
         "avatar_secure_url": new_avatar["avatar_secure_url"],
         "complete": True,
-        "site_codes": list(sites),
+        "site_codes": [authority],
     }
 
 

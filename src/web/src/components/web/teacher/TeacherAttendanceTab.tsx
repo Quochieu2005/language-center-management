@@ -267,7 +267,7 @@ export function TeacherAttendanceTab({
         <Card
           title={
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <CalendarOutlined style={{ color: "#3b82f6", fontSize: 18 }} />
+              <CalendarOutlined style={{ color: "#175245", fontSize: 18 }} />
               <span>
                 Điểm danh: <strong>Buổi #{String((activeSession as Record<string, unknown>).sequence ?? activeSession.session_number ?? "")}</strong> — Ngày: {String((activeSession as Record<string, unknown>).session_date ?? activeSession.date ?? "")}
               </span>

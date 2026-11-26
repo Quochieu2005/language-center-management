@@ -41,7 +41,7 @@ export function TeacherOverviewTab({
           <Statistic
             title="Lớp đang phụ trách"
             value={classes.length}
-            prefix={<ReadOutlined style={{ color: "#3b82f6" }} />}
+            prefix={<ReadOutlined style={{ color: "#175245" }} />}
             suffix={<span style={{ fontSize: 13, color: "#64748b" }}>({activeClasses} đang học)</span>}
           />
         </Card>
@@ -49,21 +49,21 @@ export function TeacherOverviewTab({
           <Statistic
             title="Buổi học đã lên lịch"
             value={sessions.length}
-            prefix={<CalendarOutlined style={{ color: "#8b5cf6" }} />}
+            prefix={<CalendarOutlined style={{ color: "#175245" }} />}
           />
         </Card>
         <Card className={styles.kpiCard} variant="borderless">
           <Statistic
             title="Tổng số học viên"
             value={totalStudents}
-            prefix={<TeamOutlined style={{ color: "#10b981" }} />}
+            prefix={<TeamOutlined style={{ color: "#175245" }} />}
           />
         </Card>
         <Card className={styles.kpiCard} variant="borderless">
           <Statistic
             title="Cơ sở làm việc"
             value={siteCode || "Chưa xác định"}
-            prefix={<EnvironmentOutlined style={{ color: "#f59e0b" }} />}
+            prefix={<EnvironmentOutlined style={{ color: "#175245" }} />}
           />
         </Card>
       </div>

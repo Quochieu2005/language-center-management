@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from core.academics.attendance import (
     get_attendance_roster,
     list_teacher_classes,
+    list_teacher_schedule,
     list_teacher_sessions,
     save_attendance_batch,
 )
@@ -44,6 +45,25 @@ class TeacherClassListView(_TeacherApiView):
             return error
         try:
             return Response({"site_code": scope[0], "results": list_teacher_classes(site_code=scope[0], teacher_id=scope[1])})
+        except AcademicError as exc:
+            return academic_error(exc)
+
+
+class TeacherScheduleView(_TeacherApiView):
+    @extend_schema(
+        operation_id="teacher_schedule",
+        tags=["Giáo viên - Điểm danh"],
+        summary="Thời khóa biểu: mọi buổi học của các lớp được phân công",
+        description="LOCAL tại CSDL site của giáo viên trong phiên; không nhận site hoặc mã giáo viên từ client.",
+        responses={200: OpenApiResponse(description="Buổi học sắp xếp theo ngày/giờ."), 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def get(self, request):
+        scope, error = self._teacher(request)
+        if error:
+            return error
+        try:
+            results = list_teacher_schedule(site_code=scope[0], teacher_id=scope[1])
+            return Response({"site_code": scope[0], "count": len(results), "results": results})
         except AcademicError as exc:
             return academic_error(exc)
 

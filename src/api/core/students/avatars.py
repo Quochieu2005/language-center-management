@@ -22,7 +22,7 @@ from core.media.avatars import (
     _cloudinary_resource,
     _upload_signature,
 )
-from core.media.folders import build_asset_folder
+from core.media.folders import build_avatar_public_id
 from core.slug_utils import make_slug
 from core.sites.connections import UnknownSiteError, get_site_database_alias
 from core.students.services import (
@@ -100,20 +100,18 @@ def create_student_avatar_upload_intent(actor, site_code: str, slug: str) -> dic
             raise StudentConflict
         old_avatar = _avatar_state(profile)
         cloud_name, api_key, api_secret = _cloudinary_config()
-        image_id = str(uuid.uuid4())
         try:
-            folder = build_asset_folder(
-                "student",
-                asset_id=image_id,
-                record_code=f"{make_slug(slug, max_length=52)}-{timezone.localdate().isoformat()}",
-                site_code=site,
+            folder, image_id = build_avatar_public_id(
+                "student", slug=make_slug(slug, max_length=52), on_date=timezone.localdate(), site_code=site,
             )
         except ValueError as exc:
             raise AvatarUnavailable("Cấu hình thư mục Cloudinary không hợp lệ.") from exc
         fields = {
             "allowed_formats": _ALLOWED_FORMATS,
             "asset_folder": folder,
-            "overwrite": "false",
+            # Same student, same day => same name; the new upload replaces that day's photo.
+            "invalidate": "true",
+            "overwrite": "true",
             "public_id": image_id,
             "timestamp": str(int(timezone.now().timestamp())),
         }

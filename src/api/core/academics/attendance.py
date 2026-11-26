@@ -77,6 +77,44 @@ def list_teacher_sessions(*, site_code: str, teacher_id: str, class_id: str) -> 
 
 
 @translate_database_errors
+def list_teacher_schedule(*, site_code: str, teacher_id: str) -> list[dict[str, Any]]:
+    """All sessions of the teacher's assigned classes in one LOCAL query at the teacher's site.
+
+    Uses the same ownership rule as ``list_teacher_sessions`` (current class teacher);
+    cancelled classes are left out. ``can_edit_attendance`` keeps the per-session rule.
+    """
+    alias = require_active_site(site_code)
+    with connections[alias].cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP (500) b.ma_buoi AS session_id, l.ma_lop AS class_id,
+                   l.ten_lop AS class_name, k.ten_khoa_hoc AS course_name,
+                   b.so_thu_tu AS session_number, b.ngay_hoc AS date,
+                   b.gio_bat_dau AS start_time, b.gio_ket_thuc AS end_time,
+                   b.ma_phong AS room_id, p.ten_phong AS room_name,
+                   b.trang_thai AS status, b.ghi_chu AS note,
+                   b.ma_giao_vien AS session_teacher_id
+            FROM dbo.BuoiHoc AS b
+            INNER JOIN dbo.LopHoc AS l
+                ON l.ma_lop = b.ma_lop AND l.ma_co_so = b.ma_co_so
+            INNER JOIN dbo.KhoaHoc AS k ON k.ma_khoa_hoc = l.ma_khoa_hoc
+            INNER JOIN dbo.GiaoVien AS g
+                ON g.ma_giao_vien = l.ma_giao_vien AND g.ma_co_so = l.ma_co_so
+            LEFT JOIN dbo.PhongHoc AS p
+                ON p.ma_phong = b.ma_phong AND p.ma_co_so = b.ma_co_so
+            WHERE b.ma_co_so = %s AND l.ma_giao_vien = %s
+              AND g.trang_thai = 'dang_day' AND l.trang_thai <> 'huy'
+            ORDER BY b.ngay_hoc, b.gio_bat_dau, l.ma_lop, b.so_thu_tu
+            """,
+            [site_code, teacher_id],
+        )
+        results = _items(cursor)
+        for row in results:
+            row["can_edit_attendance"] = str(row.pop("session_teacher_id")) == teacher_id
+        return results
+
+
+@translate_database_errors
 def get_attendance_roster(*, site_code: str, teacher_id: str, session_id: str) -> dict[str, Any]:
     alias = require_active_site(site_code)
     with connections[alias].cursor() as cursor:

@@ -74,3 +74,49 @@ def build_asset_folder(
     return "/".join(
         [*root_segments, category, *scope_segments, "anh", str(parsed_asset_id)]
     )
+
+
+_LEGACY_UUID_PUBLIC_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\Z")
+_PATH_PUBLIC_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(?:/[A-Za-z0-9][A-Za-z0-9_-]*){1,7}\Z")
+_AVATAR_RESOURCES = {"student", "teacher", "employee", "account"}
+
+
+def _root_segments() -> list[str]:
+    root_folder = settings.CLOUDINARY_ROOT_FOLDER.strip("/ ")
+    segments = root_folder.split("/")
+    if not segments or any(not _FOLDER_SEGMENT.fullmatch(part) for part in segments):
+        raise ValueError("CLOUDINARY_ROOT_FOLDER không hợp lệ.")
+    return segments
+
+
+def build_avatar_public_id(resource_type: str, *, slug: str, on_date, site_code: str | None = None) -> tuple[str, str]:
+    """Return ``(asset_folder, public_id)`` for a profile photo.
+
+    Layout: ``<root>/<admin|giao-vien|nhan-vien|hoc-vien>[/<SITE>]/<slug>-<dd-mm-yyyy>``.
+    The slug is the server-side profile/account slug (unique per account, or per site
+    for students, which also carry the site segment), so the name only repeats when the
+    same person uploads again on the same day; that upload replaces the day's photo.
+    """
+    if resource_type not in _AVATAR_RESOURCES:
+        raise ValueError("Loại ảnh đại diện không được hỗ trợ.")
+    category, scope = _RESOURCE_LAYOUTS[resource_type]
+    segments = [*_root_segments(), category]
+    if scope == "site":
+        if site_code is None:
+            raise ValueError("Ảnh hồ sơ theo cơ sở cần có mã site đã xác thực.")
+        segments.append(_validate_code(site_code, _SITE_CODE, "Mã cơ sở"))
+    elif site_code is not None:
+        raise ValueError("Ảnh tài khoản quản trị không gắn vào một site riêng.")
+    name = _validate_code(f"{slug}-{on_date:%d-%m-%Y}", _RECORD_CODE, "Tên ảnh")
+    folder = "/".join(segments)
+    return folder, f"{folder}/{name}"
+
+
+def is_avatar_public_id(value: object) -> bool:
+    """Accept new path-style ids under the configured root and legacy UUID ids already stored."""
+    if not isinstance(value, str):
+        return False
+    if _LEGACY_UUID_PUBLIC_ID.fullmatch(value):
+        return True
+    root = "/".join(_root_segments()) + "/"
+    return bool(_PATH_PUBLIC_ID.fullmatch(value)) and value.startswith(root)
