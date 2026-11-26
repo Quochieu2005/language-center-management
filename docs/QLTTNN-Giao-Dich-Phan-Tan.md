@@ -36,9 +36,19 @@ Quy trình `REPLICATED-WRITE` vẫn riêng với chuyển học viên:
 4. Với `KhoaHoc`, lưu ý định và snapshot thành event append-only trong `Logs` tại `AUTH_SESSION_SITE_CODE`. Tạo/sửa có thể ghi những site đang kết nối, ghi ACK `Logs` trong transaction cục bộ và trả 202 khi còn site chờ. Khi site trở lại, `POST /admin/courses/sync/` tiếp tục site chưa ACK theo cùng idempotency key. Môn học tại site vừa trở lại phải được Publication cập nhật trước khi ghi khóa học ở đó.
 5. Với thao tác xóa `KhoaHoc`, không xóa ở site nào khi còn thiếu site; chỉ khi đủ site mới kiểm tra `LopHoc` tham chiếu ở tất cả nơi rồi mới xóa. Nếu khóa đang được dùng, chuyển sang cần đối soát và không xóa.
 6. Không báo hoàn tất khi còn site chưa ACK. Nếu CSDL điều phối trong `AUTH_SESSION_SITE_CODE` mất kết nối, không thể ghi ý định vào `Logs` để nhận thao tác bền vững. Worker `manage.py sync_courses` retry nền mỗi 5 giây; `run-local.ps1` khởi chạy worker, còn môi trường khác phải giám sát tiến trình này riêng. UI cũng đối soát khi trang đang mở/mở lại.
-7. Mỗi site có transaction cục bộ; fan-out và nhật ký ý định/ACK không phải transaction ACID xuyên CSDL. `Blog`, tài khoản và các bảng khác vẫn theo service/chính sách riêng; không suy diễn chúng dùng cùng cơ chế KhoaHoc.
+7. Mỗi site có transaction cục bộ; fan-out và nhật ký ý định/ACK không phải transaction ACID xuyên CSDL. Blog, tài khoản và hồ sơ người dùng web có cơ chế riêng ở bảng dưới; không suy diễn bảng này dùng cùng cơ chế của bảng khác.
 
 MonHoc dùng SQL Server Publication, KhoaHoc giữ fan-out riêng. Các quy tắc lỗi/retry phụ thuộc cơ chế: MonHoc không phát lại DML ở Subscriber, chỉ đọc xác nhận; KhoaHoc tiếp tục site chưa ACK. [Chính sách môn học](MonHoc-SQL-Replication.md). Seed không phải minh chứng replication.
+
+| Dữ liệu | Nơi ghi | Tới site khác bằng | Khi một site offline | Worker |
+|---|---|---|---|---|
+| `MonHoc` | Publisher `MONHOC_PUBLISHER_SITE_CODE` (Q1) | SQL Server transactional push | Tiền kiểm từ chối ghi nếu thiếu site hoạt động; bản sao chậm thì 202 và `missing_sites` | SQL Server Agent |
+| `KhoaHoc` | Từng site đang kết nối; ý định ở `Logs` tại authority | Fan-out ứng dụng + ACK trong `Logs` | Ghi site còn sống, trả 202, site thiếu được tiếp tục sau; xóa chờ đủ site | `sync_courses` (5 giây) |
+| `DanhMucBlog`, `BaiVietBlog` | Từng site đang kết nối; hàng đợi ở `Logs` tại authority | Fan-out ứng dụng + ACK; dấu `BLINT-` (đang chờ), `BLFIN-` (xong), `BLREV-` (cần đối soát) | Admin Big vẫn tạo/sửa/xóa trên site còn sống; site thiếu vào hàng đợi, trả 202 và `complete=false` | `sync_blog` (5 giây): phát lại từ việc cũ nhất bằng cùng khóa idempotent, dừng ở việc đầu tiên chưa xong; xung đột hoặc không tìm thấy thì đánh dấu `BLREV-` |
+| `TaiKhoan` | Authority `AUTH_SESSION_SITE_CODE` (hiện Q1) | Trigger `TR_TaiKhoan_queue_replication` → `DongBoTaiKhoan` → snapshot hiện tại | Site thiếu giữ trong hàng đợi; phản hồi cấp tài khoản có `replication_pending_sites` | `sync_accounts` (thử lại 10 giây, đối soát 60 giây) |
+| `NguoiDung` | Authority | Không nhân bản | Mất cùng authority | Không có |
+
+`KhoaHoc` và Blog giống ROWAA ở ý “ghi các site còn sống, nhớ site thiếu rồi phát lại”, nhưng không có kiểm tra view/quorum và không phải 2PC. Hàng đợi `DongBoTaiKhoan` đóng vai trò lưu-rồi-chuyển giống distribution database, do trigger và worker ứng dụng thực hiện, không phải SQL Server Replication. `TaiKhoan` là lazy một nơi ghi nên một site có thể thấy tài khoản chậm hơn authority. Chưa có bằng chứng chạy ba SQL Server thật cho Blog và tài khoản.
 
 ## 3. Vai trò và dữ liệu đề nghị
 

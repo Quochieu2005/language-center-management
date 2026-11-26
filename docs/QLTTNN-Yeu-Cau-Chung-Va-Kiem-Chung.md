@@ -35,7 +35,7 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 | Nội dung | Đã xác định trong thiết kế | Cần chốt/kiểm chứng |
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
-| Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7; evidence ngày 20/11/2026 có API views CRUD/retry SQL thật đủ Q1/Q7/TD. Còn browser end-to-end, outage TD và TD trên máy Minh Đức; KhoaHoc giữ fan-out riêng |
+| Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7; evidence ngày 20/11/2026 có API views CRUD/retry SQL thật đủ Q1/Q7/TD. Còn browser end-to-end, outage TD và TD trên máy Minh Đức; KhoaHoc, Blog (`sync_blog`) và TaiKhoan (`sync_accounts`) dùng hàng đợi/ACK do ứng dụng cài, chưa có bằng chứng ba SQL Server thật cho ba bảng này |
 | Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |
@@ -145,7 +145,10 @@ Người dùng đã cung cấp ảnh outage/khôi phục Q7 truyền bù thay đ
 browser end-to-end, outage TD, chuyển máy TD, concurrency hoặc fault injection
 chuyển cơ sở trong đợt này. Bảng ngày 29/10 ở trên là lịch sử, không phản ánh
 topology hiện tại. Không kết luận toàn bộ YC-01–YC-07 đã đạt.
-z
+### Bổ sung đồng bộ ngoài MonHoc — 26/11/2026
+
+Ngoài `MonHoc`, ba loại dữ liệu hiện có cơ chế đồng bộ do ứng dụng cài, ghi ở [giao dịch phân tán](QLTTNN-Giao-Dich-Phan-Tan.md): `KhoaHoc` (`sync_courses`), Blog (`sync_blog`, hàng đợi `BLINT-`/`BLFIN-`/`BLREV-` trong `Logs`) và `TaiKhoan` (trigger → `DongBoTaiKhoan` → `sync_accounts`). Bảng `NguoiDung` chỉ tồn tại tại authority và không nhân bản. Với TC-REP-01/TC-SYNC-01, ba cơ chế này mới có kiểm thử giả lập (bộ `manage.py test` đạt 264 ca ngày 26/11/2026) và kiểm tra SQL thật chỉ trên Q1; migration 47, 48, 49 đã chạy ở Q1, chưa chạy ở Q7 và TD (TD không truy cập được lúc kiểm tra gần nhất). Chưa có bằng chứng ngắt site rồi phục hồi trên ba SQL Server thật, nên TC-SYNC-01 cho các bảng này vẫn là “Chưa kiểm chứng”.
+
 ## 7. Tài liệu phải khớp nhau
 
 - [AGENTS.md](../AGENTS.md): quy tắc bắt buộc cho thành viên/AI; giữ quy trình Git.
