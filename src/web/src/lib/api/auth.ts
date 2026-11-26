@@ -22,6 +22,10 @@ export type AvatarUploadIntent = {
   fields: Record<string, string>;
   max_file_bytes: number;
 };
+export type AccountProfile = {
+  slug: string; email: string; username: string; full_name: string | null; birth_date: string | null;
+  gender: string | null; phone: string | null; address: string | null; avatar_secure_url: string | null;
+};
 export type OAuthProvider = "google" | "facebook";
 
 export const authApi = {
@@ -40,6 +44,9 @@ export const authApi = {
     apiRequest<{ account_id: string; role: Role; avatar_secure_url: string; complete: boolean; site_codes: string[] }>(
       `/auth/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) },
     ),
+  accountProfile: () => apiRequest<AccountProfile>("/auth/account-profile/"),
+  updateAccountProfile: (body: Record<string, unknown>) =>
+    apiRequest<AccountProfile>("/auth/account-profile/", { method: "PATCH", body: jsonBody(body) }),
   session: () => apiRequest<ProfileResponse | null>("/auth/session/"),
   oauthLoginUrl: (provider: OAuthProvider) => `/auth/oauth/${provider}/start/`,
   startOAuthLink: (provider: OAuthProvider) =>

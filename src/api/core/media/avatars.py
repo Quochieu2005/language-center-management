@@ -64,6 +64,7 @@ _ACCOUNT_ROLE = {
     "ke_toan": "nhan_vien",
     "giao_vien": "giao_vien",
     "hoc_vien": "hoc_vien",
+    "nguoi_dung": "nguoi_dung",
 }
 _AVATAR_RESOURCE = {
     "admin_big": "account",
@@ -73,12 +74,13 @@ _AVATAR_RESOURCE = {
     "ke_toan": "employee",
     "giao_vien": "teacher",
     "hoc_vien": "student",
+    "nguoi_dung": "user",
 }
 
 
 def _account_scope_matches(role: str, site_value, account_site: str | None) -> bool:
     site_value = str(site_value).upper() if site_value is not None else None
-    if role == "admin_big":
+    if role in {"admin_big", "nguoi_dung"}:
         return site_value is None
     return role == "hoc_vien" or site_value == account_site
 
@@ -514,7 +516,7 @@ def _create_admin_avatar_upload_intent(
     elif actor_id != account_id or actor_role != role:
         raise AvatarConflict("Chỉ được tải ảnh cho tài khoản của chính mình.")
     account_site = str(getattr(target, "site_code", "") or "").strip().upper() or None
-    if (role == "admin_big" and account_site) or (role != "admin_big" and not account_site):
+    if (role in {"admin_big", "nguoi_dung"} and account_site) or (role not in {"admin_big", "nguoi_dung"} and not account_site):
         raise AvatarConflict("Phạm vi tài khoản không hợp lệ.")
     cloud_name, api_key, api_secret = _cloudinary_config()
     with _account_lock(account_id):
