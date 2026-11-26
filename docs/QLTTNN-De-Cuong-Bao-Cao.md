@@ -168,7 +168,7 @@ Thiết kế gồm các bảng sau (bộ cột chi tiết xem trực tiếp sche
 | Danh mục/tài khoản nhân bản | `CoSo`, `MonHoc`, `KhoaHoc`, `TaiKhoan`, `DanhMucBlog`, `BaiVietBlog` |
 | Hồ sơ/dữ liệu phân mảnh nguyên thủy | `HocVien`, `GiaoVien`, `NhanVien`, `Admin` Small, `PhongHoc`, `LopHoc`, `YeuCauLienHe` |
 | Bảng dẫn xuất | `BuoiHoc`, `DangKy`, `DiemDanh`, `HocPhi`, `DotHocPhi`, `PhieuThu`, `Diem` |
-| Trạng thái giao dịch và nhật ký cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, session/OTP/ledger xác thực, `ThongBao`, `Logs`; bảng SePay theo phạm vi chưa duyệt trong schema |
+| Trạng thái giao dịch và nhật ký cục bộ | `GiaoDichChuyenCoSo`, `LichSuChuyenCoSo`, session/OTP/ledger xác thực, `ThongBao`, `Logs`; bảng thanh toán SePay `YeuCauThanhToan`/`SuKienThanhToan` (cục bộ tại site chứa `HocPhi`) |
 
 Danh sách cột logic, khóa chính/ngoại, duy nhất và ý nghĩa nghiệp vụ của từng bảng nằm tại [DATABASE_SCHEMA.md, mục 6](DATABASE_SCHEMA.md#6-chi-tiết-từng-bảng); các quan hệ nằm tại [mục 5](DATABASE_SCHEMA.md#5-các-bảng-liên-quan-với-nhau-thế-nào). Vì nhóm đã chọn SQL Server, khi triển khai schema cần ghi kiểu dữ liệu, độ dài, `NULL/NOT NULL`, giá trị mặc định, `CHECK`, chỉ mục và script tạo bảng phù hợp với SQL Server. Không ghi rằng schema đã cài vật lý nếu chưa có script và kết quả chạy trên từng CSDL site.
 

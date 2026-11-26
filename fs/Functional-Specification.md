@@ -678,7 +678,7 @@ Một chức năng chỉ được đánh dấu hoàn tất khi đáp ứng tất
 | OPEN-02 | Rate limit bền vững khi chạy nhiều worker và ngưỡng bcrypt theo benchmark | API settings/deployment |
 | OPEN-03 | Tiến trình/retry khi tạo tài khoản và hồ sơ site lỗi một phần; cần thống nhất cách vận hành, email và đối soát | `TaiKhoan`, hồ sơ site, Coordinator |
 | OPEN-04 | Chủ dự án chốt tài khoản miễn phí/portal cơ bản/tự ghi danh ngày 21/11/2026; còn bootstrap và kiểm chứng ba site thật theo FS-AUTH-REG, chưa nghiệm thu SePay/OAuth thật | README, schema, API, UI |
-| OPEN-05 | Phạm vi vận hành SePay, merchant/webhook/HTTPS và đối soát; schema/API đã có nhưng tích hợp mặc định tắt | `YeuCauThanhToan`, `SuKienThanhToan`, API/UI |
+| OPEN-05 | Vận hành Cổng thanh toán SePay (duyệt 26/11/2026): URL IPN HTTPS công khai, xác nhận trạng thái `CAPTURED` bằng giao dịch đầu tiên, xử lý `TRANSACTION_VOID` và đối soát `can_doi_soat` | `YeuCauThanhToan`, `SuKienThanhToan`, API/UI |
 | OPEN-06 | Cấu hình/tích hợp thật và chính sách dọn asset mồ côi cho Cloudinary; metadata avatar nằm trong `TaiKhoan` (nhân bản) và `HocVien` (site-local). Ảnh học viên có thể được cùng tham chiếu ở nguồn/đích sau chuyển nên chưa tự xóa asset cũ; không có `MediaAsset` | API media, `TaiKhoan`, `HocVien`, môi trường |
 | OPEN-07 | Bổ sung runtime replication cho `CoSo` và thống nhất một điểm vào cho mọi luồng ghi `TaiKhoan`; `MonHoc`/`KhoaHoc` đã có service | README, schema, service dùng chung |
 | OPEN-08 | Xác nhận với giảng viên mức bảo đảm của Coordinator chuyển cơ sở; nếu cần DBMS-managed transaction thì triển khai và kiểm thử bổ sung | README, tài liệu giao dịch, YC-04 |

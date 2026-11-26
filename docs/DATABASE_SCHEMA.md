@@ -231,7 +231,7 @@ flowchart TB
     TaiKhoan -->|"OTP đã băm"| TokenDatLaiMatKhau
     CoSo -->|"Cơ sở ghi thông báo"| ThongBao
     CoSo -->|"Cơ sở tiếp nhận"| YeuCauLienHe
-    HocPhi -->|"SePay chưa duyệt phạm vi"| YeuCauThanhToan
+    HocPhi -->|"Thanh toán SePay (FS-PAY-01)"| YeuCauThanhToan
     YeuCauThanhToan -->|"Đối soát; liên kết tùy chọn"| SuKienThanhToan
 ```
 
