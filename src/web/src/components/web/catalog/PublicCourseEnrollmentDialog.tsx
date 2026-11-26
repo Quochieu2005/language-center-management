@@ -10,6 +10,7 @@ import {
   type PublicEnrollmentResult,
 } from "@/lib/api/catalog";
 import styles from "./PublicCourseCatalog.module.scss";
+import { authApi } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session";
 
 type EnrollmentValues = {
@@ -32,6 +33,9 @@ export default function PublicCourseEnrollmentDialog({
   onClose: () => void;
 }) {
   const { user } = useSession();
+  const isStudent = user?.role === "hoc_vien";
+  const isWebsiteUser = user?.role === "nguoi_dung";
+  const [prefill, setPrefill] = useState<{ full_name?: string; phone?: string } | null>(null);
   const branches = user?.role === "hoc_vien" ? course?.branches.filter((branch) => branch.site_code === user.site_code) : course?.branches;
   const [form] = Form.useForm<EnrollmentValues>();
   const [siteCode, setSiteCode] = useState(branches?.[0]?.site_code ?? "");
@@ -49,6 +53,16 @@ export default function PublicCourseEnrollmentDialog({
   const classes = currentClassResponse?.results ?? [];
   const classError = currentClassResponse?.error ?? "";
   const loadingClasses = Boolean(classRequestKey && !currentClassResponse);
+
+  // A website account has no student profile yet: start from the details saved on the account.
+  useEffect(() => {
+    if (!course || !isWebsiteUser) return;
+    let current = true;
+    authApi.accountProfile()
+      .then((profile) => { if (current) setPrefill({ full_name: profile.full_name ?? undefined, phone: profile.phone ?? undefined }); })
+      .catch(() => { /* optional: the form simply stays empty */ });
+    return () => { current = false; };
+  }, [course, isWebsiteUser]);
 
   useEffect(() => {
     if (!classRequestKey) return;
@@ -95,10 +109,10 @@ export default function PublicCourseEnrollmentDialog({
       <Alert type="success" showIcon title={result.message} description={`Cơ sở ${result.site_code} đã ghi nhận đăng ký lớp ${result.class_id}.`} />
       <Button type="primary" onClick={onClose}>Đóng</Button>
     </div> : <>
-      <p className={styles.enrollmentIntro}>{user ? "Chọn lớp tại cơ sở của bạn. Đăng ký được gắn với tài khoản đang đăng nhập." : "Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau."}</p>
-      {user && !branches?.length && <Alert type="info" title="Khóa học chưa có lớp tại cơ sở của bạn. Liên hệ trung tâm nếu cần chuyển cơ sở." />}
+      <p className={styles.enrollmentIntro}>{isWebsiteUser ? "Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ tạo hồ sơ học viên từ thông tin tài khoản của bạn và liên hệ để xác nhận." : isStudent ? "Chọn lớp tại cơ sở của bạn. Đăng ký được gắn với tài khoản đang đăng nhập." : "Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau."}</p>
+      {isStudent && !branches?.length && <Alert type="info" title="Khóa học chưa có lớp tại cơ sở của bạn. Liên hệ trung tâm nếu cần chuyển cơ sở." />}
       {(error || classError) && <Alert className={styles.enrollmentAlert} type="error" showIcon title={error || classError} />}
-      <Form form={form} layout="vertical" onFinish={submit} initialValues={{ site_code: siteCode, email: user?.email }}>
+      <Form key={prefill ? "prefilled" : "blank"} form={form} layout="vertical" onFinish={submit} initialValues={{ site_code: siteCode, email: user?.email, ...prefill }}>
         <Form.Item label="Cơ sở học" name="site_code" rules={[{ required: true, message: "Chọn cơ sở học." }]}>
           <Select
             value={siteCode || undefined}
@@ -127,7 +141,7 @@ export default function PublicCourseEnrollmentDialog({
           <Input autoComplete="name" maxLength={150} placeholder="Nguyễn Văn A" />
         </Form.Item>
         <Form.Item label="Email" name="email" rules={[{ required: true, type: "email", message: "Nhập email hợp lệ để cơ sở liên hệ." }, { max: 254, message: "Email quá dài." }]}>
-          <Input autoComplete="email" maxLength={254} placeholder="email@example.com" />
+          <Input autoComplete="email" maxLength={254} placeholder="email@example.com" readOnly={isWebsiteUser} />
         </Form.Item>
         <Form.Item label="Số điện thoại" name="phone" rules={[{ pattern: /^[+0-9(). -]{0,20}$/, message: "Số điện thoại không hợp lệ." }]}>
           <Input autoComplete="tel" maxLength={20} placeholder="0912 345 678" />

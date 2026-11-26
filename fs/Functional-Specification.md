@@ -218,6 +218,8 @@ Chủ dự án chốt ngày 21/11/2026: khách tạo tài khoản `hoc_vien` b�
 
 Đăng nhập dùng authority cùng hồ sơ liên quan; cấp/tạo tài khoản ghi authority + site sở hữu, các replica còn lại nhận qua outbox. Nghiệm thu gồm site không liên quan offline, retry phục hồi không trùng tài khoản/khôi phục mật khẩu cũ, phản hồi các site chờ và CSRF/validation. Bootstrap email phải đọc đủ site một lần trước khi bật đăng ký; không giả dữ liệu site mất. Chi tiết và giới hạn HA tại [chính sách xác thực](../docs/Auth-Site-Isolation.md).
 
+**Cập nhật (tách tài khoản xem web khỏi hồ sơ học viên, đang triển khai theo PR #84–#89; cờ `SELF_REGISTRATION_ACCOUNT_ONLY`, mặc định tắt):** đăng ký chỉ cần họ tên, email, mật khẩu và tạo tài khoản vai trò `nguoi_dung` tại authority với `ma_co_so` rỗng, **chưa** tạo `HocVien` và không chọn cơ sở; cơ sở là khóa phân mảnh nên chỉ được gán khi có hồ sơ học viên. Người dùng đăng nhập vào `/account`, tự sửa họ tên, ngày sinh, giới tính, điện thoại, địa chỉ và ảnh (`/auth/account-profile/`). Khi họ đăng ký lớp ở một cơ sở (hoặc tư vấn tạo hồ sơ cho email đó), hồ sơ học viên được tạo tại cơ sở ấy; khi Admin cấp tài khoản, tài khoản `nguoi_dung` được gắn vào hồ sơ: đổi thành `hoc_vien`, gán cơ sở, giữ mật khẩu, thu hồi phiên cũ, và các thông tin còn trống được lấy làm hồ sơ ban đầu. Vai trò `nguoi_dung` cần nhóm duyệt trước khi tính vào phạm vi đồ án; chi tiết kỹ thuật tại [Auth-Site-Isolation](../docs/Auth-Site-Isolation.md).
+
 ### FS-AUTH-01 — Đăng nhập tài khoản nội bộ
 
 **Người dùng:** Admin Big, Admin Small, nhân viên, giáo viên. **Phân tán:** tra cứu bản TaiKhoan nhân bản; xác thực tại API.

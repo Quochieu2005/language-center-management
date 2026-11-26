@@ -8,6 +8,14 @@ Chốt ngày 21/11/2026 theo yêu cầu chủ dự án: cho tự đăng ký tài
 
 **Đăng ký chỉ tạo tài khoản (bước 2, `SELF_REGISTRATION_ACCOUNT_ONLY`, mặc định tắt):** tạo `TaiKhoan` vai trò `nguoi_dung`, `ma_co_so` rỗng, không tạo `HocVien`. Email được giữ chỗ trong `DatChoEmailHocVien` dưới site authority và `ma_hoc_vien` rỗng. Trigger/worker vẫn nhân bản tài khoản tới mọi site hoạt động; 5 cột hồ sơ cơ bản chỉ được sao chép cho vai trò `nguoi_dung`, nên site chưa chạy migration 48 vẫn nhận các tài khoản khác bình thường nhưng sẽ lỗi (nằm lại hàng đợi) với tài khoản `nguoi_dung`. Đăng nhập và phiên đã hỗ trợ vai trò này (bước 3): `_resolve_principal` trả người dùng `nguoi_dung` không site, không `profile_id` (từ chối nếu tài khoản lại có `ma_co_so`); quên mật khẩu cũng áp dụng; frontend đưa họ tới `/account`. Chỉ bật cờ khi mọi site đã chạy migration 48. **Gắn tài khoản vào học viên (bước 5):** khi tư vấn tạo hồ sơ học viên tại một site cho email đã giữ chỗ dưới authority (`ma_hoc_vien` rỗng, tài khoản `nguoi_dung` còn tồn tại), `reserve_email` chuyển bản giữ chỗ sang site đó. Khi Admin cấp tài khoản cho hồ sơ, `issue_student_account` không tạo tài khoản mới mà gắn tài khoản `nguoi_dung`: authority đổi `vai_tro=hoc_vien`, `ma_co_so=<site hồ sơ>`, `phien_ban+1`, giữ mật khẩu; bản sao tại site hồ sơ được nâng cấp (cùng id, cùng slug/tên đăng nhập/email/mật khẩu, `phien_ban` cao hơn) rồi mới liên kết `HocVien.ma_tai_khoan` để thỏa khóa ngoại. Sau khi đổi vai trò, các phiên cũ bị thu hồi; giữa lúc authority commit và lúc liên kết xong hồ sơ, đăng nhập có thể thất bại ngắn. Ảnh đại diện của tài khoản không được sao sang hồ sơ học viên (hai nơi lưu riêng).
 
+**Danh sách bật đăng ký chỉ tạo tài khoản (bước 6):**
+1. Chạy `db/48_add_nguoi_dung_account_scope.sql` (và `db/47_add_blog_cover_image.sql` nếu dùng Blog) trên **mọi** site: Q1, Q7, TD.
+2. Bảo đảm worker `sync_accounts` đang chạy (`.un-local.ps1`) và hàng đợi `DongBoTaiKhoan` không tồn đọng.
+3. Đã chạy `manage.py seed_student_emails` (cờ `san_sang` bật), xem mục bootstrap ở trên.
+4. Đặt `SELF_REGISTRATION_ACCOUNT_ONLY=true` trong `.env` và khởi động lại API.
+5. Kiểm tra: đăng ký → vào `/account` sửa hồ sơ → đăng ký lớp ở một cơ sở → Admin cấp tài khoản → đăng nhập lại thấy cổng học viên với cùng mật khẩu.
+Tắt cờ trả đăng ký về hành vi cũ (tạo luôn hồ sơ học viên tại authority); tài khoản `nguoi_dung` đã tạo vẫn đăng nhập và gắn được khi có hồ sơ.
+
 | Tình huống | Hành vi |
 |---|---|
 | Q7 không truy cập được, Q1/TD và API còn chạy | Người dùng Q1/TD đăng nhập bằng kho xác thực Q1 và hồ sơ ở cơ sở mình. Không mở kết nối Q7 để đối chiếu mật khẩu. |
