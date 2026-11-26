@@ -104,7 +104,7 @@ for _site_code, _site_config in _site_database_configs.items():
         + "Connection Timeout=5;"
     )
     DATABASES[_alias] = {
-        "ENGINE": "mssql",
+        "ENGINE": "core.sites.mssql_backend",
         "NAME": str(_site_config["name"]),
         "HOST": str(_site_config["host"]),
         "PORT": str(_site_config.get("port", 1433)),

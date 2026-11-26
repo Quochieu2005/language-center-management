@@ -109,7 +109,7 @@ export default function CourseRegistrationsPage() {
       <Button onClick={() => { setSearch(""); setSearchDraft(""); setPendingOnly(true); }}>Đặt lại</Button>
     </Space>
     {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
-    {partial.length > 0 && <Alert type="warning" showIcon title={`Global Query thiếu site: ${partial.join(", ")}; dữ liệu chưa đầy đủ.`} style={{ marginBottom: 16 }} />}
+    {partial.length > 0 && <Alert type="warning" showIcon title={`Chưa lấy được dữ liệu của cơ sở ${partial.join(", ")} (đang ngoại tuyến). Danh sách dưới đây chỉ gồm các cơ sở còn lại.`} style={{ marginBottom: 16 }} />}
     <Table rowKey="enrollment_id" loading={loading} columns={columns} dataSource={rows} scroll={{ x: 860 }}
       locale={{ emptyText: pendingOnly ? "Chưa có ai đăng ký khóa học đang chờ cấp tài khoản." : "Chưa có đăng ký khóa học nào." }} />
   </Card>;

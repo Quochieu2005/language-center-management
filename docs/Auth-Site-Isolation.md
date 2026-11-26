@@ -10,8 +10,7 @@ Chốt ngày 21/11/2026 theo yêu cầu chủ dự án: cho tự đăng ký tài
 
 **Danh sách bật đăng ký chỉ tạo tài khoản (bước 6):**
 1. Chạy `db/48_add_nguoi_dung_account_scope.sql` (và `db/47_add_blog_cover_image.sql` nếu dùng Blog) trên **mọi** site: Q1, Q7, TD; rồi `db/49_create_nguoi_dung_profile.sql` **chỉ** trên site authority (Q1).
-2. Bảo đảm worker `sync_accounts` đang chạy (`.
-un-local.ps1`) và hàng đợi `DongBoTaiKhoan` không tồn đọng.
+2. Bảo đảm worker `sync_accounts` đang chạy (`.\run-local.ps1`) và hàng đợi `DongBoTaiKhoan` không tồn đọng.
 3. Đã chạy `manage.py seed_student_emails` (cờ `san_sang` bật), xem mục bootstrap ở trên.
 4. Đặt `SELF_REGISTRATION_ACCOUNT_ONLY=true` trong `.env` và khởi động lại API.
 5. Kiểm tra: đăng ký → vào `/account` sửa hồ sơ → đăng ký lớp ở một cơ sở → Admin cấp tài khoản → đăng nhập lại thấy cổng học viên với cùng mật khẩu.

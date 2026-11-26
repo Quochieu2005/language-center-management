@@ -117,7 +117,7 @@ flowchart LR
 | `GiaoDichXoaHocVien` | Cục bộ kỹ thuật, legacy | dấu tiến trình cho luồng purge học viên cũ | Database site cấu hình của Coordinator; chỉ xuất hiện sau migration 22. DELETE hiện hành không dùng bảng này và không purge lịch sử |
 | `ThongBao` | Cục bộ | Thông báo quản trị phát sinh tại site; Admin Big có thể yêu cầu ghi đồng bộ tới các site hoạt động | CSDL của từng site; không có bảng trung tâm |
 | `YeuCauLienHe` | Phân mảnh ngang theo yêu cầu | `ma_co_so` do khách chọn và API xác nhận | Chỉ CSDL của site được chọn; Admin Big đọc GLOBAL bằng cách hỏi từng site, Admin Small chỉ đọc site được giao |
-| `Logs` | Cục bộ | audit, ý định đồng bộ khóa học, ACK và trạng thái hoàn tất phát sinh tại một site | Ý định ở `AUTH_SESSION_SITE_CODE`; ACK ở từng site đích; mỗi CSDL giữ log riêng và chỉ ghi thêm, không cập nhật/xóa |
+| `Logs` | Cục bộ | audit, ý định đồng bộ khóa học và Blog, ACK và trạng thái hoàn tất phát sinh tại một site | Ý định ở `AUTH_SESSION_SITE_CODE`; ACK ở từng site đích; mỗi CSDL giữ log riêng và chỉ ghi thêm, không cập nhật/xóa |
 
 ### Chính sách ghi và bố trí vật lý
 
@@ -128,13 +128,14 @@ flowchart LR
 | `DanhMucBlog`, `BaiVietBlog` | Service có quyền theo từng chức năng | Mọi site hoạt động | Fan-out transaction cục bộ/ACK theo service hiện có; site chưa nhận được ghi vào hàng đợi bền trong `Logs` tại authority (`BLINT-`/`BLFIN-`/`BLREV-`) và worker `sync_blog` phát lại cùng khóa idempotent; không phải cùng Publication MonHoc |
 | `TaiKhoan` | Authority và site tạo hồ sơ theo quy trình cấp tài khoản | Mọi site hoạt động | Trigger/outbox tại authority, worker chuyển snapshot hiện tại; không dùng replica cũ để xác thực |
 | `DongBoTaiKhoan`, `DatChoEmailHocVien`, `TrangThaiKhoEmail` | Authority `AUTH_SESSION_SITE_CODE` | Chỉ authority | Trạng thái kỹ thuật theo migration 45; không chứa hợp hồ sơ nghiệp vụ; xem [quy trình khởi tạo](Auth-Site-Isolation.md) |
+| `NguoiDung` | Authority `AUTH_SESSION_SITE_CODE` | Chỉ authority, không nhân bản | Hồ sơ cá nhân của tài khoản `nguoi_dung` (migration 49); dòng bị xóa khi tài khoản được gắn vào hồ sơ học viên |
 | `CoSo` | Metadata vận hành theo quy trình provisioning | Bản sao các site | Chưa có API CRUD/provision runtime đầy đủ; không tuyên bố thêm site tự động |
 | Bảng nghiệp vụ phân mảnh/dẫn xuất | Site sở hữu bản ghi | Chính site đó | Transaction cục bộ; chuyển học viên là ngoại lệ được Coordinator điều phối |
 | `GiaoDichChuyenCoSo` | Nguồn | Nguồn | Trạng thái có thể cập nhật để phục hồi |
 | `LichSuChuyenCoSo`, `Logs`, `ThongBao`, liên hệ | Site phát sinh/xử lý theo schema | Site tương ứng | Nhật ký cục bộ; không nhân bản toàn bộ lịch sử |
 | `PhienDangNhap`, OTP/ledger xác thực | Site chọn bởi `AUTH_SESSION_SITE_CODE` | Một site cấu hình | Trạng thái kỹ thuật, không chứa hợp dữ liệu nghiệp vụ |
 
-`Logs` hiện có giữ ý định append-only cùng snapshot và danh sách site đích; ACK riêng tại mỗi site cho biết site nào đã áp dụng. Operation id là SHA-256 của idempotency key. Khi một site khác offline, API xác nhận phần đã ghi và giữ phần còn thiếu; worker `manage.py sync_courses` thử lại nền mỗi 5 giây, UI cũng đối soát khi trang mở và mỗi 10 giây khi còn việc chờ. `run-local.ps1` khởi động worker này; môi trường chạy API bằng cách khác phải chạy worker như một tiến trình được giám sát. Nếu site authority trong `AUTH_SESSION_SITE_CODE` offline, API không thể nhận yêu cầu mới. Migration 46 chỉ dùng một lần để chuyển dữ liệu khỏi bảng outbox tạm nếu bảng đó còn tồn tại; hệ thống không cần tạo bảng mới.
+`Logs` hiện có giữ ý định append-only cùng snapshot và danh sách site đích; ACK riêng tại mỗi site cho biết site nào đã áp dụng. Operation id là SHA-256 của idempotency key. Khi một site khác offline, API xác nhận phần đã ghi và giữ phần còn thiếu; worker `manage.py sync_courses` thử lại nền mỗi 5 giây (Blog dùng `sync_blog`, cũng 5 giây; tài khoản dùng `sync_accounts`), UI cũng đối soát khi trang mở và mỗi 10 giây khi còn việc chờ. `run-local.ps1` khởi động worker này; môi trường chạy API bằng cách khác phải chạy worker như một tiến trình được giám sát. Nếu site authority trong `AUTH_SESSION_SITE_CODE` offline, API không thể nhận yêu cầu mới. Migration 46 chỉ dùng một lần để chuyển dữ liệu khỏi bảng outbox tạm nếu bảng đó còn tồn tại; hệ thống không cần tạo bảng mới.
 
 Ảnh trạng thái lab đã ghi nhận ngày 20/11/2026: Q1 và TD là hai DB trên **cùng** instance Windows `DESKTOP-CK4K90F`; Q7 là DB `QLTTNN_Q7` trên instance Linux `sql-q7` trong Docker của Mac Intel. Mục tiêu cuối phân công TD sang Windows Minh Đức; cấu hình cuối phải đo và ghi lại khi chuyển xong. SSMS trên Windows và VS Code mssql trên Mac chỉ là công cụ khách, không quyết định dữ liệu nằm ở máy nào.
 

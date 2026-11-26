@@ -118,6 +118,15 @@ def _read_site(site: str, entity: str, slug: str, event_id: str):
         return current, event
 
 
+def sites_off_ack(sites, events, current, before, after):
+    """Sites whose copy no longer matches what replaying this operation expects.
+
+    A site that already ACKed may have moved on through later queued edits of the same row, so it is not
+    compared again; only a site still owed the operation must still hold the ``before`` state.
+    """
+    return tuple(site for site in sites if not events[site] and current[site] != before)
+
+
 def _site_context():
     registry_site = str(getattr(settings, "AUTH_SESSION_SITE_CODE", "")).strip().upper()
     try:
@@ -307,9 +316,7 @@ def write_blog(*, entity: str, action: str, slug: str, payload: dict | None,
                     raise PublicBlogConflict("ACK sửa Blog không khớp nội dung yêu cầu.")
                 if action == "xoa" and (before is None or after is not None):
                     raise PublicBlogConflict("ACK xóa Blog không hợp lệ.")
-                inconsistent = tuple(
-                    site for site in sites if current[site] != (after if events[site] else before)
-                )
+                inconsistent = sites_off_ack(sites, events, current, before, after)
                 if inconsistent:
                     raise PublicBlogConflict(
                         "Bản sao Blog lệch ACK; cần đối soát trước khi retry.",
