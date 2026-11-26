@@ -112,7 +112,7 @@ def _password_reset_verify_retry_after(cursor, identifier_digest: str, ip_digest
 def _eligible_admin_from_email(email: str, site_codes: tuple[str, ...]):
     account = _replicated_account(email, site_codes)
     user = _resolve_principal(account, site_codes) if account is not None else None
-    if user is None or user.role not in {"admin_big", "admin_small", "hoc_vien"}:
+    if user is None or user.role not in {"admin_big", "admin_small", "hoc_vien", "nguoi_dung"}:
         return None, None
     return account, user
 

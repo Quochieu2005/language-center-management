@@ -122,3 +122,32 @@ class ProfileColumnReplicationTests(SimpleTestCase):
     def test_profile_columns_are_replicated_only_for_nguoi_dung(self):
         self.assertIn("ho_ten", self.select_columns("nguoi_dung"))
         self.assertNotIn("ho_ten", self.select_columns("hoc_vien"))
+
+
+class NguoiDungPrincipalTests(SimpleTestCase):
+    def account(self, site=None, status=1):
+        return ("Q1-TK-000009", "nd-new", "nguoi-dung-new", "new@example.com", "hash", "nguoi_dung", site, status, 1, 0)
+
+    def test_website_account_resolves_without_site_or_profile(self):
+        from core.auth import service_common as common
+
+        user = common._resolve_principal(self.account())
+        self.assertEqual((user.role, user.site_code, user.profile_id), ("nguoi_dung", None, None))
+        self.assertEqual(user.slug, "nguoi-dung-new")
+
+    def test_website_account_with_a_site_is_rejected_and_inactive_is_rejected(self):
+        from core.auth import service_common as common
+
+        self.assertIsNone(common._resolve_principal(self.account(site="Q1")))
+        self.assertIsNone(common._resolve_principal(self.account(status=0)))
+
+    def test_password_reset_accepts_website_accounts(self):
+        from core.auth import password_reset
+
+        with (
+            patch.object(password_reset, "_replicated_account", return_value=self.account()),
+            patch.object(password_reset, "_resolve_principal", wraps=password_reset._resolve_principal),
+        ):
+            account, user = password_reset._eligible_admin_from_email("new@example.com", ("Q1",))
+        self.assertEqual(user.role, "nguoi_dung")
+        self.assertIsNotNone(account)

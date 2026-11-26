@@ -18,6 +18,7 @@ const links = [
 function portalLabel(role: Role): string {
   if (role === "giao_vien") return "Cổng giáo viên";
   if (role === "hoc_vien") return "Cổng học viên";
+  if (role === "nguoi_dung") return "Hồ sơ của tôi";
   return "Trang quản trị";
 }
 
