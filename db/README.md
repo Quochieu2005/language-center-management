@@ -65,7 +65,8 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 | `43_enforce_contact_site_boundary.sql` | Sau migration 39: kiểm tra dữ liệu rồi thêm CHECK site cho liên hệ; dừng khi có dòng sai, không tự chuyển/xóa. Chạy lại an toàn. |
 | `44_revalidate_course_subject_fk.sql` | Kiểm tra khóa học thiếu môn cha và xác nhận lại FK. Với FK NOT FOR REPLICATION, chỉ dựng lại ánh xạ ma_mon không cascade như schema; không sửa dữ liệu hoặc Publication. |
 | `45_account_replication_queue.sql` | Tạo outbox đồng bộ tài khoản tại authority `AUTH_SESSION_SITE_CODE`; chỉ chạy một lần trên DB authority theo hướng dẫn Auth-Site-Isolation. |
-| `48_add_nguoi_dung_account_scope.sql` | Bước 1 của hướng tách tài khoản xem web khỏi hồ sơ học viên: cho phép `TaiKhoan.vai_tro = 'nguoi_dung'` với `ma_co_so` rỗng (`CK_TaiKhoan_vai_tro`, `CK_TaiKhoan_pham_vi`) và thêm cột hồ sơ cơ bản `ho_ten`, `sdt`, `ngay_sinh`, `gioi_tinh`, `dia_chi`. **Chạy trên mọi site (Q1, Q7, TD) trước khi API tạo hoặc nhân bản tài khoản `nguoi_dung`**; API chưa dùng vai trò này ở bước này. |
+| `48_add_nguoi_dung_account_scope.sql` | Cho phép `TaiKhoan.vai_tro = 'nguoi_dung'` với `ma_co_so` rỗng (`CK_TaiKhoan_vai_tro`, `CK_TaiKhoan_pham_vi`). **Chạy trên mọi site (Q1, Q7, TD)** vì `TaiKhoan` được nhân bản. |
+| `49_create_nguoi_dung_profile.sql` | Tạo bảng `NguoiDung` (hồ sơ của tài khoản xem website) **chỉ tại site authority**, không nhân bản; nếu bản 48 cũ đã thêm cột hồ sơ vào `TaiKhoan` thì chép dữ liệu sang bảng mới rồi bỏ cột. Yêu cầu đã chạy 48. |
 | `47_add_blog_cover_image.sql` | Thêm `anh_bia_public_id`, `anh_bia_url` vào `BaiVietBlog`. **Chạy trên mọi site (Q1, Q7, TD)**: Blog là dữ liệu nhân bản, site thiếu cột bị API Blog coi là thiếu site. |
 | `46_move_course_queue_to_logs.sql` | Chuyển các yêu cầu còn lưu trong bảng outbox tạm sang `Logs` append-only rồi xóa bảng tạm; chỉ chạy tại DB `AUTH_SESSION_SITE_CODE`. Không tạo bảng mới; nếu bảng tạm không tồn tại thì không làm gì. |
 

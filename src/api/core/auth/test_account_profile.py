@@ -13,7 +13,7 @@ from core.auth.views import AuthAccountProfileView
 from core.media import avatars
 from core.media.folders import build_avatar_public_id
 
-ROW = ("nguoi_dung", None, 1, "nguoi-dung-a", "a@example.com", "nd-a", "Tên cũ", date(2000, 1, 2), "Nam", "0900", "Cũ", None)
+ROW = ("nguoi_dung", None, 1, "nguoi-dung-a", "a@example.com", "nd-a", "Tên cũ", date(2000, 1, 2), "Nam", "0900", "Cũ", None)  # TaiKhoan + NguoiDung
 USER = SimpleNamespace(role="nguoi_dung", account_id="Q1-TK-000009", pk="Q1-TK-000009", is_authenticated=True)
 
 
@@ -35,18 +35,19 @@ class AccountProfileServiceTests(SimpleTestCase):
             patch.object(account_profile, "_acquire_named_lock"),
         )
 
-    def test_update_merges_changes_and_does_not_bump_the_session_version(self):
+    def test_update_merges_changes_and_leaves_taikhoan_untouched(self):
         conn, cursor = cursor_with(ROW, ROW[:6] + ("Tên mới",) + ROW[7:])
         a, b, c, d = self.patched(conn)
         with a, b, c, d:
             result = account_profile.update_account_profile(USER, {"full_name": "Tên mới", "gender": None}, "127.0.0.1")
         self.assertEqual(result["full_name"], "Tên mới")
-        update = next(call for call in cursor.execute.call_args_list if "UPDATE dbo.TaiKhoan" in call.args[0])
-        self.assertNotIn("phien_ban", update.args[0])
+        update = next(call for call in cursor.execute.call_args_list if "UPDATE dbo.NguoiDung" in call.args[0])
+        self.assertFalse(any("UPDATE dbo.TaiKhoan" in call.args[0] for call in cursor.execute.call_args_list))
         self.assertEqual(update.args[1][:5], ["Tên mới", date(2000, 1, 2), None, "0900", "Cũ"])
 
     def test_only_a_website_account_without_a_site_is_allowed(self):
-        for row in (("hoc_vien",) + ROW[1:], ROW[:1] + ("Q1",) + ROW[2:], ROW[:2] + (0,) + ROW[3:], None):
+        for row in (("hoc_vien",) + ROW[1:], ROW[:1] + ("Q1",) + ROW[2:], ROW[:2] + (0,) + ROW[3:],
+                    ROW[:6] + (None,) + ROW[7:], None):
             conn, _ = cursor_with(row)
             a, b, c, d = self.patched(conn)
             with a, b, c, d, self.assertRaises(account_profile.AccountProfileNotAllowed):

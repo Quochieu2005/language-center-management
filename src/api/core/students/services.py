@@ -280,15 +280,14 @@ def _attach_website_account(cursor, found, student, site_code: str, actor_id: st
     with transaction.atomic(using=authority):
         with connections[authority].cursor() as acursor:
             _acquire_named_lock(acursor, f"qlttnn-account-sync:{account_id}")
+            # The sign-up profile (dbo.NguoiDung) is kept until it has been copied to the student, so a
+            # retry after the role change can still finish the copy.
+            acursor.execute(
+                "SELECT ngay_sinh, gioi_tinh, sdt, dia_chi FROM dbo.NguoiDung WITH (UPDLOCK, HOLDLOCK) "
+                "WHERE ma_tai_khoan = %s", [account_id],
+            )
+            profile = acursor.fetchone()
             if promoted:
-                acursor.execute(
-                    "SELECT ngay_sinh, gioi_tinh, sdt, dia_chi FROM dbo.TaiKhoan WITH (UPDLOCK, HOLDLOCK) "
-                    "WHERE ma_tai_khoan = %s AND vai_tro = 'nguoi_dung' AND ma_co_so IS NULL",
-                    [account_id],
-                )
-                profile = acursor.fetchone()
-                if profile is None:
-                    raise StudentConflict
                 acursor.execute(
                     "UPDATE dbo.TaiKhoan SET vai_tro = 'hoc_vien', ma_co_so = %s, bat_buoc_doi_mat_khau = 0, "
                     "phien_ban = phien_ban + 1, cap_nhat_luc = SYSUTCDATETIME() "
@@ -312,6 +311,10 @@ def _attach_website_account(cursor, found, student, site_code: str, actor_id: st
             "sdt = COALESCE(sdt, %s), dia_chi = COALESCE(dia_chi, %s) WHERE ma_hoc_vien = %s AND ma_co_so = %s",
             [*profile, student_id, site_code],
         )
+        # The student profile now owns these details; drop the website-account copy.
+        with transaction.atomic(using=authority):
+            with connections[authority].cursor() as acursor:
+                acursor.execute("DELETE FROM dbo.NguoiDung WHERE ma_tai_khoan = %s", [account_id])
     return tuple(account)
 
 

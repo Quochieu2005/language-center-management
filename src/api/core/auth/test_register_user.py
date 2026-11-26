@@ -7,7 +7,7 @@ from django.contrib.auth.hashers import check_password
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIClient
 
-from core.auth import account_replication as replication, registration
+from core.auth import registration
 from core.auth.registration import RegistrationResult
 
 
@@ -45,8 +45,10 @@ class AccountOnlyRegistrationTests(SimpleTestCase):
         sql = [call.args[0] for call in cursor.execute.call_args_list]
         insert = next(call for call in cursor.execute.call_args_list if "INSERT dbo.TaiKhoan" in call.args[0])
         self.assertIn("'nguoi_dung',NULL", insert.args[0])
+        self.assertNotIn("ho_ten", insert.args[0])
         self.assertTrue(check_password("fixture-password", insert.args[1][4]))
-        self.assertEqual(insert.args[1][-1], "New")
+        profile = next(call for call in cursor.execute.call_args_list if "INSERT dbo.NguoiDung" in call.args[0])
+        self.assertEqual(profile.args[1], ["Q1-ND-000009", "Q1-TK-000009", "New"])
         self.assertFalse(any("INSERT dbo.HocVien" in text for text in sql))
 
     def test_refuses_an_email_held_by_a_student_profile_or_an_existing_account(self):
@@ -102,26 +104,6 @@ class RegistrationSwitchTests(SimpleTestCase):
         student.assert_not_called()
         self.assertNotIn("site_code", user.call_args.kwargs)
 
-
-@override_settings(AUTH_SESSION_SITE_CODE="Q1")
-class ProfileColumnReplicationTests(SimpleTestCase):
-    def select_columns(self, role):
-        conn, cursor = connection()
-        row = tuple(range(len(replication.ACCOUNT_COLUMNS))) + ((None,) * 5 if role == "nguoi_dung" else ())
-        cursor.fetchone.side_effect = [(role,), row, None, (1,)]
-        with (
-            patch.object(replication, "auth_session_alias", return_value="auth"),
-            patch.object(replication, "get_site_database_alias", return_value="auth"),
-            patch.object(replication, "connections", {"auth": conn}),
-            patch.object(replication.transaction, "atomic", return_value=nullcontext()),
-            patch.object(replication, "_acquire_named_lock"),
-        ):
-            replication.deliver_account("A", "Q1")
-        return next(call.args[0] for call in cursor.execute.call_args_list if "FROM dbo.TaiKhoan WITH (UPDLOCK" in call.args[0])
-
-    def test_profile_columns_are_replicated_only_for_nguoi_dung(self):
-        self.assertIn("ho_ten", self.select_columns("nguoi_dung"))
-        self.assertNotIn("ho_ten", self.select_columns("hoc_vien"))
 
 
 class NguoiDungPrincipalTests(SimpleTestCase):
