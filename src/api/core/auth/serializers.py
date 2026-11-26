@@ -2,6 +2,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from core.students.serializers import StudentProfileUpdateSerializer
+
 
 class AuthLoginSerializer(serializers.Serializer):
     identifier = serializers.CharField(max_length=254, trim_whitespace=True)
@@ -390,3 +392,19 @@ class CsrfTokenResponseSerializer(serializers.Serializer):
 
 class EmptyRequestSerializer(serializers.Serializer):
     """Explicit empty JSON body for session activity and logout operations."""
+
+
+class AccountProfileUpdateSerializer(StudentProfileUpdateSerializer):
+    """Same editable fields as a student's own profile, applied to the website account."""
+
+
+class AccountProfileResponseSerializer(serializers.Serializer):
+    slug = serializers.CharField()
+    email = serializers.EmailField()
+    username = serializers.CharField()
+    full_name = serializers.CharField(allow_null=True)
+    birth_date = serializers.DateField(allow_null=True)
+    gender = serializers.CharField(allow_null=True)
+    phone = serializers.CharField(allow_null=True)
+    address = serializers.CharField(allow_null=True)
+    avatar_secure_url = serializers.URLField(allow_null=True)

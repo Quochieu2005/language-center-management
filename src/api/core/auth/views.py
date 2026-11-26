@@ -32,7 +32,10 @@ from core.auth.admin_big_profile import (
     get_admin_big_self_profile,
     update_admin_big_self_profile,
 )
+from core.auth.account_profile import AccountProfileNotAllowed, get_account_profile, update_account_profile
 from core.auth.serializers import (
+    AccountProfileResponseSerializer,
+    AccountProfileUpdateSerializer,
     AdminForgotPasswordSerializer,
     AdminBigSelfProfileResponseSerializer,
     AdminBigSelfProfileUpdateSerializer,
@@ -936,3 +939,54 @@ class AuthLogoutView(APIView):
             samesite=settings.SESSION_COOKIE_SAMESITE,
         )
         return response
+
+
+class AuthAccountProfileView(APIView):
+    """Basic profile of a website account (role nguoi_dung); the session decides whose it is."""
+
+    authentication_classes = [AuthCookieAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "student_portal"
+
+    def _guard(self, request):
+        if request.user.role != "nguoi_dung":
+            return Response({"detail": "Chỉ tài khoản xem website mới dùng hồ sơ này."}, status=status.HTTP_403_FORBIDDEN)
+        return None
+
+    @extend_schema(
+        operation_id="auth_account_profile_read", tags=["Xác thực"],
+        summary="Tài khoản xem website đọc hồ sơ cơ bản của chính mình",
+        responses={200: AccountProfileResponseSerializer, 403: OpenApiResponse(description="Không phải tài khoản xem website.")},
+    )
+    def get(self, request):
+        denied = self._guard(request)
+        if denied:
+            return denied
+        try:
+            return Response(get_account_profile(request.user))
+        except AccountProfileNotAllowed:
+            return Response({"detail": "Không tìm thấy hồ sơ tài khoản."}, status=status.HTTP_404_NOT_FOUND)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc
+
+    @extend_schema(
+        operation_id="auth_account_profile_update", tags=["Xác thực"],
+        summary="Tài khoản xem website sửa họ tên, ngày sinh, giới tính, điện thoại, địa chỉ",
+        request=AccountProfileUpdateSerializer,
+        responses={200: AccountProfileResponseSerializer, 400: OpenApiResponse(), 403: OpenApiResponse(), 503: OpenApiResponse()},
+    )
+    def patch(self, request):
+        denied = self._guard(request)
+        if denied:
+            return denied
+        serializer = AccountProfileUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            return Response(update_account_profile(
+                request.user, serializer.validated_data, request.META.get("REMOTE_ADDR", "") or "unknown",
+            ))
+        except AccountProfileNotAllowed:
+            return Response({"detail": "Không tìm thấy hồ sơ tài khoản."}, status=status.HTTP_404_NOT_FOUND)
+        except AuthInfrastructureUnavailable as exc:
+            raise AuthenticationUnavailable from exc

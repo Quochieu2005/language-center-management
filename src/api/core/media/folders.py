@@ -11,6 +11,7 @@ _RESOURCE_LAYOUTS = {
     "teacher": ("giao-vien", "site"),
     "employee": ("nhan-vien", "site"),
     "account": ("admin", "shared"),
+    "user": ("nguoi-dung", "shared"),
     "course": ("khoa-hoc", "shared"),
     "branch": ("co-so", "shared"),
     "brand": ("thuong-hieu", "shared"),
@@ -78,7 +79,7 @@ def build_asset_folder(
 
 _LEGACY_UUID_PUBLIC_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\Z")
 _PATH_PUBLIC_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*(?:/[A-Za-z0-9][A-Za-z0-9_-]*){1,7}\Z")
-_AVATAR_RESOURCES = {"student", "teacher", "employee", "account"}
+_AVATAR_RESOURCES = {"student", "teacher", "employee", "account", "user"}
 
 
 def _root_segments() -> list[str]:

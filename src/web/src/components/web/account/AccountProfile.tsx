@@ -6,6 +6,7 @@ import { Alert, Avatar, Button, Form, Input, Select } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { SelfAvatarUploader } from "@/components/shared/SelfAvatarUploader";
 import { academicsApi, type ApiRow } from "@/lib/api/academics";
+import { authApi } from "@/lib/api/auth";
 import styles from "./AccountProfile.module.scss";
 
 export type ProfileValues = {
@@ -17,6 +18,8 @@ export type ProfileValues = {
 };
 
 type Props = {
+  /** `user` is a website account (no student profile yet); `student` keeps the student's own profile. */
+  variant?: "student" | "user";
   profile: ApiRow;
   slug: string;
   saving?: boolean;
@@ -27,7 +30,8 @@ type Props = {
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
-export default function AccountProfile({ profile, slug, saving = false, onSave, onAvatarUploaded }: Props) {
+export default function AccountProfile({ variant = "student", profile, slug, saving = false, onSave, onAvatarUploaded }: Props) {
+  const isUser = variant === "user";
   const [form] = Form.useForm<ProfileValues>();
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -61,14 +65,16 @@ export default function AccountProfile({ profile, slug, saving = false, onSave, 
         <SelfAvatarUploader
           slug={slug}
           hasAvatar={Boolean(avatar)}
-          api={{ createIntent: academicsApi.createStudentSelfAvatarIntent, complete: academicsApi.completeStudentSelfAvatar }}
+          api={isUser
+            ? { createIntent: authApi.createAvatarUploadIntent, complete: authApi.completeAvatarUpload }
+            : { createIntent: academicsApi.createStudentSelfAvatarIntent, complete: academicsApi.completeStudentSelfAvatar }}
           onUploaded={(url) => { setAvatar(url); onAvatarUploaded?.(url); }}
         />
         <small>JPG, PNG hoặc WebP · tối đa 5 MB</small>
       </div>
       <nav className={styles.links} aria-label="Lối tắt tài khoản">
         <Link href="/courses">Xem khóa học <span aria-hidden="true">→</span></Link>
-        <Link href="/student">Cổng học viên <span aria-hidden="true">→</span></Link>
+        {!isUser && <Link href="/student">Cổng học viên <span aria-hidden="true">→</span></Link>}
         <Link href="/password/change">Đổi mật khẩu <span aria-hidden="true">→</span></Link>
       </nav>
     </aside>
@@ -76,7 +82,7 @@ export default function AccountProfile({ profile, slug, saving = false, onSave, 
     <section className={styles.card} aria-labelledby="account-form-title">
       <p className={styles.eyebrow}>THÔNG TIN CÁ NHÂN</p>
       <h2 id="account-form-title">Cập nhật hồ sơ</h2>
-      <p className={styles.note}>Email do hệ thống cấp nên không đổi được ở đây. Các thông tin còn lại bạn có thể sửa bất cứ lúc nào.</p>
+      <p className={styles.note}>Email dùng để đăng nhập nên không đổi được ở đây. Các thông tin còn lại bạn có thể sửa bất cứ lúc nào.</p>
       {error && <Alert className={styles.alert} type="error" showIcon title={error} />}
       {saved && <Alert className={styles.alert} type="success" showIcon title="Đã lưu hồ sơ của bạn." />}
       <Form form={form} layout="vertical" requiredMark={false} onFinish={submit} onValuesChange={() => setSaved(false)} disabled={saving}>
@@ -85,7 +91,7 @@ export default function AccountProfile({ profile, slug, saving = false, onSave, 
             <Input size="large" maxLength={150} autoComplete="name" />
           </Form.Item>
           <Form.Item label="Email"><Input size="large" value={text(profile.email)} disabled /></Form.Item>
-          <Form.Item label="Mã hồ sơ"><Input size="large" value={text(profile.student_id)} disabled /></Form.Item>
+          <Form.Item label={isUser ? "Tên đăng nhập" : "Mã hồ sơ"}><Input size="large" value={text(isUser ? profile.username : profile.student_id)} disabled /></Form.Item>
           <Form.Item name="birth_date" label="Ngày sinh"><Input size="large" type="date" max={new Date().toISOString().slice(0, 10)} /></Form.Item>
           <Form.Item name="gender" label="Giới tính">
             <Select size="large" allowClear placeholder="Chọn giới tính" options={["Nam", "Nữ", "Khác"].map((value) => ({ value, label: value }))} />
