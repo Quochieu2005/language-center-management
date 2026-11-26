@@ -168,6 +168,7 @@ class StudentProfileSerializer(serializers.Serializer):
     address = serializers.CharField(allow_null=True)
     enrolled_on = serializers.DateField()
     status = serializers.CharField()
+    avatar_secure_url = serializers.URLField(allow_null=True, required=False)
 
 
 class StudentAdminProfileSerializer(StudentProfileSerializer):

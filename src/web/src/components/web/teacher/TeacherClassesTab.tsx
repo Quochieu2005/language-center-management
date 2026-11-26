@@ -9,6 +9,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import type { ApiRow, SessionRow } from "@/lib/api/academics";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type TeacherClassesTabProps = {
   classes: ApiRow[];
@@ -156,14 +157,14 @@ export function TeacherClassesTab({
                       style={{
                         padding: 14,
                         borderRadius: 10,
-                        border: isSelected ? "2px solid #175245" : "1px solid #e2e8f0",
-                        background: isSelected ? "#e6f7ed" : "#fff",
+                        border: isSelected ? "2px solid var(--portal-accent)" : "1px solid #e2e8f0",
+                        background: isSelected ? "var(--portal-accent-soft)" : "#fff",
                         cursor: "pointer",
                         transition: "all 0.2s",
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: isSelected ? "#175245" : "#1e293b" }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: isSelected ? "var(--portal-accent)" : "#1e293b" }}>
                           {String(cls.name || cls.class_id)}
                         </span>
                         <Tag color={String(cls.status) === "dang_hoc" ? "green" : "default"}>
@@ -209,7 +210,7 @@ export function TeacherClassesTab({
               <Card
                 title={
                   <span>
-                    <CalendarOutlined style={{ marginRight: 8, color: "#175245" }} />
+                    <CalendarOutlined className={portal.accent} style={{ marginRight: 8 }}/>
                     Danh sách buổi học ({sessions.length})
                   </span>
                 }
@@ -229,7 +230,7 @@ export function TeacherClassesTab({
               <Card
                 title={
                   <span>
-                    <TeamOutlined style={{ marginRight: 8, color: "#175245" }} />
+                    <TeamOutlined className={portal.accent} style={{ marginRight: 8 }}/>
                     Học viên trong lớp ({roster.length})
                   </span>
                 }

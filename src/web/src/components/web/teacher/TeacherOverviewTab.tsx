@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 import type { ApiRow, SessionRow } from "@/lib/api/academics";
 import styles from "./TeacherPortal.module.scss";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type TeacherOverviewTabProps = {
   classes: ApiRow[];
@@ -41,7 +42,7 @@ export function TeacherOverviewTab({
           <Statistic
             title="Lớp đang phụ trách"
             value={classes.length}
-            prefix={<ReadOutlined style={{ color: "#175245" }} />}
+            prefix={<ReadOutlined className={portal.accent} />}
             suffix={<span style={{ fontSize: 13, color: "#64748b" }}>({activeClasses} đang học)</span>}
           />
         </Card>
@@ -49,21 +50,21 @@ export function TeacherOverviewTab({
           <Statistic
             title="Buổi học đã lên lịch"
             value={sessions.length}
-            prefix={<CalendarOutlined style={{ color: "#175245" }} />}
+            prefix={<CalendarOutlined className={portal.accent} />}
           />
         </Card>
         <Card className={styles.kpiCard} variant="borderless">
           <Statistic
             title="Tổng số học viên"
             value={totalStudents}
-            prefix={<TeamOutlined style={{ color: "#175245" }} />}
+            prefix={<TeamOutlined className={portal.accent} />}
           />
         </Card>
         <Card className={styles.kpiCard} variant="borderless">
           <Statistic
             title="Cơ sở làm việc"
             value={siteCode || "Chưa xác định"}
-            prefix={<EnvironmentOutlined style={{ color: "#175245" }} />}
+            prefix={<EnvironmentOutlined className={portal.accent} />}
           />
         </Card>
       </div>

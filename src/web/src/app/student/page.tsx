@@ -133,7 +133,7 @@ function StudentPortal() {
       {/* 1. Portal Header */}
       <div className={styles.portalHeader}>
         <div className={styles.studentInfo}>
-          <Avatar size={54} icon={<UserOutlined />} className={styles.avatar} />
+          <Avatar size={54} icon={<UserOutlined />} className={styles.avatar} src={typeof data.profile?.avatar_secure_url === "string" ? data.profile.avatar_secure_url : undefined} />
           <div className={styles.meta}>
             <h2>{studentName}</h2>
             <p>

@@ -3,6 +3,7 @@
 import { Card, Table, Tag, Typography, Empty, Space } from "antd";
 import { CalendarOutlined, ClockCircleOutlined, EnvironmentOutlined, UserOutlined } from "@ant-design/icons";
 import type { ApiRow } from "@/lib/api/academics";
+import portal from "@/components/web/shared/Portal.module.scss";
 
 type Props = {
   schedule: ApiRow[];
@@ -38,7 +39,7 @@ export function StudentScheduleTab({ schedule, loading }: Props) {
       key: "date",
       render: (val: unknown) => (
         <Space>
-          <CalendarOutlined style={{ color: "#175245" }} />
+          <CalendarOutlined className={portal.accent} />
           <span>{String(val || "---")}</span>
         </Space>
       ),
@@ -48,7 +49,7 @@ export function StudentScheduleTab({ schedule, loading }: Props) {
       key: "time",
       render: (_: unknown, row: ApiRow) => (
         <Space>
-          <ClockCircleOutlined style={{ color: "#fa8c16" }} />
+          <ClockCircleOutlined className={portal.accent} />
           <span>{String(row.start_time || "")} - {String(row.end_time || "")}</span>
         </Space>
       ),
@@ -59,7 +60,7 @@ export function StudentScheduleTab({ schedule, loading }: Props) {
       key: "room_name",
       render: (val: unknown) => (
         <Space>
-          <EnvironmentOutlined style={{ color: "#52c41a" }} />
+          <EnvironmentOutlined className={portal.accent} />
           <span>{String(val || "Chưa xếp phòng")}</span>
         </Space>
       ),
@@ -104,7 +105,7 @@ export function StudentScheduleTab({ schedule, loading }: Props) {
     <Card
       title={
         <Space>
-          <CalendarOutlined style={{ color: "#175245" }} />
+          <CalendarOutlined className={portal.accent} />
           <span>Thời khóa biểu & Lịch học ({schedule.length} buổi)</span>
         </Space>
       }

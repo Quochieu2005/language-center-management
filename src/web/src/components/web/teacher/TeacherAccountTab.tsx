@@ -7,8 +7,8 @@ import { adminApi, type Teacher } from "@/lib/api/admin";
 import { authApi } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session";
 import { SelfAvatarUploader } from "@/components/shared/SelfAvatarUploader";
+import portal from "@/components/web/shared/Portal.module.scss";
 
-const ACCENT = "#175245";
 const TEACHING_STATUS: Record<string, { label: string; color: string }> = {
   dang_day: { label: "Đang giảng dạy", color: "green" },
   tam_nghi: { label: "Tạm nghỉ", color: "orange" },
@@ -84,7 +84,7 @@ export function TeacherAccountTab() {
   return (
     <Row gutter={[24, 24]}>
       <Col xs={24} lg={14}>
-        <Card title={<span><UserOutlined style={{ marginRight: 8, color: ACCENT }} />Hồ sơ giáo viên</span>}>
+        <Card title={<span><UserOutlined className={portal.accent} style={{ marginRight: 8 }}/>Hồ sơ giáo viên</span>}>
           {loadError && <Alert type="error" showIcon title={loadError} style={{ marginBottom: 16 }} />}
           {loading ? <Skeleton active avatar paragraph={{ rows: 6 }} /> : (
             <>
@@ -145,7 +145,7 @@ export function TeacherAccountTab() {
       </Col>
 
       <Col xs={24} lg={10}>
-        <Card title={<span><SafetyCertificateOutlined style={{ marginRight: 8, color: ACCENT }} />Đổi mật khẩu</span>}>
+        <Card title={<span><SafetyCertificateOutlined className={portal.accent} style={{ marginRight: 8 }}/>Đổi mật khẩu</span>}>
           <Form form={passwordForm} layout="vertical" onFinish={changePassword}>
             <Form.Item name="current" label="Mật khẩu hiện tại" rules={[{ required: true, message: "Vui lòng nhập mật khẩu hiện tại" }]}>
               <Input.Password prefix={<LockOutlined />} autoComplete="current-password" placeholder="Nhập mật khẩu hiện tại" />

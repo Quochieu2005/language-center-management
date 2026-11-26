@@ -1,3 +1,4 @@
+import type { AvatarUploadIntent } from "./auth";
 import { apiRequest, jsonBody, query } from "./client";
 
 export type ApiRow = Record<string, unknown>;
@@ -75,6 +76,8 @@ export const academicsApi = {
   createStudentSePayPayment: (slug: string, tuitionId: string, body: { option: SePayPaymentOption }, idempotencyKey: string) => apiRequest<StudentSePayPayment>(`/students/profile/${encodeURIComponent(slug)}/tuition/${encodeURIComponent(tuitionId)}/payments/sepay/`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: jsonBody(body) }),
   studentPaymentStatus: (slug: string, attemptId: string) => apiRequest<StudentSePayPayment>(`/students/profile/${encodeURIComponent(slug)}/payments/${encodeURIComponent(attemptId)}/`),
   studentGrades: (slug: string) => apiRequest<ApiList<ApiRow>>(`/students/profile/${encodeURIComponent(slug)}/grades/`),
+  createStudentSelfAvatarIntent: (slug: string) => apiRequest<AvatarUploadIntent>(`/students/profile/${encodeURIComponent(slug)}/avatar/upload-intents/`, { method: "POST", body: "{}" }),
+  completeStudentSelfAvatar: (slug: string, body: { intent_token: string; public_id: string }) => apiRequest<{ avatar_secure_url: string }>(`/students/profile/${encodeURIComponent(slug)}/avatar/complete/`, { method: "POST", body: jsonBody(body) }),
   studentProfile: (slug: string) => apiRequest<ApiRow>(`/students/profile/${encodeURIComponent(slug)}/`),
   updateStudentProfile: (slug: string, body: ApiRow) => apiRequest<ApiRow>(`/students/profile/${encodeURIComponent(slug)}/`, { method: "PATCH", body: jsonBody(body) }),
 };

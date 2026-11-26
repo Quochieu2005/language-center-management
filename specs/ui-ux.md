@@ -479,6 +479,7 @@ Source hiện có route `/student` và API đọc hồ sơ, đăng ký, lịch, 
 | `/portal/student/dashboard` | Tổng quan học tập | Lớp hiện hành, lịch sắp tới, thông báo và khoản còn phải đóng |
 | `/portal/student/enrollments` | Khóa học/lớp của tôi | Đăng ký hiện hành, trạng thái, lớp và cơ sở |
 | `/portal/student/schedule` | Thời khóa biểu | Buổi học theo ngày/tuần, giờ `Asia/Ho_Chi_Minh` |
+| `/student` tab Hồ sơ & Bảo mật | Hồ sơ học viên | Tải/đổi ảnh đại diện (JPG/PNG/WebP ≤ 5 MB, tiếp tục đồng bộ khi lỗi), sửa điện thoại/địa chỉ, đổi mật khẩu, liên kết Google/Facebook; ảnh hiện ở phần đầu trang |
 | `/portal/student/tuition` | Học phí của tôi | Số phải đóng/đã đóng/còn nợ, lịch sử phiếu thu/hoàn |
 | `/portal/student/tuition/[tuitionId]/pay` | Bắt đầu thanh toán | Hiển thị số tiền API tính; chuyển tới checkout được nhà cung cấp lưu trữ; không nhập/lưu dữ liệu thẻ trong website |
 | `/portal/payments/[paymentRequestId]` | Trạng thái thanh toán | Đang chờ, đang xác minh, thành công, thất bại, đã hủy hoặc đang đối soát; trạng thái luôn lấy lại từ API sau reload; chỉ hiện “Yêu cầu hủy” khi trạng thái/quyền cho phép |
