@@ -758,7 +758,7 @@ def update_student_contact(*, user, changes: dict[str, Any], remote_ip: str):
         with connections[alias].cursor() as cursor:
             cursor.execute(
                 """
-                SELECT TOP (1) sdt, dia_chi
+                SELECT TOP (1) sdt, dia_chi, ho_ten, ngay_sinh, gioi_tinh
                 FROM dbo.HocVien WITH (UPDLOCK, HOLDLOCK)
                 WHERE ma_hoc_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
                   AND trang_thai IN ('dang_hoc', 'bao_luu')
@@ -770,12 +770,16 @@ def update_student_contact(*, user, changes: dict[str, Any], remote_ip: str):
                 raise StudentNotFound
             new_phone = changes.get("phone", before[0])
             new_address = changes.get("address", before[1])
+            new_name = changes.get("full_name", before[2])
+            new_birth = changes.get("birth_date", before[3])
+            new_gender = changes.get("gender", before[4])
             cursor.execute(
                 """
-                UPDATE dbo.HocVien SET sdt = %s, dia_chi = %s
+                UPDATE dbo.HocVien SET sdt = %s, dia_chi = %s, ho_ten = %s, ngay_sinh = %s, gioi_tinh = %s
                 WHERE ma_hoc_vien = %s AND ma_co_so = %s AND ma_tai_khoan = %s
                 """,
-                [new_phone, new_address, user.profile_id, site_code, user.account_id],
+                [new_phone, new_address, new_name, new_birth, new_gender,
+                 user.profile_id, site_code, user.account_id],
             )
             if cursor.rowcount != 1:
                 raise StudentConflict

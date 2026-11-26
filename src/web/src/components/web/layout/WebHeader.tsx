@@ -47,7 +47,7 @@ export default function WebHeader() {
         </button>
 
         <nav id="public-navigation" className={`${styles.navigation} ${menuOpen ? styles.navigationOpen : ""}`} aria-label="Điều hướng chính">
-          {links.map((link) => (
+          {(user?.role === "hoc_vien" ? [...links, { href: "/account", label: "Hồ sơ" }] : links).map((link) => (
             <Link
               key={link.href}
               className={pathname === link.href || (link.href !== "/" && pathname.startsWith(`${link.href}/`)) ? styles.activeLink : undefined}

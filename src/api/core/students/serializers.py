@@ -184,9 +184,28 @@ class StudentAvatarResponseSerializer(serializers.Serializer):
 
 
 class StudentProfileUpdateSerializer(StrictInputSerializer):
+    """What a student may change on their own profile; email, status and site stay with the center."""
+
+    full_name = serializers.CharField(max_length=150, trim_whitespace=True, required=False)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.ChoiceField(choices=("Nam", "Nữ", "Khác"), required=False, allow_blank=True, allow_null=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     address = serializers.CharField(max_length=300, required=False, allow_blank=True, allow_null=True)
-    allowed_fields = {"phone", "address"}
+    allowed_fields = {"full_name", "birth_date", "gender", "phone", "address"}
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value or any(ord(char) < 32 for char in value):
+            raise serializers.ValidationError("Họ tên không hợp lệ.")
+        return value
+
+    def validate_birth_date(self, value):
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError("Ngày sinh không được ở tương lai.")
+        return value
+
+    def validate_gender(self, value):
+        return value or None
 
     def validate_phone(self, value):
         value = value.strip() if value else ""

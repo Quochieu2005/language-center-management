@@ -2,12 +2,14 @@
 
 from functools import wraps
 
-from django.db import connections, transaction
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
+from django.db import DatabaseError, connections, transaction
 
 from core.auth.service_common import (
     AuthInfrastructureUnavailable, _acquire_named_lock, _digest, active_site_codes, auth_session_alias,
 )
-from core.sites.connections import get_site_connection
+from core.sites.connections import UnknownSiteError, get_site_connection
 
 
 class StudentEmailConflict(Exception):
@@ -84,16 +86,26 @@ def reserve_student_email(conflict_exception):
     return decorate
 
 
-def seed_student_emails():
-    """Bootstrap before cutover while all sites are readable; never infer missing data."""
+def seed_student_emails(allow_missing_sites: bool = False):
+    """Bootstrap before cutover while all sites are readable; never infer missing data.
+
+    ``allow_missing_sites`` is an explicit operator opt-in: unreachable sites are skipped, so an email
+    held only by a skipped site can later be registered again. Returns ``(reserved, skipped_sites)``.
+    """
     rows = []
+    skipped = []
     for site in active_site_codes():
-        with get_site_connection(site).cursor() as cursor:
-            cursor.execute(
-                "SELECT ma_hoc_vien, email FROM dbo.HocVien WHERE email IS NOT NULL "
-                "AND trang_thai IN ('dang_hoc', 'bao_luu')",
-            )
-            rows.extend((site, str(student), str(email)) for student, email in cursor.fetchall() if email.strip())
+        try:
+            with get_site_connection(site).cursor() as cursor:
+                cursor.execute(
+                    "SELECT ma_hoc_vien, email FROM dbo.HocVien WHERE email IS NOT NULL "
+                    "AND trang_thai IN ('dang_hoc', 'bao_luu')",
+                )
+                rows.extend((site, str(student), str(email)) for student, email in cursor.fetchall() if email.strip())
+        except (DatabaseError, ImproperlyConfigured, KeyError, UnknownSiteError):
+            if not allow_missing_sites or site == settings.AUTH_SESSION_SITE_CODE:
+                raise
+            skipped.append(site)
     seen = {}
     for site, student, email in rows:
         key = email.strip().casefold()
@@ -107,4 +119,4 @@ def seed_student_emails():
                 key = reserve_email(email, site, bootstrap=True)
                 cursor.execute("UPDATE dbo.DatChoEmailHocVien SET ma_hoc_vien = %s WHERE email_bam = %s", [student, key])
             cursor.execute("UPDATE dbo.TrangThaiKhoEmail SET san_sang = 1 WHERE id = 1")
-    return len(rows)
+    return len(rows), tuple(skipped)
