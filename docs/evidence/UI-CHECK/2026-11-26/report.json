@@ -1,0 +1,122 @@
+{
+ "report": [
+  {
+   "check": "blog list desktop: no horizontal overflow",
+   "ok": true,
+   "overflow_px": 0,
+   "console_errors": 0
+  },
+  {
+   "check": "blog detail desktop: no overflow",
+   "ok": true,
+   "overflow_px": 0
+  },
+  {
+   "check": "blog detail desktop: eyebrow/reading-time 'Bắt đầu đọc' removed",
+   "ok": true
+  },
+  {
+   "check": "blog list mobile: no horizontal overflow",
+   "ok": true,
+   "overflow_px": 0,
+   "console_errors": 0
+  },
+  {
+   "check": "blog detail mobile: no overflow",
+   "ok": true,
+   "overflow_px": 0
+  },
+  {
+   "check": "blog detail mobile: eyebrow/reading-time 'Bắt đầu đọc' removed",
+   "ok": true
+  },
+  {
+   "check": "enrollments: warning alert fills the card width",
+   "ok": true,
+   "alert_px": 1082,
+   "card_px": 1132
+  },
+  {
+   "check": "enrollments: alert text names the offline site",
+   "ok": true,
+   "text": "Chưa lấy được dữ liệu của cơ sở Q7 (đang ngoại tuyến). Danh sách dưới đây chỉ gồm các cơ sở còn lại."
+  },
+  {
+   "check": "enrollments: pending-only hides the already-issued student",
+   "ok": true
+  },
+  {
+   "check": "enrollments: both account tags present",
+   "ok": true
+  },
+  {
+   "check": "enrollments: sidebar item present",
+   "ok": true
+  },
+  {
+   "check": "enrollments: confirm modal explains password is kept for website accounts",
+   "ok": true,
+   "text": "Cấp tài khoản cho Nguyễn Văn An? Người này đã đăng ký tài khoản trên website. Tài khoản đó sẽ được chuyển thành tài khoản học viên"
+  },
+  {
+   "check": "enrollments: switch off shows issued student with 'Đã cấp'",
+   "ok": true
+  },
+  {
+   "check": "enrollments: student without email has a disabled issue button",
+   "ok": true,
+   "disabled_flags": [
+    false,
+    false,
+    true
+   ]
+  },
+  {
+   "check": "enrollments admin_big: console errors",
+   "ok": true,
+   "errors": []
+  },
+  {
+   "check": "enrollments empty state renders",
+   "ok": true,
+   "text": "Đăng ký khóa học | Tìm kiếm | Toàn hệ thống | Chỉ người chưa có tài khoản học viên | Đặt lại | Chưa lấy được dữ liệu của cơ sở Q7 (đang ngoại tuyến). Danh sách dưới đây chỉ gồm các cơ sở còn lại. | Ng"
+  },
+  {
+   "check": "enrollments error state renders",
+   "ok": true,
+   "text": "Đăng ký khóa học | Tìm kiếm | Toàn hệ thống | Chỉ người chưa có tài khoản học viên | Đặt lại | Không đọc được dữ liệu đăng ký từ cơ sở. | Ngày đăng ký\tNgười đăng ký\tKhóa học / lớp\tCơ sở\tTài khoản |  |"
+  },
+  {
+   "check": "enrollments tu_van: view-only message, no issue button",
+   "ok": true
+  },
+  {
+   "check": "enrollments mobile: page itself has no horizontal overflow (table scrolls inside card)",
+   "ok": false,
+   "overflow_px": 534
+  },
+  {
+   "check": "account page: loads profile for nguoi_dung",
+   "ok": true,
+   "console_errors": []
+  },
+  {
+   "check": "enroll dialog (website user): email prefilled and read-only",
+   "ok": true,
+   "value": "thu@example.test"
+  },
+  {
+   "check": "enroll dialog user: opens",
+   "ok": true,
+   "text": "Đăng ký lớp · Luyện thi TOEIC 450 - 550 |  | Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ tạo hồ sơ học viên từ thông tin tài khoản của bạn và liên hệ để xác nhận. |  | Cơ sở học | Cơ s"
+  },
+  {
+   "check": "enroll dialog guest: opens",
+   "ok": true,
+   "text": "Đăng ký lớp · Luyện thi TOEIC 450 - 550 |  | Chọn cơ sở và lớp còn chỗ. Trung tâm sẽ liên hệ để xác nhận thông tin và cấp tài khoản sau. |  | Cơ sở học | Cơ sở Quận 1 | Lớp đang mở"
+  }
+ ],
+ "unmatched_mock_endpoints": [
+  "POST auth/activity/"
+ ]
+}
