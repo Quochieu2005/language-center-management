@@ -70,7 +70,7 @@ Lần kiểm tra chỉ đọc mới ngày 20/11/2026: [TC-SITE-01 — kết qu�
 | TC-SYNC-01 | Ngày 26/11/2026: [hàng đợi tài khoản và Blog qua outage](evidence/TC-SYNC-01/2026-11-26/README.md) trên DB tạm, đạt sau khi sửa lỗi hai lần sửa liên tiếp không hội tụ; chưa thử trên site thật. Trước đó: người dùng cung cấp ảnh dừng/bật Q7 và đọc đồng bộ bù từ Q1 ngày 20/11/2026. API views kiểm chứng 202 → retry cùng key → complete trên ba bản sao; chưa thử outage TD hoặc cấu hình TD ở máy Minh Đức; xem [bằng chứng và giới hạn](MonHoc-SQL-Replication.md) |
 | TC-DTX-01 | Có luồng đề nghị/duyệt/Coordinator/retry; chưa có fault injection thật trước và sau commit đích |
 | TC-CON-01 | Ngày 26/11/2026: [chạy hai phiên SQL Server đồng thời](evidence/TC-CON-01/2026-11-26/README.md) trên DB tạm, phiên thứ hai chờ rồi bị từ chối, 20 vòng đúng một thắng, 12 phiên/5 chỗ ra đúng 5; chưa chạy trên site thật |
-| TC-DQ-01 | Ngày 26/11/2026: [đối chiếu từng DB, một site mất mạng, phục hồi](evidence/TC-DQ-01/2026-11-26/README.md) trên DB tạm, đạt. Phát hiện lỗi chưa sửa: database offline trên instance còn sống làm thống kê văng `InterfaceError` thay vì báo `missing_sites` |
+| TC-DQ-01 | Ngày 26/11/2026: [đối chiếu từng DB, một site mất mạng, phục hồi](evidence/TC-DQ-01/2026-11-26/README.md) trên DB tạm, đạt. Phát hiện và đã sửa: database offline trên instance còn sống làm thống kê văng `InterfaceError` thay vì báo `missing_sites` (backend `core/sites/mssql_backend`) |
 
 Đây là tình trạng đọc source/tài liệu, không phải lần chạy kiểm thử mới. Chỉ đánh dấu đạt sau khi lưu điều kiện đầu, site/bảng, lệnh hoặc request, kết quả trước/sau và log/ảnh không chứa bí mật theo [mẫu kiểm chứng](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md).
 

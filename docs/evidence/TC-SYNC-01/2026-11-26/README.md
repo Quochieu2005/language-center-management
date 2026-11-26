@@ -44,6 +44,6 @@ Hệ quả cần biết: gửi lại một khóa cũ khi tất cả site đã AC
 ## Giới hạn
 
 - Hai database tạm trên một instance; mất mạng được mô phỏng bằng cổng đóng. Chưa thử tắt máy hay ngắt VPN thật, chưa thử trên Q1/Q7/TD.
-- Database offline trên instance còn sống (không phải mất mạng) chưa được kiểm tra ở đây và có thể gặp lỗi `InterfaceError` như ghi ở [TC-DQ-01](../../TC-DQ-01/2026-11-26/README.md).
+- Database offline trên instance còn sống (không phải mất mạng) không được thử ở kịch bản này; cách xử lý lỗi kết nối loại đó đã được sửa chung ở tầng backend, xem [TC-DQ-01](../../TC-DQ-01/2026-11-26/README.md).
 - Chưa kiểm tra xung đột thật giữa hai người sửa cùng bài, chưa kiểm tra xóa hoặc đổi slug trong hàng đợi, chưa kiểm tra `KhoaHoc` (`sync_courses`) và MonHoc (Publication).
 - Worker được gọi bằng tay trong kịch bản; vòng lặp nền 5 giây và 10 giây/60 giây của `manage.py sync_blog` và `sync_accounts` chưa được chạy dài.

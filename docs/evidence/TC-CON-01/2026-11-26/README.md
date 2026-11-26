@@ -14,7 +14,7 @@ Như [TC-FRAG-01](../../TC-FRAG-01/2026-11-26/README.md): `QLTTNN_EVA`/`QLTTNN_E
 
 | Ca | Kết quả |
 |---|---|
-| A. Chứng minh chồng lấn: lớp 1 chỗ, hai học viên. Phiên 1 giữ khóa 2 giây sau khi tăng sĩ số (bộ kiểm thử chèn `sleep`), phiên 2 bắt đầu sau 0,5 giây | Phiên 1 thành công (2,22 giây). Phiên 2 **phải chờ** (1,74 giây) rồi bị từ chối `ClassConflict: Lớp đã đủ sĩ số tối đa.` Cuối: sĩ số 1, 1 đăng ký, 1 dòng học phí |
+| A. Chứng minh chồng lấn: lớp 1 chỗ, hai học viên. Phiên 1 giữ khóa 2 giây sau khi tăng sĩ số (bộ kiểm thử chèn `sleep`), phiên 2 bắt đầu sau 0,5 giây | Phiên 1 thành công (2,17 giây). Phiên 2 **phải chờ** (1,68 giây) rồi bị từ chối `ClassConflict: Lớp đã đủ sĩ số tối đa.` Cuối: sĩ số 1, 1 đăng ký, 1 dòng học phí |
 | B. 20 vòng, mỗi vòng một lớp 1 chỗ mới, hai phiên xuất phát cùng lúc bằng `Barrier` | Cả 20 vòng có đúng một thành công và một từ chối; không vượt sức chứa; sĩ số khớp số đăng ký |
 | C. Lớp 5 chỗ, 12 phiên cùng lúc | 5 thành công, 7 từ chối; cuối: sĩ số 5, 5 đăng ký, 5 dòng học phí |
 

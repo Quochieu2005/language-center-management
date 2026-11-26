@@ -1,60 +1,69 @@
 {
-  "run_at": "2026-11-26T22:41:06+07:00",
+  "run_at": "2026-11-26T22:52:35+07:00",
   "note": "Hai database tạm QLTTNN_EVA/EVB cùng instance; EVB được đưa OFFLINE bằng ALTER DATABASE để mô phỏng site mất kết nối.",
   "expected_by_direct_sql_per_database": {
-    "EVA": 59,
+    "EVA": 5,
     "EVB": 4
   },
   "step1_all_sites_up": {
     "complete": true,
     "missing_sites": [],
-    "total_active_students": 63,
+    "total_active_students": 9,
     "per_site": {
-      "EVA": 59,
+      "EVA": 5,
       "EVB": 4
     },
-    "seconds": 0.11,
+    "seconds": 0.08,
     "matches_direct": true
   },
   "step2a_EVB_database_offline_on_reachable_instance": {
     "attempts": [
       {
         "attempt": 1,
-        "returned": false,
-        "exception_type": "django.db.utils.InterfaceError",
-        "is_DatabaseError_subclass": false
+        "returned": true,
+        "complete": false,
+        "missing_sites": [
+          "EVB"
+        ]
       },
       {
         "attempt": 2,
-        "returned": false,
-        "exception_type": "django.db.utils.InterfaceError",
-        "is_DatabaseError_subclass": false
+        "returned": true,
+        "complete": false,
+        "missing_sites": [
+          "EVB"
+        ]
       },
       {
         "attempt": 3,
-        "returned": false,
-        "exception_type": "django.db.utils.InterfaceError",
-        "is_DatabaseError_subclass": false
+        "returned": true,
+        "complete": false,
+        "missing_sites": [
+          "EVB"
+        ]
       },
       {
         "attempt": 4,
-        "returned": false,
-        "exception_type": "django.db.utils.InterfaceError",
-        "is_DatabaseError_subclass": false
+        "returned": true,
+        "complete": false,
+        "missing_sites": [
+          "EVB"
+        ]
       }
     ],
-    "any_attempt_raised_instead_of_reporting_missing_site": true
+    "any_attempt_raised_instead_of_reporting_missing_site": false,
+    "every_attempt_reports_EVB_missing": true
   },
   "step2b_EVB_unreachable": {
     "complete": false,
     "missing_sites": [
       "EVB"
     ],
-    "total_active_students": 59,
+    "total_active_students": 5,
     "per_site": {
-      "EVA": 59
+      "EVA": 5
     },
-    "seconds": 6.31,
+    "seconds": 6.3,
     "EVB_not_reported_as_zero": true,
     "partial_total_equals_EVA_only": true,
     "local_EVA_query_still_works": true
@@ -62,12 +71,12 @@
   "step3_EVB_back_online": {
     "complete": true,
     "missing_sites": [],
-    "total_active_students": 63,
+    "total_active_students": 9,
     "per_site": {
-      "EVA": 59,
+      "EVA": 5,
       "EVB": 4
     },
-    "seconds": 0.06,
+    "seconds": 0.23,
     "matches_direct": true
   },
   "verdict": true

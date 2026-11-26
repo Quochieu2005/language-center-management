@@ -1,17 +1,17 @@
 {
-  "run_at": "2026-11-26T22:39:22+07:00",
+  "run_at": "2026-11-26T22:53:15+07:00",
   "note": "Hai database tạm QLTTNN_EVA/EVB trên cùng một instance; gọi trực tiếp register_student_to_class của source.",
   "A_overlap": {
     "class": "EVA-LH-C00",
     "capacity": 1,
     "t1": {
       "outcome": "success",
-      "seconds": 2.22,
+      "seconds": 2.17,
       "started_at": 0.0
     },
     "t2": {
       "outcome": "rejected",
-      "seconds": 1.74,
+      "seconds": 1.68,
       "started_at": 0.5,
       "error": "ClassConflict",
       "message": "Lớp đã đủ sĩ số tối đa."

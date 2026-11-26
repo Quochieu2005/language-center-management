@@ -1,4 +1,4 @@
-import sys, traceback
+import os, sys, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ev_harness as h
 

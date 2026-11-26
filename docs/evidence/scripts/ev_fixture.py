@@ -1,5 +1,5 @@
 """Fixture for the scratch sites EVA/EVB: shared catalog + site-local classes, students, enrollments."""
-import sys
+import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ev_harness as h
 

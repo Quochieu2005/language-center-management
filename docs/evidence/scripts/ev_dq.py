@@ -71,6 +71,8 @@ try:
 finally:
     set_state(h.SITES["EVB"], "ONLINE")
 offline_case["any_attempt_raised_instead_of_reporting_missing_site"] = any(not e["returned"] for e in offline_case["attempts"])
+offline_case["every_attempt_reports_EVB_missing"] = all(
+    e["returned"] and e["complete"] is False and e["missing_sites"] == ["EVB"] for e in offline_case["attempts"])
 result["step2a_EVB_database_offline_on_reachable_instance"] = offline_case
 time.sleep(2.6)
 
@@ -95,6 +97,7 @@ r3, t3 = api()
 result["step3_EVB_back_online"] = {**brief(r3), "seconds": t3,
                                    "matches_direct": brief(r3)["per_site"] == expected and r3["complete"]}
 result["verdict"] = bool(result["step1_all_sites_up"]["matches_direct"]
+                         and result["step2a_EVB_database_offline_on_reachable_instance"]["every_attempt_reports_EVB_missing"]
                          and result["step2b_EVB_unreachable"]["EVB_not_reported_as_zero"]
                          and result["step2b_EVB_unreachable"]["partial_total_equals_EVA_only"]
                          and result["step2b_EVB_unreachable"]["local_EVA_query_still_works"]
