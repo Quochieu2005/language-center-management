@@ -1,0 +1,89 @@
+{
+  "step1_create_category_all_up": {
+    "complete": true,
+    "sites_written": [],
+    "missing_sites": [],
+    "idempotent_replay": false
+  },
+  "step2_create_article_all_up": {
+    "complete": true,
+    "sites_written": [],
+    "missing_sites": [],
+    "idempotent_replay": false
+  },
+  "step3_edit1_while_EVB_down": {
+    "complete": false,
+    "sites_written": [],
+    "missing_sites": [
+      "EVB"
+    ],
+    "idempotent_replay": false,
+    "queue": {
+      "pending_count": 1,
+      "review_count": 0
+    }
+  },
+  "step4_edit2_while_EVB_down": {
+    "complete": false,
+    "sites_written": [],
+    "missing_sites": [
+      "EVB"
+    ],
+    "idempotent_replay": false,
+    "queue": {
+      "pending_count": 2,
+      "review_count": 0
+    }
+  },
+  "state_while_down": {
+    "EVA": {
+      "title": "Sua lan 2 khi EVB mat ket noi"
+    },
+    "EVB": {
+      "title": "Tieu de goc"
+    },
+    "sites_differ_as_expected": true
+  },
+  "worker_pass_while_EVB_down": {
+    "pending_count": 1,
+    "review_count": 1,
+    "completed": 0
+  },
+  "step5_worker_after_recovery": {
+    "pending_count": 0,
+    "review_count": 2,
+    "completed": 0
+  },
+  "converged": {
+    "EVA": {
+      "title": "Sua lan 2 khi EVB mat ket noi"
+    },
+    "EVB": {
+      "title": "Tieu de goc"
+    },
+    "identical": false,
+    "final_title_is_last_edit": false
+  },
+  "markers_in_authority_logs": [
+    [
+      "BLINT-",
+      "None",
+      "2"
+    ],
+    [
+      "BLOG-A",
+      "thanh_cong",
+      "3"
+    ],
+    [
+      "BLOG-C",
+      "thanh_cong",
+      "1"
+    ],
+    [
+      "BLREV-",
+      "that_bai",
+      "2"
+    ]
+  ]
+}

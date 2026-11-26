@@ -1,0 +1,74 @@
+{
+  "run_at": "2026-11-26T22:41:06+07:00",
+  "note": "Hai database tạm QLTTNN_EVA/EVB cùng instance; EVB được đưa OFFLINE bằng ALTER DATABASE để mô phỏng site mất kết nối.",
+  "expected_by_direct_sql_per_database": {
+    "EVA": 59,
+    "EVB": 4
+  },
+  "step1_all_sites_up": {
+    "complete": true,
+    "missing_sites": [],
+    "total_active_students": 63,
+    "per_site": {
+      "EVA": 59,
+      "EVB": 4
+    },
+    "seconds": 0.11,
+    "matches_direct": true
+  },
+  "step2a_EVB_database_offline_on_reachable_instance": {
+    "attempts": [
+      {
+        "attempt": 1,
+        "returned": false,
+        "exception_type": "django.db.utils.InterfaceError",
+        "is_DatabaseError_subclass": false
+      },
+      {
+        "attempt": 2,
+        "returned": false,
+        "exception_type": "django.db.utils.InterfaceError",
+        "is_DatabaseError_subclass": false
+      },
+      {
+        "attempt": 3,
+        "returned": false,
+        "exception_type": "django.db.utils.InterfaceError",
+        "is_DatabaseError_subclass": false
+      },
+      {
+        "attempt": 4,
+        "returned": false,
+        "exception_type": "django.db.utils.InterfaceError",
+        "is_DatabaseError_subclass": false
+      }
+    ],
+    "any_attempt_raised_instead_of_reporting_missing_site": true
+  },
+  "step2b_EVB_unreachable": {
+    "complete": false,
+    "missing_sites": [
+      "EVB"
+    ],
+    "total_active_students": 59,
+    "per_site": {
+      "EVA": 59
+    },
+    "seconds": 6.31,
+    "EVB_not_reported_as_zero": true,
+    "partial_total_equals_EVA_only": true,
+    "local_EVA_query_still_works": true
+  },
+  "step3_EVB_back_online": {
+    "complete": true,
+    "missing_sites": [],
+    "total_active_students": 63,
+    "per_site": {
+      "EVA": 59,
+      "EVB": 4
+    },
+    "seconds": 0.06,
+    "matches_direct": true
+  },
+  "verdict": true
+}

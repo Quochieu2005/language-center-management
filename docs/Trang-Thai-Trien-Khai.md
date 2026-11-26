@@ -65,12 +65,12 @@ Lần kiểm tra chỉ đọc mới ngày 20/11/2026: [TC-SITE-01 — kết qu�
 
 | Mã kiểm chứng | Trạng thái được ghi trong tài liệu hiện có |
 |---|---|
-| TC-SITE-01 / TC-FRAG-01 | Schema và script hỗ trợ; phải lưu kết quả truy vấn từng database để chứng minh phân mảnh, không suy ra đạt từ ba DB |
+| TC-SITE-01 / TC-FRAG-01 | Schema và script hỗ trợ. Ngày 26/11/2026: [TC-FRAG-01](evidence/TC-FRAG-01/2026-11-26/README.md) đạt trên hai DB tạm (tái thiết, không giao nhau, 4 ca ghi sai site bị chặn); chưa có trên Q1/Q7/TD thật, Q1/TD vẫn chưa có lớp thật |
 | TC-REP-01 | Có ảnh UPDATE/INSERT Q1 → Q7 và phép thử API views với SQL thật thêm/sửa/xóa đủ Q1/Q7/TD, retry không tăng version, key khác body bị 409. TD hiện trên cùng Windows với Q1; chưa có browser end-to-end sau bổ sung TD; xem [bằng chứng và giới hạn](MonHoc-SQL-Replication.md) |
-| TC-SYNC-01 | Người dùng cung cấp ảnh dừng/bật Q7 và đọc đồng bộ bù từ Q1 ngày 20/11/2026. API views kiểm chứng 202 → retry cùng key → complete trên ba bản sao; chưa thử outage TD hoặc cấu hình TD ở máy Minh Đức; xem [bằng chứng và giới hạn](MonHoc-SQL-Replication.md) |
+| TC-SYNC-01 | Ngày 26/11/2026: [hàng đợi tài khoản và Blog qua outage](evidence/TC-SYNC-01/2026-11-26/README.md) trên DB tạm, đạt sau khi sửa lỗi hai lần sửa liên tiếp không hội tụ; chưa thử trên site thật. Trước đó: người dùng cung cấp ảnh dừng/bật Q7 và đọc đồng bộ bù từ Q1 ngày 20/11/2026. API views kiểm chứng 202 → retry cùng key → complete trên ba bản sao; chưa thử outage TD hoặc cấu hình TD ở máy Minh Đức; xem [bằng chứng và giới hạn](MonHoc-SQL-Replication.md) |
 | TC-DTX-01 | Có luồng đề nghị/duyệt/Coordinator/retry; chưa có fault injection thật trước và sau commit đích |
-| TC-CON-01 | Có khóa/transaction bảo vệ sức chứa trong source; chưa chạy hai phiên SQL Server đồng thời tranh chỗ cuối |
-| TC-DQ-01 | Có ghi nhận API trả kết quả khi các site sẵn sàng; còn thiếu bằng chứng dữ liệu đối chiếu và trường hợp một site không phản hồi |
+| TC-CON-01 | Ngày 26/11/2026: [chạy hai phiên SQL Server đồng thời](evidence/TC-CON-01/2026-11-26/README.md) trên DB tạm, phiên thứ hai chờ rồi bị từ chối, 20 vòng đúng một thắng, 12 phiên/5 chỗ ra đúng 5; chưa chạy trên site thật |
+| TC-DQ-01 | Ngày 26/11/2026: [đối chiếu từng DB, một site mất mạng, phục hồi](evidence/TC-DQ-01/2026-11-26/README.md) trên DB tạm, đạt. Phát hiện lỗi chưa sửa: database offline trên instance còn sống làm thống kê văng `InterfaceError` thay vì báo `missing_sites` |
 
 Đây là tình trạng đọc source/tài liệu, không phải lần chạy kiểm thử mới. Chỉ đánh dấu đạt sau khi lưu điều kiện đầu, site/bảng, lệnh hoặc request, kết quả trước/sau và log/ảnh không chứa bí mật theo [mẫu kiểm chứng](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md).
 

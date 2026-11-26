@@ -1,0 +1,391 @@
+{
+  "run_at": "2026-11-26T22:39:22+07:00",
+  "note": "Hai database tạm QLTTNN_EVA/EVB trên cùng một instance; gọi trực tiếp register_student_to_class của source.",
+  "A_overlap": {
+    "class": "EVA-LH-C00",
+    "capacity": 1,
+    "t1": {
+      "outcome": "success",
+      "seconds": 2.22,
+      "started_at": 0.0
+    },
+    "t2": {
+      "outcome": "rejected",
+      "seconds": 1.74,
+      "started_at": 0.5,
+      "error": "ClassConflict",
+      "message": "Lớp đã đủ sĩ số tối đa."
+    },
+    "t2_waited_for_t1": true,
+    "final_state": {
+      "capacity": 1,
+      "stored_count": 1,
+      "enrollments": 1,
+      "tuition_rows": 1,
+      "consistent": true
+    }
+  },
+  "B_rounds": {
+    "rounds": 20,
+    "exactly_one_success_each_round": true,
+    "no_overbooking": true,
+    "counts_consistent": true,
+    "detail": [
+      {
+        "class": "EVA-LH-C11",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C12",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C13",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C14",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C15",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C16",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C17",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C18",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C19",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C20",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C21",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C22",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C23",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C24",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C25",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C26",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C27",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C28",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C29",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      },
+      {
+        "class": "EVA-LH-C30",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        },
+        "errors": [
+          "ClassConflict"
+        ]
+      }
+    ]
+  },
+  "C_many": {
+    "class": "EVA-LH-C90",
+    "capacity": 5,
+    "sessions": 12,
+    "successes": 5,
+    "rejections": 7,
+    "final_state": {
+      "capacity": 5,
+      "stored_count": 5,
+      "enrollments": 5,
+      "tuition_rows": 5,
+      "consistent": true
+    }
+  },
+  "verdict": true
+}

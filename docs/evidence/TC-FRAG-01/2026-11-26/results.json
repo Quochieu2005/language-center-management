@@ -1,0 +1,103 @@
+{
+  "run_at": "2026-11-26T22:38:27+07:00",
+  "sites": {
+    "EVA": {
+      "instance": "DESKTOP-CK4K90F",
+      "database": "QLTTNN_EVA",
+      "site_local_checks": {
+        "total": 17,
+        "enabled_and_trusted": 17
+      },
+      "classes": [
+        "EVA-LH-000001",
+        "EVA-LH-000002",
+        "EVA-LH-000003"
+      ],
+      "classes_with_wrong_site": 0,
+      "enrollments": 5,
+      "enrollments_with_wrong_site": 0,
+      "enrollments_without_parent_class_in_same_site": 0,
+      "enrollments_without_student_in_same_site": 0,
+      "students_with_wrong_site": 0,
+      "classes_with_inconsistent_count": 0
+    },
+    "EVB": {
+      "instance": "DESKTOP-CK4K90F",
+      "database": "QLTTNN_EVB",
+      "site_local_checks": {
+        "total": 17,
+        "enabled_and_trusted": 17
+      },
+      "classes": [
+        "EVB-LH-000001",
+        "EVB-LH-000002"
+      ],
+      "classes_with_wrong_site": 0,
+      "enrollments": 4,
+      "enrollments_with_wrong_site": 0,
+      "enrollments_without_parent_class_in_same_site": 0,
+      "enrollments_without_student_in_same_site": 0,
+      "students_with_wrong_site": 0,
+      "classes_with_inconsistent_count": 0
+    }
+  },
+  "negative_tests": [
+    {
+      "site_database": "QLTTNN_EVB",
+      "case": "Lớp ghi nhầm ma_co_so=EVA vào DB của EVB",
+      "rejected": true,
+      "constraint": "CK_LopHoc_site_local",
+      "sqlstate_error": "547"
+    },
+    {
+      "site_database": "QLTTNN_EVB",
+      "case": "Học viên ma_co_so=EVA trong DB của EVB",
+      "rejected": true,
+      "constraint": "CK_HocVien_site_local",
+      "sqlstate_error": "547"
+    },
+    {
+      "site_database": "QLTTNN_EVB",
+      "case": "Đăng ký ở EVB trỏ vào lớp thuộc EVA (cha khác site)",
+      "rejected": true,
+      "constraint": "FK_DangKy_LopCungCoSo",
+      "sqlstate_error": "547"
+    },
+    {
+      "site_database": "QLTTNN_EVA",
+      "case": "Đăng ký ma_co_so=EVB trong DB của EVA",
+      "rejected": true,
+      "constraint": "CK_DangKy_site_local",
+      "sqlstate_error": "547"
+    }
+  ],
+  "classes": {
+    "expected": [
+      "EVA-LH-000001",
+      "EVA-LH-000002",
+      "EVA-LH-000003",
+      "EVB-LH-000001",
+      "EVB-LH-000002"
+    ],
+    "reconstructed": [
+      "EVA-LH-000001",
+      "EVA-LH-000002",
+      "EVA-LH-000003",
+      "EVB-LH-000001",
+      "EVB-LH-000002"
+    ],
+    "complete_and_exact": true,
+    "pairwise_disjoint": true,
+    "fragment_sizes": {
+      "EVA": 3,
+      "EVB": 2
+    }
+  },
+  "enrollments": {
+    "EVA": 5,
+    "EVB": 4
+  },
+  "shared_catalog_identical": true,
+  "negative_all_rejected": true,
+  "verdict": true
+}

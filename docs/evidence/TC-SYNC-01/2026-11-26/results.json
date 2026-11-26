@@ -1,0 +1,136 @@
+{
+  "run_at": "2026-11-26T22:47:07+07:00",
+  "note": "Hai database tạm QLTTNN_EVA (authority) và QLTTNN_EVB cùng instance; EVB mất kết nối được mô phỏng bằng cách trỏ cổng kết nối sang cổng đóng, như máy tắt hoặc VPN rớt.",
+  "part1_account_replication": {
+    "queue_after_insert_at_authority": [
+      {
+        "site": "EVA",
+        "attempts": 0
+      },
+      {
+        "site": "EVB",
+        "attempts": 0
+      }
+    ],
+    "account_missing_at_EVB_before": true,
+    "worker_pass_while_EVB_down": {
+      "delivered": 1,
+      "deferred": 1,
+      "queue_row_kept": true,
+      "attempts": 1,
+      "error_recorded": "OperationalError"
+    },
+    "worker_pass_after_recovery": {
+      "delivered": 1,
+      "deferred": 0,
+      "replica_equals_authority": true,
+      "queue_empty": true
+    },
+    "rerun_is_noop": true
+  },
+  "part2_blog_queue": {
+    "step1_create_category_all_up": {
+      "complete": true,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [],
+      "idempotent_replay": false
+    },
+    "step2_create_article_all_up": {
+      "complete": true,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [],
+      "idempotent_replay": false
+    },
+    "step3_edit1_while_EVB_down": {
+      "complete": false,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [
+        "EVB"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 1,
+        "review_count": 0
+      }
+    },
+    "step4_edit2_while_EVB_down": {
+      "complete": false,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [
+        "EVB"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 2,
+        "review_count": 0
+      }
+    },
+    "state_while_down": {
+      "EVA": {
+        "title": "Sua lan 2 khi EVB mat ket noi"
+      },
+      "EVB": {
+        "title": "Tieu de goc"
+      },
+      "sites_differ_as_expected": true
+    },
+    "worker_pass_while_EVB_down": {
+      "pending_count": 2,
+      "review_count": 0,
+      "completed": 0
+    },
+    "step5_worker_after_recovery": {
+      "pending_count": 0,
+      "review_count": 0,
+      "completed": 2
+    },
+    "converged": {
+      "EVA": {
+        "title": "Sua lan 2 khi EVB mat ket noi"
+      },
+      "EVB": {
+        "title": "Sua lan 2 khi EVB mat ket noi"
+      },
+      "identical": true,
+      "final_title_is_last_edit": true
+    },
+    "retry_latest_key_after_completion": {
+      "complete": true,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [],
+      "idempotent_replay": true,
+      "rows_unchanged": true,
+      "title_still_last_edit": true
+    },
+    "retry_older_key_after_newer_edit": {
+      "complete": true,
+      "site_codes": [
+        "EVA",
+        "EVB"
+      ],
+      "missing_sites": [],
+      "idempotent_replay": true,
+      "stale_change_not_reapplied": true
+    },
+    "queue_after": {
+      "pending_count": 0,
+      "review_count": 0
+    }
+  },
+  "verdict": true
+}
