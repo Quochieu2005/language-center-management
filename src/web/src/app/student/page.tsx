@@ -53,6 +53,19 @@ function StudentPortal() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [returnAttemptId, setReturnAttemptId] = useState<string | null>(null);
+
+  // SePay redirects back with ?payment=<attempt>; open the tuition tab and confirm via the API.
+  useEffect(() => {
+    const attempt = new URLSearchParams(window.location.search).get("payment");
+    if (!attempt || !/^[A-Za-z0-9_-]{1,24}$/.test(attempt)) return;
+    queueMicrotask(() => {
+      setReturnAttemptId(attempt);
+      setActiveTab("tuition");
+    });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  const clearReturnAttempt = useCallback(() => setReturnAttemptId(null), []);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!user) return;
@@ -100,6 +113,8 @@ function StudentPortal() {
       cancelled = true;
     };
   }, [load]);
+
+  const refreshAll = useCallback(() => load(true), [load]);
 
   const handleLogout = async () => {
     try {
@@ -238,7 +253,9 @@ function StudentPortal() {
                     rows={data.tuition}
                     loading={loading}
                     slug={user?.slug || ""}
-                    onRefresh={() => load(true)}
+                    onRefresh={refreshAll}
+                    returnAttemptId={returnAttemptId}
+                    onReturnHandled={clearReturnAttempt}
                   />
                 ),
               },

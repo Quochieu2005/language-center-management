@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
-import time
 import uuid
 
 from django.conf import settings
@@ -24,7 +21,8 @@ from core.academics.common import (
     AcademicInvalid,
     AcademicNotFound,
 )
-from core.academics.sepay import create_student_payment, get_student_payment, process_sepay_webhook
+from core.academics.sepay import create_student_payment, get_student_payment, process_gateway_ipn
+from core.academics.sepay_gateway import ipn_key_valid
 from core.academics.sepay_serializers import (
     SePayWebhookAckSerializer,
     StudentSePayPaymentCreateSerializer,
@@ -56,7 +54,7 @@ class StudentSePayPaymentCreateView(APIView):
     @extend_schema(
         operation_id="student_sepay_payment_create",
         tags=["Cổng học viên", "Thanh toán SePay"],
-        summary="Tạo hoặc tiếp tục yêu cầu QR thanh toán cho kỳ học phí đầu tiên còn nợ",
+        summary="Tạo yêu cầu thanh toán SePay: kỳ tiếp theo, một nửa hoặc toàn bộ số còn nợ",
         parameters=[
             OpenApiParameter("slug", str, OpenApiParameter.PATH),
             OpenApiParameter("tuition_id", str, OpenApiParameter.PATH),
@@ -86,8 +84,7 @@ class StudentSePayPaymentCreateView(APIView):
         try:
             result = create_student_payment(
                 user=request.user, tuition_id=tuition_id,
-                installment_id=serializer.validated_data["installment_id"],
-                amount=serializer.validated_data["amount"], idempotency_key=key,
+                option=serializer.validated_data["option"], idempotency_key=key,
             )
         except (AcademicConflict, AcademicInfrastructureUnavailable, AcademicInvalid, AcademicNotFound) as exc:
             return _payment_error(exc)
@@ -130,27 +127,18 @@ class SePayWebhookView(APIView):
     @extend_schema(
         operation_id="sepay_webhook_receive",
         tags=["Thanh toán SePay"],
-        summary="Nhận webhook SePay đã ký HMAC-SHA256",
+        summary="Nhận IPN của Cổng thanh toán SePay (header X-Secret-Key)",
         request=OpenApiTypes.OBJECT,
-        responses={200: SePayWebhookAckSerializer, 401: OpenApiResponse(description="Chữ ký không hợp lệ."), 503: OpenApiResponse(description="Site database tạm thời chưa sẵn sàng.")},
+        responses={200: SePayWebhookAckSerializer, 401: OpenApiResponse(description="Secret key không hợp lệ."), 503: OpenApiResponse(description="Site database tạm thời chưa sẵn sàng; SePay gửi lại.")},
     )
     def post(self, request):
         raw_body = request.body
         if len(raw_body) > 65536:
             return Response({"detail": "Payload quá lớn."}, status=413)
-        try:
-            timestamp = int(request.headers.get("X-SePay-Timestamp", ""))
-        except ValueError:
-            return Response({"detail": "Webhook không hợp lệ."}, status=401)
-        signature = request.headers.get("X-SePay-Signature", "")
-        if not settings.SEPAY_ENABLED or not settings.SEPAY_WEBHOOK_SECRET:
-            return Response({"detail": "Webhook chưa được cấu hình."}, status=503)
-        if abs(int(time.time()) - timestamp) > 300:
-            return Response({"detail": "Webhook đã hết thời gian hợp lệ."}, status=401)
-        signed = str(timestamp).encode("ascii") + b"." + raw_body
-        digest = hmac.new(settings.SEPAY_WEBHOOK_SECRET.encode("utf-8"), signed, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(f"sha256={digest}", signature):
-            return Response({"detail": "Webhook không hợp lệ."}, status=401)
+        if not settings.SEPAY_ENABLED:
+            return Response({"detail": "Thanh toán SePay chưa được bật."}, status=503)
+        if not ipn_key_valid(request.headers.get("X-Secret-Key")):
+            return Response({"detail": "IPN không hợp lệ."}, status=401)
         try:
             payload = json.loads(raw_body)
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -158,7 +146,8 @@ class SePayWebhookView(APIView):
         if not isinstance(payload, dict):
             return Response({"detail": "Payload JSON không hợp lệ."}, status=400)
         try:
-            process_sepay_webhook(payload)
+            process_gateway_ipn(payload)
         except (AcademicConflict, AcademicInfrastructureUnavailable, AcademicInvalid, AcademicNotFound):
-            return Response({"detail": "Site database chưa thể ghi nhận webhook."}, status=503)
+            # Not acknowledged: SePay retries and the order lookup can still settle it.
+            return Response({"detail": "Site database chưa thể ghi nhận IPN."}, status=503)
         return Response({"success": True}, status=200)

@@ -625,7 +625,7 @@ Request tối thiểu gồm `ma_lop_moi`. API lấy site từ đăng ký hiện 
 
 ## Thanh toán học phí
 
-Thu/hoàn tại quầy là thao tác `LOCAL` tại site giữ `HocPhi`. Thu tiền hiện dùng mã phiếu site-prefixed để đọc lại yêu cầu lặp; hoàn tiền lưu UUID idempotency và liên kết phiếu gốc tại cùng CSDL site. Source có tích hợp SePay nhưng portal học viên/thanh toán online chưa được duyệt vào phạm vi và `SEPAY_ENABLED=false` mặc định. Không dùng trạng thái frontend thay cho trạng thái SQL Server.
+Thu/hoàn tại quầy là thao tác `LOCAL` tại site giữ `HocPhi`. Thu tiền hiện dùng mã phiếu site-prefixed để đọc lại yêu cầu lặp; hoàn tiền lưu UUID idempotency và liên kết phiếu gốc tại cùng CSDL site. Học viên có thể đóng online qua Cổng thanh toán SePay (duyệt 26/11/2026, bật bằng `SEPAY_ENABLED`). Không dùng trạng thái frontend thay cho trạng thái SQL Server.
 
 ### Thu hoặc hoàn học phí tại quầy
 
@@ -660,11 +660,16 @@ Với hoàn tiền, `receipt_id` trong URL là phiếu gốc; API kiểm tra s�
 
 `GET /api/v1/admin/reports/tuition-by-site/` trả số khoản học phí, số khoản còn nợ, tổng phải thu, đã thu, đã hoàn, thu ròng và còn nợ theo site. Kế toán & Lễ tân chỉ nhận báo cáo `LOCAL` của site trong phiên; Admin Small cũng chỉ đọc site được giao; Admin Big có thể đọc `GLOBAL` hoặc chọn một site. `GLOBAL` truy vấn riêng từng DB và đánh dấu site thiếu.
 
-### SePay — code có trong source, phạm vi và vận hành chưa được duyệt
+### SePay — Cổng thanh toán (duyệt 26/11/2026)
 
-SePay là provider được triển khai trong source. `POST /api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/`, `GET /api/v1/students/profile/{slug}/payments/{attempt_id}/` và `POST /api/v1/webhooks/sepay/` là các route hiện có. Tích hợp mặc định tắt, phụ thuộc merchant/webhook secret và chưa có bằng chứng chạy giao dịch thật. Cổng thanh toán là dịch vụ ngoài, không phải một site SQL Server; nghiệp vụ khoản phí là `LOCAL` tại database chứa `HocPhi`, không phải giao dịch xuyên DB. Các quy tắc bên dưới là tiêu chí an toàn/thiết kế, không phải bằng chứng mọi trường hợp lỗi đã được triển khai.
+Học viên đóng học phí qua Cổng thanh toán SePay (hosted checkout). Cấu hình: `SEPAY_ENABLED`, `SEPAY_MERCHANT_ID`, `SEPAY_SECRET_KEY`, `SEPAY_IPN_SECRET_KEY` (mặc định bằng secret key), `SEPAY_ENV` (bỏ trống: `spsk_live_` → production, `spsk_test_` → sandbox), `WEB_APP_BASE_URL`. Không có database thanh toán trung tâm; mọi ghi là `LOCAL` tại site chứa `HocPhi`.
 
-#### Hợp đồng thiết kế và thứ tự xử lý
+- `POST /api/v1/students/profile/{slug}/tuition/{tuition_id}/payments/sepay/` — header `Idempotency-Key` (UUID), body `{"option": "next_installment" | "half" | "full"}`. API đối soát yêu cầu cũ với SePay, tính số tiền, lưu `YeuCauThanhToan` và trả `{attempt_id, amount, payment_code, status, expires_at, checkout: {action, method, fields}}`. `fields` gồm `merchant, currency, order_amount, operation=PURCHASE, order_description, order_invoice_number, success_url, error_url, cancel_url, signature` theo đúng thứ tự; `signature = base64(HMAC_SHA256(secret_key, "k=v,k=v,..."))`. Trình duyệt POST form tới `https://pay[-sandbox].sepay.vn/v1/checkout/init`. Cùng key trả lại cùng yêu cầu; còn yêu cầu chưa hết hạn → `409`; yêu cầu `can_doi_soat` → `409`; SePay không phản hồi khi đối soát → `503`.
+- `GET /api/v1/students/profile/{slug}/payments/{attempt_id}/` — nếu yêu cầu chưa ghi nhận, API gọi `GET https://pgapi[-sandbox].sepay.vn/v1/order/detail/{order_invoice_number}` (Basic `merchant_id:secret_key`); `order_status = CAPTURED` đúng VND/số tiền thì ghi phiếu thu. `404` từ SePay = chưa có đơn/chưa trả.
+- `POST /api/v1/webhooks/sepay/` — IPN JSON, xác thực header `X-Secret-Key` (so sánh hằng thời gian). Chỉ xử lý `notification_type = ORDER_PAID`, `transaction_status = APPROVED`. Trả `200 {"success": true}` sau khi commit hoặc khi sự kiện đã xử lý; lỗi DB trả `503` để SePay gửi lại. Cấu hình URL công khai HTTPS trong my.sepay.vn → Cổng thanh toán → IPN; máy local không nhận IPN và dựa vào tra cứu `order/detail`.
+- IPN và tra cứu dùng chung `SuKienThanhToan.ma_giao_dich_sepay = -int(sha256("sepay-pg:" + mã hóa đơn)[:15], 16)` (số âm, không trùng mã giao dịch ngân hàng) nên một hóa đơn chỉ được ghi một lần.
+
+#### Hợp đồng thiết kế và thứ tự xử lý (nguyên tắc chung)
 
 Các đường dẫn tổng quát dưới đây là mẫu thiết kế, không phải route source hiện tại. Khi cập nhật hợp đồng, dùng chính xác route SePay ở trên và đối chiếu `src/api/core/urls.py`.
 

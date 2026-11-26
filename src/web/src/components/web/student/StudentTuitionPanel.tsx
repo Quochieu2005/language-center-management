@@ -1,50 +1,66 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Empty, InputNumber, Modal, Space, Spin, Tag, Typography, message } from "antd";
-import { academicsApi, type ApiRow, type StudentSePayPayment } from "@/lib/api/academics";
+import { Alert, Button, Card, Empty, Modal, Radio, Space, Spin, Tag, Typography, message } from "antd";
+import { academicsApi, type ApiRow, type SePayCheckout, type StudentSePayPayment } from "@/lib/api/academics";
+import { formatVnd as money, tuitionPaymentOptions, type PaymentOptionKey } from "@/lib/tuitionPaymentOptions";
 import styles from "./StudentTuitionPanel.module.scss";
 
-type Installment = { installment_id: string; sequence: number; amount_due: number | string; amount_paid: number | string; balance: number | string; status: string };
+type Installment = { installment_id: string; sequence: number; amount_due: number | string; amount_paid: number | string; balance: number | string; status: string; due_date?: string };
 type Tuition = ApiRow & {
   tuition_id: string; course_name: string; amount_due: number | string;
   amount_paid: number | string; balance: number | string; installments?: Installment[];
   active_payment?: { attempt_id: string } | null;
 };
 
-const money = (value: number | string) => `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+const CONFIRM_POLL_MS = 4000;
+const CONFIRM_MAX_TRIES = 30;
 
-export function StudentTuitionPanel({ rows, loading, slug, onRefresh }: {
+/** Hand the signed fields to SePay's hosted checkout; card/bank details never touch our servers. */
+function submitCheckout(checkout: SePayCheckout) {
+  const form = document.createElement("form");
+  form.method = checkout.method || "POST";
+  form.action = checkout.action;
+  Object.entries(checkout.fields).forEach(([name, value]) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+
+export function StudentTuitionPanel({ rows, loading, slug, onRefresh, returnAttemptId, onReturnHandled }: {
   rows: ApiRow[]; loading: boolean; slug: string; onRefresh: () => Promise<void>;
+  returnAttemptId?: string | null; onReturnHandled?: () => void;
 }) {
-  const [selected, setSelected] = useState<{ tuition: Tuition; installment: Installment } | null>(null);
+  const [selected, setSelected] = useState<Tuition | null>(null);
+  const [option, setOption] = useState<PaymentOptionKey>("next_installment");
   const [payment, setPayment] = useState<StudentSePayPayment | null>(null);
-  const [amount, setAmount] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  const keyRef = useRef<string | null>(null);
-  const refreshedRef = useRef<string | null>(null);
+  const keyRef = useRef<{ scope: string; key: string } | null>(null);
 
-  const begin = (tuition: Tuition, installment: Installment) => {
-    keyRef.current = null;
-    setSelected({ tuition, installment });
-    setAmount(Number(installment.balance));
-    setPayment(null);
-    setOpen(true);
+  const startCheckout = (result: StudentSePayPayment) => {
+    if (result.status === "cho_thanh_toan" && result.checkout) {
+      message.loading("Đang chuyển sang trang thanh toán SePay...", 0);
+      submitCheckout(result.checkout);
+      return;
+    }
+    setPayment(result);
   };
 
-  const createPayment = async () => {
-    if (!selected || !slug || !amount || amount < 1) return;
+  const pay = async () => {
+    if (!selected || !slug) return;
+    const scope = `${selected.tuition_id}:${option}`;
+    // Keep one key per tuition+option so a lost response replays instead of creating a second attempt.
+    if (keyRef.current?.scope !== scope) keyRef.current = { scope, key: crypto.randomUUID() };
     setBusy(true);
-    keyRef.current ||= crypto.randomUUID();
     try {
-      const result = await academicsApi.createStudentSePayPayment(
-        slug, selected.tuition.tuition_id,
-        { installment_id: selected.installment.installment_id, amount }, keyRef.current,
-      );
-      keyRef.current = null;
-      setPayment(result);
-      message.success("Đã tạo yêu cầu thanh toán. Quét QR và chờ xác nhận.");
+      const result = await academicsApi.createStudentSePayPayment(slug, selected.tuition_id, { option }, keyRef.current.key);
+      startCheckout(result);
     } catch (error) {
       message.error(error instanceof Error ? error.message : "Không tạo được yêu cầu thanh toán.");
     } finally {
@@ -52,57 +68,57 @@ export function StudentTuitionPanel({ rows, loading, slug, onRefresh }: {
     }
   };
 
-  const resumePayment = async (tuition: Tuition) => {
+  const resume = async (tuition: Tuition) => {
     if (!tuition.active_payment?.attempt_id) return;
     setBusy(true);
-    setSelected({ tuition, installment: tuition.installments?.find((item) => Number(item.balance) > 0) || {
-      installment_id: "", sequence: 1, amount_due: 0, amount_paid: 0, balance: 0, status: "chua_dong",
-    } });
-    setPayment(null);
-    setOpen(true);
     try {
       const current = await academicsApi.studentPaymentStatus(slug, tuition.active_payment.attempt_id);
-      setPayment(current);
-      if (current.status === "da_thanh_toan") void onRefresh();
+      if (current.status === "da_thanh_toan") {
+        message.success("Khoản thanh toán trước đã được ghi nhận.");
+        void onRefresh();
+      } else {
+        startCheckout(current);
+      }
     } catch (error) {
-      setOpen(false);
       message.error(error instanceof Error ? error.message : "Không tải được trạng thái thanh toán.");
     } finally {
       setBusy(false);
     }
   };
 
+  // Back from SePay: the redirect proves nothing, so confirm through the API (IPN or order lookup).
   useEffect(() => {
-    if (!open || !payment || payment.status !== "cho_thanh_toan") return;
+    if (!returnAttemptId || !slug) return;
     let stopped = false;
+    let tries = 0;
     let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
+    queueMicrotask(() => { if (!stopped) setConfirming(true); });
+    const check = async () => {
+      tries += 1;
       try {
-        const next = await academicsApi.studentPaymentStatus(slug, payment.attempt_id);
+        const next = await academicsApi.studentPaymentStatus(slug, returnAttemptId);
         if (stopped) return;
         setPayment(next);
-        if (next.status === "da_thanh_toan" && refreshedRef.current !== next.attempt_id) {
-          refreshedRef.current = next.attempt_id;
-          void onRefresh();
-        }
-        if (next.status === "cho_thanh_toan") timer = setTimeout(poll, 3000);
+        if (next.status === "da_thanh_toan") { void onRefresh(); onReturnHandled?.(); return; }
+        if (next.status !== "cho_thanh_toan" || tries >= CONFIRM_MAX_TRIES) { onReturnHandled?.(); return; }
       } catch {
-        if (!stopped) timer = setTimeout(poll, 5000);
+        if (stopped || tries >= CONFIRM_MAX_TRIES) return;
       }
+      timer = setTimeout(check, CONFIRM_POLL_MS);
     };
-    timer = setTimeout(poll, 3000);
+    void check();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [open, payment, slug, onRefresh]);
+  }, [returnAttemptId, slug, onRefresh, onReturnHandled]);
 
   const items = rows as Tuition[];
   if (loading && items.length === 0) return <div className={styles.loading}><Spin description="Đang tải học phí..." /></div>;
   if (items.length === 0) return <Empty description="Chưa có khoản học phí." />;
+  const options = selected ? tuitionPaymentOptions(Number(selected.balance), selected.installments) : [];
 
   return <>
     <div className={styles.list}>
       {items.map((tuition) => {
         const installments = tuition.installments || [];
-        const firstUnpaid = installments.find((item) => Number(item.balance) > 0);
         const balance = Number(tuition.balance || 0);
         return <Card key={tuition.tuition_id} className={styles.card}>
           <div className={styles.heading}>
@@ -116,40 +132,47 @@ export function StudentTuitionPanel({ rows, loading, slug, onRefresh }: {
           </div>
           {installments.length > 0 && <div className={styles.installments}>
             {installments.map((item) => <div key={item.installment_id} className={styles.installment}>
-              <span>Kỳ {item.sequence}</span><span>{money(item.amount_paid)} / {money(item.amount_due)}</span>
-              <Tag>{money(item.balance)} còn nợ</Tag>
+              <span>Kỳ {item.sequence}{item.due_date ? ` · hạn ${new Date(item.due_date).toLocaleDateString("vi-VN")}` : ""}</span>
+              <span>{money(item.amount_paid)} / {money(item.amount_due)}</span>
+              <Tag color={Number(item.balance) > 0 ? (item.status === "qua_han" ? "red" : "default") : "green"}>
+                {Number(item.balance) > 0 ? `${money(item.balance)} còn nợ` : "Đã đóng"}
+              </Tag>
             </div>)}
           </div>}
-          {balance > 0 && <Button type="primary" loading={busy} onClick={() => tuition.active_payment
-            ? void resumePayment(tuition)
-            : firstUnpaid && begin(tuition, firstUnpaid)}>
-            {tuition.active_payment ? "Tiếp tục thanh toán" : "Thanh toán qua SePay"}
-          </Button>}
+          {balance > 0 && (tuition.active_payment
+            ? <Button type="primary" loading={busy} onClick={() => void resume(tuition)}>Tiếp tục thanh toán</Button>
+            : <Button type="primary" onClick={() => { setSelected(tuition); setOption("next_installment"); setPayment(null); }}>Thanh toán online</Button>)}
         </Card>;
       })}
     </div>
 
-    <Modal title={payment ? "Thanh toán học phí" : "Nhập số tiền muốn thanh toán"} open={open}
-      onCancel={() => setOpen(false)} footer={null} destroyOnHidden>
-      {busy && !payment ? <Spin description="Đang tải yêu cầu..." /> : payment ? <Space orientation="vertical" size="middle" className={styles.paymentDetails}>
-        {payment.status === "da_thanh_toan" ? <Alert type="success" showIcon title="Đã nhận thanh toán" description="Học phí đã được cập nhật. Biên nhận sẽ được gửi tới email học viên." />
-          : payment.status === "cho_thanh_toan" ? <Alert type="info" showIcon title="Đang chờ ngân hàng xác nhận" description="Sau khi chuyển khoản, giữ cửa sổ này mở hoặc quay lại để kiểm tra trạng thái." />
-            : <Alert type="warning" showIcon title={payment.status === "can_doi_soat" ? "Giao dịch cần đối soát" : "Yêu cầu không còn hiệu lực"} description="Không chuyển lại theo mã QR này. Liên hệ cơ sở để kiểm tra giao dịch." />}
-        {payment.status === "cho_thanh_toan" && <img className={styles.qr} src={payment.qr_url} alt="Mã QR thanh toán học phí" />}
+    <Modal title="Thanh toán học phí qua SePay" open={Boolean(selected) && !payment} onCancel={() => setSelected(null)} footer={null} destroyOnHidden>
+      {selected && <Space orientation="vertical" size="middle" className={styles.paymentDetails}>
+        <Typography.Text type="secondary">{selected.course_name} · còn nợ {money(selected.balance)}. Chọn số tiền muốn đóng lần này:</Typography.Text>
+        <Radio.Group value={option} onChange={(event) => setOption(event.target.value)} style={{ width: "100%" }}>
+          <Space orientation="vertical" style={{ width: "100%" }}>
+            {options.map((item) => <Radio key={item.key} value={item.key}>
+              <b>{item.label}: {money(item.amount)}</b> <Typography.Text type="secondary">· {item.hint}</Typography.Text>
+            </Radio>)}
+          </Space>
+        </Radio.Group>
+        <Alert type="info" showIcon title="Bạn sẽ được chuyển sang trang thanh toán của SePay (thẻ hoặc chuyển khoản). Hệ thống chỉ ghi nhận khi SePay xác nhận đã thu tiền." />
+        <Button type="primary" block loading={busy} disabled={!options.length} onClick={() => void pay()}>Thanh toán qua SePay</Button>
+      </Space>}
+    </Modal>
+
+    <Modal title="Kết quả thanh toán" open={Boolean(payment) || confirming} onCancel={() => { setPayment(null); setConfirming(false); }} footer={null} destroyOnHidden>
+      {!payment ? <Spin description="Đang xác nhận giao dịch với SePay..." /> : <Space orientation="vertical" size="middle" className={styles.paymentDetails}>
+        {payment.status === "da_thanh_toan" ? <Alert type="success" showIcon title="Đã nhận thanh toán" description="Học phí đã được cập nhật và trừ vào các kỳ. Biên nhận được gửi tới email của bạn." />
+          : payment.status === "cho_thanh_toan" ? <Alert type="info" showIcon title="Chưa nhận được xác nhận từ SePay" description="Nếu bạn đã thanh toán, hệ thống sẽ tự cập nhật trong ít phút. Không thanh toán lại cho cùng khoản này." />
+            : payment.status === "can_doi_soat" ? <Alert type="warning" showIcon title="Giao dịch cần đối soát" description="SePay đã báo thanh toán nhưng chưa khớp khoản học phí. Không thanh toán lại; cơ sở sẽ kiểm tra và liên hệ bạn." />
+              : <Alert type="warning" showIcon title="Chưa thanh toán" description="Yêu cầu thanh toán đã hết hạn hoặc bị hủy và chưa có tiền được thu. Bạn có thể tạo yêu cầu mới." />}
         <div className={styles.bankInfo}>
+          <div><span>Mã yêu cầu</span><b>{payment.attempt_id}</b></div>
           <div><span>Số tiền</span><b>{money(payment.amount)}</b></div>
-          <div><span>Ngân hàng</span><b>{payment.bank_code}</b></div>
-          <div><span>Số tài khoản</span><b>{payment.bank_account}</b></div>
-          <div><span>Nội dung chuyển khoản</span><b>{payment.payment_code}</b></div>
-          <div><span>Hạn thanh toán</span><b>{new Date(payment.expires_at).toLocaleString("vi-VN", { hour12: false, timeZone: "Asia/Ho_Chi_Minh" })}</b></div>
+          <div><span>Mã giao dịch SePay</span><b>{payment.payment_code}</b></div>
         </div>
-        {payment.status === "da_thanh_toan" && <Button onClick={() => setOpen(false)}>Hoàn tất</Button>}
-      </Space> : selected && <Space orientation="vertical" className={styles.paymentDetails}>
-        <Typography.Paragraph type="secondary">Kỳ {selected.installment.sequence}, còn phải đóng {money(selected.installment.balance)}. Bạn có thể thanh toán một phần.</Typography.Paragraph>
-        <InputNumber min={1} max={Math.min(Number(selected.installment.balance), Number(selected.tuition.balance))}
-          value={amount} onChange={setAmount} precision={0} addonAfter="₫" style={{ width: "100%" }} />
-        <Button type="primary" block loading={busy} disabled={!amount || amount < 1}
-          onClick={() => void createPayment()}>Tạo mã QR</Button>
+        <Button onClick={() => { setPayment(null); setConfirming(false); }}>Đóng</Button>
       </Space>}
     </Modal>
   </>;

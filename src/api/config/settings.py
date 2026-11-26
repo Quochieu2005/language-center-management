@@ -255,9 +255,15 @@ WEB_APP_BASE_URL = os.getenv("WEB_APP_BASE_URL", "http://localhost:3001").rstrip
 PASSWORD_RESET_TIMEOUT = int(os.getenv("PASSWORD_RESET_TIMEOUT", "120"))
 ACCOUNT_ACTIVATION_TIMEOUT = int(os.getenv("ACCOUNT_ACTIVATION_TIMEOUT", "86400"))
 SEPAY_ENABLED = env_bool("SEPAY_ENABLED", False)
-SEPAY_BANK_CODE = os.getenv("SEPAY_BANK_CODE", "").strip()
-SEPAY_BANK_ACCOUNT = os.getenv("SEPAY_BANK_ACCOUNT", "").strip()
-SEPAY_WEBHOOK_SECRET = os.getenv("SEPAY_WEBHOOK_SECRET", "").strip()
+# SePay Payment Gateway (Cổng thanh toán): hosted checkout signed with the merchant secret key.
+SEPAY_MERCHANT_ID = os.getenv("SEPAY_MERCHANT_ID", "").strip()
+SEPAY_SECRET_KEY = os.getenv("SEPAY_SECRET_KEY", "").strip()
+# SePay issues spsk_live_… keys for production and spsk_test_… for sandbox; SEPAY_ENV overrides.
+SEPAY_ENV = os.getenv("SEPAY_ENV", "").strip().lower() or (
+    "production" if SEPAY_SECRET_KEY.startswith("spsk_live_") else "sandbox"
+)
+# Key SePay sends in the IPN "X-Secret-Key" header (set in the IPN tab); defaults to SEPAY_SECRET_KEY.
+SEPAY_IPN_SECRET_KEY = os.getenv("SEPAY_IPN_SECRET_KEY", "").strip() or SEPAY_SECRET_KEY
 SEPAY_PAYMENT_CODE_PREFIX = os.getenv("SEPAY_PAYMENT_CODE_PREFIX", "TT").strip().upper()
 try:
     SEPAY_PAYMENT_TTL_SECONDS = int(os.getenv("SEPAY_PAYMENT_TTL_SECONDS", "900"))
@@ -276,9 +282,11 @@ if not 60 <= SEPAY_PAYMENT_TTL_SECONDS <= 3600:
     raise ImproperlyConfigured("SEPAY_PAYMENT_TTL_SECONDS phải nằm trong khoảng 60–3600.")
 if not re.fullmatch(r"[A-Z0-9]{2,5}", SEPAY_PAYMENT_CODE_PREFIX):
     raise ImproperlyConfigured("SEPAY_PAYMENT_CODE_PREFIX chỉ gồm 2–5 chữ cái/số in hoa.")
-if SEPAY_ENABLED and not all((SEPAY_BANK_CODE, SEPAY_BANK_ACCOUNT, SEPAY_WEBHOOK_SECRET)):
+if SEPAY_ENV not in {"sandbox", "production"}:
+    raise ImproperlyConfigured("SEPAY_ENV chỉ nhận sandbox hoặc production.")
+if SEPAY_ENABLED and not all((SEPAY_MERCHANT_ID, SEPAY_SECRET_KEY, WEB_APP_BASE_URL)):
     raise ImproperlyConfigured(
-        "Bật SEPAY_ENABLED cần cấu hình SEPAY_BANK_CODE, SEPAY_BANK_ACCOUNT và SEPAY_WEBHOOK_SECRET."
+        "Bật SEPAY_ENABLED cần cấu hình SEPAY_MERCHANT_ID, SEPAY_SECRET_KEY và WEB_APP_BASE_URL."
     )
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured("Chỉ bật một trong EMAIL_USE_TLS hoặc EMAIL_USE_SSL.")

@@ -513,7 +513,7 @@ Hủy lớp là hủy mềm: chỉ cho phép lớp `sap_mo` chưa có đăng ký
 | `trang_thai` | CHECK | `cho_thanh_toan` · `da_thanh_toan` · `het_han` · `can_doi_soat` · `da_huy` |
 | `tao_luc_utc`, `het_han_utc`, `cap_nhat_luc_utc`, `thanh_toan_luc_utc` | | Mốc thời gian xử lý |
 
-**`SuKienThanhToan`** — sự kiện SePay theo site, có unique `ma_giao_dich_sepay` và trigger append-only. Lưu mã yêu cầu/tham chiếu, số tiền, tài khoản nhận, tham chiếu ngân hàng, thời điểm giao dịch/nhận và kết quả (`da_ghi_nhan`, `can_doi_soat`, `khong_tim_thay`); không lưu secret, chữ ký hay payload thô.
+**`SuKienThanhToan`** — sự kiện SePay theo site, có unique `ma_giao_dich_sepay` và trigger append-only. Với Cổng thanh toán SePay, `ma_giao_dich_sepay` là số âm suy ra từ mã hóa đơn (`ma_tham_chieu`) để IPN và tra cứu `order/detail` cùng ghi một dòng; mã giao dịch SePay lưu ở `ma_tham_chieu_ngan_hang`. `YeuCauThanhToan.ma_dot_hoc_phi` là kỳ chưa đóng sớm nhất lúc tạo; số tiền (một kỳ, một nửa hoặc toàn bộ) được trừ dần vào các kỳ khi ghi phiếu. Lưu mã yêu cầu/tham chiếu, số tiền, tài khoản nhận, tham chiếu ngân hàng, thời điểm giao dịch/nhận và kết quả (`da_ghi_nhan`, `can_doi_soat`, `khong_tim_thay`); không lưu secret, chữ ký hay payload thô.
 
 **`Diem`** (cha: `DangKy`)
 
