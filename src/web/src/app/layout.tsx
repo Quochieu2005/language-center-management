@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import AppProviders from "./providers";
 import "./globals.css";
 import "@/styles/globals.scss";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Quản lý trung tâm đào tạo ngoại ngữ",
+  title: BRAND_NAME,
   description: "Giao diện hệ thống quản lý trung tâm đào tạo ngoại ngữ.",
 };
 

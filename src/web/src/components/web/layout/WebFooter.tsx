@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "./WebFooter.module.scss";
+import { BRAND_INITIAL, BRAND_NAME } from "@/lib/brand";
 
 export default function WebFooter() {
   return (
@@ -7,8 +8,8 @@ export default function WebFooter() {
       <div className={styles.inner}>
         <div className={styles.brandBlock}>
           <Link className={styles.brand} href="/">
-            <span className={styles.brandMark} aria-hidden="true">N</span>
-            <span>[Tên trung tâm]</span>
+            <span className={styles.brandMark} aria-hidden="true">{BRAND_INITIAL}</span>
+            <span>{BRAND_NAME}</span>
           </Link>
           <p>Không gian để bắt đầu một ngôn ngữ mới, theo nhịp học phù hợp với bạn.</p>
         </div>
