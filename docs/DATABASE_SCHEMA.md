@@ -180,6 +180,8 @@ Không có mũi tên nhân bản mọi bảng học viên/phiếu thu. Distribut
 
 ### 5.1. ERD nghiệp vụ tại từng site
 
+> ERD đầy đủ có cột khóa, kiểu rút gọn và nhóm phân tán (sinh từ metadata của cơ sở dữ liệu thật) nằm ở [QLTTNN-So-Do.md](QLTTNN-So-Do.md), kèm sơ đồ định vị dữ liệu và bố trí máy.
+
 Sơ đồ đối chiếu DDL và migration trong [hướng dẫn DB](../db/README.md). Chỉ có quan hệ trong một database, tham chiếu bảng nhân bản qua bản sao cục bộ. Dùng mũi tên thường từ bảng được tham chiếu tới bảng tham chiếu; nhãn mô tả quan hệ, bội số và trường hợp tùy chọn được giải thích bên dưới.
 
 ```mermaid

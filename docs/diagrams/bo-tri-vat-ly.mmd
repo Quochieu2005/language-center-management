@@ -1,0 +1,44 @@
+flowchart LR
+    User["Máy trạm người dùng<br/>(trình duyệt)"] -->|HTTPS| Web["Next.js<br/>:3001"]
+    Web -->|"gọi API, không giữ chuỗi kết nối"| API
+
+    subgraph AppHost["Máy chạy ứng dụng"]
+        direction TB
+        API["Django API / Coordinator<br/>:8001<br/>Site Router: site → alias → database"]
+        Workers["Worker nền<br/>sync_accounts · sync_courses · sync_blog"]
+    end
+
+    API ---|"Q1"| Q1DB
+    API ---|"Q7 (qua ZeroTier)"| Q7DB
+    API ---|"TD (qua ZeroTier)"| TDDB
+    Workers --- API
+
+    subgraph M1["Máy Windows của Quốc Hiếu · DESKTOP-CK4K90F"]
+        Q1DB[("QLTTNN_Q1<br/>SQL Server<br/>Publisher MonHoc · authority")]
+        Agent["SQL Server Agent<br/>Log Reader · Distribution"]
+    end
+
+    subgraph M2["Máy Mac của Minh Khôi · Docker"]
+        Q7DB[("QLTTNN_Q7<br/>SQL Server trên Linux<br/>instance sql-q7")]
+    end
+
+    subgraph M3["Máy DESKTOP-N47BBPH (theo kết nối đang cấu hình 26/11/2026)"]
+        TDDB[("QLTTNN_TD_MOI<br/>SQL Server 16")]
+    end
+
+    Q1DB --- Agent
+    Agent ==>|"MonHoc: transactional replication"| Q7DB
+    Agent ==>|"MonHoc: transactional replication"| TDDB
+
+    VPN["Mạng ảo ZeroTier<br/>cổng 1433 giữa các máy"] -.- Q7DB
+    VPN -.- TDDB
+    VPN -.- Q1DB
+
+    classDef host fill:#1f2937,stroke:#9aa4b2,color:#f0f6fc
+    classDef db fill:#12263f,stroke:#3b82f6,color:#e5eefc
+    classDef app fill:#241b3d,stroke:#8b5cf6,color:#ede9fe
+    classDef net fill:#2e2410,stroke:#f59e0b,color:#fbf0d6
+    class Q1DB,Q7DB,TDDB db
+    class API,Workers,Web,User app
+    class VPN net
+    class Agent host

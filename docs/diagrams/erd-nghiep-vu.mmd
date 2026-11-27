@@ -1,0 +1,53 @@
+flowchart TB
+    CoSo["<b>CoSo</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_co_so : string<br/>trang_thai : string<br/>UK slug : string"]:::NB
+    MonHoc["<b>MonHoc</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_mon : string<br/>UK slug : string<br/>phien_ban : int"]:::NB
+    KhoaHoc["<b>KhoaHoc</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_khoa_hoc : string<br/>FK ma_mon : string<br/>UK slug : string<br/>hoc_phi_chuan : decimal<br/>phien_ban : int"]:::NB
+    TaiKhoan["<b>TaiKhoan</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_tai_khoan : string<br/>FK ma_co_so : string<br/>trang_thai : bool<br/>UK slug : string<br/>vai_tro : string<br/>UK email : string<br/>phien_ban : int"]:::NB
+    HocVien["<b>HocVien</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_hoc_vien : string<br/>FK ma_co_so : string<br/>FK co_so_goc : string<br/>FK ma_tai_khoan : string<br/>trang_thai : string<br/>UK slug : string<br/>ho_ten : string"]:::MN
+    GiaoVien["<b>GiaoVien</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_giao_vien : string<br/>FK ma_co_so : string<br/>FK ma_tai_khoan : string<br/>trang_thai : string"]:::MN
+    NhanVien["<b>NhanVien</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_nhan_vien : string<br/>FK ma_co_so : string<br/>FK ma_tai_khoan : string<br/>trang_thai : string"]:::MN
+    Admin["<b>Admin</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_admin : string<br/>FK, UK ma_tai_khoan : string<br/>FK ma_co_so : string<br/>trang_thai : bool"]:::MN
+    PhongHoc["<b>PhongHoc</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_phong : string<br/>FK ma_co_so : string<br/>trang_thai : string"]:::MN
+    LopHoc["<b>LopHoc</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_lop : string<br/>FK ma_co_so : string<br/>FK ma_khoa_hoc : string<br/>FK ma_giao_vien : string<br/>FK ma_phong : string<br/>trang_thai : string<br/>si_so_toi_da : int<br/>si_so_hien_tai : int"]:::MN
+    BuoiHoc["<b>BuoiHoc</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_buoi : string<br/>FK ma_co_so : string<br/>FK ma_lop : string<br/>FK ma_phong : string<br/>FK ma_giao_vien : string<br/>trang_thai : string"]:::DX
+    DangKy["<b>DangKy</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_dang_ky : string<br/>FK ma_co_so : string<br/>FK ma_hoc_vien : string<br/>FK ma_lop : string<br/>trang_thai : string"]:::DX
+    HocPhi["<b>HocPhi</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_hoc_phi : string<br/>FK ma_co_so : string<br/>FK, UK ma_dang_ky : string<br/>trang_thai : string<br/>so_tien_phai_dong : decimal<br/>so_tien_da_dong : decimal"]:::DX
+    DotHocPhi["<b>DotHocPhi</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_dot_hoc_phi : string<br/>FK ma_co_so : string<br/>FK ma_hoc_phi : string<br/>trang_thai : string"]:::DX
+    PhieuThu["<b>PhieuThu</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_phieu : string<br/>FK ma_co_so : string<br/>FK ma_hoc_phi : string<br/>FK ma_nhan_vien : string<br/>FK ma_phieu_goc : string<br/>loai : string<br/>so_tien : decimal"]:::DX
+    Diem["<b>Diem</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_diem : string<br/>FK ma_co_so : string<br/>FK ma_dang_ky : string<br/>FK ma_giao_vien_nhap : string<br/>loai_diem : string<br/>diem_so : decimal"]:::DX
+    DiemDanh["<b>DiemDanh</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_diem_danh : string<br/>FK ma_co_so : string<br/>FK ma_buoi : string<br/>FK ma_dang_ky : string<br/>trang_thai : string"]:::DX
+    BuoiHoc -->|"ma_buoi (cùng ma_co_so)<br/>1 : 0..n"| DiemDanh
+    CoSo -->|"co_so_goc<br/>1 : 0..n"| HocVien
+    CoSo -->|"ma_co_so<br/>0..1 : 0..n"| Admin
+    CoSo -->|"ma_co_so<br/>0..1 : 0..n"| TaiKhoan
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| GiaoVien
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| HocVien
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| LopHoc
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| NhanVien
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| PhongHoc
+    DangKy -->|"ma_dang_ky (cùng ma_co_so)<br/>1 : 0..1"| HocPhi
+    DangKy -->|"ma_dang_ky (cùng ma_co_so)<br/>1 : 0..n"| Diem
+    DangKy -->|"ma_dang_ky (cùng ma_co_so)<br/>1 : 0..n"| DiemDanh
+    GiaoVien -->|"ma_giao_vien (cùng ma_co_so)<br/>1 : 0..n"| BuoiHoc
+    GiaoVien -->|"ma_giao_vien (cùng ma_co_so)<br/>1 : 0..n"| LopHoc
+    GiaoVien -->|"ma_giao_vien_nhap (cùng ma_co_so)<br/>1 : 0..n"| Diem
+    HocPhi -->|"ma_hoc_phi (cùng ma_co_so)<br/>1 : 0..n"| DotHocPhi
+    HocPhi -->|"ma_hoc_phi (cùng ma_co_so)<br/>1 : 0..n"| PhieuThu
+    HocVien -->|"ma_hoc_vien (cùng ma_co_so)<br/>1 : 0..n"| DangKy
+    KhoaHoc -->|"ma_khoa_hoc<br/>1 : 0..n"| LopHoc
+    LopHoc -->|"ma_lop (cùng ma_co_so)<br/>1 : 0..n"| BuoiHoc
+    LopHoc -->|"ma_lop (cùng ma_co_so)<br/>1 : 0..n"| DangKy
+    MonHoc -->|"ma_mon<br/>1 : 0..n"| KhoaHoc
+    NhanVien -->|"ma_nhan_vien (cùng ma_co_so)<br/>0..1 : 0..n"| PhieuThu
+    PhieuThu -->|"ma_phieu_goc (cùng ma_co_so)<br/>0..1 : 0..n"| PhieuThu
+    PhongHoc -->|"ma_phong (cùng ma_co_so)<br/>1 : 0..n"| BuoiHoc
+    PhongHoc -->|"ma_phong (cùng ma_co_so)<br/>1 : 0..n"| LopHoc
+    TaiKhoan -->|"ma_tai_khoan (cùng ma_co_so)<br/>0..1 : 0..n"| GiaoVien
+    TaiKhoan -->|"ma_tai_khoan (cùng ma_co_so)<br/>0..1 : 0..n"| NhanVien
+    TaiKhoan -->|"ma_tai_khoan<br/>0..1 : 0..n"| HocVien
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..1"| Admin
+    classDef NB fill:#12263f,stroke:#3b82f6,color:#e5eefc,stroke-width:1.5px
+    classDef MN fill:#10281c,stroke:#22c55e,color:#e3f6ea,stroke-width:1.5px
+    classDef DX fill:#1c2a12,stroke:#84cc16,color:#eef7dc,stroke-width:1.5px
+    classDef CT fill:#2e2410,stroke:#f59e0b,color:#fbf0d6,stroke-width:1.5px
+    classDef CB fill:#2f1220,stroke:#ec4899,color:#fbe3ee,stroke-width:1.5px

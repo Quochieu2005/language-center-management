@@ -1,0 +1,21 @@
+flowchart TB
+    CoSo["<b>CoSo</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_co_so : string"]:::NB
+    TaiKhoan["<b>TaiKhoan</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_tai_khoan : string<br/>FK ma_co_so : string<br/>trang_thai : bool<br/>UK slug : string<br/>vai_tro : string<br/>UK email : string<br/>phien_ban : int"]:::NB
+    HocVien["<b>HocVien</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_hoc_vien : string"]:::MN
+    PhienDangNhap["<b>PhienDangNhap</b><br/><i>chỉ authority</i><br/>──────────<br/>PK ma_phien : string<br/>FK ma_tai_khoan : string"]:::CB
+    TokenDatLaiMatKhau["<b>TokenDatLaiMatKhau</b><br/><i>chỉ authority</i><br/>──────────<br/>PK ma_token : string<br/>FK ma_tai_khoan : string"]:::CB
+    GiaoDichDatLaiMatKhau["<b>GiaoDichDatLaiMatKhau</b><br/><i>chỉ authority</i><br/>──────────<br/>PK ma_giao_dich : string<br/>FK ma_tai_khoan : string<br/>trang_thai : string"]:::CB
+    NguoiDung["<b>NguoiDung</b><br/><i>chỉ authority</i><br/>──────────<br/>PK ma_nguoi_dung : string<br/>FK, UK ma_tai_khoan : string"]:::CB
+    CoSo -->|"co_so_goc<br/>1 : 0..n"| HocVien
+    CoSo -->|"ma_co_so<br/>0..1 : 0..n"| TaiKhoan
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| HocVien
+    TaiKhoan -->|"ma_tai_khoan<br/>0..1 : 0..n"| HocVien
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..1"| NguoiDung
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..n"| GiaoDichDatLaiMatKhau
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..n"| PhienDangNhap
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..n"| TokenDatLaiMatKhau
+    classDef NB fill:#12263f,stroke:#3b82f6,color:#e5eefc,stroke-width:1.5px
+    classDef MN fill:#10281c,stroke:#22c55e,color:#e3f6ea,stroke-width:1.5px
+    classDef DX fill:#1c2a12,stroke:#84cc16,color:#eef7dc,stroke-width:1.5px
+    classDef CT fill:#2e2410,stroke:#f59e0b,color:#fbf0d6,stroke-width:1.5px
+    classDef CB fill:#2f1220,stroke:#ec4899,color:#fbe3ee,stroke-width:1.5px

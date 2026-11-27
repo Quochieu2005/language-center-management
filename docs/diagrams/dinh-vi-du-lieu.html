@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Sơ đồ định vị dữ liệu</title>
+<style>
+  :root { --rep:#12263f; --rep-b:#3b82f6; --frag:#10281c; --frag-b:#22c55e; --der:#1c2a12; --der-b:#84cc16;
+          --loc:#2e2410; --loc-b:#f59e0b; --auth:#2f1220; --auth-b:#ec4899; --none:#161b22; --none-b:#30363d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #0d1117; font-family: "Segoe UI", Arial, sans-serif; color: #f0f6fc; width: 1500px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #9aa4b2; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 230px 1fr 1fr 1fr; gap: 8px; align-items: stretch; }
+  .head { background: #1f2937; border: 1px solid #3b4658; color: #fff; padding: 10px 12px; border-radius: 6px; font-weight: 600; font-size: 14px; }
+  .head small { display: block; font-weight: 400; font-size: 11.5px; opacity: .85; margin-top: 2px; }
+  .label { padding: 10px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1.5px solid; display: flex; flex-direction: column; justify-content: center; }
+  .label small { font-weight: 400; font-size: 11.5px; margin-top: 3px; color: #c9d1d9; }
+  .cell { padding: 10px 12px; border-radius: 6px; font-size: 13px; border: 1.5px solid; display: flex; align-items: center; line-height: 1.45; }
+  .rep { background: var(--rep); border-color: var(--rep-b); }
+  .frag { background: var(--frag); border-color: var(--frag-b); }
+  .der { background: var(--der); border-color: var(--der-b); }
+  .loc { background: var(--loc); border-color: var(--loc-b); }
+  .auth { background: var(--auth); border-color: var(--auth-b); }
+  .none { background: var(--none); border-color: var(--none-b); color: #8b949e; font-style: italic; justify-content: center; }
+  .flow { grid-column: 1 / -1; background: #1b1632; border: 1.5px solid #8b5cf6; border-radius: 6px; padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+  .flow b { color: #c4b5fd; }
+  .note { margin-top: 12px; font-size: 12px; color: #9aa4b2; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="diagram">
+  <h1>Sơ đồ định vị dữ liệu: ba cơ sở dữ liệu SQL Server độc lập</h1>
+  <div class="sub">Mỗi cột là một cơ sở dữ liệu riêng. Cùng cấu trúc bảng, nhưng dữ liệu nằm ở đâu phụ thuộc nhóm bảng.</div>
+  <div class="grid">
+    <div></div>
+    <div class="head">Q1 · QLTTNN_Q1<small>cũng là authority xác thực</small></div>
+    <div class="head">Q7 · QLTTNN_Q7<small>SQL Server trên Linux (Docker)</small></div>
+    <div class="head">TD · QLTTNN_TD_MOI<small>theo kết nối đang cấu hình 26/11/2026</small></div>
+
+    <div class="label rep">Nhân bản<small>giống nhau ở mọi site đang hoạt động</small></div>
+    <div class="cell rep">CoSo · MonHoc · KhoaHoc · TaiKhoan · DanhMucBlog · BaiVietBlog</div>
+    <div class="cell rep">CoSo · MonHoc · KhoaHoc · TaiKhoan · DanhMucBlog · BaiVietBlog</div>
+    <div class="cell rep">CoSo · MonHoc · KhoaHoc · TaiKhoan · DanhMucBlog · BaiVietBlog</div>
+
+    <div class="flow">
+      <b>Đường nhân bản:</b>
+      <b>MonHoc</b>: Q1 (Publisher) → Q7, TD bằng SQL Server transactional replication, đẩy bất đồng bộ ·
+      <b>TaiKhoan</b>: authority Q1 → các site bằng trigger, bảng DongBoTaiKhoan và worker sync_accounts ·
+      <b>KhoaHoc, Blog</b>: Coordinator ghi từng site đang kết nối kèm ACK trong Logs; worker sync_courses, sync_blog phát lại site còn thiếu.
+    </div>
+
+    <div class="label frag">Mảnh nguyên thủy<small>lọc theo ma_co_so</small></div>
+    <div class="cell frag">ma_co_so = Q1<br>HocVien · GiaoVien · NhanVien · Admin Small · PhongHoc · LopHoc · YeuCauLienHe</div>
+    <div class="cell frag">ma_co_so = Q7<br>HocVien · GiaoVien · NhanVien · Admin Small · PhongHoc · LopHoc · YeuCauLienHe</div>
+    <div class="cell frag">ma_co_so = TD<br>HocVien · GiaoVien · NhanVien · Admin Small · PhongHoc · LopHoc · YeuCauLienHe</div>
+
+    <div class="label der">Mảnh dẫn xuất<small>đi theo lớp hoặc đăng ký cha, cùng site</small></div>
+    <div class="cell der">BuoiHoc · DangKy · DiemDanh · HocPhi · DotHocPhi · PhieuThu · Diem</div>
+    <div class="cell der">BuoiHoc · DangKy · DiemDanh · HocPhi · DotHocPhi · PhieuThu · Diem</div>
+    <div class="cell der">BuoiHoc · DangKy · DiemDanh · HocPhi · DotHocPhi · PhieuThu · Diem</div>
+
+    <div class="label loc">Cục bộ<small>nhật ký và trạng thái, không nhân bản</small></div>
+    <div class="cell loc">GiaoDichChuyenCoSo · LichSuChuyenCoSo · ThongBao · Logs · YeuCauThanhToan · SuKienThanhToan</div>
+    <div class="cell loc">GiaoDichChuyenCoSo · LichSuChuyenCoSo · ThongBao · Logs · YeuCauThanhToan · SuKienThanhToan</div>
+    <div class="cell loc">GiaoDichChuyenCoSo · LichSuChuyenCoSo · ThongBao · Logs · YeuCauThanhToan · SuKienThanhToan</div>
+
+    <div class="label auth">Chỉ tại authority<small>AUTH_SESSION_SITE_CODE</small></div>
+    <div class="cell auth">PhienDangNhap · TokenDatLaiMatKhau · GiaoDichDatLaiMatKhau · DatChoEmailHocVien · TrangThaiKhoEmail · DongBoTaiKhoan · NguoiDung</div>
+    <div class="cell none">không có</div>
+    <div class="cell none">không có</div>
+  </div>
+  <div class="note">
+    Không có mũi tên nhân bản cho mảnh nguyên thủy, mảnh dẫn xuất và bảng cục bộ: dữ liệu học viên, lớp, đăng ký, học phí, điểm chỉ nằm ở site sở hữu.
+    Truy vấn toàn cục hỏi từng site rồi gộp ở ứng dụng. Học viên chuyển cơ sở để lại bản lịch sử ở site nguồn (da_chuyen_di).
+    Distributor của SQL Server chỉ giữ dữ liệu kỹ thuật replication, không phải kho nghiệp vụ tổng hợp.
+  </div>
+</div>
+</body>
+</html>

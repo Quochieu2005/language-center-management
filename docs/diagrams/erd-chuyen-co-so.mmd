@@ -1,0 +1,18 @@
+flowchart TB
+    CoSo["<b>CoSo</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_co_so : string"]:::NB
+    HocVien["<b>HocVien</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_hoc_vien : string"]:::MN
+    GiaoDichChuyenCoSo["<b>GiaoDichChuyenCoSo</b><br/><i>cục bộ</i><br/>──────────<br/>PK ma_chuyen : string<br/>FK ma_hoc_vien : string<br/>FK co_so_nguon : string<br/>FK co_so_dich : string<br/>trang_thai : string"]:::CT
+    LichSuChuyenCoSo["<b>LichSuChuyenCoSo</b><br/><i>cục bộ</i><br/>──────────<br/>PK ma_su_kien : string<br/>FK co_so_nguon : string<br/>FK co_so_dich : string<br/>FK site_ghi : string"]:::CT
+    CoSo -->|"co_so_dich<br/>1 : 0..n"| GiaoDichChuyenCoSo
+    CoSo -->|"co_so_dich<br/>1 : 0..n"| LichSuChuyenCoSo
+    CoSo -->|"co_so_goc<br/>1 : 0..n"| HocVien
+    CoSo -->|"co_so_nguon<br/>1 : 0..n"| GiaoDichChuyenCoSo
+    CoSo -->|"co_so_nguon<br/>1 : 0..n"| LichSuChuyenCoSo
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| HocVien
+    CoSo -->|"site_ghi<br/>1 : 0..n"| LichSuChuyenCoSo
+    HocVien -->|"ma_hoc_vien + co_so_nguon<br/>1 : 0..n"| GiaoDichChuyenCoSo
+    classDef NB fill:#12263f,stroke:#3b82f6,color:#e5eefc,stroke-width:1.5px
+    classDef MN fill:#10281c,stroke:#22c55e,color:#e3f6ea,stroke-width:1.5px
+    classDef DX fill:#1c2a12,stroke:#84cc16,color:#eef7dc,stroke-width:1.5px
+    classDef CT fill:#2e2410,stroke:#f59e0b,color:#fbf0d6,stroke-width:1.5px
+    classDef CB fill:#2f1220,stroke:#ec4899,color:#fbe3ee,stroke-width:1.5px
