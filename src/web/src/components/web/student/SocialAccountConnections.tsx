@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Alert, Button, Card, Space, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { FacebookFilled, GoogleOutlined, LinkOutlined } from "@ant-design/icons";
 import { ApiError } from "@/lib/api/client";
 import { authApi, type OAuthProvider } from "@/lib/api/auth";

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Avatar, Button, Card, Spin, Tabs, Tag, message } from "antd";
+import { Alert, Avatar, Button, Card, Spin, Tabs, Tag } from "antd";
+import { message } from "@/lib/ui/message";
 import {
   LogoutOutlined,
   UserOutlined,

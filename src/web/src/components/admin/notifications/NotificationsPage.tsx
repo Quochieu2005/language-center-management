@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Form, Input, message as antdMessage, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import { message as antdMessage } from "@/lib/ui/message";
 import type { ColumnsType } from "antd/es/table";
 import { useRouter } from "next/navigation";
 import { adminApi, type AdminNotification, type AdminNotificationList, type CreateAdminNotification } from "@/lib/api/admin";

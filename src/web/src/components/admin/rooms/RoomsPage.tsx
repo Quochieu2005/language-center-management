@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag } from "antd";
+import { message } from "@/lib/ui/message";
 import { academicsApi, type RoomRosterClass, type RoomRosterStudent, type RoomRow } from "@/lib/api/academics";
 import { useSession } from "@/lib/auth/session";
 import { ALL_SITES, useSiteScope } from "@/lib/auth/site-scope";
@@ -144,7 +145,7 @@ export default function RoomsPage() {
       />
     </Card>
 
-    <Modal title={editing ? "Sửa phòng học" : "Thêm phòng học"} open={formOpen} onCancel={() => setFormOpen(false)} onOk={() => form.submit()} okText={editing ? "Lưu thay đổi" : "Tạo phòng"} destroyOnHidden>
+    <Modal title={editing ? "Sửa phòng học" : "Thêm phòng học"} open={formOpen} onCancel={() => setFormOpen(false)} onOk={() => form.submit()} okText={editing ? "Lưu thay đổi" : "Tạo phòng"} forceRender>
       <Form form={form} layout="vertical" onFinish={save}>
         {global && !editing && <Form.Item name="site_code" label="Cơ sở" rules={[{ required: true, message: "Chọn cơ sở cần thêm phòng." }]}><Select options={siteCodes.map((code) => ({ value: code, label: code }))} placeholder="Chọn cơ sở" /></Form.Item>}
         {(editing || !global) && <Form.Item label="Cơ sở"><Input value={editing?.site_code || site || ""} disabled /></Form.Item>}

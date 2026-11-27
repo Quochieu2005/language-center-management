@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Button, Card, Form, Input, Space, Typography, message } from "antd";
+import { Alert, Button, Card, Form, Input, Space, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "@/components/admin/layout/AdminLayout";

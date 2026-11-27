@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Empty, Modal, Radio, Space, Spin, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Empty, Modal, Radio, Space, Spin, Tag, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { academicsApi, type ApiRow, type SePayCheckout, type StudentSePayPayment } from "@/lib/api/academics";
 import { formatVnd as money, tuitionPaymentOptions, type PaymentOptionKey } from "@/lib/tuitionPaymentOptions";
 import styles from "./StudentTuitionPanel.module.scss";

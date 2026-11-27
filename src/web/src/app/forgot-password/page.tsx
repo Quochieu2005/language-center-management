@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Button, Form, Input, Typography, message } from "antd";
+import { Alert, Button, Form, Input, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api/auth";

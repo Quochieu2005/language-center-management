@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { UserOutlined } from "@ant-design/icons";
-import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Space, Typography, message } from "antd";
+import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Space, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { RequireSession, useSession } from "@/lib/auth/session";
 import { authApi, type SessionUser } from "@/lib/api/auth";
 import { adminApi } from "@/lib/api/admin";

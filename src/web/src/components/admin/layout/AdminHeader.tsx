@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Dropdown, Tag, Typography, message } from "antd";
+import { Badge, Button, Dropdown, Tag, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { BellOutlined, BulbOutlined, GlobalOutlined, HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from "@ant-design/icons";
 import { adminApi } from "@/lib/api/admin";
 import { ApiError } from "@/lib/api/client";

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Table, Tag } from "antd";
+import { message } from "@/lib/ui/message";
 import { academicsApi, type TuitionReceipt, type TuitionRow } from "@/lib/api/academics";
 import { adminApi, type TuitionFinancialReport } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";

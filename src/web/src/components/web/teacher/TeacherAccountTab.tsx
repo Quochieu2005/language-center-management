@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Avatar, Button, Card, Col, Descriptions, Form, Input, Row, Skeleton, Space, Tag, Typography, message } from "antd";
+import { Alert, Avatar, Button, Card, Col, Descriptions, Form, Input, Row, Skeleton, Space, Tag, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import { EditOutlined, LockOutlined, SafetyCertificateOutlined, UserOutlined } from "@ant-design/icons";
 import { adminApi, type Teacher } from "@/lib/api/admin";
 import { authApi } from "@/lib/api/auth";
