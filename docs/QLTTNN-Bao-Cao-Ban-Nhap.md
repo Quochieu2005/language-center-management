@@ -223,7 +223,7 @@ Lưu ảnh vào `docs/evidence/<mã TC>/<ngày>/`. Che mật khẩu, token và I
 
 | Khoảng ngày | Việc |
 |---|---|
-| 27/11 đến 29/11 | Đưa Q7 và TD lên ổn định; xác nhận máy nào của ai; hỏi giảng viên về 2PC; chốt các quyết định còn mở |
-| 30/11 đến 5/12 | Nạp dữ liệu LAB ba site; chạy TC-FRAG, CON, DQ, SYNC, DTX, REP trên site thật; chụp ảnh E-3.x |
+| 27/11 đến 29/11 | Đưa Q7 và TD lên ổn định; xác nhận máy nào của ai; hỏi giảng viên về 2PC; chốt các quyết định còn mở. Chốt một buổi khoảng 2 giờ cả ba chủ máy cùng có mặt |
+| 30/11 đến 5/12 | Chạy buổi theo [kịch bản chạy bằng chứng](QLTTNN-Chay-Bang-Chung-Site-That.md): migration Q7, nạp dữ liệu LAB ba site, TC-FRAG, CON, DQ, SYNC, DTX, REP trên site thật, chụp ảnh E-3.x |
 | 6/12 đến 14/12 | Hoàn thiện văn bản từ bản nháp này, chèn ảnh, vẽ ERD và sơ đồ định vị |
 | 15/12 đến 16/12 | Dự phòng, rà lại từng mục với mã ảnh, nộp 17/12 |
