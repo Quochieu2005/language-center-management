@@ -24,7 +24,7 @@ Nguyên tắc khi hoàn thiện: chỉ ghi điều đã chạy thật; kết qu�
 | 3.4 Agent | MỘT PHẦN | Ảnh Agent và job trên máy Publisher |
 | 3.5 Linked Server | THIẾU | Ảnh cấu hình `LS_Q7` và truy vấn đọc thử |
 | 3.6 Replication | MỘT PHẦN | Đã có `MonHoc`; còn ảnh Replication Monitor và thử ngắt/phục hồi `KhoaHoc`, `TaiKhoan`, Blog trên ba site |
-| 3.7 Thử quyền, giao tác, truy vấn | MỘT PHẦN | Chạy lại FRAG, CON, DQ, SYNC trên site thật; chưa có DTX |
+| 3.7 Thử quyền, giao tác, truy vấn | MỘT PHẦN | CON và DQ đã chạy trên Q1 thật (27/11); còn FRAG và SYNC trên nhiều site thật, và DTX chưa có |
 
 ## 1. Đề tài được giao
 
@@ -175,11 +175,13 @@ Kết quả đã chạy ngày 26/11/2026 trên **hai database tạm cùng một 
 | TC-DQ-01 truy vấn phân tán | Đạt: số khớp từng cơ sở; một cơ sở mất kết nối thì báo thiếu, không báo 0; phục hồi khớp lại | [TC-DQ-01](evidence/TC-DQ-01/2026-11-26/README.md) |
 | TC-SYNC-01 đồng bộ sau lỗi | Đạt cho hàng đợi tài khoản và Blog sau khi sửa một lỗi hội tụ | [TC-SYNC-01](evidence/TC-SYNC-01/2026-11-26/README.md) |
 | TC-REP-01 replication `MonHoc` | Đạt trên ba site thật | [TC-REP-01](evidence/TC-REP-01/2026-11-20/README.md) |
+| TC-CON-01 trên **Q1 thật** (27/11) | Đạt: phiên thứ hai chờ rồi bị từ chối; 10 vòng đều một phiên thắng; lớp 5 chỗ với 12 phiên ra đúng 5 | [TC-CON-01 Q1 thật](evidence/TC-CON-01/2026-11-27-site-that/README.md) |
+| TC-DQ-01 khi **mất site thật** (27/11) | Đạt: Q7 và TD mất kết nối thật, API báo `complete=false`, `missing_sites=["Q7","TD"]`, tổng khớp SQL trực tiếp ở Q1, không báo 0; hai endpoint công khai qua HTTP cũng báo đúng | [TC-DQ-01 site thật](evidence/TC-DQ-01/2026-11-27-site-that/README.md) |
 | TC-DTX-01 chuyển cơ sở | **THIẾU**: có luồng đề nghị, duyệt, điều phối và retry trong code; chưa chạy thử lỗi trước và sau commit đích | — |
 
 Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog không hội tụ khi sửa liên tiếp một bài lúc một cơ sở mất kết nối; và API văng lỗi 500 thay vì báo thiếu cơ sở khi database offline trên instance còn chạy. Nên nêu trong báo cáo vì đó là kết quả trực tiếp của việc kiểm chứng.
 
-`[CẦN BỔ SUNG]` Chạy lại TC-FRAG, CON, DQ, SYNC trên Q1, Q7, TD thật sau khi nạp dữ liệu LAB ở cả ba site, và chạy TC-DTX-01. Các thử nghiệm quyền theo vai trò, nhật ký, giao tác chuyển cơ sở và trigger bảo vệ nhật ký (`TR_Logs_AppendOnly`) cần ảnh thao tác: `[CẦN ẢNH E-3.7-01]` đến `[CẦN ẢNH E-3.7-06]`.
+`[CẦN BỔ SUNG]` TC-CON và TC-DQ đã chạy trên Q1 thật (27/11, dòng trên); còn chạy TC-FRAG và TC-SYNC trên nhiều site thật, chạy lại CON và DQ trên cả ba site khi Q7 và TD lên, và chạy TC-DTX-01. Các thử nghiệm quyền theo vai trò, nhật ký, giao tác chuyển cơ sở và trigger bảo vệ nhật ký (`TR_Logs_AppendOnly`) cần ảnh thao tác: `[CẦN ẢNH E-3.7-01]` đến `[CẦN ẢNH E-3.7-06]`.
 
 ## 4. Kết luận, hạn chế và hướng phát triển
 
@@ -212,8 +214,8 @@ Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog kh
 | E-3.6-02 | 3.6 | Q1, Q7, TD | `MonHoc` trước và sau khi sửa ở cả ba site | Chưa chụp (có ảnh 20/11 do thành viên giữ) |
 | E-3.7-01 | 3.7 | Q1, Q7, TD | Dữ liệu LAB đã nạp, từng site | Chờ site lên |
 | E-3.7-02 | 3.7 | Q1, Q7, TD | TC-FRAG-01 chạy trên site thật | Chờ site lên |
-| E-3.7-03 | 3.7 | Q1 (hoặc site có lớp) | TC-CON-01: hai phiên tranh chỗ cuối | Chờ site lên |
-| E-3.7-04 | 3.7 | API và các site | TC-DQ-01: tổng khớp, thử thiếu một site | Chờ site lên |
+| E-3.7-03 | 3.7 | Q1 (hoặc site có lớp) | TC-CON-01: hai phiên tranh chỗ cuối | Đã chạy trên Q1 thật 27/11 (kết quả JSON); còn ảnh chụp |
+| E-3.7-04 | 3.7 | API và các site | TC-DQ-01: tổng khớp, thử thiếu một site | Đã chạy 27/11 khi Q7 và TD mất thật (kết quả JSON); còn ảnh chụp cảnh báo thiếu site ở trang admin |
 | E-3.7-05 | 3.7 | Nguồn và đích | TC-DTX-01: trạng thái trước, sau, khi lỗi, khi phục hồi | Chưa làm |
 | E-3.7-06 | 3.7 | Mỗi vai trò | Quyền được và bị từ chối; trigger bảo vệ nhật ký | Chưa chụp |
 
