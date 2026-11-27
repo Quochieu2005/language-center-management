@@ -1,0 +1,65 @@
+{
+  "run_at": "2026-11-27T09:09:18+07:00",
+  "note": "Q7 và TD mất kết nối thật tại thời điểm chạy (không mô phỏng); không đổi dữ liệu.",
+  "tcp_reachability": {
+    "Q1": "reachable",
+    "Q7": "TimeoutError",
+    "TD": "TimeoutError"
+  },
+  "direct_sql_active_students": {
+    "Q1": 42
+  },
+  "global_query_first_call": {
+    "seconds": 5.16,
+    "complete": false,
+    "missing_sites": [
+      "Q7",
+      "TD"
+    ],
+    "total_active_students": 42,
+    "per_site": {
+      "Q1": 42
+    }
+  },
+  "global_query_second_call": {
+    "seconds": 0.02,
+    "complete": false,
+    "missing_sites": [
+      "Q7",
+      "TD"
+    ],
+    "total_active_students": 42,
+    "note": "Gọi lại ngay: site vừa mất kết nối được bỏ qua tức thì (SITE_UNREACHABLE_COOLDOWN_SECONDS)."
+  },
+  "local_query_on_reachable_sites": {
+    "Q1": {
+      "complete": true,
+      "total_active_students": 42
+    }
+  },
+  "http_public_endpoints": {
+    "courses": {
+      "status": 200,
+      "seconds": 7.24,
+      "complete": false,
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "inconsistent_sites": [],
+      "count": 3
+    },
+    "blog_articles": {
+      "status": 200,
+      "seconds": 2.08,
+      "complete": false,
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "inconsistent_sites": [],
+      "count": 3
+    }
+  },
+  "verdict": true
+}

@@ -24,6 +24,13 @@ $py = "src/api/.venv/Scripts/python.exe"; $env:PYTHONUTF8 = "1"
 
 `ev_sync.py` (TC-SYNC-01) cần database sạch: chạy `create`, `script 01_create_schema.sql`, `ev_build.py EVA EVB` rồi `ev_sync.py`, không chạy `ev_fixture.py`/`ev_con.py` trước. Mỗi kịch bản ghi `results.json` vào `docs/evidence/<TC>/2026-11-26/`; đổi hằng ngày trong `OUT` nếu chạy lại ở ngày khác.
 
+## Kịch bản chạy trên site thật
+
+- `real_con.py <SITE> <thư-mục>`: TC-CON-01 trên site thật. Cần dữ liệu LAB (`manage.py seed_lab_data --sites <SITE> --apply`). Tạo thêm lớp và học viên LAB có nhãn (xóa cùng `seed_lab_data --remove --apply`); mỗi học viên chỉ có một đăng ký hiệu lực cho mỗi khóa học nên mỗi vòng dùng cặp học viên riêng.
+- `real_dq.py <thư-mục>`: TC-DQ-01 trên topology thật, chỉ đọc; kết quả phụ thuộc vào site nào đang truy cập được lúc chạy.
+
+Cả hai dùng cấu hình thật của `src/api/.env` (không dùng database tạm) và không in thông tin đăng nhập.
+
 ## Lưu ý
 
 - `ev_dq.py` và `ev_sync.py` mô phỏng mất kết nối bằng cách đổi cổng của alias sang cổng đóng (và `ALTER DATABASE … SET OFFLINE` cho phần phát hiện `InterfaceError`); chúng luôn khôi phục khi kết thúc, kể cả khi lỗi.

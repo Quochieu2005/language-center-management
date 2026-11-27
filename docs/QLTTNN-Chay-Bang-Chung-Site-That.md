@@ -60,7 +60,7 @@ Mong đợi: mỗi site 8 học viên, 3 lớp, 5 đăng ký, có `LAB` trong m�
 
 ## 5. Các kịch bản bằng chứng (khoảng 60 phút)
 
-Các kịch bản tự động `docs/evidence/scripts/ev_*.py` hiện chạy trên database tạm; **chưa chạy được trực tiếp trên site thật**. Khi hai máy mở, mình chuyển chúng sang cấu hình site thật (đổi nơi kết nối, không đổi logic kiểm tra) và lưu kết quả vào `docs/evidence/<TC>/<ngày>/`. Dưới đây là điều cần xảy ra ở từng kịch bản và ảnh cần chụp, để cả nhóm biết trước.
+Hai kịch bản đã có bản chạy trên site thật, đã dùng trên Q1 ngày 27/11/2026 ([CON](evidence/TC-CON-01/2026-11-27-site-that/README.md), [DQ](evidence/TC-DQ-01/2026-11-27-site-that/README.md)): `python docs/evidence/scripts/real_con.py <SITE> <thư-mục-kết-quả>` (cần dữ liệu LAB của site đó; mỗi học viên chỉ đăng ký được một lớp mỗi khóa học nên kịch bản tạo thêm học viên LAB cho mỗi vòng) và `python docs/evidence/scripts/real_dq.py <thư-mục-kết-quả>` (chỉ đọc, chạy một lần cho cả ba site). Trong buổi này chạy lại cho Q7 và TD. Các kịch bản còn lại (`ev_frag.py`, `ev_sync.py`) hiện chỉ chạy trên database tạm; khi hai máy mở, mình chuyển chúng sang cấu hình site thật (đổi nơi kết nối, không đổi logic kiểm tra) và lưu kết quả vào `docs/evidence/<TC>/<ngày>/`. Dưới đây là điều cần xảy ra ở từng kịch bản và ảnh cần chụp, để cả nhóm biết trước.
 
 | TC | Việc làm | Kết quả mong đợi | Ảnh |
 |---|---|---|---|

@@ -147,7 +147,7 @@ Các site thật hầu như chưa có lớp và đăng ký, nên TC-FRAG, TC-CON
 ```
 
 - Mỗi site nhận 1 giáo viên, 1 phòng, 8 học viên, 3 lớp (hai lớp 20 chỗ, một lớp 1 chỗ cho TC-CON) và 5 đăng ký. Mã đều có `LAB` (ví dụ `Q1-HV-LAB01`, `Q7-LH-LAB03`) để phân biệt với dữ liệu thật; học viên `LAB06` đến `LAB08` chưa đăng ký lớp, dành cho TC-CON và TC-DTX.
-- Đăng ký đi qua đúng service `register_student_to_class`, nên học phí và kỳ đóng được tạo như khi chạy thật.
+- Đăng ký đi qua đúng service `register_student_to_class`, nên học phí và kỳ đóng được tạo như khi chạy thật. Quy tắc thật của hệ thống: mỗi học viên chỉ có **một đăng ký hiệu lực cho mỗi khóa học**, nên mỗi học viên LAB chưa đăng ký chỉ dùng được cho một lớp của khóa đó.
 - Lệnh **không ghi danh mục dùng chung** (`MonHoc`, `KhoaHoc`) vì đã có Publication; nó dùng một khóa học mà mọi site đích đều đã có (`--course` để chọn). Nếu chưa có, hãy tạo khóa học qua trang admin trước để nó nhân bản.
 - Site không truy cập được bị bỏ qua và lệnh báo tên. Chạy lại cho riêng site đó sau (`--sites Q7`); mỗi site chỉ nạp một lần, chạy lại sẽ báo đã có và không tạo thêm. Nên nạp cùng lúc khi mọi site đã lên để chọn được khóa học chung.
 - Khi xóa, mọi lệnh bị giới hạn theo mã `LAB`. Nếu học viên LAB đã có lịch sử chuyển cơ sở (append-only, sau TC-DTX) thì lệnh giữ nguyên dữ liệu của site đó và cảnh báo. `Logs` vẫn giữ các dòng nhật ký đăng ký.
