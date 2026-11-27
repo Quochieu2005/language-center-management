@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -15,6 +16,7 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   DashboardOutlined,
+  HomeOutlined,
   EditOutlined,
   LogoutOutlined,
   ReadOutlined,
@@ -339,6 +341,11 @@ function TeacherPortal() {
         </div>
 
         <div className={styles.actions}>
+          <Link href="/">
+            <Button icon={<HomeOutlined />} style={headerButtonStyle}>
+              Trang chủ
+            </Button>
+          </Link>
           <Button
             icon={<ReloadOutlined />}
             style={headerButtonStyle}

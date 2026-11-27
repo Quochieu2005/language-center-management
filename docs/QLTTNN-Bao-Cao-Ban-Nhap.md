@@ -192,7 +192,9 @@ Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog kh
 - Chưa có 2PC hay MSDTC. Chuyển cơ sở là transaction cục bộ cộng phục hồi tiến về phía trước. `[CẦN BỔ SUNG]` Cần hỏi giảng viên có yêu cầu giao dịch do DBMS quản lý không.
 - Phần lớn bằng chứng mới chạy trên hai database tạm cùng một máy; ba máy thật và thử tắt máy hoặc ngắt VPN thật còn thiếu.
 - Chỉ `MonHoc` dùng Publication; chưa làm demo Publication có bộ lọc theo bảng cha như GV-02.
-- Cơ sở xác thực (Q1) và API chưa có dự phòng (HA): mất Q1 thì đăng nhập gián đoạn.
+- Cơ sở xác thực (Q1) và API chưa có dự phòng (HA): mất Q1 thì đăng nhập gián đoạn. Đây là lựa chọn thiết kế đã biết (một authority để tránh trùng email và phiên đăng nhập), không phải thiếu sót chưa phát hiện; hướng khắc phục là bản sao đồng bộ cho authority.
+- Hai tiến trình nền `sync_blog` và `sync_accounts` mới được thử theo từng lượt (một lần chạy sau khi site hồi phục), chưa chạy liên tục nhiều giờ hoặc nhiều ngày; chưa có giám sát hàng đợi tồn đọng ngoài số đếm `pending_count` và `review_count`.
+- Ảnh trên Cloudinary: ba ảnh đại diện cũ của tài khoản và học viên vẫn nằm ngoài thư mục gốc của dự án (mã dạng UUID, tải lên trước khi có cấu trúc thư mục). Chúng còn đang được dùng nên giữ nguyên; chưa di chuyển vì phải đổi tham chiếu đồng thời ở cả ba site.
 - Kiểm tra giao diện dùng dữ liệu giả lập cho các trang cần đăng nhập; chưa thử trên thiết bị thật.
 
 **Hướng phát triển:** giao dịch do DBMS quản lý nếu được yêu cầu; dự phòng cho authority; đối soát tự động định kỳ cho mọi bảng nhân bản; thêm cơ sở mới bằng cấu hình.

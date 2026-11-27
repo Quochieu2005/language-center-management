@@ -22,15 +22,19 @@ with sync_playwright() as p:
         src = open(os.path.join(DIR, name + ".mmd"), encoding="utf-8").read()
         page = b.new_page(viewport={"width": 1800, "height": 1200}, device_scale_factor=2)
         page.set_content("<html><body style='margin:0;background:%s'><div id='out' style='padding:24px;background:%s;display:inline-block'></div></body></html>" % (BG, BG))
-        page.add_script_tag(url=MERMAID)
+        use_elk = src.lstrip().startswith("%%elk")
+        if not use_elk:
+            page.add_script_tag(url=MERMAID)
         svg = page.evaluate(
-            """async ([src, theme, css]) => {
-                mermaid.initialize({startOnLoad: false, theme: 'base', themeVariables: theme, themeCSS: css, securityLevel: 'loose',
+            """async ([src, theme, css, ELK_M, ELK_L]) => {
+                const mermaid = window.mermaid || (await import(ELK_M)).default;
+                if (!window.mermaid) { const elk = (await import(ELK_L)).default; mermaid.registerLayoutLoaders(elk); }
+                mermaid.initialize({layout: window.mermaid ? undefined : 'elk', startOnLoad: false, theme: 'base', themeVariables: theme, themeCSS: css, securityLevel: 'loose',
                     flowchart: {htmlLabels: true, useMaxWidth: false, nodeSpacing: 50, rankSpacing: 80, curve: 'basis'}});
                 const {svg} = await mermaid.render('d', src);
                 document.getElementById('out').innerHTML = svg;
                 return svg;
-            }""", [src, THEME, CSS])
+            }""", [src, THEME, CSS, "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs", "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.7/dist/mermaid-layout-elk.esm.min.mjs"])
         open(os.path.join(DIR, name + ".svg"), "w", encoding="utf-8").write(svg)
         box = page.locator("#out").bounding_box()
         page.set_viewport_size({"width": int(box["width"]) + 40, "height": int(box["height"]) + 40})
