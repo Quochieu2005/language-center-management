@@ -102,7 +102,7 @@ def edge(f):
 
 def diagram(tables, stubs=()):
     stubs = set(stubs)
-    parts = ["flowchart TB"]
+    parts = ["%%elk", "flowchart TB"]
     parts += [node(t, tables, stubs) for t in tables]
     rels = sorted({edge(f) for f in fk_set(tables)})
     classes = [

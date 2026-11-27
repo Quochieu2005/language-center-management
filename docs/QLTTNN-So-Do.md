@@ -73,7 +73,7 @@ Từ gốc repo, với Python có `playwright` (Chromium) và kết nối tới 
 $py = "src/api/.venv/Scripts/python.exe"; $env:PYTHONUTF8 = "1"
 & $py docs/diagrams/tools/erd_meta.py          # đọc metadata của Q1 vào $env:TEMP\erd_meta.json (chỉ đọc)
 & $py docs/diagrams/tools/gen_erd.py           # sinh các file erd-*.mmd
-python docs/diagrams/tools/render_mmd.py       # vẽ .svg và .png từ .mmd (cần mạng để tải thư viện Mermaid)
+python docs/diagrams/tools/render_mmd.py       # vẽ .svg và .png từ .mmd (cần mạng để tải thư viện Mermaid và bộ bố cục ELK; ERD dùng dòng `%%elk` đầu file để đi dây vuông góc, ít đường cắt nhau)
 python docs/diagrams/tools/render_html.py      # vẽ dinh-vi-du-lieu.png từ HTML
 ```
 

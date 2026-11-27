@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Avatar, Button, Card, Spin, Tabs, Tag, message } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
   DashboardOutlined,
+  HomeOutlined,
   BookOutlined,
   CalendarOutlined,
   DollarCircleOutlined,
@@ -143,6 +145,11 @@ function StudentPortal() {
         </div>
 
         <div className={styles.actions}>
+          <Link href="/">
+            <Button icon={<HomeOutlined />} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", borderColor: "rgba(255,255,255,0.3)" }}>
+              Trang chủ
+            </Button>
+          </Link>
           <Button
             icon={<SyncOutlined spin={refreshing} />}
             onClick={() => void load(true)}
