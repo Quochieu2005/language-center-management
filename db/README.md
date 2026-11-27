@@ -125,6 +125,23 @@ Khi thay đổi cấu trúc, cập nhật `docs/DATABASE_SCHEMA.md` và README t
 
 `verification/01_site_fragment_readonly.sql` chỉ đọc DB đã chọn. [02_contact_boundary_regression.sql](verification/02_contact_boundary_regression.sql) thử ghi sai site rồi rollback, chỉ chấp nhận DB kiểm thử `QLTTNN_TEST*`; không chạy trên DB vận hành. Script 02 cần schema/CoSo, migration 39/43 và một cơ sở khác tồn tại trong danh mục. Các script khởi tạo/migration trong `db/` có thao tác ghi; theo hướng dẫn triển khai ở trên. Dùng SSMS trên Windows hoặc VS Code mssql trên Mac.
 
+### Dữ liệu mẫu cho các lần chạy bằng chứng (`seed_lab_data`)
+
+Các site thật hầu như chưa có lớp và đăng ký, nên TC-FRAG, TC-CON, TC-DQ và TC-DTX cần một bộ dữ liệu nhỏ có đánh dấu. Từ `src/api`:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py seed_lab_data                 # chỉ in kế hoạch, không ghi gì
+.\.venv\Scripts\python.exe manage.py seed_lab_data --apply         # tạo dữ liệu LAB ở mọi site truy cập được
+.\.venv\Scripts\python.exe manage.py seed_lab_data --remove --apply  # xóa dữ liệu LAB
+```
+
+- Mỗi site nhận 1 giáo viên, 1 phòng, 8 học viên, 3 lớp (hai lớp 20 chỗ, một lớp 1 chỗ cho TC-CON) và 5 đăng ký. Mã đều có `LAB` (ví dụ `Q1-HV-LAB01`, `Q7-LH-LAB03`) để phân biệt với dữ liệu thật; học viên `LAB06` đến `LAB08` chưa đăng ký lớp, dành cho TC-CON và TC-DTX.
+- Đăng ký đi qua đúng service `register_student_to_class`, nên học phí và kỳ đóng được tạo như khi chạy thật.
+- Lệnh **không ghi danh mục dùng chung** (`MonHoc`, `KhoaHoc`) vì đã có Publication; nó dùng một khóa học mà mọi site đích đều đã có (`--course` để chọn). Nếu chưa có, hãy tạo khóa học qua trang admin trước để nó nhân bản.
+- Site không truy cập được bị bỏ qua và lệnh báo tên. Chạy lại cho riêng site đó sau (`--sites Q7`); mỗi site chỉ nạp một lần, chạy lại sẽ báo đã có và không tạo thêm. Nên nạp cùng lúc khi mọi site đã lên để chọn được khóa học chung.
+- Khi xóa, mọi lệnh bị giới hạn theo mã `LAB`. Nếu học viên LAB đã có lịch sử chuyển cơ sở (append-only, sau TC-DTX) thì lệnh giữ nguyên dữ liệu của site đó và cảnh báo. `Logs` vẫn giữ các dòng nhật ký đăng ký.
+- Đã kiểm tra trên hai database tạm (nạp, nạp lại, xóa, nạp lại; dữ liệu không mang nhãn LAB còn nguyên). Chưa chạy `--apply` trên site thật.
+
 ### TC-SITE-01 / TC-FRAG-01
 
 1. Chọn đúng kết nối và database, ví dụ Q1/`QLTTNN_Q1`; chạy [01_site_fragment_readonly.sql](verification/01_site_fragment_readonly.sql). Chạy lại trên Q7 và TD bằng kết nối riêng. Không đổi tên DB hay xóa bản cũ để lấy ảnh.
