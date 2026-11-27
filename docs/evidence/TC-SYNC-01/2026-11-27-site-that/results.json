@@ -1,0 +1,92 @@
+{
+  "run_at": "2026-11-27T09:17:42+07:00",
+  "note": "Q7 và TD mất kết nối thật tại thời điểm chạy. Bài LAB ở trạng thái nháp, được giữ lại để chạy phần phục hồi.",
+  "queue_before": {
+    "pending_count": 0,
+    "review_count": 0
+  },
+  "steps": {
+    "1_tao_danh_muc": {
+      "complete": false,
+      "site_codes": [
+        "Q1",
+        "Q7",
+        "TD"
+      ],
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 1,
+        "review_count": 0
+      }
+    },
+    "2_tao_bai": {
+      "complete": false,
+      "site_codes": [
+        "Q1",
+        "Q7",
+        "TD"
+      ],
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 2,
+        "review_count": 0
+      }
+    },
+    "3_sua_lan_1": {
+      "complete": false,
+      "site_codes": [
+        "Q1",
+        "Q7",
+        "TD"
+      ],
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 3,
+        "review_count": 0
+      }
+    },
+    "4_sua_lan_2": {
+      "complete": false,
+      "site_codes": [
+        "Q1",
+        "Q7",
+        "TD"
+      ],
+      "missing_sites": [
+        "Q7",
+        "TD"
+      ],
+      "idempotent_replay": false,
+      "queue": {
+        "pending_count": 4,
+        "review_count": 0
+      }
+    },
+    "5_q1_hien_tai": {
+      "title": "LAB sua lan 2 khi Q7 va TD mat ket noi",
+      "status": "nhap"
+    },
+    "6_worker_khi_van_mat_ket_noi": {
+      "pending_count": 4,
+      "review_count": 0,
+      "completed": 0
+    },
+    "7_queue_sau_worker": {
+      "pending_count": 4,
+      "review_count": 0
+    }
+  },
+  "verdict_outage_part": true
+}
