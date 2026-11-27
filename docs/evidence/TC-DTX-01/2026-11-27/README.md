@@ -44,6 +44,10 @@ K4 là điểm khác với đường phục hồi tiến về phía trước: �
 - Khi đích offline, 2PC **thất bại ngay** (không "chờ và chạy tiếp" như đường cũ); người dùng thử lại khi đích lên.
 - Đường 2PC chỉ chạy cho giao dịch chưa bắt đầu; giao dịch đã chạy dở theo đường cũ tiếp tục theo đường cũ.
 
+## Thử giữa Q1 và TD thật (27/11, chưa có kết luận)
+
+Sau khi áp migration 50 lên Q1 và TD (hai site đều có `sp_chuyen_co_so_2pc` và `sp_chuyen_co_so_nhan_2pc`), mình tạo Linked Server `LS_TD` trên Q1 (đọc được `QLTTNN_TD_MOI` qua `OPENQUERY`) và bật dịch vụ MS DTC trên Q1. Chưa chạy được giao dịch phân tán thật vì: (1) **Network DTC Access đang tắt trên máy Q1** (`NetworkDtcAccess=0`), cần bật bằng tài khoản quản trị; (2) TD **chập chờn**: ngay lúc thử `BEGIN DISTRIBUTED TRANSACTION` TD hết thời gian chờ, nên không phân biệt được lỗi DTC với lỗi mạng; (3) máy TD cũng phải bật MS DTC và mở cổng 135 cùng dải RPC động.
+
 ## Giới hạn
 
 - Hai instance trên **cùng một máy**, không có mạng giữa chúng. Chưa thử MS DTC qua ZeroTier giữa các máy thật, nơi cần mở TCP 135 và dải RPC động, bật Network DTC Access, và `No Authentication Required` trong workgroup. Q7 chạy SQL Server trên Linux trong Docker: MS DTC trên Linux cần cấu hình riêng (xem [runbook](../../../QLTTNN-Chay-Bang-Chung-Site-That.md#2pc)).

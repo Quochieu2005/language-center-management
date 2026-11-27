@@ -177,6 +177,8 @@ Kết quả đã chạy ngày 26/11/2026 trên **hai database tạm cùng một 
 | TC-REP-01 replication `MonHoc` | Đạt trên ba site thật | [TC-REP-01](evidence/TC-REP-01/2026-11-20/README.md) |
 | TC-CON-01 trên **Q1 thật** (27/11) | Đạt: phiên thứ hai chờ rồi bị từ chối; 10 vòng đều một phiên thắng; lớp 5 chỗ với 12 phiên ra đúng 5 | [TC-CON-01 Q1 thật](evidence/TC-CON-01/2026-11-27-site-that/README.md) |
 | TC-DQ-01 khi **mất site thật** (27/11) | Đạt: Q7 và TD mất kết nối thật, API báo `complete=false`, `missing_sites=["Q7","TD"]`, tổng khớp SQL trực tiếp ở Q1, không báo 0; hai endpoint công khai qua HTTP cũng báo đúng | [TC-DQ-01 site thật](evidence/TC-DQ-01/2026-11-27-site-that/README.md) |
+| TC-CON-01 trên **TD thật** (27/11) | Đạt: phiên thứ hai chờ rồi bị từ chối; 10 vòng đều một phiên thắng; lớp 5 chỗ với 12 phiên ra đúng 5 | [TC-CON-01 TD](evidence/TC-CON-01/2026-11-27-site-td/README.md) |
+| TC-DQ-01 khi chỉ **Q7** mất (27/11) | Đạt: `complete=false`, `missing_sites=["Q7"]`, tổng của Q1 và TD khớp SQL trực tiếp, hai site còn sống làm việc bình thường | [TC-DQ-01 Q1+TD](evidence/TC-DQ-01/2026-11-27-q1-td/README.md) |
 | TC-DTX-01 chuyển cơ sở bằng **2PC** (27/11) | Đạt trên hai instance cùng máy: thành công, đích từ chối, đích offline rồi chạy lại, lỗi ở nguồn sau khi đích đã ghi (đích bị hủy theo), quay lại cơ sở cũ; còn chạy giữa các máy thật | [TC-DTX-01 2PC](evidence/TC-DTX-01/2026-11-27/README.md) |
 
 Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog không hội tụ khi sửa liên tiếp một bài lúc một cơ sở mất kết nối; và API văng lỗi 500 thay vì báo thiếu cơ sở khi database offline trên instance còn chạy. Nên nêu trong báo cáo vì đó là kết quả trực tiếp của việc kiểm chứng.

@@ -1,0 +1,203 @@
+{
+  "run_at": "2026-11-27T23:10:24+07:00",
+  "environment": {
+    "site": "TD",
+    "instance": "DESKTOP-N47BBPH",
+    "database": "QLTTNN_TD_MOI",
+    "note": "Site thật theo cấu hình; gọi trực tiếp register_student_to_class; chỉ ghi dữ liệu mang nhãn LAB."
+  },
+  "A_overlap": {
+    "class": "TD-LH-LAB03",
+    "capacity": 1,
+    "state_before": {
+      "capacity": 1,
+      "stored_count": 0,
+      "enrollments": 0,
+      "tuition_rows": 0,
+      "consistent": true
+    },
+    "t1": {
+      "outcome": "success",
+      "seconds": 2.39,
+      "started_at": 0.0
+    },
+    "t2": {
+      "outcome": "rejected",
+      "seconds": 1.96,
+      "started_at": 0.5,
+      "error": "ClassConflict",
+      "message": "Lớp đã đủ sĩ số tối đa."
+    },
+    "t2_waited_for_t1": true,
+    "final_state": {
+      "capacity": 1,
+      "stored_count": 1,
+      "enrollments": 1,
+      "tuition_rows": 1,
+      "consistent": true
+    }
+  },
+  "B_rounds": {
+    "rounds": 10,
+    "exactly_one_success_each_round": true,
+    "no_overbooking": true,
+    "counts_consistent": true,
+    "detail": [
+      {
+        "class": "TD-LH-LABR01",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR02",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR03",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR04",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR05",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR06",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR07",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR08",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR09",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      },
+      {
+        "class": "TD-LH-LABR10",
+        "outcomes": [
+          "rejected",
+          "success"
+        ],
+        "state": {
+          "capacity": 1,
+          "stored_count": 1,
+          "enrollments": 1,
+          "tuition_rows": 1,
+          "consistent": true
+        }
+      }
+    ]
+  },
+  "C_many": {
+    "class": "TD-LH-LABM01",
+    "capacity": 5,
+    "sessions": 12,
+    "successes": 5,
+    "rejections": 7,
+    "final_state": {
+      "capacity": 5,
+      "stored_count": 5,
+      "enrollments": 5,
+      "tuition_rows": 5,
+      "consistent": true
+    }
+  },
+  "verdict": true
+}

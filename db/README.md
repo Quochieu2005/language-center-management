@@ -102,6 +102,15 @@ python db/tools/apply_migrations.py --site Q7 47 48 --apply --backup   # sao lư
 
 Số `31` trùng hai file, nên dùng tên file. Đã kiểm tra trên database tạm (chạy, chạy lại, số trùng, site không tồn tại). Kịch bản dùng công cụ này cho Q7 và TD: [QLTTNN-Chay-Bang-Chung-Site-That.md](../docs/QLTTNN-Chay-Bang-Chung-Site-That.md).
 
+## Đối soát một bài Blog lệch giữa các site
+
+Ứng dụng từ chối sửa một bài khi bản sao giữa các site khác nhau. [tools/blog_reconcile.py](tools/blog_reconcile.py) chép các cột nội dung (tiêu đề, tóm tắt, nội dung, thời lượng đọc, trạng thái, ngày xuất bản, ảnh bìa) của **một** bài từ authority sang site lệch, trong một transaction cục bộ, và ghi một dòng audit vào `Logs` của site đó. Mặc định chỉ in chỗ khác; chỉ ghi khi có `--apply`; không đổi mã, danh mục hay thời gian của site đích.
+
+```powershell
+src/api/.venv/Scripts/python.exe db/tools/blog_reconcile.py --slug <slug> --to TD            # xem khác biệt
+src/api/.venv/Scripts/python.exe db/tools/blog_reconcile.py --slug <slug> --to TD --apply    # chép và ghi audit
+```
+
 ## Kiểm tra ảnh Cloudinary không còn dùng
 
 [tools/cloudinary_audit.py](tools/cloudinary_audit.py) chỉ đọc: liệt kê ảnh dưới `CLOUDINARY_ROOT_FOLDER` rồi so với `public_id` lưu ở các site (ảnh đại diện, ảnh bìa Blog, ảnh trong nội dung bài). Không xóa gì và không in thông tin đăng nhập. Khi còn site chưa đọc được, danh sách mồ côi chỉ là ứng viên (script cảnh báo); đừng xóa cho đến khi đọc đủ ba site. Ảnh cũ ngoài thư mục gốc chỉ được báo, không bao giờ là ứng viên.
