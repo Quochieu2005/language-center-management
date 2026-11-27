@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Form, Input, Modal, Select, Space, Table, Tag, Typography } from "antd";
+import { message } from "@/lib/ui/message";
 import type { ColumnsType } from "antd/es/table";
 import { ApiError } from "@/lib/api/client";
 import { contactsApi, type ContactRequest, type ContactRequestList, type ContactRequestStatus } from "@/lib/api/contacts";

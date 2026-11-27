@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag } from "antd";
+import { message } from "@/lib/ui/message";
 import { adminApi, type Student } from "@/lib/api/admin";
 import { academicsApi, type TransferRow } from "@/lib/api/academics";
 import { contactsApi } from "@/lib/api/contacts";

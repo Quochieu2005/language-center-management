@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Alert, Button, Space, message } from "antd";
+import { Alert, Button, Space } from "antd";
+import { message } from "@/lib/ui/message";
 import { UploadOutlined } from "@ant-design/icons";
 import { authApi, type AvatarUploadIntent } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";

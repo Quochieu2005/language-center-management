@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Button, Card, Checkbox, Col, Descriptions, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, TimePicker, message } from "antd";
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, TimePicker } from "antd";
+import { message } from "@/lib/ui/message";
 import { academicsApi, type ClassCourseOption, type ClassRow, type EnrollmentRow, type RoomRow, type SessionRow } from "@/lib/api/academics";
 import { adminApi, type Student, type Teacher } from "@/lib/api/admin";
 import { useSession } from "@/lib/auth/session";

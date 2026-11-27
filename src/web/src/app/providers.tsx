@@ -4,6 +4,7 @@ import { App as AntdApp, ConfigProvider } from "antd";
 import viVN from "antd/locale/vi_VN";
 import type { ReactNode } from "react";
 import { SessionProvider } from "@/lib/auth/session";
+import { MessageBridge } from "@/lib/ui/message";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -25,6 +26,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
       }}
     >
       <AntdApp>
+        <MessageBridge />
         <SessionProvider>{children}</SessionProvider>
       </AntdApp>
     </ConfigProvider>
