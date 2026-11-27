@@ -24,7 +24,7 @@ Nguyên tắc khi hoàn thiện: chỉ ghi điều đã chạy thật; kết qu�
 | 3.4 Agent | MỘT PHẦN | Ảnh Agent và job trên máy Publisher |
 | 3.5 Linked Server | THIẾU | Ảnh cấu hình `LS_Q7` và truy vấn đọc thử |
 | 3.6 Replication | MỘT PHẦN | Đã có `MonHoc`; còn ảnh Replication Monitor và thử ngắt/phục hồi `KhoaHoc`, `TaiKhoan`, Blog trên ba site |
-| 3.7 Thử quyền, giao tác, truy vấn | MỘT PHẦN | CON và DQ đã chạy trên Q1 thật (27/11); còn FRAG và SYNC trên nhiều site thật, và DTX chưa có |
+| 3.7 Thử quyền, giao tác, truy vấn | MỘT PHẦN | CON và DQ đã chạy trên Q1 thật (27/11); DTX (2PC) đã chạy trên hai instance cùng máy; còn FRAG, SYNC và DTX giữa các máy thật |
 
 ## 1. Đề tài được giao
 
@@ -118,7 +118,7 @@ Dự án chặn ghi sai cơ sở bằng 16 `CHECK` (migration 30) cộng 1 `CHEC
 
 Đối chiếu lý thuyết (GV-03): `MonHoc` và `TaiKhoan` là lazy một nơi ghi; `KhoaHoc` và Blog gần ROWAA (ghi cơ sở còn sống, nhớ cơ sở thiếu, phát lại sau). Không dùng 2PC, MSDTC hay quorum. Mức nhất quán là nhất quán ngầm: các bản sao có thể lệch tạm thời và hội tụ sau.
 
-**Quản lý giao tác (QTLPT).** Kiến trúc Client/Server có Coordinator: máy trạm gọi ứng dụng, Coordinator định tuyến và điều phối; mỗi cơ sở có cơ sở dữ liệu riêng, không có kho nghiệp vụ trung tâm. Chuyển cơ sở là chuỗi transaction cục bộ cùng sự kiện bền vững và phục hồi tiến về phía trước, không phải giao dịch nguyên tử xuyên hai cơ sở. `[CẦN BỔ SUNG]` Nếu giảng viên yêu cầu giao dịch do DBMS quản lý (MSDTC/2PC), phải làm thêm trước khi nộp (xem mục "Hạn chế").
+**Quản lý giao tác (QTLPT).** Kiến trúc Client/Server có Coordinator: máy trạm gọi ứng dụng, Coordinator định tuyến và điều phối; mỗi cơ sở có cơ sở dữ liệu riêng, không có kho nghiệp vụ trung tâm. Chuyển cơ sở có **hai đường**, chọn bằng cấu hình: (1) chuỗi transaction cục bộ cùng sự kiện bền vững và phục hồi tiến về phía trước, chịu được site đích mất kết nối nhưng có khoảng học viên tồn tại ở cả hai site; (2) **giao dịch phân tán 2PC qua MS DTC**: một `BEGIN DISTRIBUTED TRANSACTION` qua Linked Server, đích và nguồn cùng commit hoặc cùng hủy (migration 50, `sp_chuyen_co_so_2pc`). Đường (2) đã chạy đạt trên hai instance SQL Server thật cùng một máy, gồm các ca đích từ chối, đích offline và lỗi ở nguồn sau khi đích đã ghi (hồ sơ đích bị hủy theo); `[CẦN BỔ SUNG]` chạy giữa các máy thật khi MS DTC qua ZeroTier sẵn sàng. Đánh đổi: 2PC là giao thức chặn và thất bại ngay khi đích mất kết nối, nên được dùng cho thao tác hiếm, không tranh chấp như chuyển cơ sở, không dùng cho đăng ký lớp. Tài liệu giảng viên đã đọc (GV-01 mục 3.7, GV-06 trang 66–70) không nói rõ MSDTC/2PC; nhóm làm cả hai đường vì không xác nhận được với giảng viên.
 
 ## 3. Cài đặt vật lý thực tế
 
@@ -140,7 +140,7 @@ Bố trí máy tại thời điểm viết: Q1 trên máy Windows của Quốc H
 
 ### 3.3. Cài hệ quản trị CSDL
 
-DBMS: Microsoft SQL Server; quản trị bằng SSMS. Ba cơ sở dữ liệu `QLTTNN_Q1`, `QLTTNN_Q7` và `QLTTNN_TD_MOI` (TD) cùng một schema (`db/01_create_schema.sql` và các migration). Đã ghi nhận TD chạy SQL Server 16.0.1000.6. `[CẦN BỔ SUNG]` Phiên bản và edition của Q1 và Q7. `[CẦN ẢNH E-3.3-01]` Phiên bản từng instance và danh sách bảng cùng cấu trúc ở cả ba cơ sở dữ liệu. Trạng thái: **MỘT PHẦN**.
+DBMS: Microsoft SQL Server; quản trị bằng SSMS. Ba cơ sở dữ liệu `QLTTNN_Q1`, `QLTTNN_Q7` và `QLTTNN_TD_MOI` (TD) cùng một schema (`db/01_create_schema.sql` và các migration). Đã ghi nhận TD chạy SQL Server 16.0.1000.6. Q1 chạy SQL Server 2022 (16.0.1000.6, Developer Edition, RTM; đọc từ máy ngày 27/11/2026). `[CẦN BỔ SUNG]` Phiên bản và edition của Q7 (SQL Server trên Docker). `[CẦN ẢNH E-3.3-01]` Phiên bản từng instance và danh sách bảng cùng cấu trúc ở cả ba cơ sở dữ liệu. Trạng thái: **MỘT PHẦN**.
 
 ### 3.4. Kiểm tra dịch vụ Agent
 
@@ -177,7 +177,7 @@ Kết quả đã chạy ngày 26/11/2026 trên **hai database tạm cùng một 
 | TC-REP-01 replication `MonHoc` | Đạt trên ba site thật | [TC-REP-01](evidence/TC-REP-01/2026-11-20/README.md) |
 | TC-CON-01 trên **Q1 thật** (27/11) | Đạt: phiên thứ hai chờ rồi bị từ chối; 10 vòng đều một phiên thắng; lớp 5 chỗ với 12 phiên ra đúng 5 | [TC-CON-01 Q1 thật](evidence/TC-CON-01/2026-11-27-site-that/README.md) |
 | TC-DQ-01 khi **mất site thật** (27/11) | Đạt: Q7 và TD mất kết nối thật, API báo `complete=false`, `missing_sites=["Q7","TD"]`, tổng khớp SQL trực tiếp ở Q1, không báo 0; hai endpoint công khai qua HTTP cũng báo đúng | [TC-DQ-01 site thật](evidence/TC-DQ-01/2026-11-27-site-that/README.md) |
-| TC-DTX-01 chuyển cơ sở | **THIẾU**: có luồng đề nghị, duyệt, điều phối và retry trong code; chưa chạy thử lỗi trước và sau commit đích | — |
+| TC-DTX-01 chuyển cơ sở bằng **2PC** (27/11) | Đạt trên hai instance cùng máy: thành công, đích từ chối, đích offline rồi chạy lại, lỗi ở nguồn sau khi đích đã ghi (đích bị hủy theo), quay lại cơ sở cũ; còn chạy giữa các máy thật | [TC-DTX-01 2PC](evidence/TC-DTX-01/2026-11-27/README.md) |
 
 Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog không hội tụ khi sửa liên tiếp một bài lúc một cơ sở mất kết nối; và API văng lỗi 500 thay vì báo thiếu cơ sở khi database offline trên instance còn chạy. Nên nêu trong báo cáo vì đó là kết quả trực tiếp của việc kiểm chứng.
 
@@ -189,7 +189,7 @@ Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog kh
 
 **Hạn chế cần nói thẳng:**
 
-- Chưa có 2PC hay MSDTC. Chuyển cơ sở là transaction cục bộ cộng phục hồi tiến về phía trước. `[CẦN BỔ SUNG]` Cần hỏi giảng viên có yêu cầu giao dịch do DBMS quản lý không.
+- 2PC qua MS DTC mới chạy trên hai instance SQL Server cùng một máy; giữa Q1, Q7 và TD thật cần mở TCP 135 và dải RPC động qua ZeroTier, bật Network DTC Access, và Q7 (SQL Server Linux trong Docker) cần cấu hình MS DTC riêng. Nếu không chạy được qua mạng, ba site dùng đường phục hồi tiến về phía trước (giữa bước ghi đích và cập nhật nguồn, học viên tồn tại ở cả hai site; hồ sơ đích ở trạng thái tạm `bao_luu`).
 - Phần lớn bằng chứng mới chạy trên hai database tạm cùng một máy; ba máy thật và thử tắt máy hoặc ngắt VPN thật còn thiếu.
 - Chỉ `MonHoc` dùng Publication; chưa làm demo Publication có bộ lọc theo bảng cha như GV-02.
 - Cơ sở xác thực (Q1) và API chưa có dự phòng (HA): mất Q1 thì đăng nhập gián đoạn. Đây là lựa chọn thiết kế đã biết (một authority để tránh trùng email và phiên đăng nhập), không phải thiếu sót chưa phát hiện; hướng khắc phục là bản sao đồng bộ cho authority.
@@ -218,7 +218,7 @@ Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog kh
 | E-3.7-02 | 3.7 | Q1, Q7, TD | TC-FRAG-01 chạy trên site thật | Chờ site lên |
 | E-3.7-03 | 3.7 | Q1 (hoặc site có lớp) | TC-CON-01: hai phiên tranh chỗ cuối | Đã chạy trên Q1 thật 27/11 (kết quả JSON); còn ảnh chụp |
 | E-3.7-04 | 3.7 | API và các site | TC-DQ-01: tổng khớp, thử thiếu một site | Đã chạy 27/11 khi Q7 và TD mất thật (kết quả JSON); còn ảnh chụp cảnh báo thiếu site ở trang admin |
-| E-3.7-05 | 3.7 | Nguồn và đích | TC-DTX-01: trạng thái trước, sau, khi lỗi, khi phục hồi | Chưa làm |
+| E-3.7-05 | 3.7 | Nguồn và đích | TC-DTX-01: trạng thái trước, sau, khi lỗi, khi phục hồi | Đã chạy 27/11 trên hai instance cùng máy (kết quả JSON); còn ảnh chụp và chạy giữa các máy thật |
 | E-3.7-06 | 3.7 | Mỗi vai trò | Quyền được và bị từ chối; trigger bảo vệ nhật ký | Chưa chụp |
 
 Lưu ảnh vào `docs/evidence/<mã TC>/<ngày>/`. Che mật khẩu, token và IP riêng trước khi lưu.
@@ -227,7 +227,7 @@ Lưu ảnh vào `docs/evidence/<mã TC>/<ngày>/`. Che mật khẩu, token và I
 
 | Khoảng ngày | Việc |
 |---|---|
-| 27/11 đến 29/11 | Đưa Q7 và TD lên ổn định; xác nhận máy nào của ai; hỏi giảng viên về 2PC; chốt các quyết định còn mở. Chốt một buổi khoảng 2 giờ cả ba chủ máy cùng có mặt |
+| 27/11 đến 29/11 | Đưa Q7 và TD lên ổn định; xác nhận máy nào của ai; chốt các quyết định còn mở. Chốt một buổi khoảng 2 giờ cả ba chủ máy cùng có mặt |
 | 30/11 đến 5/12 | Chạy buổi theo [kịch bản chạy bằng chứng](QLTTNN-Chay-Bang-Chung-Site-That.md): migration Q7, nạp dữ liệu LAB ba site, TC-FRAG, CON, DQ, SYNC, DTX, REP trên site thật, chụp ảnh E-3.x |
 | 6/12 đến 14/12 | Hoàn thiện văn bản từ bản nháp này, chèn ảnh, vẽ ERD và sơ đồ định vị |
 | 15/12 đến 16/12 | Dự phòng, rà lại từng mục với mã ảnh, nộp 17/12 |

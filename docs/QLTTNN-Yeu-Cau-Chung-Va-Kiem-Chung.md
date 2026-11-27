@@ -36,7 +36,7 @@ E phối hợp lưu kết quả/demo; Quốc Hiếu review trước khi nhóm gh
 |---|---|---|
 | Phân mảnh | Ngang theo site và dẫn xuất theo bảng cha; JOIN/FK chỉ trong site | Truy vấn kiểm tra độ đầy đủ, tính không giao nhau và khả năng tái thiết tập dữ liệu logic |
 | Replication | MonHoc dùng SQL Server transactional Publication, API chỉ ghi Publisher cấu hình và đối soát mọi site sau commit | Ảnh người dùng chứng minh UPDATE/phục hồi Q1 → Q7; evidence ngày 20/11/2026 có API views CRUD/retry SQL thật đủ Q1/Q7/TD. Còn browser end-to-end, outage TD và TD trên máy Minh Đức; KhoaHoc, Blog (`sync_blog`) và TaiKhoan (`sync_accounts`) dùng hàng đợi/ACK do ứng dụng cài, chưa có bằng chứng ba SQL Server thật cho ba bảng này |
-| Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; nếu tiêu chí giảng viên yêu cầu giao dịch do DBMS quản lý, phải chốt và triển khai bổ sung, không tự ghi đã có MSDTC/2PC |
+| Distributed transaction | Chuyển cơ sở có trạng thái nguồn, sự kiện append-only và phục hồi tiến về phía trước | Ghi đúng giao thức thực tế, bảo đảm nhất quán và kết quả fault injection. Thiết kế hiện tại không bảo đảm ACID nguyên tử xuyên hai CSDL; tài liệu giảng viên đã đọc (GV-01 mục 3.7, GV-06 trang 66–70) không nói rõ MSDTC/2PC, nên đã làm thêm đường 2PC qua MS DTC (migration 50, [TC-DTX-01](evidence/TC-DTX-01/2026-11-27/README.md), đạt trên hai instance cùng máy) bên cạnh đường phục hồi tiến; chưa chạy giữa các máy thật |
 | Concurrency | Sức chứa lớp phải được bảo vệ cùng transaction tạo đăng ký/học phí | Cơ chế khóa/mức cô lập hoặc cập nhật có điều kiện phù hợp SQL Server; thời điểm cạnh tranh và kết quả hai phiên thực tế |
 | Đồng bộ | Chỉ báo hoàn tất khi mọi site bắt buộc được xác nhận đã nhận thay đổi | Cách tiếp tục sau lỗi giữa chừng, version conflict, kết quả không rõ sau timeout và đọc đối soát từng bản sao |
 
@@ -79,7 +79,7 @@ Chạy trên dữ liệu kiểm thử riêng, không thử lỗi trên dữ li�
 4. Thử riêng lỗi trước commit đích: nguồn giữ nguyên; retry hoặc kết thúc thất bại theo loại lỗi. Thử riêng dừng tiến trình sau commit đích: khởi động lại và recovery làm nốt nguồn; không xóa đích hoặc tạo hồ sơ thứ hai.
 5. Kiểm tra Global Query trong khi đang xử lý và sau phục hồi theo quy tắc chọn bản hiện hành; không đếm cả hai bản vật lý.
 
-**Đạt khi:** có thay đổi thực sự trên hai CSDL, tiến trình/sự kiện bền vững và phục hồi đúng giao thức đã chọn; bảo đảm của giao thức được trình bày đúng tiêu chí đánh giá. Chưa thống nhất cơ chế đáp ứng tiêu chí distributed transaction của giảng viên thì giữ trạng thái cần chốt, không tự đánh dấu đã đạt ACID.
+**Đạt khi:** có thay đổi thực sự trên hai CSDL, tiến trình/sự kiện bền vững và phục hồi đúng giao thức đã chọn; bảo đảm của giao thức được trình bày đúng tiêu chí đánh giá. Báo cáo nêu đúng đường nào đã chạy ở đâu: 2PC qua MS DTC đã đạt trên hai instance cùng máy, chưa trên ba máy thật; không tự đánh dấu ACID xuyên ba site khi chưa chạy MS DTC giữa các máy.
 
 ### TC-CON-01 — Hai yêu cầu tranh chỗ cuối
 

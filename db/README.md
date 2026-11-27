@@ -10,7 +10,7 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 
 - Schema/seed/verify hỗ trợ TC-SITE-01 và TC-FRAG-01; đọc riêng từng DB để đối chiếu mảnh và dữ liệu cha/con.
 - `02_seed_shared_catalog.sql` chỉ nạp ban đầu. MonHoc dùng SQL Server transactional Publication: chỉ Publisher ghi qua API; Logs giữ biên nhận Publisher. Không thêm schema/migration; phải cấu hình Subscription ngoài API cho mọi site hoạt động. [Hướng dẫn và giới hạn](../docs/MonHoc-SQL-Replication.md).
-- Bảng trạng thái/sự kiện hỗ trợ Coordinator, không tự chạy distributed transaction hoặc bảo đảm ACID xuyên site. TC-DTX-01 cần nghiệp vụ nguồn/đích và cơ chế đã chốt chạy thật.
+- Bảng trạng thái/sự kiện hỗ trợ đường chuyển cơ sở phục hồi tiến. Migration `50_add_transfer_2pc.sql` thêm đường **2PC qua MS DTC** (`sp_chuyen_co_so_2pc`, `sp_chuyen_co_so_nhan_2pc`; chạy trên mọi site, cần Linked Server `rpc out` và MS DTC); ứng dụng chỉ dùng khi `TRANSFER_2PC_LINKED_SERVERS_JSON` có cặp site, xem [TC-DTX-01](../docs/evidence/TC-DTX-01/2026-11-27/README.md).
 - TC-CON-01 cần hai phiên cạnh tranh chỗ cuối, cơ chế bảo vệ sức chứa và đọc lại `LopHoc`/`DangKy`/`HocPhi`; các ràng buộc/verify cục bộ không đủ thay bài thử này.
 - TC-DQ-01 cần đọc các DB rồi tổng hợp tại API; không thay bằng JOIN xuyên DB. Chạy xong script khởi tạo chưa có nghĩa đã đạt toàn bộ yêu cầu môn học.
 
@@ -102,6 +102,14 @@ python db/tools/apply_migrations.py --site Q7 47 48 --apply --backup   # sao lư
 
 Số `31` trùng hai file, nên dùng tên file. Đã kiểm tra trên database tạm (chạy, chạy lại, số trùng, site không tồn tại). Kịch bản dùng công cụ này cho Q7 và TD: [QLTTNN-Chay-Bang-Chung-Site-That.md](../docs/QLTTNN-Chay-Bang-Chung-Site-That.md).
 
+## Kiểm tra ảnh Cloudinary không còn dùng
+
+[tools/cloudinary_audit.py](tools/cloudinary_audit.py) chỉ đọc: liệt kê ảnh dưới `CLOUDINARY_ROOT_FOLDER` rồi so với `public_id` lưu ở các site (ảnh đại diện, ảnh bìa Blog, ảnh trong nội dung bài). Không xóa gì và không in thông tin đăng nhập. Khi còn site chưa đọc được, danh sách mồ côi chỉ là ứng viên (script cảnh báo); đừng xóa cho đến khi đọc đủ ba site. Ảnh cũ ngoài thư mục gốc chỉ được báo, không bao giờ là ứng viên.
+
+```powershell
+src/api/.venv/Scripts/python.exe db/tools/cloudinary_audit.py [--out orphans.json]
+```
+
 ## Bổ sung khi nâng cấp DB hiện có
 
 - Sao lưu từng DB và kiểm tra bản sao lưu trước khi sửa. Không chạy lại schema 01 trên DB có bảng.
@@ -173,7 +181,7 @@ Không chạy lại seed để “sửa” bản sao trong khi lấy bằng ch�
 Theo [bộ YC/TC](../docs/QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md). Cần các request/phiên độc lập trên fixture dành cho demo:
 
 - CON: hai học viên tranh lớp còn đúng một chỗ; bắt đầu đồng thời, giữ response của cả hai, kiểm tra sĩ số, đúng một đăng ký/học phí mới và rollback bên thất bại. Khóa ở source không thay bằng chứng cạnh tranh thật.
-- DTX: tư vấn gửi đề nghị, Big/Small đích duyệt; thử lỗi trước/sau commit đích, retry và đối chiếu nguồn/đích, lịch sử/tài khoản/thông báo. **Chưa có cơ chế MSDTC/2PC trong source**.
+- DTX: tư vấn gửi đề nghị, Big/Small đích duyệt; thử lỗi trước/sau commit đích, retry và đối chiếu nguồn/đích, lịch sử/tài khoản/thông báo. Đường **2PC** đã chạy đạt trên hai instance cùng máy (`docs/evidence/scripts/ev_dtx.py`, `ev_dtx_api.py`); chưa chạy trên site thật.
 - DQ: lấy số liệu từng DB rồi so API tổng hợp; thử mất một site và thấy cảnh báo thiếu. Không dùng tổng `dang_hoc` thuần khi chuyển đang phục hồi.
 
 Lưu bằng chứng theo mẫu `docs/evidence/<TC>/<ngày>/`: điều kiện đầu, fixture, người/máy/site, câu lệnh/request không secret, kết quả kỳ vọng/thực tế và ảnh/log. Chưa chạy phải ghi **chưa kiểm chứng**, không tạo kết quả mẫu giả.

@@ -1,0 +1,509 @@
+{
+  "run_at": "2026-11-27T10:10:26+07:00",
+  "moi_truong": {
+    "nguon": "instance mặc định (SQL Server 2022), database QLTTNN_EVA",
+    "dich": "instance có tên MSSQLSERVER01 (SQL Server 2025), database QLTTNN_EVB",
+    "co_che": "BEGIN DISTRIBUTED TRANSACTION qua Linked Server LS_EVB, MS DTC",
+    "phien_ban": {
+      "nguon": "16.0.1000.6",
+      "dich": "17.0.1000.7"
+    }
+  },
+  "K1_thanh_cong": {
+    "truoc": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            "EVA-TK-000002"
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            2
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            2
+          ],
+          [
+            "EVA-LH-000002",
+            1
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "goi": {
+      "ok": true,
+      "result": [
+        [
+          "EVA-CC-000001",
+          "hoan_tat",
+          "hoan_tat"
+        ]
+      ]
+    },
+    "sau": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "da_chuyen_di",
+            "EVA-TK-000002"
+          ]
+        ],
+        "dang_ky": [
+          [
+            "chuyen_di",
+            2
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [
+          "xac_nhan_ho_so_dich",
+          "cap_nhat_ho_so_nguon",
+          "hoan_tat"
+        ],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "hoan_tat",
+            "hoan_tat"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            "EVA-TK-000002"
+          ]
+        ],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [
+          "tao_ho_so_dich",
+          "hoan_tat"
+        ],
+        "thong_bao": 1,
+        "giao_dich": []
+      }
+    }
+  },
+  "K2_dich_tu_choi": {
+    "truoc": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "goi": {
+      "ok": false,
+      "error": "('42000', '[42000] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Đã tồn tại hồ sơ khác tại cơ sở đích; cần đối soát trước khi chuyển. (51519) (SQLExecDirectW)')"
+    },
+    "sau": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "nguon_nguyen_ven": true
+  },
+  "K3_dich_offline_roi_chay_lai": {
+    "truoc": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "goi_khi_offline": {
+      "ok": false,
+      "error": "('42000', \"[42000] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Database 'QLTTNN_EVB' cannot be opened because it is offline. (942) (SQLExecDirectW)\")"
+    },
+    "sau_khi_offline": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "nguon_nguyen_ven": true,
+    "goi_lai_khi_online": {
+      "ok": true,
+      "result": [
+        [
+          "EVA-CC-000002",
+          "hoan_tat",
+          "hoan_tat"
+        ]
+      ]
+    },
+    "cuoi": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "da_chuyen_di",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "chuyen_di",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            0
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [
+          "xac_nhan_ho_so_dich",
+          "cap_nhat_ho_so_nguon",
+          "hoan_tat"
+        ],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "hoan_tat",
+            "hoan_tat"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [
+          "tao_ho_so_dich",
+          "hoan_tat"
+        ],
+        "thong_bao": 1,
+        "giao_dich": []
+      }
+    }
+  },
+  "K4_loi_nguon_sau_khi_dich_ghi": {
+    "truoc": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            0
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "goi": {
+      "ok": false,
+      "error": "('42000', '[42000] [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Sĩ số lớp nguồn không khớp số đăng ký còn hiệu lực; cần đối soát. (51530) (SQLExecDirectW)')"
+    },
+    "sau": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            0
+          ],
+          [
+            "EVA-LH-000002",
+            0
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "dich_khong_con_ho_so": true,
+    "nguon_nguyen_ven": true
+  },
+  "K5_quay_lai_co_so_cu": {
+    "goi": {
+      "ok": true,
+      "result": [
+        [
+          "EVB-CC-000001",
+          "hoan_tat",
+          "hoan_tat"
+        ]
+      ]
+    },
+    "nguon_EVB": [
+      [
+        "da_chuyen_di"
+      ]
+    ],
+    "dich_EVA": [
+      [
+        "dang_hoc",
+        "EVA-TK-000002"
+      ]
+    ],
+    "so_ho_so_o_EVA": 1,
+    "su_kien_EVA": [
+      "tao_ho_so_dich",
+      "hoan_tat"
+    ],
+    "dang_ky_cu_EVA": [
+      [
+        "chuyen_di",
+        2
+      ]
+    ]
+  },
+  "ket_luan": {
+    "K1": true,
+    "K2": true,
+    "K3": true,
+    "K4": true,
+    "K5": true
+  }
+}
