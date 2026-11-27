@@ -68,7 +68,7 @@ Hai kịch bản đã có bản chạy trên site thật, đã dùng trên Q1 ng
 | TC-CON-01 | Hai phiên đăng ký hai học viên LAB vào lớp `LAB03` (1 chỗ) cùng lúc | Đúng một thành công, một "Lớp đã đủ sĩ số tối đa"; sĩ số 1, một dòng học phí | E-3.7-03 |
 | TC-DQ-01 | Lấy số học viên đang học từ từng database rồi so với `GET /admin/reports/students-by-site/`. Sau đó **chủ một máy dừng dịch vụ SQL Server** (hoặc ngắt ZeroTier) và chạy lại | Đủ site thì tổng khớp; thiếu site thì `complete=false`, `missing_sites` nêu đúng site, không đổi thành 0; bật lại thì khớp lại | E-3.7-04 |
 | TC-SYNC-01 | Khi một site dừng, sửa một bài Blog ở trang admin; xem `GET/POST /admin/blog/sync/`; bật site lại | Bài ghi ở site còn sống, hàng đợi chờ 1; sau khi site lên và worker chạy thì hai site giống nhau, hàng đợi 0 | E-3.6-02 |
-| TC-DTX-01 | Tư vấn tạo đề nghị chuyển học viên `LAB06` Q1 → Q7; Admin Big hoặc Admin Small Q7 duyệt; chạy chuyển. Thử riêng: dừng Q7 trước khi đích commit, rồi bật lại và retry | Nguồn `da_chuyen_di`, đích `dang_hoc`, giữ tài khoản và lịch sử; khi đích dừng thì nguồn giữ nguyên; retry không tạo hồ sơ thứ hai | E-3.7-05 |
+| TC-DTX-01 | Tư vấn tạo đề nghị chuyển học viên `LAB06` Q1 → Q7; Admin Big hoặc Admin Small Q7 duyệt; chạy chuyển (đường **2PC** nếu đã cấu hình theo [mục 2PC](#2pc), nếu không thì đường phục hồi tiến). Thử riêng: dừng Q7 giữa chừng, rồi bật lại và chạy lại | Nguồn `da_chuyen_di`, đích `dang_hoc`, giữ tài khoản và lịch sử; khi đích dừng thì nguồn giữ nguyên, **không** có hồ sơ đích dở dang; chạy lại không tạo hồ sơ thứ hai | E-3.7-05 |
 | TC-REP-01 | Sửa một môn học qua trang admin, đọc `MonHoc` ở ba site; chụp Replication Monitor trên máy Q1 | Ba site khớp nội dung và phiên bản; Agent báo thành công | E-3.6-01, E-3.6-02 |
 | Quyền và trigger | Mỗi vai trò thử một chức năng được phép và một bị cấm; thử sửa hoặc xóa `Logs` | Được/bị từ chối đúng; `TR_Logs_AppendOnly` chặn | E-3.7-06 |
 | Linked Server | Trên máy có `LS_Q7`: chụp cấu hình (che tài khoản) và truy vấn đọc thử qua `LS_Q7` | Kết quả đến từ Q7 | E-3.5-01, E-3.5-02 |
@@ -76,12 +76,34 @@ Hai kịch bản đã có bản chạy trên site thật, đã dùng trên Q1 ng
 
 Trong lúc một site dừng, đây cũng là cơ hội chụp cảnh báo thiếu site ở trang admin (Dashboard, Đăng ký khóa học, Blog).
 
+## <a id="2pc"></a>Cấu hình 2PC giữa các máy thật (làm trước TC-DTX-01, khoảng 30 phút)
+
+Đã chạy đạt trên hai instance cùng máy ([kết quả](evidence/TC-DTX-01/2026-11-27/README.md)); giữa các máy thật cần thêm hạ tầng. **Làm trước, vì đây là rủi ro lớn nhất.**
+
+1. **Migration 50** trên mọi site: `python db/tools/apply_migrations.py --site <Q1|Q7|TD> 50 --apply` (tạo `sp_chuyen_co_so_2pc` và `sp_chuyen_co_so_nhan_2pc`).
+2. **MS DTC trên máy Windows (Q1, TD):** Component Services → My Computer → Properties → MSDTC → Security: bật Network DTC Access, Allow Inbound, Allow Outbound; xác thực `No Authentication Required` (workgroup, không có Kerberos); dịch vụ `Distributed Transaction Coordinator` chạy; mở firewall **TCP 135 và dải RPC động 49152–65535** giữa các máy qua ZeroTier.
+3. **Linked Server** từ site nguồn tới từng site đích, bật `rpc out` (chạy trên site nguồn; Q1 đã có `LS_Q7`, cần thêm tới TD):
+   ```sql
+   EXEC sp_addlinkedserver @server = 'LS_TD', @srvproduct = '', @provider = 'MSOLEDBSQL', @datasrc = '<máy,cổng>', @provstr = 'TrustServerCertificate=Yes';
+   EXEC sp_serveroption 'LS_TD', 'rpc out', 'true';
+   EXEC sp_addlinkedsrvlogin @rmtsrvname = 'LS_TD', @useself = 'false', @rmtuser = '<user>', @rmtpassword = '<mật khẩu>';
+   ```
+4. **Kiểm tra DTC trước khi chạy ứng dụng** (từ site nguồn; phải chạy được mới đi tiếp):
+   ```sql
+   BEGIN DISTRIBUTED TRANSACTION; SELECT TOP 1 1 FROM LS_TD.QLTTNN_TD_MOI.dbo.HocVien; COMMIT TRANSACTION;
+   ```
+5. **Bật cho ứng dụng:** trong `src/api/.env` đặt `TRANSFER_2PC_LINKED_SERVERS_JSON={"Q1":{"Q7":"LS_Q7","TD":"LS_TD"}}` (nguồn → đích → tên Linked Server) rồi khởi động lại API. Cặp không liệt kê vẫn dùng đường phục hồi tiến.
+6. **Q7 là SQL Server Linux trong Docker:** MS DTC trên Linux cần `mssql-conf set distributedtransaction.allowonlysecurerpccalls 0`, `distributedtransaction.fallbacktounsecurerpcifnecessary 1`, `network.rpcport 13500`, mở cổng 135 và 13500 từ container; nếu không chạy được thì chứng minh 2PC giữa Q1 và TD (cả hai Windows) hoặc ở mức hai instance cùng máy. Các tham số `mssql-conf` này lấy từ tài liệu Microsoft về giao dịch phân tán trên SQL Server Linux, **chưa kiểm chứng trên Q7 của nhóm**.
+
+**Phương án dự phòng nếu DTC không chạy qua mạng:** chạy `python docs/evidence/scripts/ev_dtx.py` trên một máy có hai instance (cần dịch vụ MS DTC đang chạy), chụp kết quả K1 đến K5, và nói rõ giới hạn.
+
 ## 6. Sau buổi
 
 1. Dọn: `seed_lab_data --remove --apply` (trừ khi còn cần cho báo cáo); xác nhận Q7 và TD đã bật lại và đồng bộ về 0 hàng đợi.
 2. Lưu ảnh vào `docs/evidence/<TC>/<ngày>/`, che mật khẩu, token, IP riêng.
 3. Cập nhật trạng thái trong [bản nháp báo cáo](QLTTNN-Bao-Cao-Ban-Nhap.md) (phụ lục A), [Trang-Thai-Trien-Khai.md](Trang-Thai-Trien-Khai.md) và [bộ yêu cầu](QLTTNN-Yeu-Cau-Chung-Va-Kiem-Chung.md): ghi site thật, ngày, và phần nào vẫn là "chưa kiểm chứng".
 4. Cập nhật sơ đồ bố trí máy ([diagrams/bo-tri-vat-ly.mmd](diagrams/bo-tri-vat-ly.mmd)) theo máy thật rồi vẽ lại.
+5. Khi cả ba site đã đọc được, chạy `python db/tools/cloudinary_audit.py` (chỉ đọc) để xem ảnh Cloudinary nào không site nào còn dùng; chỉ xóa tay những ảnh mà script báo mồ côi mà **không** có cảnh báo thiếu site.
 
 ## Tóm tắt thời gian
 

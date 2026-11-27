@@ -1,0 +1,129 @@
+{
+  "run_at": "2026-11-27T10:08:33+07:00",
+  "note": "execute_approved_transfer của source, nguồn EVA (SQL Server 2022) và đích EVB (SQL Server 2025), TRANSFER_2PC_LINKED_SERVERS_JSON={EVA:{EVB:LS_EVB}}",
+  "1_service_2pc": {
+    "truoc": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "dang_hoc",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            2
+          ],
+          [
+            "EVA-LH-000002",
+            1
+          ]
+        ],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "dang_xu_ly",
+            "da_tiep_nhan"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [],
+        "thong_bao": 0,
+        "giao_dich": []
+      }
+    },
+    "ket_qua_tra_ve": {
+      "transfer_id": "EVA-CC-000001",
+      "status": "hoan_tat",
+      "step": "hoan_tat",
+      "complete": true,
+      "source_site": "EVA",
+      "target_site": "EVB",
+      "mechanism": "2PC"
+    },
+    "sau": {
+      "nguon_EVA": {
+        "hoc_vien": [
+          [
+            "da_chuyen_di",
+            null
+          ]
+        ],
+        "dang_ky": [
+          [
+            "chuyen_di",
+            1
+          ]
+        ],
+        "si_so_lop": [
+          [
+            "EVA-LH-000001",
+            1
+          ],
+          [
+            "EVA-LH-000002",
+            1
+          ]
+        ],
+        "su_kien": [
+          "xac_nhan_ho_so_dich",
+          "cap_nhat_ho_so_nguon",
+          "hoan_tat"
+        ],
+        "thong_bao": 0,
+        "giao_dich": [
+          [
+            "hoan_tat",
+            "hoan_tat"
+          ]
+        ]
+      },
+      "dich_EVB": {
+        "hoc_vien": [
+          [
+            "dang_hoc",
+            null
+          ]
+        ],
+        "dang_ky": [],
+        "si_so_lop": [],
+        "su_kien": [
+          "tao_ho_so_dich",
+          "hoan_tat"
+        ],
+        "thong_bao": 1,
+        "giao_dich": []
+      }
+    }
+  },
+  "2_goi_lai": {
+    "ket_qua_tra_ve": {
+      "transfer_id": "EVA-CC-000001",
+      "status": "hoan_tat",
+      "step": "hoan_tat",
+      "complete": true
+    },
+    "so_ho_so_dich": 1
+  },
+  "3_dich_tu_choi": {
+    "ket_qua": "AcademicConflict: Đã tồn tại hồ sơ khác tại cơ sở đích; cần đối soát trước khi chuyển.",
+    "nguon_nguyen_ven": true
+  },
+  "ket_luan": {
+    "service_2pc": true,
+    "goi_lai_khong_lap": true,
+    "dich_tu_choi_la_conflict": true
+  }
+}

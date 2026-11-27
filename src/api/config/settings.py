@@ -122,6 +122,23 @@ for _site_code, _site_config in _site_database_configs.items():
     }
     SITE_DATABASE_ALIASES[_site_code] = _alias
 
+# Optional two-phase-commit path for student transfers: {"<source site>": {"<target site>": "<linked server on the source>"}}.
+# When a pair is listed, an approved transfer that has not started runs as ONE distributed transaction through MS DTC
+# (dbo.sp_chuyen_co_so_2pc, migration 50); unlisted pairs keep the resumable local-transactions path.
+_transfer_2pc_raw = os.getenv("TRANSFER_2PC_LINKED_SERVERS_JSON", "{}").strip() or "{}"
+try:
+    TRANSFER_2PC_LINKED_SERVERS = json.loads(_transfer_2pc_raw)
+except json.JSONDecodeError as exc:
+    raise ImproperlyConfigured("TRANSFER_2PC_LINKED_SERVERS_JSON phải là JSON hợp lệ.") from exc
+if not isinstance(TRANSFER_2PC_LINKED_SERVERS, dict) or any(
+    not isinstance(_targets, dict)
+    or any(not re.fullmatch(r"[A-Za-z0-9_]{1,128}", str(_linked)) for _linked in _targets.values())
+    for _targets in TRANSFER_2PC_LINKED_SERVERS.values()
+):
+    raise ImproperlyConfigured(
+        "TRANSFER_2PC_LINKED_SERVERS_JSON phải ánh xạ site nguồn -> site đích -> tên Linked Server (chữ, số, gạch dưới)."
+    )
+
 # After a connect failure, GLOBAL reads report the site missing at once for this long
 # instead of waiting for the connect timeout again; 0 disables the skip.
 SITE_UNREACHABLE_COOLDOWN_SECONDS = float(os.getenv("SITE_UNREACHABLE_COOLDOWN_SECONDS", "30"))

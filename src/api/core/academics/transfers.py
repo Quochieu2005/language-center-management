@@ -1,8 +1,10 @@
 """Two-step transfer requests and resumable source/destination coordination."""
 
+import re
 from typing import Any
 
-from django.db import connections, transaction
+from django.conf import settings
+from django.db import DatabaseError, connections, transaction
 from django.utils import timezone
 
 from core.academics.common import (
@@ -22,6 +24,7 @@ from core.academics.common import (
 from core.notifications.publisher import publish_notification
 from core.sites.connections import get_site_database_alias
 from core.sites.fanout import read_sites_concurrently
+from core.slug_utils import make_slug
 from core.students.slugging import available_student_slug
 
 
@@ -797,6 +800,43 @@ def _record_retryable_transfer_error(source_site: str, transfer_id: str, actor_i
             )
 
 
+# Errors THROWn by dbo.sp_chuyen_co_so_2pc / sp_chuyen_co_so_nhan_2pc (migration 50) that mean the data is not in a state
+# the transfer may proceed from; everything else (link, DTC, lock, configuration) is infrastructure and can be retried.
+_TWO_PHASE_CONFLICT_CODES = {
+    "51513", "51515", "51516", "51517", "51518", "51519", "51523", "51526", "51527", "51528", "51529", "51530", "51531", "51532",
+}
+
+
+def _two_phase_link(source_site: str, target_site: str) -> str | None:
+    links = getattr(settings, "TRANSFER_2PC_LINKED_SERVERS", {}) or {}
+    linked = (links.get(source_site) or {}).get(target_site)
+    return str(linked) if linked else None
+
+
+def _execute_two_phase(snapshot: dict[str, Any], actor_id: str, linked_server: str) -> None:
+    """Move the whole transfer in ONE distributed transaction (MS DTC): the destination profile and the source updates
+    commit together or not at all, so no state exists where the student is half moved."""
+    source_site = str(snapshot["source_site"])
+    target_site = str(snapshot["target_site"])
+    source_alias = get_site_database_alias(source_site)
+    target_db = str(connections[get_site_database_alias(target_site)].settings_dict["NAME"])
+    base_slug = make_slug(str(snapshot["full_name"]), snapshot["slug"], max_length=160)
+    try:
+        with connections[source_alias].cursor() as cursor:
+            cursor.execute(
+                "SET NOCOUNT ON; EXEC dbo.sp_chuyen_co_so_2pc @ma_chuyen = %s, @linked_server = %s, "
+                "@db_dich = %s, @slug_goc = %s, @actor = %s",
+                [snapshot["transfer_id"], linked_server, target_db, base_slug, actor_id],
+            )
+            cursor.fetchall()
+    except DatabaseError as exc:
+        found = re.search(r"\((51\d{3})\)", " ".join(str(arg) for arg in exc.args))
+        if found and found.group(1) in _TWO_PHASE_CONFLICT_CODES:
+            message = re.search(r"\[SQL Server\](.*?)\s*\(51\d{3}\)", " ".join(str(arg) for arg in exc.args), re.S)
+            raise AcademicConflict((message.group(1).strip() if message else "Giao dịch phân tán bị từ chối; dữ liệu giữ nguyên.")) from exc
+        raise AcademicInfrastructureUnavailable from exc
+
+
 @translate_database_errors
 def execute_approved_transfer(*, source_site: str, transfer_id: str, actor_id: str) -> dict[str, Any]:
     source_site = str(source_site).strip().upper()
@@ -809,6 +849,14 @@ def execute_approved_transfer(*, source_site: str, transfer_id: str, actor_id: s
         raise AcademicConflict("Chỉ giao dịch đã được duyệt mới được thực hiện.")
     _active_destination(str(snapshot["source_site"]), str(snapshot["target_site"]))
     try:
+        linked_server = _two_phase_link(str(snapshot["source_site"]), str(snapshot["target_site"]))
+        if step == "da_tiep_nhan" and linked_server:
+            _execute_two_phase(snapshot, actor_id, linked_server)
+            return {
+                "transfer_id": transfer_id, "status": "hoan_tat", "step": "hoan_tat", "complete": True,
+                "source_site": str(snapshot["source_site"]), "target_site": str(snapshot["target_site"]),
+                "mechanism": "2PC",
+            }
         if step == "da_tiep_nhan":
             _create_destination_profile(snapshot, actor_id)
             _checkpoint_source(snapshot, actor_id, "da_tao_ho_so_dich")
