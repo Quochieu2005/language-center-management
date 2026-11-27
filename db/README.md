@@ -91,6 +91,17 @@ Môn học yêu cầu **2–4 site**; nhóm dùng 3 DB Q1/Q7/TD. Phải có phâ
 
 `01_create_schema.sql` chỉ dành cho database mới/chưa có bảng. Nếu đã có bảng, script sẽ dừng thay vì âm thầm sửa dữ liệu. Không dùng lệnh `DROP DATABASE` để xử lý lỗi; kiểm tra database đích và sao lưu trước khi quyết định cách khôi phục.
 
+### Chạy migration bằng dòng lệnh
+
+Thay cho SSMS ở chế độ SQLCMD, [tools/apply_migrations.py](tools/apply_migrations.py) chạy các migration (đều chạy lặp lại an toàn) lên **một** site, đọc kết nối từ `SITE_DATABASES_JSON` trong `src/api/.env` và không in thông tin đăng nhập. Mặc định chỉ in trạng thái migration 47 và 48; chỉ ghi khi có `--apply`; chỉ nhận database tên `QLTTNN_*`; `--backup` tạo bản sao lưu COPY_ONLY trước khi chạy (không tự xác minh bằng `RESTORE VERIFYONLY`).
+
+```powershell
+python db/tools/apply_migrations.py --site Q7 47 48                    # chỉ xem trạng thái
+python db/tools/apply_migrations.py --site Q7 47 48 --apply --backup   # sao lưu rồi chạy
+```
+
+Số `31` trùng hai file, nên dùng tên file. Đã kiểm tra trên database tạm (chạy, chạy lại, số trùng, site không tồn tại). Kịch bản dùng công cụ này cho Q7 và TD: [QLTTNN-Chay-Bang-Chung-Site-That.md](../docs/QLTTNN-Chay-Bang-Chung-Site-That.md).
+
 ## Bổ sung khi nâng cấp DB hiện có
 
 - Sao lưu từng DB và kiểm tra bản sao lưu trước khi sửa. Không chạy lại schema 01 trên DB có bảng.
