@@ -17,7 +17,7 @@ Nguyên tắc khi hoàn thiện: chỉ ghi điều đã chạy thật; kết qu�
 | 1. Đề tài và thành viên | THIẾU | Danh sách 5 sinh viên và phân công |
 | 2.1 Đặt vấn đề | ĐÃ CÓ (văn bản) | Đọc lại cho đúng giọng của nhóm |
 | 2.2.1 Phân tích | ĐÃ CÓ (văn bản) | Tần suất mới là ước lượng định tính |
-| 2.2.2 Thiết kế | ĐÃ CÓ (văn bản) | Vẽ lại ERD và sơ đồ định vị để đưa vào file nộp |
+| 2.2.2 Thiết kế | ĐÃ CÓ (văn bản và sơ đồ) | ERD và sơ đồ định vị đã dựng ở [QLTTNN-So-Do.md](QLTTNN-So-Do.md); chèn vào file nộp |
 | 3.1 VPN | MỘT PHẦN | Ảnh từng máy trong mạng ZeroTier |
 | 3.2 Kết nối giữa server | MỘT PHẦN | Xác nhận máy nào của ai; Q7 và TD hiện offline |
 | 3.3 Cài DBMS | MỘT PHẦN | Phiên bản và edition của Q1, Q7; ảnh |
@@ -74,7 +74,7 @@ Vai trò sử dụng: Admin Big (toàn hệ thống), Admin Small (một cơ s�
 
 Bảng đầy đủ kèm bảng đọc/ghi nằm ở [đề cương, mục 2.2.1](QLTTNN-De-Cuong-Bao-Cao.md).
 
-**Phân tích CSDL.** `[CẦN ẢNH E-2.2-01]` ERD lấy từ [DATABASE_SCHEMA.md, mục 5](DATABASE_SCHEMA.md#5-các-bảng-liên-quan-với-nhau-thế-nào). Điểm cần nói rõ: chỉ có khóa ngoại cục bộ trong từng cơ sở; không có khóa ngoại hay JOIN xuyên cơ sở. Học viên chuyển cơ sở để lại bản lịch sử ở nguồn (`da_chuyen_di`), nên thống kê phải chọn bản hiện hành theo bước của Coordinator.
+**Phân tích CSDL.** ERD đầy đủ (có khóa, kiểu rút gọn, nhóm phân tán) ở [QLTTNN-So-Do.md](QLTTNN-So-Do.md), mục 1 và 2, ảnh `docs/diagrams/erd-*.png`; sơ đồ quan hệ gốc ở [DATABASE_SCHEMA.md, mục 5](DATABASE_SCHEMA.md#5-các-bảng-liên-quan-với-nhau-thế-nào). Điểm cần nói rõ: chỉ có khóa ngoại cục bộ trong từng cơ sở; không có khóa ngoại hay JOIN xuyên cơ sở. Học viên chuyển cơ sở để lại bản lịch sử ở nguồn (`da_chuyen_di`), nên thống kê phải chọn bản hiện hành theo bước của Coordinator.
 
 #### 2.2.2. Thiết kế
 
@@ -105,7 +105,7 @@ Dự án chặn ghi sai cơ sở bằng 16 `CHECK` (migration 30) cộng 1 `CHEC
 | `REPLICATED-WRITE` | Theo cơ chế riêng của từng bảng, xem bảng dưới |
 | `DISTRIBUTED-TX` | Coordinator điều phối nguồn và đích, phục hồi tiến về phía trước |
 
-**Định vị dữ liệu.** `[CẦN ẢNH E-2.2-02]` Sơ đồ định vị và bố trí máy, lấy từ [DATABASE_SCHEMA.md, mục 8](DATABASE_SCHEMA.md#phan-manh) và sơ đồ mermaid ở đề cương. Bố trí máy cuối cùng phải ghi theo thực tế (xem 3.2).
+**Định vị dữ liệu.** Sơ đồ định vị dữ liệu ở [QLTTNN-So-Do.md](QLTTNN-So-Do.md), mục 3 (`docs/diagrams/dinh-vi-du-lieu.png`); lược đồ phân mảnh ở [DATABASE_SCHEMA.md, mục 8](DATABASE_SCHEMA.md#phan-manh). Sơ đồ bố trí máy (mục 4 của tài liệu sơ đồ) phải ghi theo thực tế, xem 3.2.
 
 **Đồng bộ hóa — cơ chế theo bảng:**
 
@@ -136,7 +136,7 @@ Máy chạy Django API kết nối riêng tới từng SQL Server qua alias theo
 
 Bố trí máy tại thời điểm viết: Q1 trên máy Windows của Quốc Hiếu; TD trên máy `DESKTOP-N47BBPH` (database `QLTTNN_TD_MOI`); Q7 trên SQL Server trong Docker trên Mac. `[CẦN BỔ SUNG]` Xác nhận máy nào của ai, vì nhiều tài liệu cũ vẫn ghi TD cùng máy với Q1. Trạng thái: **MỘT PHẦN**. Kết nối tới Q7 và TD hiện chập chờn hoặc offline.
 
-`[CẦN ẢNH E-3.2-01]` Sơ đồ máy thật (máy, vai trò, port). `[CẦN BỔ SUNG]` Bảng `site | máy | instance | port | kiểm tra từ đâu | kết quả`.
+`[CẦN XÁC NHẬN]` Sơ đồ máy thật: đã có bản nháp `docs/diagrams/bo-tri-vat-ly.png`, cần xác nhận máy nào của ai rồi sửa và vẽ lại. `[CẦN BỔ SUNG]` Bảng `site | máy | instance | port | kiểm tra từ đâu | kết quả`.
 
 ### 3.3. Cài hệ quản trị CSDL
 
@@ -199,11 +199,11 @@ Hai lỗi do các lần chạy này tìm ra và đã sửa: hàng đợi Blog kh
 
 | Mã | Mục | Máy/site | Cần chụp | Trạng thái |
 |---|---|---|---|---|
-| E-2.2-01 | 2.2.1 | — | ERD (vẽ lại từ schema) | Chưa làm |
-| E-2.2-02 | 2.2.2 | — | Sơ đồ định vị và bố trí máy | Chưa làm |
+| E-2.2-01 | 2.2.1 | — | ERD | ĐÃ CÓ (`docs/diagrams/erd-*.png`) |
+| E-2.2-02 | 2.2.2 | — | Sơ đồ định vị dữ liệu | ĐÃ CÓ (`docs/diagrams/dinh-vi-du-lieu.png`) |
 | E-3.1-01 | 3.1 | Mỗi máy | Máy trong mạng ZeroTier | Chưa chụp |
 | E-3.1-02 | 3.1 | Máy API | Kiểm tra cổng 1433 tới từng SQL Server | Chưa chụp |
-| E-3.2-01 | 3.2 | — | Sơ đồ máy thật | Chưa làm |
+| E-3.2-01 | 3.2 | — | Sơ đồ máy thật | Bản nháp, cần xác nhận máy (`docs/diagrams/bo-tri-vat-ly.png`) |
 | E-3.3-01 | 3.3 | Q1, Q7, TD | Phiên bản instance và danh sách bảng | Chưa chụp |
 | E-3.4-01 | 3.4 | Publisher | SQL Server Agent và lịch sử job | Chưa chụp |
 | E-3.5-01 | 3.5 | Máy có Linked Server | Cấu hình `LS_Q7` (che tài khoản) | Chưa chụp |

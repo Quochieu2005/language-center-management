@@ -1,0 +1,23 @@
+flowchart TB
+    CoSo["<b>CoSo</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_co_so : string"]:::NB
+    TaiKhoan["<b>TaiKhoan</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_tai_khoan : string"]:::NB
+    HocPhi["<b>HocPhi</b><br/><i>mảnh dẫn xuất</i><br/>──────────<br/>PK ma_hoc_phi : string"]:::DX
+    ThongBao["<b>ThongBao</b><br/><i>cục bộ</i><br/>──────────<br/>PK slug : string<br/>FK ma_co_so : string"]:::CT
+    YeuCauLienHe["<b>YeuCauLienHe</b><br/><i>mảnh nguyên thủy</i><br/>──────────<br/>PK ma_yeu_cau : string<br/>FK ma_co_so : string<br/>trang_thai : string"]:::MN
+    YeuCauThanhToan["<b>YeuCauThanhToan</b><br/><i>cục bộ</i><br/>──────────<br/>PK ma_yeu_cau : string<br/>FK ma_co_so : string<br/>FK ma_hoc_phi : string<br/>FK ma_tai_khoan : string<br/>trang_thai : string"]:::CT
+    SuKienThanhToan["<b>SuKienThanhToan</b><br/><i>cục bộ</i><br/>──────────<br/>PK ma_su_kien : string<br/>FK ma_co_so : string<br/>FK ma_yeu_cau : string"]:::CT
+    DanhMucBlog["<b>DanhMucBlog</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_danh_muc_blog : int<br/>trang_thai : string<br/>UK slug : string"]:::NB
+    BaiVietBlog["<b>BaiVietBlog</b><br/><i>nhân bản</i><br/>──────────<br/>PK ma_bai_viet_blog : int<br/>FK ma_danh_muc_blog : int<br/>trang_thai : string<br/>UK slug : string"]:::NB
+    CoSo -->|"ma_co_so<br/>0..1 : 0..n"| TaiKhoan
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| SuKienThanhToan
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| ThongBao
+    CoSo -->|"ma_co_so<br/>1 : 0..n"| YeuCauLienHe
+    DanhMucBlog -->|"ma_danh_muc_blog<br/>1 : 0..n"| BaiVietBlog
+    HocPhi -->|"ma_hoc_phi (cùng ma_co_so)<br/>1 : 0..n"| YeuCauThanhToan
+    TaiKhoan -->|"ma_tai_khoan<br/>1 : 0..n"| YeuCauThanhToan
+    YeuCauThanhToan -->|"ma_yeu_cau (cùng ma_co_so)<br/>0..1 : 0..n"| SuKienThanhToan
+    classDef NB fill:#12263f,stroke:#3b82f6,color:#e5eefc,stroke-width:1.5px
+    classDef MN fill:#10281c,stroke:#22c55e,color:#e3f6ea,stroke-width:1.5px
+    classDef DX fill:#1c2a12,stroke:#84cc16,color:#eef7dc,stroke-width:1.5px
+    classDef CT fill:#2e2410,stroke:#f59e0b,color:#fbf0d6,stroke-width:1.5px
+    classDef CB fill:#2f1220,stroke:#ec4899,color:#fbe3ee,stroke-width:1.5px
